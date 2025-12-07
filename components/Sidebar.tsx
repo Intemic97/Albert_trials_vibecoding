@@ -1,11 +1,11 @@
 import React from 'react';
-import { 
-  LayoutDashboard, 
-  Database, 
-  Workflow, 
-  Settings, 
-  Users, 
-  FileText, 
+import {
+  LayoutDashboard,
+  Database,
+  Workflow,
+  Settings,
+  Users,
+  FileText,
   Cpu,
   Layers,
   ChevronRight
@@ -44,13 +44,13 @@ export const Sidebar: React.FC = () => {
           <SectionLabel label="Modeling" />
           <NavItem icon={Workflow} label="Dataflows" />
           <NavItem icon={Database} label="Database" active />
-          <NavItem icon={Cpu} label="Models" />
+          <NavItem icon={Cpu} label="Reports" />
 
           <SectionLabel label="Discover" />
           <NavItem icon={FileText} label="Documentation" />
-          
+
           <div className="mt-8 border-t border-slate-100 pt-4">
-             <NavItem icon={Users} label="Admin panel" />
+            <NavItem icon={Users} label="Admin panel" />
           </div>
         </nav>
       </div>

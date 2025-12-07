@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { EntityCard } from './components/EntityCard';
 import { Entity, Property, PropertyType } from './types';
-import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil } from 'lucide-react';
+import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X } from 'lucide-react';
 
 export default function App() {
     const [entities, setEntities] = useState<Entity[]>([]);
@@ -29,6 +29,10 @@ export default function App() {
     // Relations State
     const [relatedData, setRelatedData] = useState<Record<string, { entity: Entity, records: any[] }>>({});
     const [incomingData, setIncomingData] = useState<Record<string, { sourceEntity: Entity, sourceProperty: Property, records: any[] }>>({});
+
+    // Side Panel State
+    const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
+    const [selectedRecordEntity, setSelectedRecordEntity] = useState<Entity | null>(null);
 
     const activeEntity = entities.find(e => e.id === activeEntityId);
 
@@ -267,15 +271,30 @@ export default function App() {
     };
 
     const getRecordDisplayName = (record: any, entity: Entity) => {
+        // 1. Try to find a property named "name" or "title"
         const nameProp = entity.properties.find(p => p.name.toLowerCase() === 'name' || p.name.toLowerCase() === 'title');
         if (nameProp && record.values[nameProp.id]) {
             return record.values[nameProp.id];
         }
-        const firstPropId = entity.properties[0]?.id;
-        if (firstPropId && record.values[firstPropId]) {
-            return record.values[firstPropId];
+
+        // 2. Fallback to the first "text" property
+        const firstTextProp = entity.properties.find(p => p.type === 'text');
+        if (firstTextProp && record.values[firstTextProp.id]) {
+            return record.values[firstTextProp.id];
         }
+
+        // 3. Fallback to the first "number" property
+        const firstNumberProp = entity.properties.find(p => p.type === 'number');
+        if (firstNumberProp && record.values[firstNumberProp.id]) {
+            return record.values[firstNumberProp.id];
+        }
+
         return 'Untitled Record';
+    };
+
+    const handleRecordClick = (record: any, entity: Entity) => {
+        setSelectedRecord(record);
+        setSelectedRecordEntity(entity);
     };
 
     const renderCellValue = (prop: Property, value: any) => {
@@ -293,9 +312,13 @@ export default function App() {
                             {ids.map(id => {
                                 const rec = relatedInfo.records.find(r => r.id === id);
                                 return (
-                                    <span key={id} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-800">
+                                    <button
+                                        key={id}
+                                        onClick={() => rec && handleRecordClick(rec, relatedInfo.entity)}
+                                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-800 hover:bg-teal-200 transition-colors"
+                                    >
                                         {rec ? getRecordDisplayName(rec, relatedInfo.entity) : 'Unknown'}
-                                    </span>
+                                    </button>
                                 );
                             })}
                         </div>
@@ -320,7 +343,7 @@ export default function App() {
         <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
             <Sidebar />
 
-            <main className="flex-1 flex flex-col h-screen overflow-hidden">
+            <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
                 {/* Top Header */}
                 <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
                     {activeEntity ? (
@@ -658,9 +681,13 @@ export default function App() {
                                                                     <td key={sourceProperty.id} className="px-6 py-4 text-sm text-slate-700 bg-teal-50/10">
                                                                         <div className="flex flex-wrap gap-1">
                                                                             {linkedRecords.length > 0 ? linkedRecords.map(lr => (
-                                                                                <span key={lr.id} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                                                                <button
+                                                                                    key={lr.id}
+                                                                                    onClick={() => handleRecordClick(lr, sourceEntity)}
+                                                                                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200 hover:bg-indigo-200 transition-colors"
+                                                                                >
                                                                                     {getRecordDisplayName(lr, sourceEntity)}
-                                                                                </span>
+                                                                                </button>
                                                                             )) : <span className="text-slate-400 text-xs italic">None</span>}
                                                                         </div>
                                                                     </td>
@@ -691,6 +718,50 @@ export default function App() {
                         </div>
                     )}
                 </div>
+
+                {/* Side Panel for Record Details */}
+                {selectedRecord && selectedRecordEntity && (
+                    <div className="absolute inset-y-0 right-0 w-96 bg-white shadow-2xl border-l border-slate-200 z-50 animate-in slide-in-from-right duration-300 flex flex-col">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-800">
+                                    {getRecordDisplayName(selectedRecord, selectedRecordEntity)}
+                                </h2>
+                                <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mt-1">
+                                    {selectedRecordEntity.name}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setSelectedRecord(null)}
+                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                            {selectedRecordEntity.properties.map(prop => (
+                                <div key={prop.id}>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                                        {prop.name}
+                                    </label>
+                                    <div className="text-sm text-slate-800 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                        {prop.type === 'relation' ? (
+                                            renderCellValue(prop, selectedRecord.values[prop.id])
+                                        ) : (
+                                            selectedRecord.values[prop.id] || '-'
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                            <div className="pt-4 border-t border-slate-100">
+                                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                                    Record ID
+                                </label>
+                                <p className="text-xs font-mono text-slate-400">{selectedRecord.id}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Create Entity Modal */}
                 {isCreatingEntity && (
