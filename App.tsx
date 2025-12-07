@@ -34,6 +34,9 @@ export default function App() {
     const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
     const [selectedRecordEntity, setSelectedRecordEntity] = useState<Entity | null>(null);
 
+    // Editing Schema State (for editing records from side panel)
+    const [editingSchema, setEditingSchema] = useState<Entity | null>(null);
+
     const activeEntity = entities.find(e => e.id === activeEntityId);
 
     // Fetch Entities on Mount
@@ -146,6 +149,17 @@ export default function App() {
         }
     };
 
+    const handleDeleteEntity = async (entity: Entity) => {
+        try {
+            await fetch(`http://localhost:3001/api/entities/${entity.id}`, {
+                method: 'DELETE'
+            });
+            await fetchEntities();
+        } catch (error) {
+            console.error('Error deleting entity:', error);
+        }
+    };
+
     const handleAddProperty = async () => {
         if (!newPropName.trim() || !activeEntityId) return;
 
@@ -190,7 +204,8 @@ export default function App() {
     };
 
     const handleSaveRecord = async () => {
-        if (!activeEntityId) return;
+        const targetEntityId = editingSchema?.id || activeEntityId;
+        if (!targetEntityId) return;
 
         const processedValues = { ...newRecordValues };
 
@@ -216,25 +231,36 @@ export default function App() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        entityId: activeEntityId,
+                        entityId: targetEntityId,
                         values: processedValues
                     })
                 });
             }
-            await fetchRecords();
+
+            // Refresh all data to ensure consistency
+            if (activeEntityId) {
+                await fetchRecords();
+                await fetchRelatedData();
+                await fetchIncomingData();
+            }
+
             setIsAddingRecord(false);
             setEditingRecordId(null);
+            setEditingSchema(null);
             setNewRecordValues({});
         } catch (error) {
             console.error('Error saving record:', error);
         }
     };
 
-    const handleEditRecord = (record: any) => {
+    const handleEditRecord = (record: any, entity?: Entity) => {
+        const schema = entity || activeEntity;
+        if (!schema) return;
+
         const values: Record<string, any> = {};
 
         // Parse JSON strings back to arrays for relations if needed
-        activeEntity?.properties.forEach(prop => {
+        schema.properties.forEach(prop => {
             const val = record.values[prop.id];
             if (prop.type === 'relation' && val) {
                 try {
@@ -250,6 +276,7 @@ export default function App() {
 
         setNewRecordValues(values);
         setEditingRecordId(record.id);
+        setEditingSchema(schema);
         setIsAddingRecord(true);
     };
 
@@ -339,6 +366,8 @@ export default function App() {
         }
     };
 
+    const currentSchema = editingSchema || activeEntity;
+
     return (
         <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
             <Sidebar />
@@ -417,6 +446,7 @@ export default function App() {
                                         key={entity.id}
                                         entity={entity}
                                         onClick={(e) => setActiveEntityId(e.id)}
+                                        onDelete={handleDeleteEntity}
                                     />
                                 ))}
 
@@ -721,7 +751,7 @@ export default function App() {
 
                 {/* Side Panel for Record Details */}
                 {selectedRecord && selectedRecordEntity && (
-                    <div className="absolute inset-y-0 right-0 w-96 bg-white shadow-2xl border-l border-slate-200 z-50 animate-in slide-in-from-right duration-300 flex flex-col">
+                    <div className="absolute inset-y-0 right-0 w-96 bg-white shadow-2xl border-l border-slate-200 z-50 flex flex-col">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-800">
@@ -731,12 +761,23 @@ export default function App() {
                                     {selectedRecordEntity.name}
                                 </p>
                             </div>
-                            <button
-                                onClick={() => setSelectedRecord(null)}
-                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors"
-                            >
-                                <X size={20} />
-                            </button>
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={() => {
+                                        handleEditRecord(selectedRecord, selectedRecordEntity);
+                                        setSelectedRecord(null);
+                                    }}
+                                    className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-full transition-colors"
+                                >
+                                    <Pencil size={20} />
+                                </button>
+                                <button
+                                    onClick={() => setSelectedRecord(null)}
+                                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
                             {selectedRecordEntity.properties.map(prop => (
@@ -813,13 +854,13 @@ export default function App() {
                 )}
 
                 {/* Add/Edit Record Modal */}
-                {isAddingRecord && activeEntity && (
+                {isAddingRecord && currentSchema && (
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
                         <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
                             <h2 className="text-xl font-bold text-slate-800 mb-4">{editingRecordId ? 'Edit Record' : 'Add New Record'}</h2>
 
                             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                                {activeEntity.properties.map(prop => {
+                                {currentSchema.properties.map(prop => {
                                     if (prop.type === 'relation' && prop.relatedEntityId) {
                                         const relatedInfo = relatedData[prop.relatedEntityId];
                                         return (
@@ -861,7 +902,7 @@ export default function App() {
 
                             <div className="flex justify-end space-x-3 mt-6">
                                 <button
-                                    onClick={() => { setIsAddingRecord(false); setNewRecordValues({}); setEditingRecordId(null); }}
+                                    onClick={() => { setIsAddingRecord(false); setNewRecordValues({}); setEditingRecordId(null); setEditingSchema(null); }}
                                     className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
                                 >
                                     Cancel
