@@ -11,9 +11,17 @@ import {
   ChevronRight
 } from 'lucide-react';
 
-export const Sidebar: React.FC = () => {
-  const NavItem = ({ icon: Icon, label, active = false }: { icon: any, label: string, active?: boolean }) => (
-    <div className={`flex items-center px-4 py-2 my-1 text-sm font-medium rounded-md cursor-pointer transition-colors ${active ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}>
+interface SidebarProps {
+  activeView: string;
+  onNavigate: (view: string) => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
+  const NavItem = ({ icon: Icon, label, view, active = false }: { icon: any, label: string, view?: string, active?: boolean }) => (
+    <div
+      onClick={() => view && onNavigate(view)}
+      className={`flex items-center px-4 py-2 my-1 text-sm font-medium rounded-md cursor-pointer transition-colors ${active ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+    >
       <Icon size={18} className={`mr-3 ${active ? 'text-teal-600' : 'text-slate-400'}`} />
       {label}
     </div>
@@ -43,8 +51,8 @@ export const Sidebar: React.FC = () => {
 
           <SectionLabel label="Modeling" />
           <NavItem icon={Workflow} label="Dataflows" />
-          <NavItem icon={Database} label="Database" active />
-          <NavItem icon={Cpu} label="Reports" />
+          <NavItem icon={Database} label="Database" view="database" active={activeView === 'database'} />
+          <NavItem icon={Cpu} label="Reports" view="reports" active={activeView === 'reports'} />
 
           <SectionLabel label="Discover" />
           <NavItem icon={FileText} label="Documentation" />

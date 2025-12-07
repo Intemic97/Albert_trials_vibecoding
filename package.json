@@ -12,10 +12,13 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "lucide-react": "^0.555.0",
+    "openai": "^6.10.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
+    "react-markdown": "^10.1.0",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7"
   },

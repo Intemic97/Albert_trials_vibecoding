@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { initDb } = require('./db');
+require('dotenv').config();
 
 const app = express();
 const PORT = 3001;
@@ -10,10 +11,16 @@ app.use(express.json());
 
 let db;
 
-// Initialize DB
+// Initialize DB and start server
 initDb().then(database => {
     db = database;
     console.log('Database initialized');
+
+    app.listen(PORT, () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+    });
+}).catch(err => {
+    console.error('Failed to initialize database:', err);
 });
 
 // --- Routes ---
@@ -23,13 +30,8 @@ app.get('/api/entities', async (req, res) => {
     try {
         const entities = await db.all('SELECT * FROM entities');
 
-        // Fetch properties for each entity
-        // Note: In a production app, we might use a JOIN or a separate query more efficiently,
-        // but for this scale, iterating is fine or a single join query.
-        // Let's use a simple loop for clarity and matching the frontend structure.
-
         const entitiesWithProps = await Promise.all(entities.map(async (entity) => {
-            const properties = await db.all('SELECT * FROM properties WHERE entityId = ?', entity.id);
+            const properties = await db.all('SELECT * FROM properties WHERE entityId = ?', [entity.id]);
             return { ...entity, properties };
         }));
 
@@ -47,15 +49,14 @@ app.post('/api/entities', async (req, res) => {
     try {
         await db.run(
             'INSERT INTO entities (id, name, description, author, lastEdited) VALUES (?, ?, ?, ?, ?)',
-            id, name, description, author, lastEdited
+            [id, name, description, author, lastEdited]
         );
 
-        // Insert properties if any (though usually new entities might start empty)
         if (properties && properties.length > 0) {
             for (const prop of properties) {
                 await db.run(
                     'INSERT INTO properties (id, entityId, name, type, defaultValue, relatedEntityId) VALUES (?, ?, ?, ?, ?, ?)',
-                    prop.id, id, prop.name, prop.type, prop.defaultValue, prop.relatedEntityId
+                    [prop.id, id, prop.name, prop.type, prop.defaultValue, prop.relatedEntityId]
                 );
             }
         }
@@ -71,9 +72,8 @@ app.post('/api/entities', async (req, res) => {
 app.delete('/api/entities/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        await db.run('DELETE FROM entities WHERE id = ?', id);
-        // Cascade delete should handle properties, but let's be safe if foreign keys aren't enabled by default in some sqlite versions
-        await db.run('DELETE FROM properties WHERE entityId = ?', id);
+        await db.run('DELETE FROM entities WHERE id = ?', [id]);
+        await db.run('DELETE FROM properties WHERE entityId = ?', [id]);
         res.json({ message: 'Entity deleted' });
     } catch (error) {
         console.error(error);
@@ -87,7 +87,7 @@ app.post('/api/properties', async (req, res) => {
     try {
         await db.run(
             'INSERT INTO properties (id, entityId, name, type, defaultValue, relatedEntityId) VALUES (?, ?, ?, ?, ?, ?)',
-            id, entityId, name, type, defaultValue, relatedEntityId
+            [id, entityId, name, type, defaultValue, relatedEntityId]
         );
         res.status(201).json({ message: 'Property added' });
     } catch (error) {
@@ -100,7 +100,7 @@ app.post('/api/properties', async (req, res) => {
 app.delete('/api/properties/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        await db.run('DELETE FROM properties WHERE id = ?', id);
+        await db.run('DELETE FROM properties WHERE id = ?', [id]);
         res.json({ message: 'Property deleted' });
     } catch (error) {
         console.error(error);
@@ -114,11 +114,10 @@ app.delete('/api/properties/:id', async (req, res) => {
 app.get('/api/entities/:id/records', async (req, res) => {
     const { id } = req.params;
     try {
-        const records = await db.all('SELECT * FROM records WHERE entityId = ?', id);
+        const records = await db.all('SELECT * FROM records WHERE entityId = ?', [id]);
 
         const recordsWithValues = await Promise.all(records.map(async (record) => {
-            const values = await db.all('SELECT * FROM record_values WHERE recordId = ?', record.id);
-            // Convert array of values to object: { propertyId: value }
+            const values = await db.all('SELECT * FROM record_values WHERE recordId = ?', [record.id]);
             const valuesMap = {};
             values.forEach(v => {
                 valuesMap[v.propertyId] = v.value;
@@ -135,14 +134,14 @@ app.get('/api/entities/:id/records', async (req, res) => {
 
 // POST /api/records
 app.post('/api/records', async (req, res) => {
-    const { entityId, values } = req.body; // values is { propertyId: value }
+    const { entityId, values } = req.body;
     const recordId = Math.random().toString(36).substr(2, 9);
     const createdAt = new Date().toISOString();
 
     try {
         await db.run(
             'INSERT INTO records (id, entityId, createdAt) VALUES (?, ?, ?)',
-            recordId, entityId, createdAt
+            [recordId, entityId, createdAt]
         );
 
         if (values) {
@@ -150,7 +149,7 @@ app.post('/api/records', async (req, res) => {
                 const valueId = Math.random().toString(36).substr(2, 9);
                 await db.run(
                     'INSERT INTO record_values (id, recordId, propertyId, value) VALUES (?, ?, ?, ?)',
-                    valueId, recordId, propId, String(val)
+                    [valueId, recordId, propId, String(val)]
                 );
             }
         }
@@ -165,30 +164,26 @@ app.post('/api/records', async (req, res) => {
 // PUT /api/records/:id
 app.put('/api/records/:id', async (req, res) => {
     const { id } = req.params;
-    const { values } = req.body; // values is { propertyId: value }
+    const { values } = req.body;
 
     try {
-        // We don't strictly need to update the 'records' table unless we track 'lastEdited' there.
-        // For now, we just update the values.
-
         if (values) {
             for (const [propId, val] of Object.entries(values)) {
-                // Check if value exists for this record and property
                 const existing = await db.get(
                     'SELECT id FROM record_values WHERE recordId = ? AND propertyId = ?',
-                    id, propId
+                    [id, propId]
                 );
 
                 if (existing) {
                     await db.run(
                         'UPDATE record_values SET value = ? WHERE id = ?',
-                        String(val), existing.id
+                        [String(val), existing.id]
                     );
                 } else {
                     const valueId = Math.random().toString(36).substr(2, 9);
                     await db.run(
                         'INSERT INTO record_values (id, recordId, propertyId, value) VALUES (?, ?, ?, ?)',
-                        valueId, id, propId, String(val)
+                        [valueId, id, propId, String(val)]
                     );
                 }
             }
@@ -205,8 +200,7 @@ app.put('/api/records/:id', async (req, res) => {
 app.delete('/api/records/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        await db.run('DELETE FROM records WHERE id = ?', id);
-        // Cascade delete handles record_values
+        await db.run('DELETE FROM records WHERE id = ?', [id]);
         res.json({ message: 'Record deleted' });
     } catch (error) {
         console.error(error);
@@ -214,7 +208,101 @@ app.delete('/api/records/:id', async (req, res) => {
     }
 });
 
+// OpenAI Generation Endpoint
+app.post('/api/generate', async (req, res) => {
+    console.log('Received generation request');
+    console.time('Total Request Time');
+    try {
+        const { prompt, mentionedEntityIds } = req.body;
+        console.log('Prompt:', prompt);
+        console.log('Mentioned IDs:', mentionedEntityIds);
 
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+        if (!process.env.OPENAI_API_KEY) {
+            console.error('OpenAI API Key missing');
+            return res.status(500).json({ error: 'OpenAI API Key not configured' });
+        }
+
+        // 1. Fetch data for mentioned entities
+        console.time('DB Fetch Time');
+        let contextData = {};
+
+        if (mentionedEntityIds && mentionedEntityIds.length > 0) {
+            // Fetch all entities in parallel
+            const entityPromises = mentionedEntityIds.map(async (entityId) => {
+                // Get Entity Metadata
+                const entity = await db.get('SELECT * FROM entities WHERE id = ?', [entityId]);
+                if (!entity) return null;
+
+                // Get Properties
+                const properties = await db.all('SELECT * FROM properties WHERE entityId = ?', [entityId]);
+
+                // Get Records (Limit to 50 for performance)
+                const records = await db.all('SELECT * FROM records WHERE entityId = ? LIMIT 50', [entityId]);
+
+                // Fetch record values for these records
+                const recordsWithValues = await Promise.all(records.map(async (r) => {
+                    const values = await db.all('SELECT * FROM record_values WHERE recordId = ?', [r.id]);
+                    const valuesMap = {};
+                    values.forEach(v => {
+                        // Find property name if possible, or use ID
+                        const prop = properties.find(p => p.id === v.propertyId);
+                        const key = prop ? prop.name : v.propertyId;
+                        valuesMap[key] = v.value;
+                    });
+                    return {
+                        id: r.id,
+                        createdAt: r.createdAt,
+                        ...valuesMap
+                    };
+                }));
+
+                return {
+                    name: entity.name,
+                    data: {
+                        description: entity.description,
+                        properties: properties.map(p => ({ name: p.name, type: p.type })),
+                        records: recordsWithValues
+                    }
+                };
+            });
+
+            const results = await Promise.all(entityPromises);
+
+            results.forEach(result => {
+                if (result) {
+                    contextData[result.name] = result.data;
+                }
+            });
+        }
+        console.timeEnd('DB Fetch Time');
+        console.log('Context Data Keys:', Object.keys(contextData));
+
+        // 2. Call OpenAI
+        console.time('OpenAI API Time');
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const completion = await openai.chat.completions.create({
+            messages: [
+                {
+                    role: "system",
+                    content: `You are a helpful data analyst assistant. 
+            You have access to the following data context (JSON format): ${JSON.stringify(contextData)}. 
+            Answer the user's question based on this data. 
+            If the answer is not in the data, say so.
+            Format your response in Markdown.`
+                },
+                { role: "user", content: prompt }
+            ],
+            model: "gpt-4o",
+        });
+        console.timeEnd('OpenAI API Time');
+        console.timeEnd('Total Request Time');
+
+        res.json({ response: completion.choices[0].message.content });
+
+    } catch (error) {
+        console.error('Error generating response:', error);
+        res.status(500).json({ error: 'Failed to generate response' });
+    }
 });
