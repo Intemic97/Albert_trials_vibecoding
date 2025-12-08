@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { EntityCard } from './components/EntityCard';
 import { Reporting } from './components/Reporting';
+import { Dashboard } from './components/Dashboard';
 import { Entity, Property, PropertyType } from './types';
 import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X } from 'lucide-react';
 
@@ -375,7 +376,9 @@ export default function App() {
             <Sidebar activeView={currentView} onNavigate={setCurrentView} />
 
             <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-                {currentView === 'reports' ? (
+                {currentView === 'dashboard' ? (
+                    <Dashboard entities={entities} />
+                ) : currentView === 'reports' ? (
                     <Reporting entities={entities} />
                 ) : (
                     <>

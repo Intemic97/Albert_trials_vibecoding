@@ -46,7 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
         <nav className="px-2">
           <SectionLabel label="Company" />
           <NavItem icon={LayoutDashboard} label="Overview" />
-          <NavItem icon={LayoutDashboard} label="Dashboards" />
+          <NavItem icon={LayoutDashboard} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
           <NavItem icon={Users} label="Copilots" />
 
           <SectionLabel label="Modeling" />
