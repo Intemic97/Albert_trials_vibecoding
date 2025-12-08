@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Entity } from '../types';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
-import { Database, TrendingUp, Layers, Activity } from 'lucide-react';
+import { Database, TrendingUp, Layers, Activity, Sparkles, X } from 'lucide-react';
+import { PromptInput } from './PromptInput';
+import { DynamicChart, WidgetConfig } from './DynamicChart';
 
 interface DashboardProps {
     entities: Entity[];
@@ -10,6 +12,9 @@ interface DashboardProps {
 const COLORS = ['#0d9488', '#14b8a6', '#2dd4bf', '#5eead4', '#99f6e4', '#ccfbf1'];
 
 export const Dashboard: React.FC<DashboardProps> = ({ entities }) => {
+    const [generatedWidgets, setGeneratedWidgets] = useState<WidgetConfig[]>([]);
+    const [isGenerating, setIsGenerating] = useState(false);
+
     // Calculate statistics
     const totalEntities = entities.length;
     const totalProperties = entities.reduce((sum, e) => sum + e.properties.length, 0);
@@ -59,6 +64,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities }) => {
         };
     }).sort((a, b) => b.complexity - a.complexity).slice(0, 6);
 
+    const handleGenerateWidget = async (prompt: string, mentionedEntityIds: string[]) => {
+        setIsGenerating(true);
+        try {
+            const res = await fetch('http://localhost:3001/api/generate-widget', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt,
+                    mentionedEntityIds
+                })
+            });
+
+            const widgetConfig = await res.json();
+            if (widgetConfig.error) {
+                throw new Error(widgetConfig.error);
+            }
+
+            setGeneratedWidgets(prev => [widgetConfig, ...prev]);
+        } catch (error) {
+            console.error('Error generating widget:', error);
+            alert('Failed to generate widget. Please try again.');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const removeWidget = (index: number) => {
+        setGeneratedWidgets(prev => prev.filter((_, i) => i !== index));
+    };
+
     return (
         <div className="flex flex-col h-full bg-slate-50">
             {/* Header */}
@@ -75,6 +110,51 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities }) => {
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-7xl mx-auto space-y-8">
+
+                    {/* AI Widget Generator */}
+                    <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-xl shadow-lg p-6 text-white">
+                        <div className="flex items-center gap-3 mb-4">
+                            <Sparkles className="text-teal-100" size={24} />
+                            <h2 className="text-lg font-bold">AI Widget Generator</h2>
+                        </div>
+                        <p className="text-teal-50 text-sm mb-6">
+                            Ask a question about your data to generate a custom chart. Try "Show me a bar chart of @Entities by property count".
+                        </p>
+                        <PromptInput
+                            entities={entities}
+                            onGenerate={handleGenerateWidget}
+                            isGenerating={isGenerating}
+                            placeholder="Describe the chart you want to create..."
+                            buttonLabel="Generate Widget"
+                            className="bg-white rounded-lg shadow-inner text-slate-800"
+                        />
+                    </div>
+
+                    {/* Generated Widgets Section */}
+                    {generatedWidgets.length > 0 && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                            <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                                <Sparkles size={18} className="text-teal-500" />
+                                Custom Insights
+                            </h3>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {generatedWidgets.map((widget, index) => (
+                                    <div key={index} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 relative group">
+                                        <button
+                                            onClick={() => removeWidget(index)}
+                                            className="absolute top-4 right-4 p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                        <h3 className="text-lg font-semibold text-slate-800 mb-1">{widget.title}</h3>
+                                        <p className="text-xs text-slate-500 mb-4">{widget.description}</p>
+                                        <DynamicChart config={widget} />
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="border-b border-slate-200 my-8" />
+                        </div>
+                    )}
 
                     {/* Stats Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -272,3 +352,4 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities }) => {
         </div>
     );
 };
+

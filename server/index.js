@@ -306,3 +306,82 @@ app.post('/api/generate', async (req, res) => {
         res.status(500).json({ error: 'Failed to generate response' });
     }
 });
+
+// OpenAI Widget Generation Endpoint
+app.post('/api/generate-widget', async (req, res) => {
+    console.log('Received widget generation request');
+    try {
+        const { prompt, mentionedEntityIds } = req.body;
+        console.log('Widget Prompt:', prompt);
+
+        if (!process.env.OPENAI_API_KEY) {
+            return res.status(500).json({ error: 'OpenAI API Key not configured' });
+        }
+
+        // 1. Fetch data context (Reuse logic - ideally refactor into function)
+        let contextData = {};
+        if (mentionedEntityIds && mentionedEntityIds.length > 0) {
+            const entityPromises = mentionedEntityIds.map(async (entityId) => {
+                const entity = await db.get('SELECT * FROM entities WHERE id = ?', [entityId]);
+                if (!entity) return null;
+                const properties = await db.all('SELECT * FROM properties WHERE entityId = ?', [entityId]);
+                const records = await db.all('SELECT * FROM records WHERE entityId = ? LIMIT 50', [entityId]);
+                const recordsWithValues = await Promise.all(records.map(async (r) => {
+                    const values = await db.all('SELECT * FROM record_values WHERE recordId = ?', [r.id]);
+                    const valuesMap = {};
+                    values.forEach(v => {
+                        const prop = properties.find(p => p.id === v.propertyId);
+                        const key = prop ? prop.name : v.propertyId;
+                        valuesMap[key] = v.value;
+                    });
+                    return { id: r.id, ...valuesMap };
+                }));
+                return {
+                    name: entity.name,
+                    data: { properties: properties.map(p => ({ name: p.name, type: p.type })), records: recordsWithValues }
+                };
+            });
+            const results = await Promise.all(entityPromises);
+            results.forEach(result => { if (result) contextData[result.name] = result.data; });
+        }
+
+        // 2. Call OpenAI for Widget Config
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const completion = await openai.chat.completions.create({
+            messages: [
+                {
+                    role: "system",
+                    content: `You are a data visualization expert.
+            You have access to the following data context: ${JSON.stringify(contextData)}.
+            Based on the user's prompt, generate a JSON configuration for a chart.
+            
+            The JSON structure MUST be:
+            {
+                "type": "bar" | "line" | "pie" | "area",
+                "title": "Chart Title",
+                "description": "Brief description",
+                "data": [ { "name": "Label", "value": 123, ... } ],
+                "xAxisKey": "name",
+                "dataKey": "value" (or array of keys for multiple lines/areas),
+                "colors": ["#hex", ...] (optional custom colors)
+            }
+            
+            Ensure the data is aggregated or formatted correctly for the chosen chart type.
+            Return ONLY the valid JSON string, no markdown formatting.`
+                },
+                { role: "user", content: prompt }
+            ],
+            model: "gpt-4o",
+            response_format: { type: "json_object" }
+        });
+
+        const widgetConfig = JSON.parse(completion.choices[0].message.content);
+        res.json(widgetConfig);
+
+    } catch (error) {
+        console.error('Error generating widget:', error);
+        res.status(500).json({ error: 'Failed to generate widget' });
+    }
+});
