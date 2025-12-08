@@ -475,7 +475,8 @@ export const Reporting: React.FC<ReportingProps> = ({ entities }) => {
                             entities={entities}
                             onGenerate={handleGenerate}
                             isGenerating={isLoading}
-                            placeholder={templatePrompt || "e.g. Analyze the capacity of @Factories and list any issues..."}
+                            initialValue={templatePrompt}
+                            placeholder="e.g. Analyze the capacity of @Factories and list any issues..."
                             buttonLabel="Generate Report"
                         />
                     </div>

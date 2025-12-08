@@ -9,6 +9,7 @@ interface PromptInputProps {
     placeholder?: string;
     buttonLabel?: string;
     className?: string;
+    initialValue?: string;
 }
 
 type MentionType = 'entity' | 'attribute';
@@ -29,9 +30,10 @@ export const PromptInput: React.FC<PromptInputProps> = ({
     isGenerating,
     placeholder = "Ask a question...",
     buttonLabel = "Generate",
-    className = ""
+    className = "",
+    initialValue = ""
 }) => {
-    const [prompt, setPrompt] = useState('');
+    const [prompt, setPrompt] = useState(initialValue);
     const [mention, setMention] = useState<MentionState>({
         isActive: false,
         type: 'entity',
@@ -285,10 +287,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
                 <div
                     ref={mirrorRef}
                     className="absolute top-0 left-0 w-full h-full p-4 pointer-events-none invisible whitespace-pre-wrap font-sans text-base leading-relaxed"
-                >
-                    {prompt.slice(0, textareaRef.current?.selectionStart || 0)}
-                    <span className="relative">|</span>
-                </div>
+                />
             </div>
 
             <div className="flex justify-between items-center mt-4">

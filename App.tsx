@@ -454,7 +454,10 @@ export default function App() {
                                             <EntityCard
                                                 key={entity.id}
                                                 entity={entity}
-                                                onClick={(e) => setActiveEntityId(e.id)}
+                                                onClick={(e) => {
+                                                    setActiveEntityId(e.id);
+                                                    setActiveTab('data');
+                                                }}
                                                 onDelete={handleDeleteEntity}
                                             />
                                         ))}
@@ -482,8 +485,8 @@ export default function App() {
                                         <button
                                             onClick={() => setActiveTab('structure')}
                                             className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'structure'
-                                                    ? 'border-teal-600 text-teal-600'
-                                                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                                                ? 'border-teal-600 text-teal-600'
+                                                : 'border-transparent text-slate-500 hover:text-slate-700'
                                                 }`}
                                         >
                                             Structure & Properties
@@ -491,8 +494,8 @@ export default function App() {
                                         <button
                                             onClick={() => setActiveTab('data')}
                                             className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'data'
-                                                    ? 'border-teal-600 text-teal-600'
-                                                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                                                ? 'border-teal-600 text-teal-600'
+                                                : 'border-transparent text-slate-500 hover:text-slate-700'
                                                 }`}
                                         >
                                             Data Records

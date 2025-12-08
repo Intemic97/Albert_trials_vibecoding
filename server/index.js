@@ -108,6 +108,57 @@ app.delete('/api/properties/:id', async (req, res) => {
     }
 });
 
+// Helper to resolve relation values
+async function resolveRelationValue(db, value, relatedEntityId) {
+    if (!value || !relatedEntityId) return value;
+
+    try {
+        let ids = [];
+        try {
+            const parsed = JSON.parse(value);
+            ids = Array.isArray(parsed) ? parsed : [value];
+        } catch {
+            ids = [value];
+        }
+
+        const names = [];
+        for (const id of ids) {
+            // Get related record values
+            const relatedValues = await db.all('SELECT * FROM record_values WHERE recordId = ?', [id]);
+            if (relatedValues.length === 0) {
+                names.push(id);
+                continue;
+            }
+
+            // Get related entity properties to identify the "name" field
+            const relatedProps = await db.all('SELECT * FROM properties WHERE entityId = ?', [relatedEntityId]);
+
+            let nameVal = null;
+            // 1. Try "name" or "title"
+            const nameProp = relatedProps.find(p => p.name.toLowerCase() === 'name' || p.name.toLowerCase() === 'title');
+            if (nameProp) {
+                const valRow = relatedValues.find(rv => rv.propertyId === nameProp.id);
+                if (valRow) nameVal = valRow.value;
+            }
+
+            // 2. Fallback to first text property
+            if (!nameVal) {
+                const textProp = relatedProps.find(p => p.type === 'text');
+                if (textProp) {
+                    const valRow = relatedValues.find(rv => rv.propertyId === textProp.id);
+                    if (valRow) nameVal = valRow.value;
+                }
+            }
+
+            names.push(nameVal || id);
+        }
+        return names.join(', ');
+    } catch (error) {
+        console.error('Error resolving relation:', error);
+        return value;
+    }
+}
+
 // --- Records Endpoints ---
 
 // GET /api/entities/:id/records
@@ -240,15 +291,24 @@ app.post('/api/generate', async (req, res) => {
                 const records = await db.all('SELECT * FROM records WHERE entityId = ? LIMIT 50', [entityId]);
 
                 // Fetch record values for these records
+                // Fetch record values for these records
                 const recordsWithValues = await Promise.all(records.map(async (r) => {
                     const values = await db.all('SELECT * FROM record_values WHERE recordId = ?', [r.id]);
                     const valuesMap = {};
-                    values.forEach(v => {
+
+                    await Promise.all(values.map(async v => {
                         // Find property name if possible, or use ID
                         const prop = properties.find(p => p.id === v.propertyId);
                         const key = prop ? prop.name : v.propertyId;
-                        valuesMap[key] = v.value;
-                    });
+
+                        let value = v.value;
+                        if (prop && prop.type === 'relation' && prop.relatedEntityId) {
+                            value = await resolveRelationValue(db, v.value, prop.relatedEntityId);
+                        }
+
+                        valuesMap[key] = value;
+                    }));
+
                     return {
                         id: r.id,
                         createdAt: r.createdAt,
@@ -329,11 +389,19 @@ app.post('/api/generate-widget', async (req, res) => {
                 const recordsWithValues = await Promise.all(records.map(async (r) => {
                     const values = await db.all('SELECT * FROM record_values WHERE recordId = ?', [r.id]);
                     const valuesMap = {};
-                    values.forEach(v => {
+
+                    await Promise.all(values.map(async v => {
                         const prop = properties.find(p => p.id === v.propertyId);
                         const key = prop ? prop.name : v.propertyId;
-                        valuesMap[key] = v.value;
-                    });
+
+                        let value = v.value;
+                        if (prop && prop.type === 'relation' && prop.relatedEntityId) {
+                            value = await resolveRelationValue(db, v.value, prop.relatedEntityId);
+                        }
+
+                        valuesMap[key] = value;
+                    }));
+
                     return { id: r.id, ...valuesMap };
                 }));
                 return {
