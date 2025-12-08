@@ -377,7 +377,14 @@ export default function App() {
 
             <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
                 {currentView === 'dashboard' ? (
-                    <Dashboard entities={entities} />
+                    <Dashboard
+                        entities={entities}
+                        onNavigate={(entityId) => {
+                            setActiveEntityId(entityId);
+                            setCurrentView('database');
+                            setActiveTab('data');
+                        }}
+                    />
                 ) : currentView === 'reports' ? (
                     <Reporting entities={entities} />
                 ) : (

@@ -7,6 +7,7 @@ import { DynamicChart, WidgetConfig } from './DynamicChart';
 
 interface DashboardProps {
     entities: Entity[];
+    onNavigate?: (entityId: string) => void;
 }
 
 const COLORS = ['#0d9488', '#14b8a6', '#2dd4bf', '#5eead4', '#99f6e4', '#ccfbf1'];
@@ -16,10 +17,40 @@ interface WidgetCardProps {
     onSave?: (widget: WidgetConfig) => void;
     onRemove: () => void;
     isSaved?: boolean;
+    onNavigate?: (entityId: string) => void;
+    entities?: Entity[];
 }
 
-const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSaved }) => {
+const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSaved, onNavigate, entities }) => {
     const [showExplanation, setShowExplanation] = useState(false);
+
+    const renderExplanation = (text: string) => {
+        if (!text) return null;
+
+        // Regex to match @EntityName (assuming CamelCase or single word for now, or matching until non-word char)
+        const parts = text.split(/(@[a-zA-Z0-9_]+)/g);
+
+        return parts.map((part, index) => {
+            if (part.startsWith('@')) {
+                const entityName = part.substring(1);
+                const entity = entities?.find(e => e.name === entityName);
+
+                if (entity && onNavigate) {
+                    return (
+                        <span
+                            key={index}
+                            onClick={() => onNavigate(entity.id)}
+                            className="text-teal-600 font-medium cursor-pointer hover:underline"
+                            title={`View ${entityName} details`}
+                        >
+                            {part}
+                        </span>
+                    );
+                }
+            }
+            return <span key={index}>{part}</span>;
+        });
+    };
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 relative group">
@@ -59,7 +90,7 @@ const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSav
 
                     {showExplanation && (
                         <div className="mt-2 p-3 bg-teal-50 rounded-lg text-xs text-slate-700 leading-relaxed animate-in fade-in slide-in-from-top-1">
-                            {widget.explanation}
+                            {renderExplanation(widget.explanation)}
                         </div>
                     )}
                 </div>
@@ -68,7 +99,7 @@ const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSav
     );
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ entities }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate }) => {
     const [generatedWidgets, setGeneratedWidgets] = useState<WidgetConfig[]>([]);
     const [savedWidgets, setSavedWidgets] = useState<WidgetConfig[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -227,7 +258,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities }) => {
                             <h2 className="text-lg font-bold">AI Widget Generator</h2>
                         </div>
                         <p className="text-teal-50 text-sm mb-6">
-                            Ask a question about your data to generate a custom chart. Try "Show me a bar chart of @Entities by property count".
+                            Ask a question about your data to generate a custom chart. Try "Show me a bar chart of @Entities by property count". <strong>Press Enter to generate.</strong>
                         </p>
                         <PromptInput
                             entities={entities}
@@ -253,6 +284,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities }) => {
                                         widget={widget}
                                         onSave={handleSaveWidget}
                                         onRemove={() => removeWidget(index)}
+                                        onNavigate={onNavigate}
+                                        entities={entities}
                                     />
                                 ))}
                             </div>
@@ -274,6 +307,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities }) => {
                                         widget={widget}
                                         onRemove={() => removeWidget(index, true, (widget as any).id)}
                                         isSaved={true}
+                                        onNavigate={onNavigate}
+                                        entities={entities}
                                     />
                                 ))}
                             </div>

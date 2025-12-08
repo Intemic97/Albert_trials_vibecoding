@@ -220,7 +220,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
     };
 
     const handleSubmit = () => {
-        if (!prompt.trim()) return;
+        if (!prompt.trim() || isGenerating) return;
 
         // Extract mentioned entity IDs from the prompt
         const mentionedIds = entities
