@@ -430,6 +430,7 @@ app.post('/api/generate-widget', async (req, res) => {
                 "type": "bar" | "line" | "pie" | "area",
                 "title": "Chart Title",
                 "description": "Brief description",
+                "explanation": "A detailed explanation of how this chart was prepared. Structure it as follows: 1. A natural language description of the logic. 2. A 'Technical Query' section with pseudo-code steps. IMPORTANT: In the Technical Query, you MUST use the EXACT names of the Entities and Properties from the provided context (e.g., 'Filter @Equipment where Status=Active', 'Group by @Location'). Do not use generic terms like 'items' or 'records'.",
                 "data": [ { "name": "Label", "value": 123, ... } ],
                 "xAxisKey": "name",
                 "dataKey": "value" (or array of keys for multiple lines/areas),

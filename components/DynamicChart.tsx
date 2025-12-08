@@ -8,6 +8,7 @@ export interface WidgetConfig {
     type: 'bar' | 'line' | 'pie' | 'area';
     title: string;
     description: string;
+    explanation?: string;
     data: any[];
     xAxisKey: string;
     dataKey: string | string[];

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Entity } from '../types';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
-import { Database, TrendingUp, Layers, Activity, Sparkles, X } from 'lucide-react';
+import { Database, TrendingUp, Layers, Activity, Sparkles, X, Info } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 
@@ -11,9 +11,82 @@ interface DashboardProps {
 
 const COLORS = ['#0d9488', '#14b8a6', '#2dd4bf', '#5eead4', '#99f6e4', '#ccfbf1'];
 
+interface WidgetCardProps {
+    widget: WidgetConfig;
+    onSave?: (widget: WidgetConfig) => void;
+    onRemove: () => void;
+    isSaved?: boolean;
+}
+
+const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSaved }) => {
+    const [showExplanation, setShowExplanation] = useState(false);
+
+    return (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 relative group">
+            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                {!isSaved && onSave && (
+                    <button
+                        onClick={() => onSave(widget)}
+                        className="p-1 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded transition-colors"
+                        title="Save to Dashboard"
+                    >
+                        <Database size={16} />
+                    </button>
+                )}
+                <button
+                    onClick={onRemove}
+                    className={`p-1 text-slate-400 rounded transition-colors ${isSaved ? 'hover:text-red-500 hover:bg-red-50' : 'hover:text-red-500 hover:bg-red-50'}`}
+                    title={isSaved ? "Delete Widget" : "Remove"}
+                >
+                    <X size={16} />
+                </button>
+            </div>
+
+            <h3 className="text-lg font-semibold text-slate-800 mb-1">{widget.title}</h3>
+            <p className="text-xs text-slate-500 mb-4">{widget.description}</p>
+
+            <DynamicChart config={widget} />
+
+            {widget.explanation && (
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                    <button
+                        onClick={() => setShowExplanation(!showExplanation)}
+                        className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium"
+                    >
+                        <Info size={12} />
+                        How did I prepare this?
+                    </button>
+
+                    {showExplanation && (
+                        <div className="mt-2 p-3 bg-teal-50 rounded-lg text-xs text-slate-700 leading-relaxed animate-in fade-in slide-in-from-top-1">
+                            {widget.explanation}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
 export const Dashboard: React.FC<DashboardProps> = ({ entities }) => {
     const [generatedWidgets, setGeneratedWidgets] = useState<WidgetConfig[]>([]);
+    const [savedWidgets, setSavedWidgets] = useState<WidgetConfig[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
+
+    // Fetch saved widgets on mount
+    React.useEffect(() => {
+        fetchWidgets();
+    }, []);
+
+    const fetchWidgets = async () => {
+        try {
+            const res = await fetch('http://localhost:3001/api/widgets');
+            const data = await res.json();
+            setSavedWidgets(data.map((w: any) => ({ ...w.config, id: w.id })));
+        } catch (error) {
+            console.error('Error fetching widgets:', error);
+        }
+    };
 
     // Calculate statistics
     const totalEntities = entities.length;
@@ -90,8 +163,44 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities }) => {
         }
     };
 
-    const removeWidget = (index: number) => {
-        setGeneratedWidgets(prev => prev.filter((_, i) => i !== index));
+    const handleSaveWidget = async (widget: WidgetConfig) => {
+        try {
+            const id = crypto.randomUUID();
+            const res = await fetch('http://localhost:3001/api/widgets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id,
+                    title: widget.title,
+                    description: widget.description,
+                    config: widget
+                })
+            });
+
+            if (res.ok) {
+                // Add to saved widgets and remove from generated
+                setSavedWidgets(prev => [{ ...widget, id: id as any }, ...prev]);
+                setGeneratedWidgets(prev => prev.filter(w => w !== widget));
+            }
+        } catch (error) {
+            console.error('Error saving widget:', error);
+            alert('Failed to save widget.');
+        }
+    };
+
+    const removeWidget = async (index: number, isSaved: boolean = false, widgetId?: string) => {
+        if (isSaved && widgetId) {
+            try {
+                await fetch(`http://localhost:3001/api/widgets/${widgetId}`, {
+                    method: 'DELETE'
+                });
+                setSavedWidgets(prev => prev.filter(w => (w as any).id !== widgetId));
+            } catch (error) {
+                console.error('Error deleting widget:', error);
+            }
+        } else {
+            setGeneratedWidgets(prev => prev.filter((_, i) => i !== index));
+        }
     };
 
     return (
@@ -139,17 +248,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities }) => {
                             </h3>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 {generatedWidgets.map((widget, index) => (
-                                    <div key={index} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 relative group">
-                                        <button
-                                            onClick={() => removeWidget(index)}
-                                            className="absolute top-4 right-4 p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
-                                        >
-                                            <X size={16} />
-                                        </button>
-                                        <h3 className="text-lg font-semibold text-slate-800 mb-1">{widget.title}</h3>
-                                        <p className="text-xs text-slate-500 mb-4">{widget.description}</p>
-                                        <DynamicChart config={widget} />
-                                    </div>
+                                    <WidgetCard
+                                        key={index}
+                                        widget={widget}
+                                        onSave={handleSaveWidget}
+                                        onRemove={() => removeWidget(index)}
+                                    />
+                                ))}
+                            </div>
+                            <div className="border-b border-slate-200 my-8" />
+                        </div>
+                    )}
+
+                    {/* Saved Widgets Section */}
+                    {savedWidgets.length > 0 && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500 mb-8">
+                            <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                                <Database size={18} className="text-teal-500" />
+                                Saved Dashboards
+                            </h3>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {savedWidgets.map((widget, index) => (
+                                    <WidgetCard
+                                        key={(widget as any).id || index}
+                                        widget={widget}
+                                        onRemove={() => removeWidget(index, true, (widget as any).id)}
+                                        isSaved={true}
+                                    />
                                 ))}
                             </div>
                             <div className="border-b border-slate-200 my-8" />
