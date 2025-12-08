@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Entity, Property } from '../types';
-import { Send, Sparkles, Database, Hash, Type, Link as LinkIcon, FileText, Clipboard, FlaskConical, Wrench, AlertTriangle } from 'lucide-react';
+import { Send, Sparkles, Database, Hash, Type, Link as LinkIcon, FileText, Clipboard, FlaskConical, Wrench, AlertTriangle, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface ReportingProps {
     entities: Entity[];
@@ -314,6 +316,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities }) => {
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const mirrorRef = useRef<HTMLDivElement>(null);
+    const reportRef = useRef<HTMLDivElement>(null);
 
     // Filter suggestions based on query
     const getSuggestions = () => {
@@ -532,6 +535,72 @@ export const Reporting: React.FC<ReportingProps> = ({ entities }) => {
         }
     };
 
+    const handleDownloadPDF = async () => {
+        if (!reportRef.current || !report) return;
+
+        try {
+            // Create a temporary container with better styling for PDF
+            const tempContainer = document.createElement('div');
+            tempContainer.style.position = 'absolute';
+            tempContainer.style.left = '-9999px';
+            tempContainer.style.width = '210mm'; // A4 width
+            tempContainer.style.padding = '20mm';
+            tempContainer.style.backgroundColor = 'white';
+            tempContainer.style.fontFamily = 'Arial, sans-serif';
+
+            // Clone the report content
+            const clonedReport = reportRef.current.cloneNode(true) as HTMLElement;
+            tempContainer.appendChild(clonedReport);
+            document.body.appendChild(tempContainer);
+
+            // Generate canvas from the temporary container
+            const canvas = await html2canvas(tempContainer, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff'
+            });
+
+            // Remove temporary container
+            document.body.removeChild(tempContainer);
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            // Calculate dimensions to fit the page
+            const imgWidth = 210; // A4 width in mm
+            const pageHeight = 297; // A4 height in mm
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            // Add first page
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            // Add additional pages if needed
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
+            // Generate filename with timestamp
+            const timestamp = new Date().toISOString().split('T')[0];
+            const filename = `report_${timestamp}.pdf`;
+
+            pdf.save(filename);
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            alert('Failed to generate PDF. Please try again.');
+        }
+    };
+
     return (
         <div className="flex flex-col h-full bg-slate-50 relative">
             {/* Header */}
@@ -565,14 +634,14 @@ export const Reporting: React.FC<ReportingProps> = ({ entities }) => {
                                         key={template.id}
                                         onClick={() => handleTemplateSelect(template)}
                                         className={`group text-left p-4 rounded-lg border-2 transition-all duration-200 hover:shadow-md ${isSelected
-                                                ? 'border-teal-500 bg-teal-50 shadow-md'
-                                                : 'border-slate-200 bg-white hover:border-teal-300'
+                                            ? 'border-teal-500 bg-teal-50 shadow-md'
+                                            : 'border-slate-200 bg-white hover:border-teal-300'
                                             }`}
                                     >
                                         <div className="flex items-start gap-3">
                                             <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors ${isSelected
-                                                    ? 'bg-teal-600 text-white'
-                                                    : 'bg-slate-100 text-slate-600 group-hover:bg-teal-100 group-hover:text-teal-600'
+                                                ? 'bg-teal-600 text-white'
+                                                : 'bg-slate-100 text-slate-600 group-hover:bg-teal-100 group-hover:text-teal-600'
                                                 }`}>
                                                 <IconComponent size={20} />
                                             </div>
@@ -695,12 +764,19 @@ export const Reporting: React.FC<ReportingProps> = ({ entities }) => {
                                 <div className="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center">
                                     <Sparkles className="text-teal-600" size={20} />
                                 </div>
-                                <div>
+                                <div className="flex-1">
                                     <h2 className="text-lg font-bold text-slate-800">Generated Insights</h2>
                                     <p className="text-sm text-slate-500">Based on your data context</p>
                                 </div>
+                                <button
+                                    onClick={handleDownloadPDF}
+                                    className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium shadow-sm transition-all"
+                                >
+                                    <Download size={16} />
+                                    Download PDF
+                                </button>
                             </div>
-                            <div className="prose prose-slate max-w-none">
+                            <div ref={reportRef} className="prose prose-slate max-w-none">
                                 <ReactMarkdown>{report}</ReactMarkdown>
                             </div>
                         </div>
