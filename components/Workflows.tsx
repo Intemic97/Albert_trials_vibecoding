@@ -3,27 +3,35 @@ import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, Fol
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords';
     label: string;
     x: number;
     y: number;
     status?: 'idle' | 'running' | 'completed' | 'error';
-    executionResult?: string;
     config?: {
         entityId?: string;
         entityName?: string;
+        // For condition nodes:
+        conditionField?: string;
+        conditionOperator?: string;
+        conditionValue?: string;
     };
+    executionResult?: string;
     data?: any;
+    inputData?: any;
+    outputData?: any;
+    conditionResult?: boolean;  // Store evaluation result
 }
 
 interface Connection {
     id: string;
     fromNodeId: string;
     toNodeId: string;
+    outputType?: 'true' | 'false';  // For condition nodes
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords';
     label: string;
     icon: React.ElementType;
 }
@@ -32,6 +40,8 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'trigger', label: 'Manual Trigger', icon: Play },
     { type: 'trigger', label: 'Schedule', icon: Workflow },
     { type: 'fetchData', label: 'Fetch Data', icon: Database },
+    { type: 'addField', label: 'Add Field', icon: CheckCircle },
+    { type: 'saveRecords', label: 'Save Records', icon: Database },
     { type: 'action', label: 'Send Email', icon: Zap },
     { type: 'action', label: 'Update Record', icon: CheckCircle },
     { type: 'condition', label: 'If / Else', icon: AlertCircle },
@@ -54,6 +64,21 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
     const [configuringNodeId, setConfiguringNodeId] = useState<string | null>(null);
     const [selectedEntityId, setSelectedEntityId] = useState<string>('');
     const [viewingDataNodeId, setViewingDataNodeId] = useState<string | null>(null);
+    const [configuringConditionNodeId, setConfiguringConditionNodeId] = useState<string | null>(null);
+    const [conditionField, setConditionField] = useState<string>('');
+    const [conditionOperator, setConditionOperator] = useState<string>('isText');
+    const [conditionValue, setConditionValue] = useState<string>('');
+    const [connectingFromType, setConnectingFromType] = useState<'true' | 'false' | null>(null);
+    const [configuringAddFieldNodeId, setConfiguringAddFieldNodeId] = useState<string | null>(null);
+    const [addFieldName, setAddFieldName] = useState<string>('');
+    const [addFieldValue, setAddFieldValue] = useState<string>('');
+    const [configuringSaveNodeId, setConfiguringSaveNodeId] = useState<string | null>(null);
+    const [saveEntityId, setSaveEntityId] = useState<string>('');
+    const [dataViewTab, setDataViewTab] = useState<'input' | 'output'>('output');
+    const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
+    const [canvasZoom, setCanvasZoom] = useState(1);
+    const [isPanning, setIsPanning] = useState(false);
+    const [panStart, setPanStart] = useState({ x: 0, y: 0 });
     const canvasRef = useRef<HTMLDivElement>(null);
 
     // Load workflows on mount
@@ -172,6 +197,88 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
         setSelectedEntityId('');
     };
 
+    const openConditionConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'condition') {
+            setConfiguringConditionNodeId(nodeId);
+            setConditionField(node.config?.conditionField || '');
+            setConditionOperator(node.config?.conditionOperator || 'isText');
+            setConditionValue(node.config?.conditionValue || '');
+        }
+    };
+
+    const saveConditionConfig = () => {
+        if (!configuringConditionNodeId || !conditionField) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringConditionNodeId
+                ? {
+                    ...n,
+                    config: {
+                        ...n.config,
+                        conditionField,
+                        conditionOperator,
+                        conditionValue
+                    }
+                }
+                : n
+        ));
+        setConfiguringConditionNodeId(null);
+        setConditionField('');
+        setConditionOperator('isText');
+        setConditionValue('');
+    };
+
+    const openAddFieldConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'addField') {
+            setConfiguringAddFieldNodeId(nodeId);
+            setAddFieldName(node.config?.conditionField || '');
+            setAddFieldValue(node.config?.conditionValue || '');
+        }
+    };
+
+    const saveAddFieldConfig = () => {
+        if (!configuringAddFieldNodeId || !addFieldName) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringAddFieldNodeId
+                ? {
+                    ...n,
+                    config: {
+                        ...n.config,
+                        conditionField: addFieldName,
+                        conditionValue: addFieldValue
+                    }
+                }
+                : n
+        ));
+        setConfiguringAddFieldNodeId(null);
+        setAddFieldName('');
+        setAddFieldValue('');
+    };
+
+    const openSaveRecordsConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'saveRecords') {
+            setConfiguringSaveNodeId(nodeId);
+            setSaveEntityId(node.config?.entityId || '');
+        }
+    };
+
+    const saveSaveRecordsConfig = () => {
+        if (!configuringSaveNodeId || !saveEntityId) return;
+
+        const entity = entities.find(e => e.id === saveEntityId);
+        setNodes(prev => prev.map(n =>
+            n.id === configuringSaveNodeId
+                ? { ...n, config: { entityId: saveEntityId, entityName: entity?.name || '' } }
+                : n
+        ));
+        setConfiguringSaveNodeId(null);
+        setSaveEntityId('');
+    };
+
     const runWorkflow = async () => {
         if (isRunning) return;
         setIsRunning(true);
@@ -191,13 +298,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
         }
 
         // Execute nodes in order following connections
-        const executeNode = async (nodeId: string) => {
+        const executeNode = async (nodeId: string, inputData?: any) => {
             const node = nodes.find(n => n.id === nodeId);
             if (!node) return;
 
             // Set to running
             setNodes(prev => prev.map(n =>
-                n.id === nodeId ? { ...n, status: 'running' as const } : n
+                n.id === nodeId ? { ...n, status: 'running' as const, inputData } : n
             ));
 
             //Simulate work
@@ -237,20 +344,110 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                         result = 'Action executed!';
                         break;
                     case 'condition':
-                        result = 'Condition evaluated!';
+                        // Evaluate condition
+                        if (node.config?.conditionField && node.config?.conditionOperator) {
+                            const dataToEval = inputData;
+
+                            if (dataToEval && Array.isArray(dataToEval) && dataToEval.length > 0) {
+                                const record = dataToEval[0];
+                                const fieldValue = record[node.config.conditionField];
+                                let condResult = false;
+
+                                switch (node.config.conditionOperator) {
+                                    case 'isText': condResult = typeof fieldValue === 'string'; break;
+                                    case 'isNumber': condResult = !isNaN(Number(fieldValue)); break;
+                                    case 'equals': condResult = String(fieldValue) === node.config.conditionValue; break;
+                                    case 'greaterThan': condResult = Number(fieldValue) > Number(node.config.conditionValue); break;
+                                    case 'lessThan': condResult = Number(fieldValue) < Number(node.config.conditionValue); break;
+                                }
+
+                                nodeData = dataToEval;
+                                result = `${node.config.conditionField} ${node.config.conditionOperator} → ${condResult ? '✓' : '✗'}`;
+                                setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, conditionResult: condResult } : n));
+                            } else {
+                                result = 'No data to evaluate';
+                            }
+                        } else {
+                            result = 'Not configured';
+                        }
+                        break;
+                    case 'addField':
+                        // Add field to all records
+                        if (node.config?.conditionField && inputData && Array.isArray(inputData)) {
+                            const fieldName = node.config.conditionField;
+                            const fieldValue = node.config.conditionValue || '';
+
+                            nodeData = inputData.map(record => ({
+                                ...record,
+                                [fieldName]: fieldValue
+                            }));
+
+                            result = `Added field "${fieldName}" = "${fieldValue}" to ${nodeData.length} records`;
+                        } else {
+                            result = 'Not configured or no data';
+                        }
+                        break;
+                    case 'saveRecords':
+                        // Save records to entity
+                        if (node.config?.entityId && inputData && Array.isArray(inputData)) {
+                            try {
+                                let savedCount = 0;
+                                let failedCount = 0;
+
+                                for (const record of inputData) {
+                                    // Remove id to let database generate it
+                                    const { id, ...recordWithoutId } = record;
+
+                                    const response = await fetch(`http://localhost:3001/api/entities/${node.config.entityId}/records`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify(recordWithoutId)
+                                    });
+
+                                    if (response.ok) {
+                                        savedCount++;
+                                    } else {
+                                        failedCount++;
+                                        console.error(`Failed to save record:`, record, await response.text());
+                                    }
+                                }
+
+                                nodeData = inputData;
+                                result = failedCount > 0
+                                    ? `Saved ${savedCount}, Failed ${failedCount} to ${node.config.entityName}`
+                                    : `Saved ${savedCount} records to ${node.config.entityName}`;
+                            } catch (error) {
+                                console.error('Save records error:', error);
+                                result = `Error: ${error.message || 'Failed to save'}`;
+                            }
+                        } else {
+                            result = 'Not configured or no data';
+                        }
                         break;
                 }
             }
 
             // Set to completed
             setNodes(prev => prev.map(n =>
-                n.id === nodeId ? { ...n, status: 'completed' as const, executionResult: result } : n
+                n.id === nodeId ? { ...n, status: 'completed' as const, executionResult: result, data: nodeData, outputData: nodeData } : n
             ));
 
             // Find and execute connected nodes
             const nextConnections = connections.filter(conn => conn.fromNodeId === nodeId);
-            for (const conn of nextConnections) {
-                await executeNode(conn.toNodeId);
+
+            // For condition nodes, filter by outputType based on result
+            const toExecute = node.type === 'condition' && node.conditionResult !== undefined
+                ? nextConnections.filter(c => {
+                    if (node.conditionResult) {
+                        return !c.outputType || c.outputType === 'true';
+                    } else {
+                        return c.outputType === 'false';
+                    }
+                })
+                : nextConnections;
+
+            for (const conn of toExecute) {
+                await executeNode(conn.toNodeId, nodeData);
             }
         };
 
@@ -275,13 +472,45 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
         e.dataTransfer.dropEffect = 'copy';
     };
 
+    const handleWheel = (e: React.WheelEvent) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        setCanvasZoom(prev => Math.min(Math.max(prev * delta, 0.25), 3));
+    };
+
+    const handleCanvasMouseDown = (e: React.MouseEvent) => {
+        if (e.button === 1 || (e.button === 0 && e.altKey)) { // Middle mouse or Alt+Left
+            setIsPanning(true);
+            setPanStart({ x: e.clientX - canvasOffset.x, y: e.clientY - canvasOffset.y });
+            e.preventDefault();
+        }
+    };
+
+    const handleCanvasMouseMove = (e: React.MouseEvent) => {
+        if (isPanning) {
+            setCanvasOffset({
+                x: e.clientX - panStart.x,
+                y: e.clientY - panStart.y
+            });
+        }
+    };
+
+    const handleCanvasMouseUp = () => {
+        setIsPanning(false);
+    };
+
+    const resetView = () => {
+        setCanvasOffset({ x: 0, y: 0 });
+        setCanvasZoom(1);
+    };
+
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         if (!draggingItem || !canvasRef.current) return;
 
         const canvasRect = canvasRef.current.getBoundingClientRect();
-        const x = e.clientX - canvasRect.left;
-        const y = e.clientY - canvasRect.top;
+        const x = (e.clientX - canvasRect.left - canvasOffset.x) / canvasZoom;
+        const y = (e.clientY - canvasRect.top - canvasOffset.y) / canvasZoom;
 
         const newNode: WorkflowNode = {
             id: crypto.randomUUID(),
@@ -301,22 +530,35 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
         setConnections(prev => prev.filter(c => c.fromNodeId !== id && c.toNodeId !== id));
     };
 
-    const handleConnectorClick = (nodeId: string) => {
+    const handleConnectorClick = (nodeId: string, outputType?: 'true' | 'false') => {
         if (!connectingFrom) {
             // Start connecting
             setConnectingFrom(nodeId);
+            setConnectingFromType(outputType || null);
         } else if (connectingFrom !== nodeId) {
             // Complete connection
+            let finalOutputType = connectingFromType;
+
+            // If connecting from a condition node and no type was set, ask the user
+            const fromNode = nodes.find(n => n.id === connectingFrom);
+            if (fromNode?.type === 'condition' && !finalOutputType) {
+                const choice = window.confirm('Click OK for TRUE path, Cancel for FALSE path');
+                finalOutputType = choice ? 'true' : 'false';
+            }
+
             const newConnection: Connection = {
                 id: crypto.randomUUID(),
                 fromNodeId: connectingFrom,
-                toNodeId: nodeId
+                toNodeId: nodeId,
+                outputType: finalOutputType || undefined
             };
             setConnections(prev => [...prev, newConnection]);
             setConnectingFrom(null);
+            setConnectingFromType(null);
         } else {
             // Cancel if clicking same node
             setConnectingFrom(null);
+            setConnectingFromType(null);
         }
     };
 
@@ -330,6 +572,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
             case 'action': return 'bg-blue-100 border-blue-300 text-blue-800';
             case 'condition': return 'bg-amber-100 border-amber-300 text-amber-800';
             case 'fetchData': return 'bg-teal-100 border-teal-300 text-teal-800';
+            case 'addField': return 'bg-indigo-100 border-indigo-300 text-indigo-800';
+            case 'saveRecords': return 'bg-emerald-100 border-emerald-300 text-emerald-800';
             default: return 'bg-slate-100 border-slate-300';
         }
     };
@@ -419,172 +663,476 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                     ref={canvasRef}
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
+                    onWheel={handleWheel}
+                    onMouseDown={handleCanvasMouseDown}
+                    onMouseMove={handleCanvasMouseMove}
+                    onMouseUp={handleCanvasMouseUp}
+                    onMouseLeave={handleCanvasMouseUp}
                     className="w-full h-full relative"
+                    style={{ cursor: isPanning ? 'grabbing' : 'default' }}
                 >
-                    {/* SVG Layer for Connections */}
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
-                        {connections.map(conn => {
-                            const fromNode = nodes.find(n => n.id === conn.fromNodeId);
-                            const toNode = nodes.find(n => n.id === conn.toNodeId);
-                            if (!fromNode || !toNode) return null;
-
-                            // Calculate line positions (from right of fromNode to left of toNode)
-                            const x1 = fromNode.x + 96; // Half width of node (192px / 2)
-                            const y1 = fromNode.y;
-                            const x2 = toNode.x - 96;
-                            const y2 = toNode.y;
-
-                            return (
-                                <line
-                                    key={conn.id}
-                                    x1={x1}
-                                    y1={y1}
-                                    x2={x2}
-                                    y2={y2}
-                                    stroke="#0d9488"
-                                    strokeWidth="3"
-                                    markerEnd="url(#arrowhead)"
-                                />
-                            );
-                        })}
-                        {/* Arrow marker definition */}
-                        <defs>
-                            <marker
-                                id="arrowhead"
-                                markerWidth="10"
-                                markerHeight="10"
-                                refX="9"
-                                refY="3"
-                                orient="auto"
-                            >
-                                <polygon points="0 0, 10 3, 0 6" fill="#0d9488" />
-                            </marker>
-                        </defs>
-                    </svg>
-
-                    {nodes.map((node) => (
-                        <div
-                            key={node.id}
-                            onClick={(e) => {
-                                // Don't trigger on connector points or delete button
-                                if ((e.target as HTMLElement).closest('.connector-point, button')) return;
-
-                                if (node.type === 'fetchData') {
-                                    if (node.data && node.status === 'completed') {
-                                        setViewingDataNodeId(node.id);
-                                    } else {
-                                        openNodeConfig(node.id);
-                                    }
-                                }
-                            }}
-                            style={{
-                                position: 'absolute',
-                                left: node.x,
-                                top: node.y,
-                                transform: 'translate(-50%, -50%)', // Center on drop point
-                                zIndex: 10,
-                                cursor: node.type === 'fetchData' ? 'pointer' : 'default'
-                            }}
-                            className={`flex flex-col p-4 rounded-lg border-2 shadow-md w-48 group relative ${getNodeColor(node.type, node.status)}`}
+                    {/* Zoom Controls */}
+                    <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2">
+                        <button
+                            onClick={() => setCanvasZoom(prev => Math.min(prev * 1.2, 3))}
+                            className="px-3 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm font-bold"
+                            title="Zoom In"
                         >
-                            <div className="flex items-center">
-                                <div className="flex-1 font-medium text-sm">{node.label}</div>
-                                {node.status === 'completed' && <Check size={16} className="text-green-600" />}
-                                {node.status === 'error' && <XCircle size={16} className="text-red-600" />}
-                                <button
-                                    onClick={() => removeNode(node.id)}
-                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all ml-2"
+                            +
+                        </button>
+                        <button
+                            onClick={() => setCanvasZoom(prev => Math.max(prev / 1.2, 0.25))}
+                            className="px-3 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm font-bold"
+                            title="Zoom Out"
+                        >
+                            −
+                        </button>
+                        <button
+                            onClick={resetView}
+                            className="px-3 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm text-xs"
+                            title="Reset View"
+                        >
+                            Reset
+                        </button>
+                        <div className="px-3 py-1 bg-white border border-slate-300 rounded-lg shadow-sm text-xs text-center">
+                            {Math.round(canvasZoom * 100)}%
+                        </div>
+                    </div>
+
+                    {/* Content with transform */}
+                    <div style={{
+                        transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${canvasZoom})`,
+                        transformOrigin: '0 0',
+                        width: '100%',
+                        height: '100%',
+                        position: 'relative'
+                    }}>
+                        {/* SVG Layer for Connections */}
+                        <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
+                            {connections.map(conn => {
+                                const fromNode = nodes.find(n => n.id === conn.fromNodeId);
+                                const toNode = nodes.find(n => n.id === conn.toNodeId);
+                                if (!fromNode || !toNode) return null;
+
+                                // Calculate line positions (from right of fromNode to left of toNode)
+                                const x1 = fromNode.x + 96; // Half width of node (192px / 2)
+                                const y1 = fromNode.y;
+                                const x2 = toNode.x - 96;
+                                const y2 = toNode.y;
+
+                                // Color based on outputType: green for true, red for false, teal for default
+                                const strokeColor = conn.outputType === 'true' ? '#10b981'
+                                    : conn.outputType === 'false' ? '#ef4444'
+                                        : '#0d9488';
+
+                                return (
+                                    <line
+                                        key={conn.id}
+                                        x1={x1}
+                                        y1={y1}
+                                        x2={x2}
+                                        y2={y2}
+                                        stroke={strokeColor}
+                                        strokeWidth="3"
+                                        markerEnd="url(#arrowhead)"
+                                    />
+                                );
+                            })}
+                            {/* Arrow marker definition */}
+                            <defs>
+                                <marker
+                                    id="arrowhead"
+                                    markerWidth="10"
+                                    markerHeight="10"
+                                    refX="9"
+                                    refY="3"
+                                    orient="auto"
                                 >
-                                    <X size={14} />
-                                </button>
-                            </div>
+                                    <polygon points="0 0, 10 3, 0 6" fill="#0d9488" />
+                                </marker>
+                            </defs>
+                        </svg>
 
-                            {node.executionResult && (
-                                <div className="mt-2 text-xs italic opacity-75">
-                                    {node.executionResult}
-                                </div>
-                            )}
-
-                            {node.type === 'fetchData' && node.config?.entityName && (
-                                <div className="mt-2 text-xs font-medium text-teal-700">
-                                    Entity: {node.config.entityName}
-                                    {node.data && (
-                                        <span className="ml-2 text-green-600">({node.data.length} records)</span>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Connector Points */}
+                        {nodes.map((node) => (
                             <div
+                                key={node.id}
                                 onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleConnectorClick(node.id);
+                                    // Don't trigger on connector points or delete button
+                                    if ((e.target as HTMLElement).closest('.connector-point, button')) return;
+
+                                    // Open config for configurable nodes
+                                    if (node.type === 'fetchData') {
+                                        openNodeConfig(node.id);
+                                    } else if (node.type === 'condition') {
+                                        openConditionConfig(node.id);
+                                    } else if (node.type === 'addField') {
+                                        openAddFieldConfig(node.id);
+                                    } else if (node.type === 'saveRecords') {
+                                        openSaveRecordsConfig(node.id);
+                                    }
                                 }}
-                                className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all ${connectingFrom === node.id ? 'border-teal-500 scale-150' : 'border-slate-400'
-                                    }`}
-                            />
-                            {node.type !== 'trigger' && (
+                                style={{
+                                    position: 'absolute',
+                                    left: node.x,
+                                    top: node.y,
+                                    transform: 'translate(-50%, -50%)', // Center on drop point
+                                    zIndex: 10,
+                                    cursor: (node.data || ['fetchData', 'condition', 'addField', 'saveRecords'].includes(node.type)) ? 'pointer' : 'default'
+                                }}
+                                className={`flex flex-col p-4 rounded-lg border-2 shadow-md w-48 group relative ${getNodeColor(node.type, node.status)}`}
+                            >
+                                <div className="flex items-center">
+                                    <div className="flex-1 font-medium text-sm">{node.label}</div>
+                                    {node.status === 'completed' && <Check size={16} className="text-green-600" />}
+                                    {node.status === 'error' && <XCircle size={16} className="text-red-600" />}
+                                    {node.data && Array.isArray(node.data) && node.data.length > 0 && (
+                                        <button
+                                            onClick={() => setViewingDataNodeId(node.id)}
+                                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all ml-2"
+                                            title="View Data"
+                                        >
+                                            <Database size={14} />
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => removeNode(node.id)}
+                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all ml-2"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+
+                                {node.executionResult && (
+                                    <div className="mt-2 text-xs italic opacity-75">
+                                        {node.executionResult}
+                                    </div>
+                                )}
+
+                                {node.type === 'fetchData' && node.config?.entityName && (
+                                    <div className="mt-2 text-xs font-medium text-teal-700">
+                                        Entity: {node.config.entityName}
+                                        {node.data && (
+                                            <span className="ml-2 text-green-600">({node.data.length} records)</span>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Connector Points */}
                                 <div
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         handleConnectorClick(node.id);
                                     }}
-                                    className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all ${connectingFrom === node.id ? 'border-teal-500 scale-150' : 'border-slate-400'
+                                    className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all ${connectingFrom === node.id ? 'border-teal-500 scale-150' : 'border-slate-400'
                                         }`}
                                 />
-                            )}
-                        </div>
-                    ))}
+                                {node.type !== 'trigger' && (
+                                    <div
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleConnectorClick(node.id);
+                                        }}
+                                        className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all ${connectingFrom === node.id ? 'border-teal-500 scale-150' : 'border-slate-400'
+                                            }`}
+                                    />
+                                )}
+                            </div>
+                        ))}
 
-                    {nodes.length === 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="text-center text-slate-400">
-                                <Workflow size={48} className="mx-auto mb-4 opacity-50" />
-                                <p className="text-lg font-medium">Drag components here</p>
+                        {nodes.length === 0 && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="text-center text-slate-400">
+                                    <Workflow size={48} className="mx-auto mb-4 opacity-50" />
+                                    <p className="text-lg font-medium">Drag components here</p>
+                                </div>
+                            </div>
+                        )}
+                    </div> {/* Close transform div */}
+                </div> {/* Close canvas div */}
+
+                {/* Configuration Modal */}
+                {configuringNodeId && (
+                    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringNodeId(null)}>
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
+                            <h3 className="text-lg font-bold text-slate-800 mb-4">Configure Fetch Data</h3>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Select Entity
+                                </label>
+                                <select
+                                    value={selectedEntityId}
+                                    onChange={(e) => setSelectedEntityId(e.target.value)}
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                >
+                                    <option value="">Choose entity...</option>
+                                    {entities.map(entity => (
+                                        <option key={entity.id} value={entity.id}>{entity.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                                <button
+                                    onClick={() => setConfiguringNodeId(null)}
+                                    className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={saveNodeConfig}
+                                    disabled={!selectedEntityId}
+                                    className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium"
+                                >
+                                    Save
+                                </button>
                             </div>
                         </div>
-                    )}
-                </div>
-            </div>
+                    </div>
+                )}
 
-            {/* Configuration Modal */}
-            {configuringNodeId && (
-                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringNodeId(null)}>
-                    <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
-                        <h3 className="text-lg font-bold text-slate-800 mb-4">Configure Fetch Data</h3>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Select Entity
-                            </label>
-                            <select
-                                value={selectedEntityId}
-                                onChange={(e) => setSelectedEntityId(e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                            >
-                                <option value="">Choose entity...</option>
-                                {entities.map(entity => (
-                                    <option key={entity.id} value={entity.id}>{entity.name}</option>
-                                ))}
-                            </select>
+                {/* Data Preview Modal */}
+                {viewingDataNodeId && (() => {
+                    const node = nodes.find(n => n.id === viewingDataNodeId);
+                    if (!node) return null;
+
+                    const hasInput = node.inputData && Array.isArray(node.inputData) && node.inputData.length > 0;
+                    const hasOutput = node.outputData && Array.isArray(node.outputData) && node.outputData.length > 0;
+
+                    if (!hasInput && !hasOutput) return null;
+
+                    return (
+                        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setViewingDataNodeId(null)}>
+                            <div className="bg-white rounded-lg shadow-xl p-6 max-w-4xl max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-bold text-slate-800">
+                                        {node.label} - Data Preview
+                                    </h3>
+                                    <button
+                                        onClick={() => setViewingDataNodeId(null)}
+                                        className="p-1 hover:bg-slate-100 rounded"
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                </div>
+
+                                {/* Tabs */}
+                                <div className="flex gap-2 mb-4 border-b">
+                                    {hasInput && (
+                                        <button
+                                            onClick={() => setDataViewTab('input')}
+                                            className={`px-4 py-2 font-medium transition-all ${dataViewTab === 'input'
+                                                    ? 'text-emerald-600 border-b-2 border-emerald-600'
+                                                    : 'text-slate-600 hover:text-slate-800'
+                                                }`}
+                                        >
+                                            Input ({node.inputData.length})
+                                        </button>
+                                    )}
+                                    {hasOutput && (
+                                        <button
+                                            onClick={() => setDataViewTab('output')}
+                                            className={`px-4 py-2 font-medium transition-all ${dataViewTab === 'output'
+                                                    ? 'text-emerald-600 border-b-2 border-emerald-600'
+                                                    : 'text-slate-600 hover:text-slate-800'
+                                                }`}
+                                        >
+                                            Output ({node.outputData.length})
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="overflow-auto flex-1">
+                                    {(() => {
+                                        const displayData = dataViewTab === 'input' ? node.inputData : node.outputData;
+                                        return displayData && displayData.length > 0 ? (
+                                            <table className="w-full text-sm">
+                                                <thead className="bg-slate-100 sticky top-0">
+                                                    <tr>
+                                                        {Object.keys(displayData[0]).map(key => (
+                                                            <th key={key} className="px-4 py-2 text-left font-semibold text-slate-700 border-b">
+                                                                {key}
+                                                            </th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {displayData.map((record: any, idx: number) => (
+                                                        <tr key={idx} className="border-b hover:bg-slate-50">
+                                                            {Object.values(record).map((value: any, vidx: number) => (
+                                                                <td key={vidx} className="px-4 py-2">
+                                                                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                                                </td>
+                                                            ))}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        ) : (
+                                            <p className="text-slate-500 text-center py-8">No data available</p>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex gap-2 justify-end">
-                            <button
-                                onClick={() => setConfiguringNodeId(null)}
-                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={saveNodeConfig}
-                                disabled={!selectedEntityId}
-                                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium"
-                            >
-                                Save
-                            </button>
+                    );
+                })()}
+
+                {/* Condition Configuration Modal */}
+                {configuringConditionNodeId && (
+                    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringConditionNodeId(null)}>
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
+                            <h3 className="text-lg font-bold text-slate-800 mb-4">Configure Condition</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        Field Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={conditionField}
+                                        onChange={(e) => setConditionField(e.target.value)}
+                                        placeholder="e.g., status, price, name"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        Operator
+                                    </label>
+                                    <select
+                                        value={conditionOperator}
+                                        onChange={(e) => setConditionOperator(e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                    >
+                                        <option value="isText">Is Text</option>
+                                        <option value="isNumber">Is Number</option>
+                                        <option value="equals">Equals</option>
+                                        <option value="greaterThan">Greater Than</option>
+                                        <option value="lessThan">Less Than</option>
+                                    </select>
+                                </div>
+                                {['equals', 'greaterThan', 'lessThan'].includes(conditionOperator) && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Value
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={conditionValue}
+                                            onChange={(e) => setConditionValue(e.target.value)}
+                                            placeholder="Comparison value"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex gap-2 justify-end mt-6">
+                                <button
+                                    onClick={() => setConfiguringConditionNodeId(null)}
+                                    className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={saveConditionConfig}
+                                    disabled={!conditionField}
+                                    className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 text-sm font-medium"
+                                >
+                                    Save
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+
+                {/* Add Field Configuration Modal */}
+                {configuringAddFieldNodeId && (
+                    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringAddFieldNodeId(null)}>
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
+                            <h3 className="text-lg font-bold text-slate-800 mb-4">Add Field to Records</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        Field Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={addFieldName}
+                                        onChange={(e) => setAddFieldName(e.target.value)}
+                                        placeholder="e.g., Nombre, Category"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        Field Value
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={addFieldValue}
+                                        onChange={(e) => setAddFieldValue(e.target.value)}
+                                        placeholder="e.g., Albert, Active"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex gap-2 justify-end mt-6">
+                                <button
+                                    onClick={() => setConfiguringAddFieldNodeId(null)}
+                                    className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={saveAddFieldConfig}
+                                    disabled={!addFieldName}
+                                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
+                                >
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Save Records Configuration Modal */}
+                {configuringSaveNodeId && (
+                    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringSaveNodeId(null)}>
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
+                            <h3 className="text-lg font-bold text-slate-800 mb-4">Save Records to Entity</h3>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Select Entity
+                                </label>
+                                <select
+                                    value={saveEntityId}
+                                    onChange={(e) => setSaveEntityId(e.target.value)}
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                >
+                                    <option value="">Choose entity...</option>
+                                    {entities.map(entity => (
+                                        <option key={entity.id} value={entity.id}>{entity.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                                <button
+                                    onClick={() => setConfiguringSaveNodeId(null)}
+                                    className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={saveSaveRecordsConfig}
+                                    disabled={!saveEntityId}
+                                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm font-medium"
+                                >
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
