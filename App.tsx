@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar';
 import { EntityCard } from './components/EntityCard';
 import { Reporting } from './components/Reporting';
 import { Dashboard } from './components/Dashboard';
+import { Workflows } from './components/Workflows';
 import { Entity, Property, PropertyType } from './types';
 import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X } from 'lucide-react';
 
@@ -385,6 +386,8 @@ export default function App() {
                             setActiveTab('data');
                         }}
                     />
+                ) : currentView === 'workflows' ? (
+                    <Workflows />
                 ) : currentView === 'reports' ? (
                     <Reporting entities={entities} />
                 ) : (

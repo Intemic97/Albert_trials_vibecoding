@@ -50,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
           <NavItem icon={Users} label="Copilots" />
 
           <SectionLabel label="Modeling" />
-          <NavItem icon={Workflow} label="Dataflows" />
+          <NavItem icon={Workflow} label="Workflows" view="workflows" active={activeView === 'workflows'} />
           <NavItem icon={Database} label="Database" view="database" active={activeView === 'database'} />
           <NavItem icon={Cpu} label="Reports" view="reports" active={activeView === 'reports'} />
 
