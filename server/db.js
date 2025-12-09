@@ -45,6 +45,14 @@ async function initDb() {
       FOREIGN KEY(recordId) REFERENCES records(id) ON DELETE CASCADE,
       FOREIGN KEY(propertyId) REFERENCES properties(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS workflows (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      data TEXT NOT NULL,
+      createdAt TEXT,
+      updatedAt TEXT
+    );
   `);
 
   return db;
