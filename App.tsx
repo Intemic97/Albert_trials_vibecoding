@@ -387,7 +387,7 @@ export default function App() {
                         }}
                     />
                 ) : currentView === 'workflows' ? (
-                    <Workflows />
+                    <Workflows entities={entities} />
                 ) : currentView === 'reports' ? (
                     <Reporting entities={entities} />
                 ) : (

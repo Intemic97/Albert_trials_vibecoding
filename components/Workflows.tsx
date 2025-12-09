@@ -1,12 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2 } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database } from 'lucide-react';
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData';
     label: string;
     x: number;
     y: number;
+    status?: 'idle' | 'running' | 'completed' | 'error';
+    executionResult?: string;
+    config?: {
+        entityId?: string;
+        entityName?: string;
+    };
+    data?: any;
 }
 
 interface Connection {
@@ -16,7 +23,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData';
     label: string;
     icon: React.ElementType;
 }
@@ -24,12 +31,17 @@ interface DraggableItem {
 const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'trigger', label: 'Manual Trigger', icon: Play },
     { type: 'trigger', label: 'Schedule', icon: Workflow },
+    { type: 'fetchData', label: 'Fetch Data', icon: Database },
     { type: 'action', label: 'Send Email', icon: Zap },
     { type: 'action', label: 'Update Record', icon: CheckCircle },
     { type: 'condition', label: 'If / Else', icon: AlertCircle },
 ];
 
-export const Workflows: React.FC = () => {
+interface WorkflowsProps {
+    entities: any[];
+}
+
+export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
     const [nodes, setNodes] = useState<WorkflowNode[]>([]);
     const [connections, setConnections] = useState<Connection[]>([]);
     const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
@@ -38,6 +50,10 @@ export const Workflows: React.FC = () => {
     const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null);
     const [savedWorkflows, setSavedWorkflows] = useState<any[]>([]);
     const [isSaving, setIsSaving] = useState(false);
+    const [isRunning, setIsRunning] = useState(false);
+    const [configuringNodeId, setConfiguringNodeId] = useState<string | null>(null);
+    const [selectedEntityId, setSelectedEntityId] = useState<string>('');
+    const [viewingDataNodeId, setViewingDataNodeId] = useState<string | null>(null);
     const canvasRef = useRef<HTMLDivElement>(null);
 
     // Load workflows on mount
@@ -135,6 +151,117 @@ export const Workflows: React.FC = () => {
         setConnectingFrom(null);
     };
 
+    const openNodeConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'fetchData') {
+            setConfiguringNodeId(nodeId);
+            setSelectedEntityId(node.config?.entityId || '');
+        }
+    };
+
+    const saveNodeConfig = () => {
+        if (!configuringNodeId || !selectedEntityId) return;
+
+        const entity = entities.find(e => e.id === selectedEntityId);
+        setNodes(prev => prev.map(n =>
+            n.id === configuringNodeId
+                ? { ...n, config: { entityId: selectedEntityId, entityName: entity?.name || '' } }
+                : n
+        ));
+        setConfiguringNodeId(null);
+        setSelectedEntityId('');
+    };
+
+    const runWorkflow = async () => {
+        if (isRunning) return;
+        setIsRunning(true);
+
+        // Reset all nodes to idle
+        setNodes(prev => prev.map(n => ({ ...n, status: 'idle' as const, executionResult: undefined })));
+
+        // Find trigger nodes (nodes with no incoming connections)
+        const triggerNodes = nodes.filter(node =>
+            !connections.some(conn => conn.toNodeId === node.id)
+        );
+
+        if (triggerNodes.length === 0) {
+            alert('No trigger nodes found! Add a node without incoming connections.');
+            setIsRunning(false);
+            return;
+        }
+
+        // Execute nodes in order following connections
+        const executeNode = async (nodeId: string) => {
+            const node = nodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            // Set to running
+            setNodes(prev => prev.map(n =>
+                n.id === nodeId ? { ...n, status: 'running' as const } : n
+            ));
+
+            //Simulate work
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // Set result based on type
+            let result = '';
+            let nodeData: any = null;
+
+            if (node.type === 'fetchData') {
+                if (!node.config?.entityId) {
+                    result = 'Error: No entity configured';
+                    setNodes(prev => prev.map(n =>
+                        n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
+                    ));
+                    return;
+                }
+
+                try {
+                    const res = await fetch(`http://localhost:3001/api/entities/${node.config.entityId}/records`);
+                    const records = await res.json();
+                    nodeData = records;
+                    result = `Fetched ${records.length} records from ${node.config.entityName}`;
+                } catch (error) {
+                    result = 'Error fetching data';
+                    setNodes(prev => prev.map(n =>
+                        n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
+                    ));
+                    return;
+                }
+            } else {
+                switch (node.type) {
+                    case 'trigger':
+                        result = 'Triggered!';
+                        break;
+                    case 'action':
+                        result = 'Action executed!';
+                        break;
+                    case 'condition':
+                        result = 'Condition evaluated!';
+                        break;
+                }
+            }
+
+            // Set to completed
+            setNodes(prev => prev.map(n =>
+                n.id === nodeId ? { ...n, status: 'completed' as const, executionResult: result } : n
+            ));
+
+            // Find and execute connected nodes
+            const nextConnections = connections.filter(conn => conn.fromNodeId === nodeId);
+            for (const conn of nextConnections) {
+                await executeNode(conn.toNodeId);
+            }
+        };
+
+        // Execute all trigger nodes
+        for (const trigger of triggerNodes) {
+            await executeNode(trigger.id);
+        }
+
+        setIsRunning(false);
+    };
+
 
     const handleDragStart = (e: React.DragEvent, item: DraggableItem) => {
         setDraggingItem(item);
@@ -193,12 +320,16 @@ export const Workflows: React.FC = () => {
         }
     };
 
-    // Simple node rendering based on type
-    const getNodeColor = (type: string) => {
+    const getNodeColor = (type: string, status?: string) => {
+        if (status === 'running') return 'bg-yellow-100 border-yellow-400 text-yellow-900 animate-pulse';
+        if (status === 'completed') return 'bg-green-100 border-green-400 text-green-900';
+        if (status === 'error') return 'bg-red-100 border-red-400 text-red-900';
+
         switch (type) {
             case 'trigger': return 'bg-purple-100 border-purple-300 text-purple-800';
             case 'action': return 'bg-blue-100 border-blue-300 text-blue-800';
             case 'condition': return 'bg-amber-100 border-amber-300 text-amber-800';
+            case 'fetchData': return 'bg-teal-100 border-teal-300 text-teal-800';
             default: return 'bg-slate-100 border-slate-300';
         }
     };
@@ -273,6 +404,14 @@ export const Workflows: React.FC = () => {
                             <Save size={16} />
                             {isSaving ? 'Saving...' : 'Save'}
                         </button>
+                        <button
+                            onClick={runWorkflow}
+                            disabled={isRunning}
+                            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                        >
+                            <PlayCircle size={16} />
+                            {isRunning ? 'Running...' : 'Run'}
+                        </button>
                     </div>
                 </div>
 
@@ -326,22 +465,54 @@ export const Workflows: React.FC = () => {
                     {nodes.map((node) => (
                         <div
                             key={node.id}
+                            onClick={(e) => {
+                                // Don't trigger on connector points or delete button
+                                if ((e.target as HTMLElement).closest('.connector-point, button')) return;
+
+                                if (node.type === 'fetchData') {
+                                    if (node.data && node.status === 'completed') {
+                                        setViewingDataNodeId(node.id);
+                                    } else {
+                                        openNodeConfig(node.id);
+                                    }
+                                }
+                            }}
                             style={{
                                 position: 'absolute',
                                 left: node.x,
                                 top: node.y,
                                 transform: 'translate(-50%, -50%)', // Center on drop point
-                                zIndex: 10
+                                zIndex: 10,
+                                cursor: node.type === 'fetchData' ? 'pointer' : 'default'
                             }}
-                            className={`flex items-center p-4 rounded-lg border shadow-md w-48 group ${getNodeColor(node.type)}`}
+                            className={`flex flex-col p-4 rounded-lg border-2 shadow-md w-48 group relative ${getNodeColor(node.type, node.status)}`}
                         >
-                            <div className="flex-1 font-medium text-sm">{node.label}</div>
-                            <button
-                                onClick={() => removeNode(node.id)}
-                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all"
-                            >
-                                <X size={14} />
-                            </button>
+                            <div className="flex items-center">
+                                <div className="flex-1 font-medium text-sm">{node.label}</div>
+                                {node.status === 'completed' && <Check size={16} className="text-green-600" />}
+                                {node.status === 'error' && <XCircle size={16} className="text-red-600" />}
+                                <button
+                                    onClick={() => removeNode(node.id)}
+                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all ml-2"
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+
+                            {node.executionResult && (
+                                <div className="mt-2 text-xs italic opacity-75">
+                                    {node.executionResult}
+                                </div>
+                            )}
+
+                            {node.type === 'fetchData' && node.config?.entityName && (
+                                <div className="mt-2 text-xs font-medium text-teal-700">
+                                    Entity: {node.config.entityName}
+                                    {node.data && (
+                                        <span className="ml-2 text-green-600">({node.data.length} records)</span>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Connector Points */}
                             <div
@@ -375,6 +546,45 @@ export const Workflows: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {/* Configuration Modal */}
+            {configuringNodeId && (
+                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringNodeId(null)}>
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-lg font-bold text-slate-800 mb-4">Configure Fetch Data</h3>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                Select Entity
+                            </label>
+                            <select
+                                value={selectedEntityId}
+                                onChange={(e) => setSelectedEntityId(e.target.value)}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                            >
+                                <option value="">Choose entity...</option>
+                                {entities.map(entity => (
+                                    <option key={entity.id} value={entity.id}>{entity.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                            <button
+                                onClick={() => setConfiguringNodeId(null)}
+                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={saveNodeConfig}
+                                disabled={!selectedEntityId}
+                                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium"
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
