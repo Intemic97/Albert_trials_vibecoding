@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python';
     label: string;
     x: number;
     y: number;
@@ -21,6 +21,8 @@ interface WorkflowNode {
         llmPrompt?: string;
         llmContextEntities?: string[];
         llmIncludeInput?: boolean;
+        pythonCode?: string;
+        pythonAiPrompt?: string;
     };
     executionResult?: string;
     data?: any;
@@ -37,7 +39,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -52,6 +54,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'equipment', label: 'Equipment', icon: Wrench, description: 'Use specific equipment data', category: 'Data' },
     { type: 'condition', label: 'If / Else', icon: AlertCircle, description: 'Branch based on conditions', category: 'Logic' },
     { type: 'llm', label: 'AI Generation', icon: Sparkles, description: 'Generate text using AI', category: 'Logic' },
+    { type: 'python', label: 'Python Code', icon: Code, description: 'Run Python script', category: 'Logic' },
     { type: 'addField', label: 'Add Field', icon: CheckCircle, description: 'Add a new field to data', category: 'Logic' },
     { type: 'action', label: 'Send Email', icon: Zap, description: 'Send an email notification', category: 'Actions' },
     { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },
@@ -101,6 +104,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
     const [llmPrompt, setLlmPrompt] = useState<string>('');
     const [llmContextEntities, setLlmContextEntities] = useState<string[]>([]);
     const [llmIncludeInput, setLlmIncludeInput] = useState<boolean>(true);
+
+    // Python Node State
+    const [configuringPythonNodeId, setConfiguringPythonNodeId] = useState<string | null>(null);
+    const [pythonCode, setPythonCode] = useState<string>('def process(data):\n    # Modify data here\n    return data');
+    const [pythonAiPrompt, setPythonAiPrompt] = useState<string>('');
+    const [isGeneratingCode, setIsGeneratingCode] = useState(false);
 
     const [dataViewTab, setDataViewTab] = useState<'input' | 'output'>('output');
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
@@ -412,6 +421,48 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
         setLlmIncludeInput(true);
     };
 
+    const openPythonConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node) {
+            setPythonCode(node.config?.pythonCode || 'def process(data):\n    # Modify data here\n    return data');
+            setPythonAiPrompt(node.config?.pythonAiPrompt || '');
+            setConfiguringPythonNodeId(nodeId);
+        }
+    };
+
+    const savePythonConfig = () => {
+        if (configuringPythonNodeId) {
+            setNodes(nodes.map(n => n.id === configuringPythonNodeId ? {
+                ...n,
+                config: { ...n.config, pythonCode, pythonAiPrompt }
+            } : n));
+            setConfiguringPythonNodeId(null);
+        }
+    };
+
+    const generatePythonCode = async () => {
+        if (!pythonAiPrompt.trim()) return;
+
+        setIsGeneratingCode(true);
+        try {
+            const response = await fetch('/api/python/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: pythonAiPrompt })
+            });
+
+            if (!response.ok) throw new Error('Failed to generate code');
+
+            const data = await response.json();
+            setPythonCode(data.code);
+        } catch (error) {
+            console.error('Error generating python code:', error);
+            alert('Failed to generate code. Please try again.');
+        } finally {
+            setIsGeneratingCode(false);
+        }
+    };
+
     const runWorkflow = async () => {
         if (isRunning) return;
         setIsRunning(true);
@@ -595,6 +646,35 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                             }
                         } else {
                             result = 'Not configured or no data';
+                        }
+                        break;
+                    case 'python':
+                        if (node.config?.pythonCode) {
+                            try {
+                                const response = await fetch('http://localhost:3001/api/python/execute', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        code: node.config.pythonCode,
+                                        inputData: inputData || []
+                                    })
+                                });
+
+                                if (response.ok) {
+                                    const data = await response.json();
+                                    nodeData = data.result;
+                                    result = 'Python code executed successfully';
+                                } else {
+                                    const errorData = await response.json();
+                                    throw new Error(errorData.error || 'Python execution failed');
+                                }
+                            } catch (error) {
+                                console.error('Python execution error:', error);
+                                result = `Error: ${error.message || 'Failed to execute'}`;
+                                nodeData = [{ error: error.message }];
+                            }
+                        } else {
+                            result = 'Code not configured';
                         }
                         break;
                     case 'llm':
@@ -1001,35 +1081,39 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                 const x2 = toNode.x - 96;
                                 const y2 = toNode.y;
 
+                                // Control points for Bezier curve
+                                const c1x = x1 + Math.abs(x2 - x1) / 2;
+                                const c1y = y1;
+                                const c2x = x2 - Math.abs(x2 - x1) / 2;
+                                const c2y = y2;
+
                                 // Color based on outputType: green for true, red for false, teal for default
                                 const strokeColor = conn.outputType === 'true' ? '#10b981'
                                     : conn.outputType === 'false' ? '#ef4444'
                                         : '#0d9488';
 
                                 return (
-                                    <line
+                                    <path
                                         key={conn.id}
-                                        x1={x1}
-                                        y1={y1}
-                                        x2={x2}
-                                        y2={y2}
+                                        d={`M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`}
                                         stroke={strokeColor}
-                                        strokeWidth="3"
-                                        markerEnd="url(#arrowhead)"
+                                        strokeWidth="2"
+                                        fill="none"
+                                        markerEnd="url(#workflow-arrowhead)"
                                     />
                                 );
                             })}
                             {/* Arrow marker definition */}
                             <defs>
                                 <marker
-                                    id="arrowhead"
-                                    markerWidth="10"
-                                    markerHeight="10"
-                                    refX="9"
+                                    id="workflow-arrowhead"
+                                    markerWidth="6"
+                                    markerHeight="6"
+                                    refX="5"
                                     refY="3"
                                     orient="auto"
                                 >
-                                    <polygon points="0 0, 10 3, 0 6" fill="#0d9488" />
+                                    <polygon points="0 0, 6 3, 0 6" fill="#0d9488" />
                                 </marker>
                             </defs>
                         </svg>
@@ -1055,6 +1139,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                         openEquipmentConfig(node.id);
                                     } else if (node.type === 'llm') {
                                         openLLMConfig(node.id);
+                                    } else if (node.type === 'python') {
+                                        openPythonConfig(node.id);
                                     }
                                 }}
                                 onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
@@ -1063,19 +1149,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                     left: node.x,
                                     top: node.y,
                                     transform: 'translate(-50%, -50%)', // Center on drop point
-
+                                    width: '192px', // Enforce fixed width (w-48)
                                     cursor: (node.data || ['fetchData', 'condition', 'addField', 'saveRecords', 'equipment', 'llm'].includes(node.type)) ? 'grab' : 'default'
                                 }}
                                 className={`flex flex-col p-4 rounded-lg border-2 shadow-md w-48 group relative ${getNodeColor(node.type, node.status)}`}
                             >
-                                <div className="flex items-center">
-                                    <div className="flex-1 font-medium text-sm">{node.label}</div>
-                                    {node.status === 'completed' && <Check size={16} className="text-green-600" />}
-                                    {node.status === 'error' && <XCircle size={16} className="text-red-600" />}
+                                <div className="flex items-center overflow-hidden">
+                                    <div className="flex-1 font-medium text-sm truncate" title={node.label}>{node.label}</div>
+                                    {node.status === 'completed' && <Check size={16} className="text-green-600 flex-shrink-0 ml-1" />}
+                                    {node.status === 'error' && <XCircle size={16} className="text-red-600 flex-shrink-0 ml-1" />}
                                     {node.data && Array.isArray(node.data) && node.data.length > 0 && (
                                         <button
                                             onClick={() => setViewingDataNodeId(node.id)}
-                                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all ml-2"
+                                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all ml-2 flex-shrink-0"
                                             title="View Data"
                                         >
                                             <Database size={14} />
@@ -1557,6 +1643,91 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                 onClick={saveLLMConfig}
                                 disabled={!llmPrompt.trim()}
                                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Python Config Modal */}
+            {configuringPythonNodeId && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl shadow-xl p-6 w-[600px] max-w-full">
+                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <Code className="text-yellow-600" />
+                            Configure Python Code
+                        </h3>
+
+                        <div className="space-y-4">
+                            {/* AI Assistant Section */}
+                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                                    <Sparkles size={14} className="text-violet-500" />
+                                    Ask AI to write code
+                                </label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={pythonAiPrompt}
+                                        onChange={(e) => setPythonAiPrompt(e.target.value)}
+                                        placeholder="e.g., Filter records where price > 100"
+                                        className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-sm"
+                                        onKeyDown={(e) => e.key === 'Enter' && generatePythonCode()}
+                                    />
+                                    <button
+                                        onClick={generatePythonCode}
+                                        disabled={isGeneratingCode || !pythonAiPrompt.trim()}
+                                        className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 text-sm font-medium whitespace-nowrap flex items-center gap-2"
+                                    >
+                                        {isGeneratingCode ? (
+                                            <>
+                                                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                Generating...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles size={14} />
+                                                Generate
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Code Editor */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                    Python Code
+                                </label>
+                                <div className="relative">
+                                    <textarea
+                                        value={pythonCode}
+                                        onChange={(e) => setPythonCode(e.target.value)}
+                                        className="w-full px-4 py-3 bg-slate-900 text-slate-50 font-mono text-sm rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none h-64 resize-none"
+                                        spellCheck={false}
+                                    />
+                                    <div className="absolute top-2 right-2 text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded">
+                                        Python 3
+                                    </div>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Function must be named <code>process(data)</code> and return a list.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 mt-6">
+                            <button
+                                onClick={() => setConfiguringPythonNodeId(null)}
+                                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={savePythonConfig}
+                                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
                             >
                                 Save
                             </button>

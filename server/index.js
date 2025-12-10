@@ -375,6 +375,130 @@ app.post('/api/generate', async (req, res) => {
     }
 });
 
+// Python Execution Endpoint
+app.post('/api/python/execute', async (req, res) => {
+    const { code, inputData } = req.body;
+    const fs = require('fs');
+    const path = require('path');
+    const { spawn } = require('child_process');
+
+    try {
+        // Create a wrapper script that imports the user's code and runs it
+        const wrapperCode = `
+import json
+import sys
+
+# User code
+${code}
+
+if __name__ == "__main__":
+    try:
+        # Read input from stdin
+        input_data = json.load(sys.stdin)
+        
+        # Execute user function (assuming it's named 'process')
+        if 'process' in locals():
+            result = process(input_data)
+            print(json.dumps(result))
+        else:
+            print(json.dumps({"error": "Function 'process(data)' not found in code"}))
+            
+    except Exception as e:
+        print(json.dumps({"error": str(e)}))
+`;
+
+        // Write to temp file
+        const tempFile = path.join(__dirname, `temp_${Date.now()}.py`);
+        fs.writeFileSync(tempFile, wrapperCode);
+
+        // Execute python script
+        const pythonProcess = spawn('python', [tempFile]);
+
+        let stdoutData = '';
+        let stderrData = '';
+
+        // Send input data to stdin
+        pythonProcess.stdin.write(JSON.stringify(inputData || []));
+        pythonProcess.stdin.end();
+
+        pythonProcess.stdout.on('data', (data) => {
+            stdoutData += data.toString();
+        });
+
+        pythonProcess.stderr.on('data', (data) => {
+            stderrData += data.toString();
+        });
+
+        pythonProcess.on('close', (code) => {
+            // Cleanup temp file
+            try {
+                fs.unlinkSync(tempFile);
+            } catch (e) {
+                console.error('Error deleting temp file:', e);
+            }
+
+            if (code !== 0) {
+                return res.status(500).json({ error: stderrData || 'Python execution failed' });
+            }
+
+            try {
+                const result = JSON.parse(stdoutData);
+                res.json({ result });
+            } catch (e) {
+                res.status(500).json({ error: 'Failed to parse Python output: ' + stdoutData });
+            }
+        });
+
+    } catch (error) {
+        console.error('Error executing Python:', error);
+        res.status(500).json({ error: 'Internal server error during execution' });
+    }
+});
+
+// Python Code Generation Endpoint
+app.post('/api/python/generate', async (req, res) => {
+    const { prompt } = req.body;
+
+    if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ error: 'OpenAI API Key not configured' });
+    }
+
+    try {
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const completion = await openai.chat.completions.create({
+            messages: [
+                {
+                    role: "system",
+                    content: `You are a Python expert. Write a Python function named \`process(data)\` that takes a list of records (dictionaries) as input and returns a modified list. 
+                    
+                    Rules:
+                    1. The function MUST be named \`process\`.
+                    2. It MUST accept one argument \`data\`.
+                    3. It MUST return a list of dictionaries.
+                    4. Do NOT include any markdown formatting (like \`\`\`python).
+                    5. Do NOT include explanations. Just the code.
+                    6. Import any standard libraries you need inside the function or at the top.`
+                },
+                { role: "user", content: prompt }
+            ],
+            model: "gpt-4o",
+        });
+
+        let code = completion.choices[0].message.content;
+
+        // Strip markdown if present (just in case)
+        code = code.replace(/```python/g, '').replace(/```/g, '').trim();
+
+        res.json({ code });
+
+    } catch (error) {
+        console.error('Error generating Python code:', error);
+        res.status(500).json({ error: 'Failed to generate code' });
+    }
+});
+
 // OpenAI Widget Generation Endpoint
 app.post('/api/generate-widget', async (req, res) => {
     console.log('Received widget generation request');
