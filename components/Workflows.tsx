@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles } from 'lucide-react';
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm';
     label: string;
     x: number;
     y: number;
@@ -17,6 +17,9 @@ interface WorkflowNode {
         conditionValue?: string;
         recordId?: string;
         recordName?: string;
+        llmPrompt?: string;
+        llmContextEntities?: string[];
+        llmIncludeInput?: boolean;
     };
     executionResult?: string;
     data?: any;
@@ -33,7 +36,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -47,6 +50,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'saveRecords', label: 'Save Records', icon: Database, description: 'Create or update records', category: 'Data' },
     { type: 'equipment', label: 'Equipment', icon: Wrench, description: 'Use specific equipment data', category: 'Data' },
     { type: 'condition', label: 'If / Else', icon: AlertCircle, description: 'Branch based on conditions', category: 'Logic' },
+    { type: 'llm', label: 'AI Generation', icon: Sparkles, description: 'Generate text using AI', category: 'Logic' },
     { type: 'addField', label: 'Add Field', icon: CheckCircle, description: 'Add a new field to data', category: 'Logic' },
     { type: 'action', label: 'Send Email', icon: Zap, description: 'Send an email notification', category: 'Actions' },
     { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },
@@ -90,6 +94,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
     const [equipmentRecords, setEquipmentRecords] = useState<any[]>([]);
     const [selectedEquipmentId, setSelectedEquipmentId] = useState<string>('');
     const [isLoadingEquipments, setIsLoadingEquipments] = useState(false);
+
+    // LLM Node State
+    const [configuringLLMNodeId, setConfiguringLLMNodeId] = useState<string | null>(null);
+    const [llmPrompt, setLlmPrompt] = useState<string>('');
+    const [llmContextEntities, setLlmContextEntities] = useState<string[]>([]);
+    const [llmIncludeInput, setLlmIncludeInput] = useState<boolean>(true);
+
     const [dataViewTab, setDataViewTab] = useState<'input' | 'output'>('output');
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
     const [canvasZoom, setCanvasZoom] = useState(1);
@@ -368,6 +379,38 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
         setEquipmentRecords([]);
     };
 
+    const openLLMConfig = (nodeId: string) => {
+        setConfiguringLLMNodeId(nodeId);
+        const node = nodes.find(n => n.id === nodeId);
+        if (node) {
+            setLlmPrompt(node.config?.llmPrompt || '');
+            setLlmContextEntities(node.config?.llmContextEntities || []);
+            setLlmIncludeInput(node.config?.llmIncludeInput !== undefined ? node.config.llmIncludeInput : true);
+        }
+    };
+
+    const saveLLMConfig = () => {
+        if (!configuringLLMNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringLLMNodeId
+                ? {
+                    ...n,
+                    config: {
+                        ...n.config,
+                        llmPrompt,
+                        llmContextEntities,
+                        llmIncludeInput
+                    }
+                }
+                : n
+        ));
+        setConfiguringLLMNodeId(null);
+        setLlmPrompt('');
+        setLlmContextEntities([]);
+        setLlmIncludeInput(true);
+    };
+
     const runWorkflow = async () => {
         if (isRunning) return;
         setIsRunning(true);
@@ -553,6 +596,36 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                             result = 'Not configured or no data';
                         }
                         break;
+                    case 'llm':
+                        if (node.config?.llmPrompt) {
+                            try {
+                                const response = await fetch('http://localhost:3001/api/generate', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        prompt: node.config.llmPrompt,
+                                        mentionedEntityIds: node.config.llmContextEntities || [],
+                                        additionalContext: node.config.llmIncludeInput ? inputData : undefined
+                                    })
+                                });
+
+                                if (response.ok) {
+                                    const data = await response.json();
+                                    nodeData = [{ result: data.response }]; // Store as a record-like object
+                                    result = 'Generated text successfully';
+                                } else {
+                                    const errorData = await response.json();
+                                    throw new Error(errorData.error || 'Failed to generate text');
+                                }
+                            } catch (error) {
+                                console.error('LLM generation error:', error);
+                                result = `Error: ${error.message || 'Failed to generate'}`;
+                                nodeData = [{ error: error.message }];
+                            }
+                        } else {
+                            result = 'Prompt not configured';
+                        }
+                        break;
                 }
             }
 
@@ -607,8 +680,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
         setCanvasZoom(prev => Math.min(Math.max(prev * delta, 0.25), 3));
     };
 
+    const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+
     const handleCanvasMouseDown = (e: React.MouseEvent) => {
-        if (e.button === 0 || e.button === 1) { // Left or Middle mouse
+        // Panning logic (Middle mouse or Left mouse on canvas)
+        if (e.button === 1 || (e.button === 0 && !draggingNodeId)) {
             setIsPanning(true);
             setPanStart({ x: e.clientX - canvasOffset.x, y: e.clientY - canvasOffset.y });
             e.preventDefault();
@@ -621,11 +697,33 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                 x: e.clientX - panStart.x,
                 y: e.clientY - panStart.y
             });
+        } else if (draggingNodeId) {
+            // Node dragging logic
+            if (!canvasRef.current) return;
+            const canvasRect = canvasRef.current.getBoundingClientRect();
+
+            // Calculate new position in canvas coordinates
+            const x = (e.clientX - canvasRect.left - canvasOffset.x) / canvasZoom;
+            const y = (e.clientY - canvasRect.top - canvasOffset.y) / canvasZoom;
+
+            setNodes(prev => prev.map(n =>
+                n.id === draggingNodeId
+                    ? { ...n, x, y }
+                    : n
+            ));
         }
     };
 
     const handleCanvasMouseUp = () => {
         setIsPanning(false);
+        setDraggingNodeId(null);
+    };
+
+    const handleNodeMouseDown = (e: React.MouseEvent, nodeId: string) => {
+        if (e.button === 0) { // Left click only
+            e.stopPropagation(); // Prevent canvas panning
+            setDraggingNodeId(nodeId);
+        }
     };
 
     const resetView = () => {
@@ -659,17 +757,33 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
         setConnections(prev => prev.filter(c => c.fromNodeId !== id && c.toNodeId !== id));
     };
 
-    const handleConnectorClick = (nodeId: string, outputType?: 'true' | 'false') => {
-        if (!connectingFrom) {
-            // Start connecting
-            setConnectingFrom(nodeId);
-            setConnectingFromType(outputType || null);
-        } else if (connectingFrom !== nodeId) {
+    const [dragConnectionStart, setDragConnectionStart] = useState<{ nodeId: string, outputType?: 'true' | 'false', x: number, y: number } | null>(null);
+    const [dragConnectionCurrent, setDragConnectionCurrent] = useState<{ x: number, y: number } | null>(null);
+
+    const handleConnectorMouseDown = (e: React.MouseEvent, nodeId: string, outputType?: 'true' | 'false') => {
+        e.stopPropagation();
+        e.preventDefault();
+
+        // Calculate start position relative to canvas
+        if (!canvasRef.current) return;
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        const x = (e.clientX - canvasRect.left - canvasOffset.x) / canvasZoom;
+        const y = (e.clientY - canvasRect.top - canvasOffset.y) / canvasZoom;
+
+        setDragConnectionStart({ nodeId, outputType, x, y });
+        setDragConnectionCurrent({ x, y });
+    };
+
+    const handleConnectorMouseUp = (e: React.MouseEvent, targetNodeId: string) => {
+        e.stopPropagation();
+        e.preventDefault();
+
+        if (dragConnectionStart && dragConnectionStart.nodeId !== targetNodeId) {
             // Complete connection
-            let finalOutputType = connectingFromType;
+            let finalOutputType = dragConnectionStart.outputType;
 
             // If connecting from a condition node and no type was set, ask the user
-            const fromNode = nodes.find(n => n.id === connectingFrom);
+            const fromNode = nodes.find(n => n.id === dragConnectionStart.nodeId);
             if (fromNode?.type === 'condition' && !finalOutputType) {
                 const choice = window.confirm('Click OK for TRUE path, Cancel for FALSE path');
                 finalOutputType = choice ? 'true' : 'false';
@@ -677,18 +791,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
 
             const newConnection: Connection = {
                 id: crypto.randomUUID(),
-                fromNodeId: connectingFrom,
-                toNodeId: nodeId,
-                outputType: finalOutputType || undefined
+                fromNodeId: dragConnectionStart.nodeId,
+                toNodeId: targetNodeId,
+                outputType: finalOutputType
             };
             setConnections(prev => [...prev, newConnection]);
-            setConnectingFrom(null);
-            setConnectingFromType(null);
-        } else {
-            // Cancel if clicking same node
-            setConnectingFrom(null);
-            setConnectingFromType(null);
         }
+
+        setDragConnectionStart(null);
+        setDragConnectionCurrent(null);
     };
 
     const getNodeColor = (type: string, status?: string) => {
@@ -704,6 +815,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
             case 'equipment': return 'bg-orange-100 border-orange-300 text-orange-800';
             case 'addField': return 'bg-indigo-100 border-indigo-300 text-indigo-800';
             case 'saveRecords': return 'bg-emerald-100 border-emerald-300 text-emerald-800';
+            case 'llm': return 'bg-violet-100 border-violet-300 text-violet-800';
             default: return 'bg-slate-100 border-slate-300';
         }
     };
@@ -924,7 +1036,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                         {nodes.map((node) => (
                             <div
                                 key={node.id}
-                                onMouseDown={(e) => e.stopPropagation()}
+
                                 onClick={(e) => {
                                     // Don't trigger on connector points or delete button
                                     if ((e.target as HTMLElement).closest('.connector-point, button')) return;
@@ -940,16 +1052,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                         openSaveRecordsConfig(node.id);
                                     } else if (node.type === 'equipment') {
                                         openEquipmentConfig(node.id);
+                                    } else if (node.type === 'llm') {
+                                        openLLMConfig(node.id);
                                     }
                                 }}
+                                onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
                                 style={{
                                     position: 'absolute',
                                     left: node.x,
                                     top: node.y,
                                     transform: 'translate(-50%, -50%)', // Center on drop point
-                                    zIndex: 10,
 
-                                    cursor: (node.data || ['fetchData', 'condition', 'addField', 'saveRecords', 'equipment'].includes(node.type)) ? 'pointer' : 'default'
+                                    cursor: (node.data || ['fetchData', 'condition', 'addField', 'saveRecords', 'equipment', 'llm'].includes(node.type)) ? 'grab' : 'default'
                                 }}
                                 className={`flex flex-col p-4 rounded-lg border-2 shadow-md w-48 group relative ${getNodeColor(node.type, node.status)}`}
                             >
@@ -991,25 +1105,32 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
 
                                 {/* Connector Points */}
                                 <div
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleConnectorClick(node.id);
-                                    }}
-                                    className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all ${connectingFrom === node.id ? 'border-teal-500 scale-150' : 'border-slate-400'
+                                    onMouseDown={(e) => handleConnectorMouseDown(e, node.id)}
+                                    onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                    className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id ? 'border-teal-500 scale-150' : 'border-slate-400'
                                         }`}
                                 />
                                 {node.type !== 'trigger' && (
                                     <div
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleConnectorClick(node.id);
-                                        }}
-                                        className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all ${connectingFrom === node.id ? 'border-teal-500 scale-150' : 'border-slate-400'
-                                            }`}
+                                        onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                        className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all border-slate-400`}
                                     />
                                 )}
                             </div>
                         ))}
+
+                        {/* Temporary Connection Line */}
+                        {dragConnectionStart && dragConnectionCurrent && (
+                            <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 20 }}>
+                                <path
+                                    d={`M ${nodes.find(n => n.id === dragConnectionStart.nodeId)!.x + 96} ${nodes.find(n => n.id === dragConnectionStart.nodeId)!.y} C ${nodes.find(n => n.id === dragConnectionStart.nodeId)!.x + 96 + 50} ${nodes.find(n => n.id === dragConnectionStart.nodeId)!.y}, ${dragConnectionCurrent.x - 50} ${dragConnectionCurrent.y}, ${dragConnectionCurrent.x} ${dragConnectionCurrent.y}`}
+                                    stroke="#0d9488"
+                                    strokeWidth="2"
+                                    fill="none"
+                                    strokeDasharray="5,5"
+                                />
+                            </svg>
+                        )}
 
                         {nodes.length === 0 && (
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -1374,6 +1495,83 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                 onClick={saveEquipmentConfig}
                                 className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
                                 disabled={!selectedEquipmentId}
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* LLM Config Modal */}
+            {configuringLLMNodeId && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl shadow-xl p-6 w-[500px] max-w-full">
+                        <h3 className="text-lg font-bold text-slate-800 mb-4">Configure AI Generation</h3>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                    Prompt
+                                </label>
+                                <textarea
+                                    value={llmPrompt}
+                                    onChange={(e) => setLlmPrompt(e.target.value)}
+                                    placeholder="e.g., Summarize the status of these equipments..."
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none h-32 resize-none"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Context Entities (Optional)
+                                </label>
+                                <div className="border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1">
+                                    {entities.map(entity => (
+                                        <label key={entity.id} className="flex items-center gap-2 p-1 hover:bg-slate-50 rounded cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={llmContextEntities.includes(entity.id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setLlmContextEntities(prev => [...prev, entity.id]);
+                                                    } else {
+                                                        setLlmContextEntities(prev => prev.filter(id => id !== entity.id));
+                                                    }
+                                                }}
+                                                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                            <span className="text-sm text-slate-700">{entity.name}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    id="includeInput"
+                                    checked={llmIncludeInput}
+                                    onChange={(e) => setLlmIncludeInput(e.target.checked)}
+                                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <label htmlFor="includeInput" className="text-sm text-slate-700 cursor-pointer">
+                                    Include Input Data (from previous node)
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 mt-6">
+                            <button
+                                onClick={() => setConfiguringLLMNodeId(null)}
+                                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={saveLLMConfig}
+                                disabled={!llmPrompt.trim()}
+                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Save
                             </button>

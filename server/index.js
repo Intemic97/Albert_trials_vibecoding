@@ -264,9 +264,10 @@ app.post('/api/generate', async (req, res) => {
     console.log('Received generation request');
     console.time('Total Request Time');
     try {
-        const { prompt, mentionedEntityIds } = req.body;
+        const { prompt, mentionedEntityIds, additionalContext } = req.body;
         console.log('Prompt:', prompt);
         console.log('Mentioned IDs:', mentionedEntityIds);
+        console.log('Additional Context Present:', !!additionalContext);
 
         if (!process.env.OPENAI_API_KEY) {
             console.error('OpenAI API Key missing');
@@ -342,15 +343,22 @@ app.post('/api/generate', async (req, res) => {
         const OpenAI = require('openai');
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+        let systemPrompt = `You are a helpful data analyst assistant. 
+            You have access to the following data context (JSON format): ${JSON.stringify(contextData)}.`;
+
+        if (additionalContext) {
+            systemPrompt += `\n\nAdditionally, here is some specific input data to consider: ${JSON.stringify(additionalContext)}.`;
+        }
+
+        systemPrompt += `\n\nAnswer the user's question based on this data. 
+            If the answer is not in the data, say so.
+            Format your response in Markdown.`;
+
         const completion = await openai.chat.completions.create({
             messages: [
                 {
                     role: "system",
-                    content: `You are a helpful data analyst assistant. 
-            You have access to the following data context (JSON format): ${JSON.stringify(contextData)}. 
-            Answer the user's question based on this data. 
-            If the answer is not in the data, say so.
-            Format your response in Markdown.`
+                    content: systemPrompt
                 },
                 { role: "user", content: prompt }
             ],
