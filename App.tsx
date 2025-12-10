@@ -43,6 +43,21 @@ export default function App() {
 
     const activeEntity = entities.find(e => e.id === activeEntityId);
 
+    // Database Tab State
+    const [databaseTab, setDatabaseTab] = useState<'company' | 'entities'>('entities');
+
+    // Company Information State
+    const [companyInfo, setCompanyInfo] = useState({
+        name: '',
+        industry: '',
+        employees: '',
+        website: '',
+        linkedinUrl: '',
+        headquarters: '',
+        foundingYear: '',
+        overview: ''
+    });
+
     // Fetch Entities on Mount
     useEffect(() => {
         fetchEntities();
@@ -64,6 +79,32 @@ export default function App() {
             setEntities(data);
         } catch (error) {
             console.error('Error fetching entities:', error);
+        }
+    };
+
+    const fetchCompanyInfo = async () => {
+        try {
+            const res = await fetch('http://localhost:3001/api/company');
+            if (res.ok) {
+                const data = await res.json();
+                setCompanyInfo(data);
+            }
+        } catch (error) {
+            console.error('Error fetching company info:', error);
+        }
+    };
+
+    const updateCompanyInfo = async () => {
+        try {
+            await fetch('http://localhost:3001/api/company', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(companyInfo)
+            });
+            alert('Company information saved successfully!');
+        } catch (error) {
+            console.error('Error saving company info:', error);
+            alert('Failed to save company information');
         }
     };
 
@@ -430,59 +471,193 @@ export default function App() {
                             {/* LIST VIEW */}
                             {!activeEntityId && (
                                 <div className="space-y-6">
-                                    {/* Toolbar */}
-                                    <div className="flex justify-between items-center">
-                                        <div className="text-sm text-slate-500">
-                                            Total: {entities.length} entities
-                                        </div>
-                                        <div className="flex space-x-3">
-                                            <div className="relative">
-                                                <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Search..."
-                                                    className="pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent w-64 shadow-sm"
-                                                />
-                                            </div>
-                                            <button className="flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm transition-colors">
-                                                <Filter size={16} className="mr-2" />
-                                                Filter
-                                            </button>
-                                            <button
-                                                onClick={() => setIsCreatingEntity(true)}
-                                                className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-md transition-colors"
-                                            >
-                                                <Plus size={16} className="mr-2" />
-                                                Create Entity
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Grid */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
-                                        {entities.map(entity => (
-                                            <EntityCard
-                                                key={entity.id}
-                                                entity={entity}
-                                                onClick={(e) => {
-                                                    setActiveEntityId(e.id);
-                                                    setActiveTab('data');
-                                                }}
-                                                onDelete={handleDeleteEntity}
-                                            />
-                                        ))}
-
-                                        {/* Empty State / Add New Placeholder */}
-                                        <div
-                                            onClick={() => setIsCreatingEntity(true)}
-                                            className="border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center min-h-[200px] text-slate-400 hover:border-teal-500 hover:text-teal-600 hover:bg-teal-50 transition-all cursor-pointer group"
+                                    {/* Database Tabs */}
+                                    <div className="flex space-x-6 border-b border-slate-200 mb-6">
+                                        <button
+                                            onClick={() => setDatabaseTab('company')}
+                                            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${databaseTab === 'company'
+                                                ? 'border-teal-600 text-teal-600'
+                                                : 'border-transparent text-slate-500 hover:text-slate-700'
+                                                }`}
                                         >
-                                            <div className="p-4 bg-slate-100 rounded-full mb-3 group-hover:bg-white">
-                                                <Plus size={24} />
-                                            </div>
-                                            <span className="font-medium">Create new entity</span>
-                                        </div>
+                                            Company Information
+                                        </button>
+                                        <button
+                                            onClick={() => setDatabaseTab('entities')}
+                                            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${databaseTab === 'entities'
+                                                ? 'border-teal-600 text-teal-600'
+                                                : 'border-transparent text-slate-500 hover:text-slate-700'
+                                                }`}
+                                        >
+                                            Entities
+                                        </button>
                                     </div>
+
+                                    {/* Company Information Tab */}
+                                    {databaseTab === 'company' && (
+                                        <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+                                            <div className="flex justify-between items-center mb-6">
+                                                <div>
+                                                    <h2 className="text-lg font-semibold text-slate-800">Company Profile</h2>
+                                                    <p className="text-sm text-slate-500">Manage your company's core information.</p>
+                                                </div>
+                                                <button
+                                                    onClick={updateCompanyInfo}
+                                                    className="px-4 py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 transition-colors shadow-sm"
+                                                >
+                                                    Save Changes
+                                                </button>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div className="md:col-span-2">
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
+                                                    <input
+                                                        type="text"
+                                                        value={companyInfo.name}
+                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, name: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Industry</label>
+                                                    <input
+                                                        type="text"
+                                                        value={companyInfo.industry}
+                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, industry: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Number of Employees</label>
+                                                    <select
+                                                        value={companyInfo.employees}
+                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, employees: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                    >
+                                                        <option value="">Select...</option>
+                                                        <option value="1-10">1-10</option>
+                                                        <option value="11-50">11-50</option>
+                                                        <option value="51-200">51-200</option>
+                                                        <option value="201-500">201-500</option>
+                                                        <option value="500+">500+</option>
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Website</label>
+                                                    <input
+                                                        type="url"
+                                                        value={companyInfo.website}
+                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, website: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">LinkedIn URL</label>
+                                                    <input
+                                                        type="url"
+                                                        value={companyInfo.linkedinUrl}
+                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, linkedinUrl: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Headquarters Location</label>
+                                                    <input
+                                                        type="text"
+                                                        value={companyInfo.headquarters}
+                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, headquarters: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Founding Year</label>
+                                                    <input
+                                                        type="text"
+                                                        value={companyInfo.foundingYear}
+                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, foundingYear: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                    />
+                                                </div>
+
+                                                <div className="md:col-span-2">
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Company Overview</label>
+                                                    <textarea
+                                                        rows={4}
+                                                        value={companyInfo.overview}
+                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, overview: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                        placeholder="Brief overview of your company..."
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Entities Tab (Existing View) */}
+                                    {databaseTab === 'entities' && (
+                                        <div className="space-y-6">
+                                            {/* Toolbar */}
+                                            <div className="flex justify-between items-center">
+                                                <div className="text-sm text-slate-500">
+                                                    Total: {entities.length} entities
+                                                </div>
+                                                <div className="flex space-x-3">
+                                                    <div className="relative">
+                                                        <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Search..."
+                                                            className="pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent w-64 shadow-sm"
+                                                        />
+                                                    </div>
+                                                    <button className="flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm transition-colors">
+                                                        <Filter size={16} className="mr-2" />
+                                                        Filter
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setIsCreatingEntity(true)}
+                                                        className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-md transition-colors"
+                                                    >
+                                                        <Plus size={16} className="mr-2" />
+                                                        Create Entity
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Grid */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
+                                                {entities.map(entity => (
+                                                    <EntityCard
+                                                        key={entity.id}
+                                                        entity={entity}
+                                                        onClick={(e) => {
+                                                            setActiveEntityId(e.id);
+                                                            setActiveTab('data');
+                                                        }}
+                                                        onDelete={handleDeleteEntity}
+                                                    />
+                                                ))}
+
+                                                {/* Empty State / Add New Placeholder */}
+                                                <div
+                                                    onClick={() => setIsCreatingEntity(true)}
+                                                    className="border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center min-h-[200px] text-slate-400 hover:border-teal-500 hover:text-teal-600 hover:bg-teal-50 transition-all cursor-pointer group"
+                                                >
+                                                    <div className="p-4 bg-slate-100 rounded-full mb-3 group-hover:bg-white">
+                                                        <Plus size={24} />
+                                                    </div>
+                                                    <span className="font-medium">Create new entity</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
