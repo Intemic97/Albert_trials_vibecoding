@@ -330,11 +330,32 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
         if (!configuringEquipmentNodeId || !selectedEquipmentId) return;
 
         const record = equipmentRecords.find(r => r.id === selectedEquipmentId);
-        // Try to find a name for the record
+
+        // Find the Equipment entity to understand the schema
+        const equipmentEntity = entities.find(e =>
+            e.name.toLowerCase() === 'equipment' ||
+            e.name.toLowerCase() === 'equipments'
+        );
+
         let recordName = 'Unknown Equipment';
-        if (record && record.values) {
-            const firstVal = Object.values(record.values).find(v => typeof v === 'string');
-            recordName = (firstVal as string) || record.id;
+
+        if (record && equipmentEntity) {
+            // 1. Try to find a property named "name" or "title"
+            const nameProp = equipmentEntity.properties.find(p => p.name.toLowerCase() === 'name' || p.name.toLowerCase() === 'title');
+            if (nameProp && record.values[nameProp.id]) {
+                recordName = record.values[nameProp.id];
+            } else {
+                // 2. Fallback to the first "text" property
+                const firstTextProp = equipmentEntity.properties.find(p => p.type === 'text');
+                if (firstTextProp && record.values[firstTextProp.id]) {
+                    recordName = record.values[firstTextProp.id];
+                } else {
+                    // 3. Fallback to ID
+                    recordName = record.id;
+                }
+            }
+        } else if (record) {
+            recordName = record.id;
         }
 
         setNodes(prev => prev.map(n =>
@@ -1305,7 +1326,29 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                 >
                                     <option value="">Select an equipment...</option>
                                     {equipmentRecords.map(record => {
-                                        const name = Object.values(record.values || {}).find(v => typeof v === 'string') || record.id;
+                                        // Find the Equipment entity to understand the schema
+                                        const equipmentEntity = entities.find(e =>
+                                            e.name.toLowerCase() === 'equipment' ||
+                                            e.name.toLowerCase() === 'equipments'
+                                        );
+
+                                        let name = record.id;
+                                        if (equipmentEntity) {
+                                            const nameProp = equipmentEntity.properties.find(p => p.name.toLowerCase() === 'name' || p.name.toLowerCase() === 'title');
+                                            if (nameProp && record.values[nameProp.id]) {
+                                                name = record.values[nameProp.id];
+                                            } else {
+                                                const firstTextProp = equipmentEntity.properties.find(p => p.type === 'text');
+                                                if (firstTextProp && record.values[firstTextProp.id]) {
+                                                    name = record.values[firstTextProp.id];
+                                                }
+                                            }
+                                        } else {
+                                            // Fallback if entity not found (shouldn't happen given the check above)
+                                            const firstVal = Object.values(record.values || {}).find(v => typeof v === 'string');
+                                            if (firstVal) name = firstVal as string;
+                                        }
+
                                         return (
                                             <option key={record.id} value={record.id}>
                                                 {String(name)}
