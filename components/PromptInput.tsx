@@ -11,6 +11,8 @@ interface PromptInputProps {
     buttonLabel?: string;
     className?: string;
     initialValue?: string;
+    onChange?: (value: string, mentionedIds: string[]) => void;
+    hideButton?: boolean;
 }
 
 type MentionType = 'entity' | 'attribute';
@@ -33,7 +35,9 @@ export const PromptInput: React.FC<PromptInputProps> = ({
     placeholder = "Ask a question...",
     buttonLabel = "Generate",
     className = "",
-    initialValue = ""
+    initialValue = "",
+    onChange,
+    hideButton = false
 }) => {
     const [prompt, setPrompt] = useState(initialValue);
     const [mention, setMention] = useState<MentionState>({
@@ -94,6 +98,13 @@ export const PromptInput: React.FC<PromptInputProps> = ({
     const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const val = e.target.value;
         setPrompt(val);
+
+        if (onChange) {
+            const mentionedIds = entities
+                .filter(ent => val.includes(`@${ent.name}`))
+                .map(ent => ent.id);
+            onChange(val, mentionedIds);
+        }
 
         const cursor = e.target.selectionStart;
 
@@ -193,7 +204,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
             } else if (e.key === 'Escape') {
                 setMention(prev => ({ ...prev, isActive: false }));
             }
-        } else if (e.key === 'Enter' && !e.shiftKey) {
+        } else if (e.key === 'Enter' && !e.shiftKey && !hideButton) {
             e.preventDefault();
             handleSubmit();
         }
@@ -217,6 +228,13 @@ export const PromptInput: React.FC<PromptInputProps> = ({
             setPrompt(newText);
             newCursorPos = start + 1 + insertText.length;
 
+            if (onChange) {
+                const mentionedIds = entities
+                    .filter(ent => newText.includes(`@${ent.name}`))
+                    .map(ent => ent.id);
+                onChange(newText, mentionedIds);
+            }
+
         } else {
             const prop = item as Property;
             insertText = prop.name;
@@ -227,6 +245,13 @@ export const PromptInput: React.FC<PromptInputProps> = ({
             const newText = text.slice(0, start) + '.' + insertText + text.slice(end);
             setPrompt(newText);
             newCursorPos = start + 1 + insertText.length;
+
+            if (onChange) {
+                const mentionedIds = entities
+                    .filter(ent => newText.includes(`@${ent.name}`))
+                    .map(ent => ent.id);
+                onChange(newText, mentionedIds);
+            }
         }
 
         setTimeout(() => {
@@ -310,35 +335,37 @@ export const PromptInput: React.FC<PromptInputProps> = ({
                 />
             </div>
 
-            <div className="flex justify-between items-center mt-4">
-                <div className="flex items-center space-x-4 text-xs text-slate-400">
-                    <span className="flex items-center">
-                        <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded mr-1.5 font-sans">@</kbd>
-                        to mention entities
-                    </span>
-                    <span className="flex items-center">
-                        <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded mr-1.5 font-sans">.</kbd>
-                        for attributes
-                    </span>
+            {!hideButton && (
+                <div className="flex justify-between items-center mt-4">
+                    <div className="flex items-center space-x-4 text-xs text-slate-400">
+                        <span className="flex items-center">
+                            <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded mr-1.5 font-sans">@</kbd>
+                            to mention entities
+                        </span>
+                        <span className="flex items-center">
+                            <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded mr-1.5 font-sans">.</kbd>
+                            for attributes
+                        </span>
+                    </div>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={isGenerating || !prompt.trim()}
+                        className="flex items-center px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isGenerating ? (
+                            <>
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                                Generating...
+                            </>
+                        ) : (
+                            <>
+                                <Send size={16} className="mr-2" />
+                                {buttonLabel}
+                            </>
+                        )}
+                    </button>
                 </div>
-                <button
-                    onClick={handleSubmit}
-                    disabled={isGenerating || !prompt.trim()}
-                    className="flex items-center px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {isGenerating ? (
-                        <>
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                            Generating...
-                        </>
-                    ) : (
-                        <>
-                            <Send size={16} className="mr-2" />
-                            {buttonLabel}
-                        </>
-                    )}
-                </button>
-            </div>
+            )}
         </div>
     );
 };

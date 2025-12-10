@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles } from 'lucide-react';
+import { PromptInput } from './PromptInput';
 
 interface WorkflowNode {
     id: string;
@@ -1514,40 +1515,24 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">
                                     Prompt
                                 </label>
-                                <textarea
-                                    value={llmPrompt}
-                                    onChange={(e) => setLlmPrompt(e.target.value)}
-                                    placeholder="e.g., Summarize the status of these equipments..."
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none h-32 resize-none"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Context Entities (Optional)
-                                </label>
-                                <div className="border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1">
-                                    {entities.map(entity => (
-                                        <label key={entity.id} className="flex items-center gap-2 p-1 hover:bg-slate-50 rounded cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={llmContextEntities.includes(entity.id)}
-                                                onChange={(e) => {
-                                                    if (e.target.checked) {
-                                                        setLlmContextEntities(prev => [...prev, entity.id]);
-                                                    } else {
-                                                        setLlmContextEntities(prev => prev.filter(id => id !== entity.id));
-                                                    }
-                                                }}
-                                                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                            />
-                                            <span className="text-sm text-slate-700">{entity.name}</span>
-                                        </label>
-                                    ))}
+                                <div className="h-48">
+                                    <PromptInput
+                                        entities={entities}
+                                        onGenerate={() => { }} // Not used here
+                                        isGenerating={false}
+                                        initialValue={llmPrompt}
+                                        placeholder="Ask a question... Use @ to mention entities."
+                                        hideButton={true}
+                                        onChange={(val, ids) => {
+                                            setLlmPrompt(val);
+                                            setLlmContextEntities(ids);
+                                        }}
+                                        className="h-full"
+                                    />
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 mt-2">
                                 <input
                                     type="checkbox"
                                     id="includeInput"
