@@ -1,4 +1,4 @@
-export type PropertyType = 'text' | 'number' | 'relation';
+export type PropertyType = 'text' | 'number' | 'relation' | 'json';
 
 export interface Property {
   id: string;

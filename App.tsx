@@ -5,7 +5,7 @@ import { Reporting } from './components/Reporting';
 import { Dashboard } from './components/Dashboard';
 import { Workflows } from './components/Workflows';
 import { Entity, Property, PropertyType } from './types';
-import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X } from 'lucide-react';
+import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X, Code } from 'lucide-react';
 
 export default function App() {
     const [entities, setEntities] = useState<Entity[]>([]);
@@ -372,6 +372,14 @@ export default function App() {
     const renderCellValue = (prop: Property, value: any) => {
         if (!value) return '-';
 
+        if (prop.type === 'json') {
+            return (
+                <div className="font-mono text-xs text-slate-600 bg-slate-100 p-1 rounded truncate max-w-[200px]" title={typeof value === 'string' ? value : JSON.stringify(value)}>
+                    {typeof value === 'string' ? value : JSON.stringify(value)}
+                </div>
+            );
+        }
+
         if (prop.type === 'relation' && prop.relatedEntityId) {
             try {
                 const ids = JSON.parse(value);
@@ -408,6 +416,7 @@ export default function App() {
             case 'text': return <Type size={16} className="text-slate-400" />;
             case 'number': return <Hash size={16} className="text-slate-400" />;
             case 'relation': return <LinkIcon size={16} className="text-teal-500" />;
+            case 'json': return <Code size={16} className="text-amber-500" />;
         }
     };
 
@@ -793,6 +802,7 @@ export default function App() {
                                                                 >
                                                                     <option value="text">Text</option>
                                                                     <option value="number">Number</option>
+                                                                    <option value="json">JSON</option>
                                                                     <option value="relation">Relation</option>
                                                                 </select>
                                                             </div>
@@ -1085,13 +1095,23 @@ export default function App() {
                                             return (
                                                 <div key={prop.id}>
                                                     <label className="block text-sm font-medium text-slate-700 mb-1">{prop.name}</label>
-                                                    <input
-                                                        type={prop.type === 'number' ? 'number' : 'text'}
-                                                        value={newRecordValues[prop.id] || ''}
-                                                        onChange={(e) => setNewRecordValues({ ...newRecordValues, [prop.id]: e.target.value })}
-                                                        placeholder={`Enter ${prop.name}...`}
-                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                                                    />
+                                                    {prop.type === 'json' ? (
+                                                        <textarea
+                                                            value={newRecordValues[prop.id] || ''}
+                                                            onChange={(e) => setNewRecordValues({ ...newRecordValues, [prop.id]: e.target.value })}
+                                                            placeholder={`Enter valid JSON for ${prop.name}...`}
+                                                            rows={4}
+                                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none font-mono text-sm"
+                                                        />
+                                                    ) : (
+                                                        <input
+                                                            type={prop.type === 'number' ? 'number' : 'text'}
+                                                            value={newRecordValues[prop.id] || ''}
+                                                            onChange={(e) => setNewRecordValues({ ...newRecordValues, [prop.id]: e.target.value })}
+                                                            placeholder={`Enter ${prop.name}...`}
+                                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                        />
+                                                    )}
                                                 </div>
                                             );
                                         })}

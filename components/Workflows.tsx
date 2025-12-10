@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment';
     label: string;
     x: number;
     y: number;
@@ -15,6 +15,8 @@ interface WorkflowNode {
         conditionField?: string;
         conditionOperator?: string;
         conditionValue?: string;
+        recordId?: string;
+        recordName?: string;
     };
     executionResult?: string;
     data?: any;
@@ -31,20 +33,23 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment';
     label: string;
     icon: React.ElementType;
+    description: string;
+    category: 'Triggers' | 'Data' | 'Logic' | 'Actions';
 }
 
 const DRAGGABLE_ITEMS: DraggableItem[] = [
-    { type: 'trigger', label: 'Manual Trigger', icon: Play },
-    { type: 'trigger', label: 'Schedule', icon: Workflow },
-    { type: 'fetchData', label: 'Fetch Data', icon: Database },
-    { type: 'addField', label: 'Add Field', icon: CheckCircle },
-    { type: 'saveRecords', label: 'Save Records', icon: Database },
-    { type: 'action', label: 'Send Email', icon: Zap },
-    { type: 'action', label: 'Update Record', icon: CheckCircle },
-    { type: 'condition', label: 'If / Else', icon: AlertCircle },
+    { type: 'trigger', label: 'Manual Trigger', icon: Play, description: 'Manually start the workflow', category: 'Triggers' },
+    { type: 'trigger', label: 'Schedule', icon: Workflow, description: 'Run on a specific schedule', category: 'Triggers' },
+    { type: 'fetchData', label: 'Fetch Data', icon: Database, description: 'Get records from an entity', category: 'Data' },
+    { type: 'saveRecords', label: 'Save Records', icon: Database, description: 'Create or update records', category: 'Data' },
+    { type: 'equipment', label: 'Equipment', icon: Wrench, description: 'Use specific equipment data', category: 'Data' },
+    { type: 'condition', label: 'If / Else', icon: AlertCircle, description: 'Branch based on conditions', category: 'Logic' },
+    { type: 'addField', label: 'Add Field', icon: CheckCircle, description: 'Add a new field to data', category: 'Logic' },
+    { type: 'action', label: 'Send Email', icon: Zap, description: 'Send an email notification', category: 'Actions' },
+    { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },
 ];
 
 interface WorkflowsProps {
@@ -74,6 +79,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
     const [addFieldValue, setAddFieldValue] = useState<string>('');
     const [configuringSaveNodeId, setConfiguringSaveNodeId] = useState<string | null>(null);
     const [saveEntityId, setSaveEntityId] = useState<string>('');
+
+    // Sidebar State
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('All');
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+    // Equipment Node State
+    const [configuringEquipmentNodeId, setConfiguringEquipmentNodeId] = useState<string | null>(null);
+    const [equipmentRecords, setEquipmentRecords] = useState<any[]>([]);
+    const [selectedEquipmentId, setSelectedEquipmentId] = useState<string>('');
+    const [isLoadingEquipments, setIsLoadingEquipments] = useState(false);
     const [dataViewTab, setDataViewTab] = useState<'input' | 'output'>('output');
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
     const [canvasZoom, setCanvasZoom] = useState(1);
@@ -279,6 +295,58 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
         setSaveEntityId('');
     };
 
+    const openEquipmentConfig = async (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'equipment') {
+            setConfiguringEquipmentNodeId(nodeId);
+            setSelectedEquipmentId(node.config?.recordId || '');
+
+            // Find "Equipment" or "Equipments" entity
+            const equipmentEntity = entities.find(e =>
+                e.name.toLowerCase() === 'equipment' ||
+                e.name.toLowerCase() === 'equipments'
+            );
+
+            if (equipmentEntity) {
+                setIsLoadingEquipments(true);
+                try {
+                    const res = await fetch(`http://localhost:3001/api/entities/${equipmentEntity.id}/records`);
+                    const data = await res.json();
+                    setEquipmentRecords(data);
+                } catch (error) {
+                    console.error('Error fetching equipment records:', error);
+                    setEquipmentRecords([]);
+                } finally {
+                    setIsLoadingEquipments(false);
+                }
+            } else {
+                alert('No "Equipment" entity found. Please create one first.');
+                setEquipmentRecords([]);
+            }
+        }
+    };
+
+    const saveEquipmentConfig = () => {
+        if (!configuringEquipmentNodeId || !selectedEquipmentId) return;
+
+        const record = equipmentRecords.find(r => r.id === selectedEquipmentId);
+        // Try to find a name for the record
+        let recordName = 'Unknown Equipment';
+        if (record && record.values) {
+            const firstVal = Object.values(record.values).find(v => typeof v === 'string');
+            recordName = (firstVal as string) || record.id;
+        }
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringEquipmentNodeId
+                ? { ...n, label: recordName, config: { ...n.config, recordId: selectedEquipmentId, recordName } }
+                : n
+        ));
+        setConfiguringEquipmentNodeId(null);
+        setSelectedEquipmentId('');
+        setEquipmentRecords([]);
+    };
+
     const runWorkflow = async () => {
         if (isRunning) return;
         setIsRunning(true);
@@ -330,6 +398,46 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                     result = `Fetched ${records.length} records from ${node.config.entityName}`;
                 } catch (error) {
                     result = 'Error fetching data';
+                    setNodes(prev => prev.map(n =>
+                        n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
+                    ));
+                    return;
+                }
+            } else if (node.type === 'equipment') {
+                if (!node.config?.recordId) {
+                    result = 'Error: No equipment selected';
+                    setNodes(prev => prev.map(n =>
+                        n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
+                    ));
+                    return;
+                }
+
+                try {
+                    const equipmentEntity = entities.find(e =>
+                        e.name.toLowerCase() === 'equipment' ||
+                        e.name.toLowerCase() === 'equipments'
+                    );
+
+                    if (!equipmentEntity) {
+                        throw new Error('Equipment entity not found');
+                    }
+
+                    const res = await fetch(`http://localhost:3001/api/entities/${equipmentEntity.id}/records`);
+                    const records = await res.json();
+                    const record = records.find((r: any) => r.id === node.config?.recordId);
+
+                    if (record) {
+                        nodeData = [record];
+                        result = `Fetched equipment: ${node.config.recordName}`;
+                    } else {
+                        result = 'Equipment record not found';
+                        setNodes(prev => prev.map(n =>
+                            n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
+                        ));
+                        return;
+                    }
+                } catch (error) {
+                    result = 'Error fetching equipment';
                     setNodes(prev => prev.map(n =>
                         n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
                     ));
@@ -479,7 +587,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
     };
 
     const handleCanvasMouseDown = (e: React.MouseEvent) => {
-        if (e.button === 1 || (e.button === 0 && e.altKey)) { // Middle mouse or Alt+Left
+        if (e.button === 0 || e.button === 1) { // Left or Middle mouse
             setIsPanning(true);
             setPanStart({ x: e.clientX - canvasOffset.x, y: e.clientY - canvasOffset.y });
             e.preventDefault();
@@ -572,44 +680,83 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
             case 'action': return 'bg-blue-100 border-blue-300 text-blue-800';
             case 'condition': return 'bg-amber-100 border-amber-300 text-amber-800';
             case 'fetchData': return 'bg-teal-100 border-teal-300 text-teal-800';
+            case 'equipment': return 'bg-orange-100 border-orange-300 text-orange-800';
             case 'addField': return 'bg-indigo-100 border-indigo-300 text-indigo-800';
             case 'saveRecords': return 'bg-emerald-100 border-emerald-300 text-emerald-800';
             default: return 'bg-slate-100 border-slate-300';
         }
     };
 
+    const filteredItems = DRAGGABLE_ITEMS.filter(item => {
+        const matchesSearch = item.label.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
+        return matchesSearch && matchesCategory;
+    });
+
     return (
         <div className="flex h-full bg-slate-50">
             {/* Sidebar */}
-            <div className="w-64 bg-white border-r border-slate-200 p-4 flex flex-col shadow-sm z-10">
-                <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Components</h2>
-                <div className="space-y-3">
-                    {DRAGGABLE_ITEMS.map((item) => (
+            <div className="w-80 bg-slate-50 border-r border-slate-200 flex flex-col shadow-sm z-10 h-full">
+                <div className="p-4 border-b border-slate-200 bg-white">
+                    <h2 className="text-lg font-bold text-slate-800 mb-1">Components</h2>
+                    <p className="text-xs text-slate-500 mb-4">Drag & Drop</p>
+
+                    {/* Search */}
+                    <div className="relative mb-4">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <input
+                            type="text"
+                            placeholder="Search..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                        />
+                    </div>
+
+                    {/* Categories */}
+                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                        {['All', 'Triggers', 'Data', 'Logic', 'Actions'].map(cat => (
+                            <button
+                                key={cat}
+                                onClick={() => setSelectedCategory(cat)}
+                                className={`px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${selectedCategory === cat
+                                    ? 'bg-teal-100 text-teal-700 border border-teal-200'
+                                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                                    }`}
+                            >
+                                {cat}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+                    {filteredItems.map((item) => (
                         <div
                             key={item.label}
                             draggable
                             onDragStart={(e) => handleDragStart(e, item)}
-                            className="flex items-center p-3 bg-white border border-slate-200 rounded-lg shadow-sm cursor-grab hover:border-teal-500 hover:shadow-md transition-all"
+                            className="flex items-start p-3 bg-white border border-slate-200 rounded-xl shadow-sm cursor-grab hover:border-teal-500 hover:shadow-md transition-all group"
                         >
-                            <item.icon size={18} className="text-slate-500 mr-3" />
-                            <span className="text-sm font-medium text-slate-700">{item.label}</span>
+                            <div className={`p-2 rounded-lg mr-3 ${item.category === 'Triggers' ? 'bg-purple-100 text-purple-600' :
+                                item.category === 'Data' ? 'bg-teal-100 text-teal-600' :
+                                    item.category === 'Logic' ? 'bg-amber-100 text-amber-600' :
+                                        'bg-blue-100 text-blue-600'
+                                }`}>
+                                <item.icon size={20} />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-semibold text-slate-800 group-hover:text-teal-700 transition-colors">{item.label}</h3>
+                                <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
+                            </div>
                         </div>
                     ))}
-                </div>
-
-                <div className="mt-auto p-4 bg-slate-50 rounded-lg text-xs text-slate-500">
-                    <p className="font-semibold mb-1">Tip:</p>
-                    {connectingFrom ? (
-                        <p>Click another connector point to complete the connection, or click the same node to cancel.</p>
-                    ) : (
-                        <p>Drag components onto the canvas. Click connector points to link nodes.</p>
-                    )}
                 </div>
             </div>
 
             {/* Canvas */}
             <div className="flex-1 relative overflow-hidden bg-slate-50 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px]">
-                <div className="absolute top-4 left-4 right-4 z-10 flex items-center gap-4">
+                <div className="absolute top-4 left-4 right-8 z-10 flex items-center gap-4">
                     <div className="flex-1">
                         <input
                             type="text"
@@ -756,6 +903,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                         {nodes.map((node) => (
                             <div
                                 key={node.id}
+                                onMouseDown={(e) => e.stopPropagation()}
                                 onClick={(e) => {
                                     // Don't trigger on connector points or delete button
                                     if ((e.target as HTMLElement).closest('.connector-point, button')) return;
@@ -769,6 +917,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                         openAddFieldConfig(node.id);
                                     } else if (node.type === 'saveRecords') {
                                         openSaveRecordsConfig(node.id);
+                                    } else if (node.type === 'equipment') {
+                                        openEquipmentConfig(node.id);
                                     }
                                 }}
                                 style={{
@@ -777,7 +927,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                     top: node.y,
                                     transform: 'translate(-50%, -50%)', // Center on drop point
                                     zIndex: 10,
-                                    cursor: (node.data || ['fetchData', 'condition', 'addField', 'saveRecords'].includes(node.type)) ? 'pointer' : 'default'
+
+                                    cursor: (node.data || ['fetchData', 'condition', 'addField', 'saveRecords', 'equipment'].includes(node.type)) ? 'pointer' : 'default'
                                 }}
                                 className={`flex flex-col p-4 rounded-lg border-2 shadow-md w-48 group relative ${getNodeColor(node.type, node.status)}`}
                             >
@@ -920,8 +1071,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                         <button
                                             onClick={() => setDataViewTab('input')}
                                             className={`px-4 py-2 font-medium transition-all ${dataViewTab === 'input'
-                                                    ? 'text-emerald-600 border-b-2 border-emerald-600'
-                                                    : 'text-slate-600 hover:text-slate-800'
+                                                ? 'text-emerald-600 border-b-2 border-emerald-600'
+                                                : 'text-slate-600 hover:text-slate-800'
                                                 }`}
                                         >
                                             Input ({node.inputData.length})
@@ -931,8 +1082,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                         <button
                                             onClick={() => setDataViewTab('output')}
                                             className={`px-4 py-2 font-medium transition-all ${dataViewTab === 'output'
-                                                    ? 'text-emerald-600 border-b-2 border-emerald-600'
-                                                    : 'text-slate-600 hover:text-slate-800'
+                                                ? 'text-emerald-600 border-b-2 border-emerald-600'
+                                                : 'text-slate-600 hover:text-slate-800'
                                                 }`}
                                         >
                                             Output ({node.outputData.length})
@@ -1133,6 +1284,61 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                     </div>
                 )}
             </div>
+
+            {/* Equipment Config Modal */}
+            {configuringEquipmentNodeId && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl shadow-xl p-6 w-96 max-w-full">
+                        <h3 className="text-lg font-bold text-slate-800 mb-4">Select Equipment</h3>
+
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                Equipment Record
+                            </label>
+                            {isLoadingEquipments ? (
+                                <div className="text-sm text-slate-500">Loading equipments...</div>
+                            ) : equipmentRecords.length > 0 ? (
+                                <select
+                                    value={selectedEquipmentId}
+                                    onChange={(e) => setSelectedEquipmentId(e.target.value)}
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                                >
+                                    <option value="">Select an equipment...</option>
+                                    {equipmentRecords.map(record => {
+                                        const name = Object.values(record.values || {}).find(v => typeof v === 'string') || record.id;
+                                        return (
+                                            <option key={record.id} value={record.id}>
+                                                {String(name)}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                            ) : (
+                                <div className="text-sm text-red-500">
+                                    No equipment records found. Please create an "Equipment" entity and add records.
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end gap-2">
+                            <button
+                                onClick={() => setConfiguringEquipmentNodeId(null)}
+                                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={saveEquipmentConfig}
+                                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                                disabled={!selectedEquipmentId}
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
+
     );
 };
