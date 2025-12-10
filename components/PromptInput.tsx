@@ -4,6 +4,7 @@ import { Send, Database, Hash } from 'lucide-react';
 
 interface PromptInputProps {
     entities: Entity[];
+    companyInfo?: any;
     onGenerate: (prompt: string, mentionedEntityIds: string[]) => void;
     isGenerating: boolean;
     placeholder?: string;
@@ -26,6 +27,7 @@ interface MentionState {
 
 export const PromptInput: React.FC<PromptInputProps> = ({
     entities,
+    companyInfo,
     onGenerate,
     isGenerating,
     placeholder = "Ask a question...",
@@ -54,9 +56,27 @@ export const PromptInput: React.FC<PromptInputProps> = ({
         const query = mention.query.toLowerCase();
 
         if (mention.type === 'entity') {
-            return entities.filter(e =>
+            const entitySuggestions = entities.filter(e =>
                 e.name.toLowerCase().includes(query)
             );
+
+            // Add company info fields as pseudo-entities
+            const companyFields: Entity[] = companyInfo ? [
+                { id: 'company_name', name: 'Company Name', properties: [], description: 'Company Name', lastEdited: '', author: 'System' },
+                { id: 'company_industry', name: 'Industry', properties: [], description: 'Company Industry', lastEdited: '', author: 'System' },
+                { id: 'company_employees', name: 'Employees', properties: [], description: 'Number of Employees', lastEdited: '', author: 'System' },
+                { id: 'company_website', name: 'Website', properties: [], description: 'Company Website', lastEdited: '', author: 'System' },
+                { id: 'company_linkedin', name: 'LinkedIn', properties: [], description: 'LinkedIn Profile', lastEdited: '', author: 'System' },
+                { id: 'company_headquarters', name: 'Headquarters', properties: [], description: 'Headquarters Location', lastEdited: '', author: 'System' },
+                { id: 'company_founding_year', name: 'Founding Year', properties: [], description: 'Year Founded', lastEdited: '', author: 'System' },
+                { id: 'company_overview', name: 'Company Overview', properties: [], description: 'Company Overview', lastEdited: '', author: 'System' }
+            ] : [];
+
+            const companySuggestions = companyFields.filter(f =>
+                f.name.toLowerCase().includes(query)
+            );
+
+            return [...entitySuggestions, ...companySuggestions];
         } else if (mention.type === 'attribute' && mention.entityContext) {
             return mention.entityContext.properties.filter(p =>
                 p.name.toLowerCase().includes(query)

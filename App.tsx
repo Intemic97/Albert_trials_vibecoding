@@ -430,7 +430,7 @@ export default function App() {
                 ) : currentView === 'workflows' ? (
                     <Workflows entities={entities} />
                 ) : currentView === 'reports' ? (
-                    <Reporting entities={entities} />
+                    <Reporting entities={entities} companyInfo={companyInfo} />
                 ) : (
                     <>
                         {/* Top Header */}

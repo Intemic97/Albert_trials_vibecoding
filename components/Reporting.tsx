@@ -8,6 +8,7 @@ import { PromptInput } from './PromptInput';
 
 interface ReportingProps {
     entities: Entity[];
+    companyInfo?: any;
 }
 
 interface ReportTemplate {
@@ -289,7 +290,7 @@ Provide thorough analysis with actionable recommendations.`
     }
 ];
 
-export const Reporting: React.FC<ReportingProps> = ({ entities }) => {
+export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [report, setReport] = useState<string | null>(null);
     const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
@@ -473,6 +474,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities }) => {
                         <PromptInput
                             key={selectedTemplate} // Reset input when template changes (optional, but good for UX here)
                             entities={entities}
+                            companyInfo={companyInfo}
                             onGenerate={handleGenerate}
                             isGenerating={isLoading}
                             initialValue={templatePrompt}
