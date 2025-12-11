@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput';
     label: string;
     x: number;
     y: number;
@@ -23,6 +23,9 @@ interface WorkflowNode {
         llmIncludeInput?: boolean;
         pythonCode?: string;
         pythonAiPrompt?: string;
+        // For manual input nodes:
+        inputVarName?: string;
+        inputVarValue?: string;
     };
     executionResult?: string;
     data?: any;
@@ -39,7 +42,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -52,6 +55,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'fetchData', label: 'Fetch Data', icon: Database, description: 'Get records from an entity', category: 'Data' },
     { type: 'saveRecords', label: 'Save Records', icon: Database, description: 'Create or update records', category: 'Data' },
     { type: 'equipment', label: 'Equipment', icon: Wrench, description: 'Use specific equipment data', category: 'Data' },
+    { type: 'manualInput', label: 'Manual Data Input', icon: Edit, description: 'Define a variable with a value', category: 'Data' },
     { type: 'condition', label: 'If / Else', icon: AlertCircle, description: 'Branch based on conditions', category: 'Logic' },
     { type: 'llm', label: 'AI Generation', icon: Sparkles, description: 'Generate text using AI', category: 'Logic' },
     { type: 'python', label: 'Python Code', icon: Code, description: 'Run Python script', category: 'Logic' },
@@ -110,6 +114,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
     const [pythonCode, setPythonCode] = useState<string>('def process(data):\n    # Modify data here\n    return data');
     const [pythonAiPrompt, setPythonAiPrompt] = useState<string>('');
     const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+
+    // Manual Input Node State
+    const [configuringManualInputNodeId, setConfiguringManualInputNodeId] = useState<string | null>(null);
+    const [manualInputVarName, setManualInputVarName] = useState<string>('');
+    const [manualInputVarValue, setManualInputVarValue] = useState<string>('');
 
     const [dataViewTab, setDataViewTab] = useState<'input' | 'output'>('output');
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
@@ -440,6 +449,36 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
         }
     };
 
+    const openManualInputConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'manualInput') {
+            setConfiguringManualInputNodeId(nodeId);
+            setManualInputVarName(node.config?.inputVarName || '');
+            setManualInputVarValue(node.config?.inputVarValue || '');
+        }
+    };
+
+    const saveManualInputConfig = () => {
+        if (!configuringManualInputNodeId || !manualInputVarName.trim()) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringManualInputNodeId
+                ? {
+                    ...n,
+                    label: `${manualInputVarName}: ${manualInputVarValue}`,
+                    config: {
+                        ...n.config,
+                        inputVarName: manualInputVarName,
+                        inputVarValue: manualInputVarValue
+                    }
+                }
+                : n
+        ));
+        setConfiguringManualInputNodeId(null);
+        setManualInputVarName('');
+        setManualInputVarValue('');
+    };
+
     const generatePythonCode = async () => {
         if (!pythonAiPrompt.trim()) return;
 
@@ -721,6 +760,21 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                         }
                     } else {
                         result = 'Prompt not configured';
+                    }
+                    break;
+                case 'manualInput':
+                    // Create output data from the configured variable
+                    if (node.config?.inputVarName) {
+                        const varName = node.config.inputVarName;
+                        const varValue = node.config.inputVarValue || '';
+                        // Try to parse as number if possible
+                        const parsedValue = !isNaN(Number(varValue)) && varValue.trim() !== ''
+                            ? Number(varValue)
+                            : varValue;
+                        nodeData = [{ [varName]: parsedValue }];
+                        result = `Set ${varName} = ${parsedValue}`;
+                    } else {
+                        result = 'Not configured';
                     }
                     break;
             }
@@ -1199,6 +1253,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                         openLLMConfig(node.id);
                                     } else if (node.type === 'python') {
                                         openPythonConfig(node.id);
+                                    } else if (node.type === 'manualInput') {
+                                        openManualInputConfig(node.id);
                                     }
                                 }}
                                 onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
@@ -1797,6 +1853,64 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                             <button
                                 onClick={savePythonConfig}
                                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Manual Input Config Modal */}
+            {configuringManualInputNodeId && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl shadow-xl p-6 w-96 max-w-full">
+                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <Edit className="text-teal-600" size={20} />
+                            Configure Manual Data Input
+                        </h3>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                    Variable Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={manualInputVarName}
+                                    onChange={(e) => setManualInputVarName(e.target.value)}
+                                    placeholder="e.g., temperature, count, status"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                    Value
+                                </label>
+                                <input
+                                    type="text"
+                                    value={manualInputVarValue}
+                                    onChange={(e) => setManualInputVarValue(e.target.value)}
+                                    placeholder="e.g., 25, Active, Hello World"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Numbers will be parsed automatically.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 mt-6">
+                            <button
+                                onClick={() => setConfiguringManualInputNodeId(null)}
+                                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={saveManualInputConfig}
+                                disabled={!manualInputVarName.trim()}
+                                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Save
                             </button>
