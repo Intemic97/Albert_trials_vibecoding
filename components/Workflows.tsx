@@ -138,15 +138,27 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
 
     const fetchWorkflows = async () => {
         try {
-            const res = await fetch('http://localhost:3001/api/workflows');
+            const res = await fetch('http://localhost:3001/api/workflows', { credentials: 'include' });
+            if (!res.ok) {
+                console.error('Failed to fetch workflows');
+                setSavedWorkflows([]);
+                return;
+            }
             const data = await res.json();
-            setSavedWorkflows(data);
-            // Auto-load the most recent workflow
-            if (data.length > 0 && !currentWorkflowId) {
-                loadWorkflow(data[0].id);
+
+            if (Array.isArray(data)) {
+                setSavedWorkflows(data);
+                // Auto-load the most recent workflow
+                if (data.length > 0 && !currentWorkflowId) {
+                    loadWorkflow(data[0].id);
+                }
+            } else {
+                console.error('Workflows API returned non-array:', data);
+                setSavedWorkflows([]);
             }
         } catch (error) {
             console.error('Error fetching workflows:', error);
+            setSavedWorkflows([]);
         }
     };
 
@@ -344,7 +356,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
             if (equipmentEntity) {
                 setIsLoadingEquipments(true);
                 try {
-                    const res = await fetch(`http://localhost:3001/api/entities/${equipmentEntity.id}/records`);
+                    const res = await fetch(`http://localhost:3001/api/entities/${equipmentEntity.id}/records`, { credentials: 'include' });
                     const data = await res.json();
                     setEquipmentRecords(data);
                 } catch (error) {
@@ -491,7 +503,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
             const response = await fetch('http://localhost:3001/api/python/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: pythonAiPrompt })
+                body: JSON.stringify({ prompt: pythonAiPrompt }),
+                credentials: 'include'
             });
 
             const text = await response.text();
@@ -546,7 +559,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
             }
 
             try {
-                const res = await fetch(`http://localhost:3001/api/entities/${node.config.entityId}/records`);
+                const res = await fetch(`http://localhost:3001/api/entities/${node.config.entityId}/records`, { credentials: 'include' });
                 const records = await res.json();
 
                 // Flatten data using entity schema
@@ -597,7 +610,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                     throw new Error('Equipment entity not found');
                 }
 
-                const res = await fetch(`http://localhost:3001/api/entities/${equipmentEntity.id}/records`);
+                const res = await fetch(`http://localhost:3001/api/entities/${equipmentEntity.id}/records`, { credentials: 'include' });
                 const records = await res.json();
                 const record = records.find((r: any) => r.id === node.config?.recordId);
 
@@ -684,7 +697,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                 const response = await fetch(`http://localhost:3001/api/entities/${node.config.entityId}/records`, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify(recordWithoutId)
+                                    body: JSON.stringify(recordWithoutId),
+                                    credentials: 'include'
                                 });
 
                                 if (response.ok) {
@@ -716,7 +730,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                 body: JSON.stringify({
                                     code: node.config.pythonCode,
                                     inputData: inputData || []
-                                })
+                                }),
+                                credentials: 'include'
                             });
 
                             if (response.ok) {
@@ -746,7 +761,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                     prompt: node.config.llmPrompt,
                                     mentionedEntityIds: node.config.llmContextEntities || [],
                                     additionalContext: node.config.llmIncludeInput ? inputData : undefined
-                                })
+                                }),
+                                credentials: 'include'
                             });
 
                             if (response.ok) {

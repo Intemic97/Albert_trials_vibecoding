@@ -316,7 +316,8 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo }) =
                 body: JSON.stringify({
                     prompt,
                     mentionedEntityIds
-                })
+                }),
+                credentials: 'include'
             });
 
             const data = await res.json();
