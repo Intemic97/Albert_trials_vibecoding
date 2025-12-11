@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output';
     label: string;
     x: number;
     y: number;
@@ -42,7 +42,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -62,6 +62,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'addField', label: 'Add Field', icon: CheckCircle, description: 'Add a new field to data', category: 'Logic' },
     { type: 'action', label: 'Send Email', icon: Zap, description: 'Send an email notification', category: 'Actions' },
     { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },
+    { type: 'output', label: 'Output', icon: LogOut, description: 'Display workflow output data', category: 'Actions' },
 ];
 
 interface WorkflowsProps {
@@ -775,6 +776,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                         result = `Set ${varName} = ${parsedValue}`;
                     } else {
                         result = 'Not configured';
+                    }
+                    break;
+                case 'output':
+                    // Output node just displays the input data
+                    if (inputData && Array.isArray(inputData) && inputData.length > 0) {
+                        nodeData = inputData;
+                        result = `Received ${inputData.length} record(s)`;
+                    } else if (inputData) {
+                        nodeData = [inputData];
+                        result = 'Received data';
+                    } else {
+                        result = 'No input data';
                     }
                     break;
             }
