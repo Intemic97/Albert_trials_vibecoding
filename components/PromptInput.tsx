@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Entity, Property } from '../types';
-import { Send, Database, Hash } from 'lucide-react';
+import { Send, Database, Hash, ArrowLeftCircle } from 'lucide-react';
 
 interface PromptInputProps {
     entities: Entity[];
@@ -13,6 +13,7 @@ interface PromptInputProps {
     initialValue?: string;
     onChange?: (value: string, mentionedIds: string[]) => void;
     hideButton?: boolean;
+    inputData?: any[]; // Data from previous node for @ mention
 }
 
 type MentionType = 'entity' | 'attribute';
@@ -37,7 +38,8 @@ export const PromptInput: React.FC<PromptInputProps> = ({
     className = "",
     initialValue = "",
     onChange,
-    hideButton = false
+    hideButton = false,
+    inputData
 }) => {
     const [prompt, setPrompt] = useState(initialValue);
     const [mention, setMention] = useState<MentionState>({
@@ -80,7 +82,12 @@ export const PromptInput: React.FC<PromptInputProps> = ({
                 f.name.toLowerCase().includes(query)
             );
 
-            return [...entitySuggestions, ...companySuggestions];
+            // Add Input Data option if inputData is available
+            const inputDataOption: Entity[] = (inputData && inputData.length > 0 && 'input data'.includes(query)) ? [
+                { id: '__input_data__', name: 'Input Data', properties: [], description: 'Data from previous node', lastEdited: '', author: 'System' }
+            ] : [];
+
+            return [...inputDataOption, ...entitySuggestions, ...companySuggestions];
         } else if (mention.type === 'attribute' && mention.entityContext) {
             return mention.entityContext.properties.filter(p =>
                 p.name.toLowerCase().includes(query)
@@ -304,7 +311,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
                         }}
                     >
                         <div className="bg-slate-50 px-3 py-2 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                            {mention.type === 'entity' ? 'Entities' : `Properties of ${mention.entityContext?.name}`}
+                            {mention.type === 'entity' ? (inputData && inputData.length > 0 ? 'Data Sources' : 'Entities') : `Properties of ${mention.entityContext?.name}`}
                         </div>
                         <div className="max-h-48 overflow-y-auto">
                             {suggestions.map((item, index) => (
@@ -317,7 +324,11 @@ export const PromptInput: React.FC<PromptInputProps> = ({
                                         }`}
                                 >
                                     {mention.type === 'entity' ? (
-                                        <Database size={14} className="text-slate-400" />
+                                        item.id === '__input_data__' ? (
+                                            <ArrowLeftCircle size={14} className="text-teal-500" />
+                                        ) : (
+                                            <Database size={14} className="text-slate-400" />
+                                        )
                                     ) : (
                                         <Hash size={14} className="text-slate-400" />
                                     )}

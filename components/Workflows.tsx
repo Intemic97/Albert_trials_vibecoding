@@ -1194,7 +1194,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                         position: 'relative'
                     }}>
                         {/* SVG Layer for Connections */}
-                        <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
+                        <svg
+                            className="absolute pointer-events-none"
+                            style={{
+                                zIndex: 1,
+                                overflow: 'visible',
+                                left: 0,
+                                top: 0,
+                                width: '10000px',
+                                height: '10000px'
+                            }}
+                        >
                             {connections.map(conn => {
                                 const fromNode = nodes.find(n => n.id === conn.fromNodeId);
                                 const toNode = nodes.find(n => n.id === conn.toNodeId);
@@ -1745,13 +1755,26 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                         onGenerate={() => { }} // Not used here
                                         isGenerating={false}
                                         initialValue={llmPrompt}
-                                        placeholder="Ask a question... Use @ to mention entities."
+                                        placeholder="Ask a question... Use @ to mention entities or Input Data."
                                         hideButton={true}
                                         onChange={(val, ids) => {
                                             setLlmPrompt(val);
                                             setLlmContextEntities(ids);
+                                            // Auto-enable include input if @Input Data is mentioned
+                                            if (val.includes('@Input Data')) {
+                                                setLlmIncludeInput(true);
+                                            }
                                         }}
                                         className="h-full"
+                                        inputData={(() => {
+                                            // Get input data from parent node
+                                            const parentConnection = connections.find(c => c.toNodeId === configuringLLMNodeId);
+                                            if (parentConnection) {
+                                                const parentNode = nodes.find(n => n.id === parentConnection.fromNodeId);
+                                                return parentNode?.outputData || parentNode?.data || [];
+                                            }
+                                            return [];
+                                        })()}
                                     />
                                 </div>
                             </div>
