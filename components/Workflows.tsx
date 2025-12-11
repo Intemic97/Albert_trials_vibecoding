@@ -1356,13 +1356,36 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
 
                         {/* Temporary Connection Line */}
                         {dragConnectionStart && dragConnectionCurrent && (
-                            <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 20 }}>
+                            <svg
+                                className="absolute pointer-events-none"
+                                style={{
+                                    zIndex: 20,
+                                    overflow: 'visible',
+                                    left: 0,
+                                    top: 0,
+                                    width: '10000px',
+                                    height: '10000px'
+                                }}
+                            >
+                                <defs>
+                                    <marker
+                                        id="temp-arrowhead"
+                                        markerWidth="10"
+                                        markerHeight="7"
+                                        refX="9"
+                                        refY="3.5"
+                                        orient="auto"
+                                    >
+                                        <polygon points="0 0, 10 3.5, 0 7" fill="#0d9488" />
+                                    </marker>
+                                </defs>
                                 <path
                                     d={`M ${nodes.find(n => n.id === dragConnectionStart.nodeId)!.x + 96} ${nodes.find(n => n.id === dragConnectionStart.nodeId)!.y} C ${nodes.find(n => n.id === dragConnectionStart.nodeId)!.x + 96 + 50} ${nodes.find(n => n.id === dragConnectionStart.nodeId)!.y}, ${dragConnectionCurrent.x - 50} ${dragConnectionCurrent.y}, ${dragConnectionCurrent.x} ${dragConnectionCurrent.y}`}
                                     stroke="#0d9488"
                                     strokeWidth="2"
                                     fill="none"
                                     strokeDasharray="5,5"
+                                    markerEnd="url(#temp-arrowhead)"
                                 />
                             </svg>
                         )}
