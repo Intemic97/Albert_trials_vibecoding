@@ -750,17 +750,16 @@ function AuthenticatedApp() {
                                                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                                                     <div>
                                                         <h2 className="text-lg font-semibold text-slate-800">Properties</h2>
-                                                        <p className="text-sm text-slate-500">Define the schema for this entity.</p>
+                                                        <p className="text-sm text-slate-500">Define the data structure for this entity.</p>
                                                     </div>
                                                     <button
                                                         onClick={() => setIsAddingProp(true)}
-                                                        className="flex items-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium shadow-sm transition-colors"
+                                                        className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-sm transition-colors"
                                                     >
                                                         <Plus size={16} className="mr-2" />
                                                         Add Property
                                                     </button>
                                                 </div>
-
                                                 {/* Property List */}
                                                 <div className="divide-y divide-slate-100">
                                                     {activeEntity.properties.length === 0 ? (
@@ -857,7 +856,7 @@ function AuthenticatedApp() {
                                                                 <button
                                                                     onClick={handleAddProperty}
                                                                     disabled={!newPropName || (newPropType === 'relation' && !newPropRelationId)}
-                                                                    className="flex-1 py-2 bg-teal-600 text-white rounded-md text-sm font-medium hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                    className="flex-1 py-2 bg-slate-800 text-white rounded-md text-sm font-medium hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
                                                                 >
                                                                     Save
                                                                 </button>
@@ -889,7 +888,7 @@ function AuthenticatedApp() {
                                                         setNewRecordValues({});
                                                         setIsAddingRecord(true);
                                                     }}
-                                                    className="flex items-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium shadow-sm transition-colors"
+                                                    className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-sm transition-colors"
                                                 >
                                                     <Plus size={16} className="mr-2" />
                                                     Add Record
@@ -1162,6 +1161,7 @@ function AuthenticatedApp() {
                                 </div>
                             </div>
                         )}
+
                     </>
                 )}
             </main>

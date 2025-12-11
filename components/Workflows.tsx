@@ -1150,17 +1150,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                         <button
                             onClick={saveWorkflow}
                             disabled={isSaving}
-                            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                            className="flex items-center px-4 py-2 bg-slate-800 border-none text-white rounded-lg hover:bg-slate-900 transition-colors shadow-sm text-sm font-medium disabled:opacity-50"
                         >
-                            <Save size={16} />
-                            {isSaving ? 'Saving...' : 'Save'}
+                            {isSaving ? <span className="animate-spin mr-2">⟳</span> : <Save size={16} className="mr-2" />}
+                            Save
                         </button>
                         <button
                             onClick={runWorkflow}
-                            disabled={isRunning}
-                            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                            disabled={isRunning || nodes.length === 0}
+                            className={`flex items-center px-4 py-2 rounded-lg text-white shadow-sm transition-colors text-sm font-medium ${isRunning || nodes.length === 0
+                                ? 'bg-slate-300 cursor-not-allowed'
+                                : 'bg-slate-800 hover:bg-slate-900'
+                                }`}
                         >
-                            <PlayCircle size={16} />
+                            <PlayCircle size={16} className="mr-2" />
                             {isRunning ? 'Running...' : 'Run'}
                         </button>
                     </div>

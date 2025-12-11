@@ -73,8 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
           <SectionLabel label="Discover" />
           <NavItem icon={FileText} label="Documentation" />
 
-          <div className="mt-8 border-t border-slate-200 pt-4 mx-4"></div>
-          <NavItem icon={Users} label="Admin panel" />
+
         </nav>
       </div>
 
