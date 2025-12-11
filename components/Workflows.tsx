@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment';
     label: string;
     x: number;
     y: number;
@@ -26,6 +26,8 @@ interface WorkflowNode {
         // For manual input nodes:
         inputVarName?: string;
         inputVarValue?: string;
+        // For comment nodes:
+        commentText?: string;
     };
     executionResult?: string;
     data?: any;
@@ -42,11 +44,11 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment';
     label: string;
     icon: React.ElementType;
     description: string;
-    category: 'Triggers' | 'Data' | 'Logic' | 'Actions';
+    category: 'Triggers' | 'Data' | 'Logic' | 'Actions' | 'Other';
 }
 
 const DRAGGABLE_ITEMS: DraggableItem[] = [
@@ -63,6 +65,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'action', label: 'Send Email', icon: Zap, description: 'Send an email notification', category: 'Actions' },
     { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },
     { type: 'output', label: 'Output', icon: LogOut, description: 'Display workflow output data', category: 'Actions' },
+    { type: 'comment', label: 'Comment', icon: MessageSquare, description: 'Add a note or comment', category: 'Other' },
 ];
 
 interface WorkflowsProps {
@@ -1022,6 +1025,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
             case 'addField': return 'bg-indigo-100 border-indigo-300 text-indigo-800';
             case 'saveRecords': return 'bg-emerald-100 border-emerald-300 text-emerald-800';
             case 'llm': return 'bg-violet-100 border-violet-300 text-violet-800';
+            case 'comment': return 'bg-amber-50 border-amber-200 text-amber-900';
             default: return 'bg-slate-100 border-slate-300';
         }
     };
@@ -1054,7 +1058,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
 
                     {/* Categories */}
                     <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                        {['All', 'Triggers', 'Data', 'Logic', 'Actions'].map(cat => (
+                        {['All', 'Triggers', 'Data', 'Logic', 'Actions', 'Other'].map(cat => (
                             <button
                                 key={cat}
                                 onClick={() => setSelectedCategory(cat)}
@@ -1322,17 +1326,46 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                 </div>
 
                                 {/* Node Content */}
-                                <div className="flex items-center">
-                                    <div className="flex-1 font-medium text-sm truncate" title={node.label}>{node.label}</div>
-                                    {node.status === 'completed' && <Check size={16} className="text-green-600 flex-shrink-0 ml-1" />}
-                                    {node.status === 'error' && <XCircle size={16} className="text-red-600 flex-shrink-0 ml-1" />}
-                                    {node.status === 'running' && <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin ml-1" />}
-                                </div>
-
-                                {node.executionResult && (
-                                    <div className="mt-2 text-xs italic opacity-75">
-                                        {node.executionResult}
+                                {node.type === 'comment' ? (
+                                    /* Comment Node Special Layout */
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                                                A
+                                            </div>
+                                            <span className="text-xs text-slate-500">Comment</span>
+                                        </div>
+                                        <textarea
+                                            value={node.config?.commentText || ''}
+                                            onChange={(e) => {
+                                                const newText = e.target.value;
+                                                setNodes(prev => prev.map(n =>
+                                                    n.id === node.id
+                                                        ? { ...n, config: { ...n.config, commentText: newText } }
+                                                        : n
+                                                ));
+                                            }}
+                                            placeholder="Write a comment..."
+                                            className="w-full p-2 text-xs bg-transparent border-none resize-none focus:outline-none text-slate-700 min-h-[40px]"
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
                                     </div>
+                                ) : (
+                                    /* Regular Node Layout */
+                                    <>
+                                        <div className="flex items-center">
+                                            <div className="flex-1 font-medium text-sm truncate" title={node.label}>{node.label}</div>
+                                            {node.status === 'completed' && <Check size={16} className="text-green-600 flex-shrink-0 ml-1" />}
+                                            {node.status === 'error' && <XCircle size={16} className="text-red-600 flex-shrink-0 ml-1" />}
+                                            {node.status === 'running' && <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin ml-1" />}
+                                        </div>
+
+                                        {node.executionResult && (
+                                            <div className="mt-2 text-xs italic opacity-75">
+                                                {node.executionResult}
+                                            </div>
+                                        )}
+                                    </>
                                 )}
 
                                 {node.type === 'fetchData' && node.config?.entityName && (
@@ -1344,18 +1377,22 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                     </div>
                                 )}
 
-                                {/* Connector Points */}
-                                <div
-                                    onMouseDown={(e) => handleConnectorMouseDown(e, node.id)}
-                                    onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
-                                    className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id ? 'border-teal-500 scale-150' : 'border-slate-400'
-                                        }`}
-                                />
-                                {node.type !== 'trigger' && (
-                                    <div
-                                        onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
-                                        className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all border-slate-400`}
-                                    />
+                                {/* Connector Points - not for comment nodes */}
+                                {node.type !== 'comment' && (
+                                    <>
+                                        <div
+                                            onMouseDown={(e) => handleConnectorMouseDown(e, node.id)}
+                                            onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                            className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id ? 'border-teal-500 scale-150' : 'border-slate-400'
+                                                }`}
+                                        />
+                                        {node.type !== 'trigger' && (
+                                            <div
+                                                onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all border-slate-400`}
+                                            />
+                                        )}
+                                    </>
                                 )}
                             </div>
                         ))}
