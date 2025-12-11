@@ -412,7 +412,15 @@ if __name__ == "__main__":
         fs.writeFileSync(tempFile, wrapperCode);
 
         // Execute python script
-        const pythonProcess = spawn('python', [tempFile]);
+        // Use 'py' launcher for Windows compatibility if 'python' fails
+        const pythonCommand = process.platform === 'win32' ? 'py' : 'python3';
+        console.log('Executing Python with command:', pythonCommand);
+
+        const pythonProcess = spawn(pythonCommand, [tempFile]);
+
+        pythonProcess.on('error', (err) => {
+            console.error('Failed to start python process:', err);
+        });
 
         let stdoutData = '';
         let stderrData = '';
@@ -479,7 +487,13 @@ app.post('/api/python/generate', async (req, res) => {
                     3. It MUST return a list of dictionaries.
                     4. Do NOT include any markdown formatting (like \`\`\`python).
                     5. Do NOT include explanations. Just the code.
-                    6. Import any standard libraries you need inside the function or at the top.`
+                    6. Import any standard libraries you need inside the function or at the top.
+                    
+                    Example Output:
+                    import json
+                    def process(data):
+                        # Your logic here
+                        return data`
                 },
                 { role: "user", content: prompt }
             ],

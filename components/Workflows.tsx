@@ -445,19 +445,29 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
 
         setIsGeneratingCode(true);
         try {
-            const response = await fetch('/api/python/generate', {
+            const response = await fetch('http://localhost:3001/api/python/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ prompt: pythonAiPrompt })
             });
 
-            if (!response.ok) throw new Error('Failed to generate code');
+            const text = await response.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                console.error('Failed to parse JSON:', text);
+                throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}...`);
+            }
 
-            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to generate code');
+            }
+
             setPythonCode(data.code);
         } catch (error) {
             console.error('Error generating python code:', error);
-            alert('Failed to generate code. Please try again.');
+            alert(`Failed to generate code: ${error.message}`);
         } finally {
             setIsGeneratingCode(false);
         }
