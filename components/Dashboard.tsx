@@ -4,6 +4,7 @@ import { BarChart, Bar, LineChart, Line, PieChart, Pie, AreaChart, Area, XAxis, 
 import { Database, TrendingUp, Layers, Activity, Sparkles, X, Info } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
+import { ProfileMenu } from './ProfileMenu';
 
 interface DashboardProps {
     entities: Entity[];
@@ -111,11 +112,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate }) =>
 
     const fetchWidgets = async () => {
         try {
-            const res = await fetch('http://localhost:3001/api/widgets');
+            const res = await fetch('http://localhost:3001/api/widgets', { credentials: 'include' });
             const data = await res.json();
-            setSavedWidgets(data.map((w: any) => ({ ...w.config, id: w.id })));
+            if (Array.isArray(data)) {
+                setSavedWidgets(data.map((w: any) => ({ ...w.config, id: w.id })));
+            } else {
+                setSavedWidgets([]);
+            }
         } catch (error) {
             console.error('Error fetching widgets:', error);
+            setSavedWidgets([]);
         }
     };
 
@@ -177,7 +183,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate }) =>
                 body: JSON.stringify({
                     prompt,
                     mentionedEntityIds
-                })
+                }),
+                credentials: 'include'
             });
 
             const widgetConfig = await res.json();
@@ -205,7 +212,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate }) =>
                     title: widget.title,
                     description: widget.description,
                     config: widget
-                })
+                }),
+                credentials: 'include'
             });
 
             if (res.ok) {
@@ -223,7 +231,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate }) =>
         if (isSaved && widgetId) {
             try {
                 await fetch(`http://localhost:3001/api/widgets/${widgetId}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    credentials: 'include'
                 });
                 setSavedWidgets(prev => prev.filter(w => (w as any).id !== widgetId));
             } catch (error) {
@@ -244,6 +253,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate }) =>
                         <h1 className="text-xl font-bold text-slate-800">Dashboard</h1>
                         <p className="text-xs text-slate-500">Visual analytics and insights</p>
                     </div>
+                </div>
+                <div className="flex items-center space-x-4">
+                    <ProfileMenu />
                 </div>
             </header>
 

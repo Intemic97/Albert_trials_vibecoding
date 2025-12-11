@@ -8,6 +8,7 @@ import { LoginPage } from './components/LoginPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Entity, Property, PropertyType } from './types';
 import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X, Code } from 'lucide-react';
+import { ProfileMenu } from './components/ProfileMenu';
 
 export default function App() {
     return (
@@ -497,9 +498,7 @@ function AuthenticatedApp() {
                             )}
 
                             <div className="flex items-center space-x-4">
-                                <div className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold shadow-md cursor-pointer">
-                                    A
-                                </div>
+                                <ProfileMenu />
                             </div>
                         </header>
 

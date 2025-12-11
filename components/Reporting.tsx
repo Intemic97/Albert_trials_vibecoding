@@ -5,6 +5,7 @@ import { Sparkles, FileText, FlaskConical, Clipboard, Wrench, AlertTriangle, Dow
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { PromptInput } from './PromptInput';
+import { ProfileMenu } from './ProfileMenu';
 
 interface ReportingProps {
     entities: Entity[];
@@ -409,6 +410,9 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo }) =
                         <h1 className="text-xl font-bold text-slate-800">AI Reporting</h1>
                         <p className="text-xs text-slate-500">Generate insights from your data</p>
                     </div>
+                </div>
+                <div className="flex items-center space-x-4">
+                    <ProfileMenu />
                 </div>
             </header>
 

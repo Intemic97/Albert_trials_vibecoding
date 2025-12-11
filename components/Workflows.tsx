@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare } from 'lucide-react';
 import { PromptInput } from './PromptInput';
+import { ProfileMenu } from './ProfileMenu';
 
 interface WorkflowNode {
     id: string;
