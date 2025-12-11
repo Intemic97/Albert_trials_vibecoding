@@ -1289,38 +1289,44 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                     width: '192px', // Enforce fixed width (w-48)
                                     cursor: (node.data || ['fetchData', 'condition', 'addField', 'saveRecords', 'equipment', 'llm'].includes(node.type)) ? 'grab' : 'default'
                                 }}
-                                className={`flex flex-col p-4 rounded-lg border-2 shadow-md w-48 group relative ${getNodeColor(node.type, node.status)}`}
+                                className={`flex flex-col p-3 rounded-lg border-2 shadow-md w-48 group relative ${getNodeColor(node.type, node.status)}`}
                             >
-                                <div className="flex items-center overflow-hidden">
-                                    <div className="flex-1 font-medium text-sm truncate" title={node.label}>{node.label}</div>
-                                    {node.status === 'completed' && <Check size={16} className="text-green-600 flex-shrink-0 ml-1" />}
-                                    {node.status === 'error' && <XCircle size={16} className="text-red-600 flex-shrink-0 ml-1" />}
-                                    {node.data && Array.isArray(node.data) && node.data.length > 0 && (
-                                        <button
-                                            onClick={() => setViewingDataNodeId(node.id)}
-                                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all ml-2 flex-shrink-0"
-                                            title="View Data"
-                                        >
-                                            <Database size={14} />
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => removeNode(node.id)}
-                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all ml-2"
-                                        title="Delete Node"
-                                    >
-                                        <X size={14} />
-                                    </button>
+                                {/* Hover Action Buttons - Above Node */}
+                                <div className="absolute -top-7 left-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all bg-white rounded-md shadow-sm border border-slate-200 p-0.5">
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             handleRunNode(node.id);
                                         }}
-                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all ml-1 text-teal-700"
-                                        title="Run Node Only"
+                                        className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-teal-600 transition-all"
+                                        title="Run Node"
                                     >
-                                        <Play size={14} fill="currentColor" />
+                                        <Play size={12} fill="currentColor" />
                                     </button>
+                                    {node.data && Array.isArray(node.data) && node.data.length > 0 && (
+                                        <button
+                                            onClick={() => setViewingDataNodeId(node.id)}
+                                            className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-slate-800 transition-all"
+                                            title="View Data"
+                                        >
+                                            <Database size={12} />
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => removeNode(node.id)}
+                                        className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-red-500 transition-all"
+                                        title="Delete Node"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                </div>
+
+                                {/* Node Content */}
+                                <div className="flex items-center">
+                                    <div className="flex-1 font-medium text-sm truncate" title={node.label}>{node.label}</div>
+                                    {node.status === 'completed' && <Check size={16} className="text-green-600 flex-shrink-0 ml-1" />}
+                                    {node.status === 'error' && <XCircle size={16} className="text-red-600 flex-shrink-0 ml-1" />}
+                                    {node.status === 'running' && <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin ml-1" />}
                                 </div>
 
                                 {node.executionResult && (
