@@ -505,7 +505,28 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
             try {
                 const res = await fetch(`http://localhost:3001/api/entities/${node.config.entityId}/records`);
                 const records = await res.json();
-                nodeData = records;
+
+                // Flatten data using entity schema
+                const entity = entities.find(e => e.id === node.config?.entityId);
+                nodeData = records.map((record: any) => {
+                    const flattened: any = {
+                        id: record.id,
+                        createdAt: record.createdAt
+                    };
+
+                    if (record.values) {
+                        Object.entries(record.values).forEach(([propId, value]) => {
+                            if (entity) {
+                                const prop = entity.properties.find((p: any) => p.id === propId);
+                                flattened[prop ? prop.name : propId] = value;
+                            } else {
+                                flattened[propId] = value;
+                            }
+                        });
+                    }
+                    return flattened;
+                });
+
                 result = `Fetched ${records.length} records from ${node.config.entityName}`;
             } catch (error) {
                 result = 'Error fetching data';
