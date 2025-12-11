@@ -1666,7 +1666,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-xl shadow-xl p-6 w-[600px] max-w-full">
                         <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <Code className="text-yellow-600" />
+                            <Code className="text-indigo-600" />
                             Configure Python Code
                         </h3>
 
@@ -1674,7 +1674,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                             {/* AI Assistant Section */}
                             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                                 <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-                                    <Sparkles size={14} className="text-violet-500" />
+                                    <Sparkles size={14} className="text-indigo-500" />
                                     Ask AI to write code
                                 </label>
                                 <div className="flex gap-2">
@@ -1683,13 +1683,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                         value={pythonAiPrompt}
                                         onChange={(e) => setPythonAiPrompt(e.target.value)}
                                         placeholder="e.g., Filter records where price > 100"
-                                        className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-sm"
+                                        className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm"
                                         onKeyDown={(e) => e.key === 'Enter' && generatePythonCode()}
                                     />
                                     <button
                                         onClick={generatePythonCode}
                                         disabled={isGeneratingCode || !pythonAiPrompt.trim()}
-                                        className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 text-sm font-medium whitespace-nowrap flex items-center gap-2"
+                                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium whitespace-nowrap flex items-center gap-2"
                                     >
                                         {isGeneratingCode ? (
                                             <>
@@ -1715,7 +1715,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                     <textarea
                                         value={pythonCode}
                                         onChange={(e) => setPythonCode(e.target.value)}
-                                        className="w-full px-4 py-3 bg-slate-900 text-slate-50 font-mono text-sm rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none h-64 resize-none"
+                                        className="w-full px-4 py-3 bg-slate-900 text-slate-50 font-mono text-sm rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-64 resize-none"
                                         spellCheck={false}
                                     />
                                     <div className="absolute top-2 right-2 text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded">
@@ -1737,7 +1737,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                             </button>
                             <button
                                 onClick={savePythonConfig}
-                                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
+                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                             >
                                 Save
                             </button>

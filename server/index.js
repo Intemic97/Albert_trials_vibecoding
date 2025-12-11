@@ -387,9 +387,54 @@ app.post('/api/python/execute', async (req, res) => {
         const wrapperCode = `
 import json
 import sys
+import ast
+
+# Security Check
+def check_security(code_str):
+    try:
+        tree = ast.parse(code_str)
+    except SyntaxError as e:
+        return f"Syntax Error: {e}"
+
+    forbidden_imports = {'os', 'subprocess', 'shutil', 'sys', 'socket', 'requests', 'http', 'urllib', 'ftplib', 'telnetlib', 'importlib', 'pickle', 'marshal', 'shelve'}
+    forbidden_functions = {'open', 'exec', 'eval', 'compile', '__import__', 'input', 'breakpoint', 'help', 'exit', 'quit'}
+
+    for node in ast.walk(tree):
+        # Check imports
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.split('.')[0] in forbidden_imports:
+                    return f"Security Error: Import of '{alias.name}' is forbidden"
+        elif isinstance(node, ast.ImportFrom):
+            if node.module and node.module.split('.')[0] in forbidden_imports:
+                return f"Security Error: Import from '{node.module}' is forbidden"
+        
+        # Check function calls
+        elif isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name):
+                if node.func.id in forbidden_functions:
+                    return f"Security Error: Usage of '{node.func.id}' is forbidden"
+            elif isinstance(node.func, ast.Attribute):
+                # Block specific dangerous methods if needed, but for now relying on import blocking
+                pass
+
+    return None
 
 # User code
-${code}
+user_code = """${code}"""
+
+# Run security check
+security_error = check_security(user_code)
+if security_error:
+    print(json.dumps({"error": security_error}))
+    sys.exit(0)
+
+# Execute User Code
+try:
+    exec(user_code, globals())
+except Exception as e:
+    print(json.dumps({"error": f"Runtime Error: {str(e)}"}))
+    sys.exit(0)
 
 if __name__ == "__main__":
     try:
