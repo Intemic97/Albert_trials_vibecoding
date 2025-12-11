@@ -473,6 +473,264 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
         }
     };
 
+
+    const executeNode = async (nodeId: string, inputData: any = null, recursive: boolean = true) => {
+        // Use a ref or get the latest node from the state setter to ensure we have the latest config?
+        // For now, using 'nodes' from closure is fine for config, but we must be careful about 'status' checks if we needed them.
+        const node = nodes.find(n => n.id === nodeId);
+        if (!node) return;
+
+        // Set to running
+        setNodes(prev => prev.map(n =>
+            n.id === nodeId ? { ...n, status: 'running' as const, inputData } : n
+        ));
+
+        //Simulate work
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Set result based on type
+        let result = '';
+        let nodeData: any = null;
+        let conditionResult: boolean | undefined = undefined;
+
+        if (node.type === 'fetchData') {
+            if (!node.config?.entityId) {
+                result = 'Error: No entity configured';
+                setNodes(prev => prev.map(n =>
+                    n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
+                ));
+                return;
+            }
+
+            try {
+                const res = await fetch(`http://localhost:3001/api/entities/${node.config.entityId}/records`);
+                const records = await res.json();
+                nodeData = records;
+                result = `Fetched ${records.length} records from ${node.config.entityName}`;
+            } catch (error) {
+                result = 'Error fetching data';
+                setNodes(prev => prev.map(n =>
+                    n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
+                ));
+                return;
+            }
+        } else if (node.type === 'equipment') {
+            if (!node.config?.recordId) {
+                result = 'Error: No equipment selected';
+                setNodes(prev => prev.map(n =>
+                    n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
+                ));
+                return;
+            }
+
+            try {
+                const equipmentEntity = entities.find(e =>
+                    e.name.toLowerCase() === 'equipment' ||
+                    e.name.toLowerCase() === 'equipments'
+                );
+
+                if (!equipmentEntity) {
+                    throw new Error('Equipment entity not found');
+                }
+
+                const res = await fetch(`http://localhost:3001/api/entities/${equipmentEntity.id}/records`);
+                const records = await res.json();
+                const record = records.find((r: any) => r.id === node.config?.recordId);
+
+                if (record) {
+                    nodeData = [record];
+                    result = `Fetched equipment: ${node.config.recordName}`;
+                } else {
+                    result = 'Equipment record not found';
+                    setNodes(prev => prev.map(n =>
+                        n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
+                    ));
+                    return;
+                }
+            } catch (error) {
+                result = 'Error fetching equipment';
+                setNodes(prev => prev.map(n =>
+                    n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
+                ));
+                return;
+            }
+        } else {
+            switch (node.type) {
+                case 'trigger':
+                    result = 'Triggered!';
+                    break;
+                case 'action':
+                    result = 'Action executed!';
+                    break;
+                case 'condition':
+                    // Evaluate condition
+                    if (node.config?.conditionField && node.config?.conditionOperator) {
+                        const dataToEval = inputData;
+
+                        if (dataToEval && Array.isArray(dataToEval) && dataToEval.length > 0) {
+                            const record = dataToEval[0];
+                            const fieldValue = record[node.config.conditionField];
+                            let condResult = false;
+
+                            switch (node.config.conditionOperator) {
+                                case 'isText': condResult = typeof fieldValue === 'string'; break;
+                                case 'isNumber': condResult = !isNaN(Number(fieldValue)); break;
+                                case 'equals': condResult = String(fieldValue) === node.config.conditionValue; break;
+                                case 'greaterThan': condResult = Number(fieldValue) > Number(node.config.conditionValue); break;
+                                case 'lessThan': condResult = Number(fieldValue) < Number(node.config.conditionValue); break;
+                            }
+
+                            nodeData = dataToEval;
+                            conditionResult = condResult;
+                            result = `${node.config.conditionField} ${node.config.conditionOperator} → ${condResult ? '✓' : '✗'}`;
+                        } else {
+                            result = 'No data to evaluate';
+                        }
+                    } else {
+                        result = 'Not configured';
+                    }
+                    break;
+                case 'addField':
+                    // Add field to all records
+                    if (node.config?.conditionField && inputData && Array.isArray(inputData)) {
+                        const fieldName = node.config.conditionField;
+                        const fieldValue = node.config.conditionValue || '';
+
+                        nodeData = inputData.map(record => ({
+                            ...record,
+                            [fieldName]: fieldValue
+                        }));
+
+                        result = `Added field "${fieldName}" = "${fieldValue}" to ${nodeData.length} records`;
+                    } else {
+                        result = 'Not configured or no data';
+                    }
+                    break;
+                case 'saveRecords':
+                    // Save records to entity
+                    if (node.config?.entityId && inputData && Array.isArray(inputData)) {
+                        try {
+                            let savedCount = 0;
+                            let failedCount = 0;
+
+                            for (const record of inputData) {
+                                // Remove id to let database generate it
+                                const { id, ...recordWithoutId } = record;
+
+                                const response = await fetch(`http://localhost:3001/api/entities/${node.config.entityId}/records`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(recordWithoutId)
+                                });
+
+                                if (response.ok) {
+                                    savedCount++;
+                                } else {
+                                    failedCount++;
+                                    console.error(`Failed to save record:`, record, await response.text());
+                                }
+                            }
+
+                            nodeData = inputData;
+                            result = failedCount > 0
+                                ? `Saved ${savedCount}, Failed ${failedCount} to ${node.config.entityName}`
+                                : `Saved ${savedCount} records to ${node.config.entityName}`;
+                        } catch (error) {
+                            console.error('Save records error:', error);
+                            result = `Error: ${error.message || 'Failed to save'}`;
+                        }
+                    } else {
+                        result = 'Not configured or no data';
+                    }
+                    break;
+                case 'python':
+                    if (node.config?.pythonCode) {
+                        try {
+                            const response = await fetch('http://localhost:3001/api/python/execute', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    code: node.config.pythonCode,
+                                    inputData: inputData || []
+                                })
+                            });
+
+                            if (response.ok) {
+                                const data = await response.json();
+                                nodeData = data.result;
+                                result = 'Python code executed successfully';
+                            } else {
+                                const errorData = await response.json();
+                                throw new Error(errorData.error || 'Python execution failed');
+                            }
+                        } catch (error) {
+                            console.error('Python execution error:', error);
+                            result = `Error: ${error.message || 'Failed to execute'}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'Code not configured';
+                    }
+                    break;
+                case 'llm':
+                    if (node.config?.llmPrompt) {
+                        try {
+                            const response = await fetch('http://localhost:3001/api/generate', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    prompt: node.config.llmPrompt,
+                                    mentionedEntityIds: node.config.llmContextEntities || [],
+                                    additionalContext: node.config.llmIncludeInput ? inputData : undefined
+                                })
+                            });
+
+                            if (response.ok) {
+                                const data = await response.json();
+                                nodeData = [{ result: data.response }]; // Store as a record-like object
+                                result = 'Generated text successfully';
+                            } else {
+                                const errorData = await response.json();
+                                throw new Error(errorData.error || 'Failed to generate text');
+                            }
+                        } catch (error) {
+                            console.error('LLM generation error:', error);
+                            result = `Error: ${error.message || 'Failed to generate'}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'Prompt not configured';
+                    }
+                    break;
+            }
+        }
+
+        // Set to completed
+        setNodes(prev => prev.map(n =>
+            n.id === nodeId ? { ...n, status: 'completed' as const, executionResult: result, data: nodeData, outputData: nodeData, conditionResult: conditionResult !== undefined ? conditionResult : n.conditionResult } : n
+        ));
+
+        if (recursive) {
+            // Find and execute connected nodes
+            const nextConnections = connections.filter(conn => conn.fromNodeId === nodeId);
+
+            // For condition nodes, filter by outputType based on result
+            const toExecute = node.type === 'condition' && conditionResult !== undefined
+                ? nextConnections.filter(c => {
+                    if (conditionResult) {
+                        return !c.outputType || c.outputType === 'true';
+                    } else {
+                        return c.outputType === 'false';
+                    }
+                })
+                : nextConnections;
+
+            for (const conn of toExecute) {
+                await executeNode(conn.toNodeId, nodeData);
+            }
+        }
+    };
+
     const runWorkflow = async () => {
         if (isRunning) return;
         setIsRunning(true);
@@ -491,265 +749,34 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
             return;
         }
 
-        // Execute nodes in order following connections
-        const executeNode = async (nodeId: string, inputData?: any) => {
-            const node = nodes.find(n => n.id === nodeId);
-            if (!node) return;
-
-            // Set to running
-            setNodes(prev => prev.map(n =>
-                n.id === nodeId ? { ...n, status: 'running' as const, inputData } : n
-            ));
-
-            //Simulate work
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            // Set result based on type
-            let result = '';
-            let nodeData: any = null;
-
-            if (node.type === 'fetchData') {
-                if (!node.config?.entityId) {
-                    result = 'Error: No entity configured';
-                    setNodes(prev => prev.map(n =>
-                        n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
-                    ));
-                    return;
-                }
-
-                try {
-                    const res = await fetch(`http://localhost:3001/api/entities/${node.config.entityId}/records`);
-                    const records = await res.json();
-                    nodeData = records;
-                    result = `Fetched ${records.length} records from ${node.config.entityName}`;
-                } catch (error) {
-                    result = 'Error fetching data';
-                    setNodes(prev => prev.map(n =>
-                        n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
-                    ));
-                    return;
-                }
-            } else if (node.type === 'equipment') {
-                if (!node.config?.recordId) {
-                    result = 'Error: No equipment selected';
-                    setNodes(prev => prev.map(n =>
-                        n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
-                    ));
-                    return;
-                }
-
-                try {
-                    const equipmentEntity = entities.find(e =>
-                        e.name.toLowerCase() === 'equipment' ||
-                        e.name.toLowerCase() === 'equipments'
-                    );
-
-                    if (!equipmentEntity) {
-                        throw new Error('Equipment entity not found');
-                    }
-
-                    const res = await fetch(`http://localhost:3001/api/entities/${equipmentEntity.id}/records`);
-                    const records = await res.json();
-                    const record = records.find((r: any) => r.id === node.config?.recordId);
-
-                    if (record) {
-                        nodeData = [record];
-                        result = `Fetched equipment: ${node.config.recordName}`;
-                    } else {
-                        result = 'Equipment record not found';
-                        setNodes(prev => prev.map(n =>
-                            n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
-                        ));
-                        return;
-                    }
-                } catch (error) {
-                    result = 'Error fetching equipment';
-                    setNodes(prev => prev.map(n =>
-                        n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
-                    ));
-                    return;
-                }
-            } else {
-                switch (node.type) {
-                    case 'trigger':
-                        result = 'Triggered!';
-                        break;
-                    case 'action':
-                        result = 'Action executed!';
-                        break;
-                    case 'condition':
-                        // Evaluate condition
-                        if (node.config?.conditionField && node.config?.conditionOperator) {
-                            const dataToEval = inputData;
-
-                            if (dataToEval && Array.isArray(dataToEval) && dataToEval.length > 0) {
-                                const record = dataToEval[0];
-                                const fieldValue = record[node.config.conditionField];
-                                let condResult = false;
-
-                                switch (node.config.conditionOperator) {
-                                    case 'isText': condResult = typeof fieldValue === 'string'; break;
-                                    case 'isNumber': condResult = !isNaN(Number(fieldValue)); break;
-                                    case 'equals': condResult = String(fieldValue) === node.config.conditionValue; break;
-                                    case 'greaterThan': condResult = Number(fieldValue) > Number(node.config.conditionValue); break;
-                                    case 'lessThan': condResult = Number(fieldValue) < Number(node.config.conditionValue); break;
-                                }
-
-                                nodeData = dataToEval;
-                                result = `${node.config.conditionField} ${node.config.conditionOperator} → ${condResult ? '✓' : '✗'}`;
-                                setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, conditionResult: condResult } : n));
-                            } else {
-                                result = 'No data to evaluate';
-                            }
-                        } else {
-                            result = 'Not configured';
-                        }
-                        break;
-                    case 'addField':
-                        // Add field to all records
-                        if (node.config?.conditionField && inputData && Array.isArray(inputData)) {
-                            const fieldName = node.config.conditionField;
-                            const fieldValue = node.config.conditionValue || '';
-
-                            nodeData = inputData.map(record => ({
-                                ...record,
-                                [fieldName]: fieldValue
-                            }));
-
-                            result = `Added field "${fieldName}" = "${fieldValue}" to ${nodeData.length} records`;
-                        } else {
-                            result = 'Not configured or no data';
-                        }
-                        break;
-                    case 'saveRecords':
-                        // Save records to entity
-                        if (node.config?.entityId && inputData && Array.isArray(inputData)) {
-                            try {
-                                let savedCount = 0;
-                                let failedCount = 0;
-
-                                for (const record of inputData) {
-                                    // Remove id to let database generate it
-                                    const { id, ...recordWithoutId } = record;
-
-                                    const response = await fetch(`http://localhost:3001/api/entities/${node.config.entityId}/records`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify(recordWithoutId)
-                                    });
-
-                                    if (response.ok) {
-                                        savedCount++;
-                                    } else {
-                                        failedCount++;
-                                        console.error(`Failed to save record:`, record, await response.text());
-                                    }
-                                }
-
-                                nodeData = inputData;
-                                result = failedCount > 0
-                                    ? `Saved ${savedCount}, Failed ${failedCount} to ${node.config.entityName}`
-                                    : `Saved ${savedCount} records to ${node.config.entityName}`;
-                            } catch (error) {
-                                console.error('Save records error:', error);
-                                result = `Error: ${error.message || 'Failed to save'}`;
-                            }
-                        } else {
-                            result = 'Not configured or no data';
-                        }
-                        break;
-                    case 'python':
-                        if (node.config?.pythonCode) {
-                            try {
-                                const response = await fetch('http://localhost:3001/api/python/execute', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        code: node.config.pythonCode,
-                                        inputData: inputData || []
-                                    })
-                                });
-
-                                if (response.ok) {
-                                    const data = await response.json();
-                                    nodeData = data.result;
-                                    result = 'Python code executed successfully';
-                                } else {
-                                    const errorData = await response.json();
-                                    throw new Error(errorData.error || 'Python execution failed');
-                                }
-                            } catch (error) {
-                                console.error('Python execution error:', error);
-                                result = `Error: ${error.message || 'Failed to execute'}`;
-                                nodeData = [{ error: error.message }];
-                            }
-                        } else {
-                            result = 'Code not configured';
-                        }
-                        break;
-                    case 'llm':
-                        if (node.config?.llmPrompt) {
-                            try {
-                                const response = await fetch('http://localhost:3001/api/generate', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        prompt: node.config.llmPrompt,
-                                        mentionedEntityIds: node.config.llmContextEntities || [],
-                                        additionalContext: node.config.llmIncludeInput ? inputData : undefined
-                                    })
-                                });
-
-                                if (response.ok) {
-                                    const data = await response.json();
-                                    nodeData = [{ result: data.response }]; // Store as a record-like object
-                                    result = 'Generated text successfully';
-                                } else {
-                                    const errorData = await response.json();
-                                    throw new Error(errorData.error || 'Failed to generate text');
-                                }
-                            } catch (error) {
-                                console.error('LLM generation error:', error);
-                                result = `Error: ${error.message || 'Failed to generate'}`;
-                                nodeData = [{ error: error.message }];
-                            }
-                        } else {
-                            result = 'Prompt not configured';
-                        }
-                        break;
-                }
-            }
-
-            // Set to completed
-            setNodes(prev => prev.map(n =>
-                n.id === nodeId ? { ...n, status: 'completed' as const, executionResult: result, data: nodeData, outputData: nodeData } : n
-            ));
-
-            // Find and execute connected nodes
-            const nextConnections = connections.filter(conn => conn.fromNodeId === nodeId);
-
-            // For condition nodes, filter by outputType based on result
-            const toExecute = node.type === 'condition' && node.conditionResult !== undefined
-                ? nextConnections.filter(c => {
-                    if (node.conditionResult) {
-                        return !c.outputType || c.outputType === 'true';
-                    } else {
-                        return c.outputType === 'false';
-                    }
-                })
-                : nextConnections;
-
-            for (const conn of toExecute) {
-                await executeNode(conn.toNodeId, nodeData);
-            }
-        };
-
         // Execute all trigger nodes
         for (const trigger of triggerNodes) {
             await executeNode(trigger.id);
         }
 
         setIsRunning(false);
+    };
+
+    const handleRunNode = async (nodeId: string) => {
+        if (isRunning) return;
+
+        // Find input data from parent nodes if available
+        const incomingConnections = connections.filter(c => c.toNodeId === nodeId);
+        let inputData = null;
+
+        if (incomingConnections.length > 0) {
+            // Use the data from the first connected parent that has output data
+            // This is a simplification; in a real runner, we might need to wait for all or handle multiple inputs
+            for (const conn of incomingConnections) {
+                const parentNode = nodes.find(n => n.id === conn.fromNodeId);
+                if (parentNode && parentNode.outputData) {
+                    inputData = parentNode.outputData;
+                    break;
+                }
+            }
+        }
+
+        await executeNode(nodeId, inputData, false);
     };
 
 
@@ -1180,8 +1207,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                                     <button
                                         onClick={() => removeNode(node.id)}
                                         className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all ml-2"
+                                        title="Delete Node"
                                     >
                                         <X size={14} />
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRunNode(node.id);
+                                        }}
+                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all ml-1 text-teal-700"
+                                        title="Run Node Only"
+                                    >
+                                        <Play size={14} fill="currentColor" />
                                     </button>
                                 </div>
 
