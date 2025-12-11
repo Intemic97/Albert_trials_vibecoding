@@ -4,10 +4,21 @@ import { EntityCard } from './components/EntityCard';
 import { Reporting } from './components/Reporting';
 import { Dashboard } from './components/Dashboard';
 import { Workflows } from './components/Workflows';
+import { LoginPage } from './components/LoginPage';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { Entity, Property, PropertyType } from './types';
 import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X, Code } from 'lucide-react';
 
 export default function App() {
+    return (
+        <AuthProvider>
+            <AuthenticatedApp />
+        </AuthProvider>
+    );
+}
+
+function AuthenticatedApp() {
+    const { isAuthenticated, isLoading } = useAuth();
     const [entities, setEntities] = useState<Entity[]>([]);
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
     const [currentView, setCurrentView] = useState('database');
@@ -60,8 +71,10 @@ export default function App() {
 
     // Fetch Entities on Mount
     useEffect(() => {
-        fetchEntities();
-    }, []);
+        if (isAuthenticated) {
+            fetchEntities();
+        }
+    }, [isAuthenticated]);
 
     // Fetch Records when active entity or tab changes
     useEffect(() => {
@@ -74,7 +87,7 @@ export default function App() {
 
     const fetchEntities = async () => {
         try {
-            const res = await fetch('http://localhost:3001/api/entities');
+            const res = await fetch('http://localhost:3001/api/entities', { credentials: 'include' });
             const data = await res.json();
             setEntities(data);
         } catch (error) {
@@ -84,7 +97,7 @@ export default function App() {
 
     const fetchCompanyInfo = async () => {
         try {
-            const res = await fetch('http://localhost:3001/api/company');
+            const res = await fetch('http://localhost:3001/api/company', { credentials: 'include' });
             if (res.ok) {
                 const data = await res.json();
                 setCompanyInfo(data);
@@ -99,7 +112,8 @@ export default function App() {
             await fetch('http://localhost:3001/api/company', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(companyInfo)
+                body: JSON.stringify(companyInfo),
+                credentials: 'include'
             });
             alert('Company information saved successfully!');
         } catch (error) {
@@ -111,7 +125,7 @@ export default function App() {
     const fetchRecords = async () => {
         if (!activeEntityId) return;
         try {
-            const res = await fetch(`http://localhost:3001/api/entities/${activeEntityId}/records`);
+            const res = await fetch(`http://localhost:3001/api/entities/${activeEntityId}/records`, { credentials: 'include' });
             const data = await res.json();
             setRecords(data);
         } catch (error) {
@@ -131,7 +145,7 @@ export default function App() {
                 const relatedEntity = entities.find(e => e.id === prop.relatedEntityId);
 
                 if (relatedEntity) {
-                    const res = await fetch(`http://localhost:3001/api/entities/${prop.relatedEntityId}/records`);
+                    const res = await fetch(`http://localhost:3001/api/entities/${prop.relatedEntityId}/records`, { credentials: 'include' });
                     const records = await res.json();
                     newRelatedData[prop.relatedEntityId] = { entity: relatedEntity, records };
                 }
@@ -153,7 +167,7 @@ export default function App() {
 
             for (const prop of pointingProps) {
                 try {
-                    const res = await fetch(`http://localhost:3001/api/entities/${entity.id}/records`);
+                    const res = await fetch(`http://localhost:3001/api/entities/${entity.id}/records`, { credentials: 'include' });
                     const records = await res.json();
                     newIncomingData[prop.id] = { sourceEntity: entity, sourceProperty: prop, records };
                 } catch (error) {
@@ -180,7 +194,8 @@ export default function App() {
             await fetch('http://localhost:3001/api/entities', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newEntity)
+                body: JSON.stringify(newEntity),
+                credentials: 'include'
             });
 
             await fetchEntities();
@@ -197,7 +212,8 @@ export default function App() {
     const handleDeleteEntity = async (entity: Entity) => {
         try {
             await fetch(`http://localhost:3001/api/entities/${entity.id}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                credentials: 'include'
             });
             await fetchEntities();
         } catch (error) {
@@ -220,7 +236,8 @@ export default function App() {
             await fetch('http://localhost:3001/api/properties', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...newProp, entityId: activeEntityId })
+                body: JSON.stringify({ ...newProp, entityId: activeEntityId }),
+                credentials: 'include'
             });
 
             // Refresh data
@@ -240,7 +257,8 @@ export default function App() {
     const deleteProperty = async (propId: string) => {
         try {
             await fetch(`http://localhost:3001/api/properties/${propId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                credentials: 'include'
             });
             await fetchEntities();
         } catch (error) {
@@ -268,7 +286,8 @@ export default function App() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         values: processedValues
-                    })
+                    }),
+                    credentials: 'include'
                 });
             } else {
                 // Create new record
@@ -278,7 +297,8 @@ export default function App() {
                     body: JSON.stringify({
                         entityId: targetEntityId,
                         values: processedValues
-                    })
+                    }),
+                    credentials: 'include'
                 });
             }
 
@@ -328,7 +348,8 @@ export default function App() {
     const deleteRecord = async (recordId: string) => {
         try {
             await fetch(`http://localhost:3001/api/records/${recordId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                credentials: 'include'
             });
             await fetchRecords();
         } catch (error) {
@@ -421,6 +442,14 @@ export default function App() {
     };
 
     const currentSchema = editingSchema || activeEntity;
+
+    if (isLoading) {
+        return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Loading...</div>;
+    }
+
+    if (!isAuthenticated) {
+        return <LoginPage />;
+    }
 
     return (
         <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">

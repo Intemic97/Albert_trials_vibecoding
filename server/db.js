@@ -11,13 +11,53 @@ async function openDb() {
 async function initDb() {
   const db = await openDb();
 
+  // Enable foreign keys
+  await db.exec('PRAGMA foreign_keys = ON;');
+
+  // DROP tables to ensure fresh schema (User approved data deletion)
   await db.exec(`
+    DROP TABLE IF EXISTS record_values;
+    DROP TABLE IF EXISTS records;
+    DROP TABLE IF EXISTS properties;
+    DROP TABLE IF EXISTS entities;
+    DROP TABLE IF EXISTS workflows;
+    DROP TABLE IF EXISTS user_organizations;
+    DROP TABLE IF EXISTS organizations;
+    DROP TABLE IF EXISTS users;
+  `);
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      name TEXT,
+      createdAt TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS organizations (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      createdAt TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS user_organizations (
+      userId TEXT,
+      organizationId TEXT,
+      role TEXT DEFAULT 'member',
+      PRIMARY KEY (userId, organizationId),
+      FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS entities (
       id TEXT PRIMARY KEY,
+      organizationId TEXT,
       name TEXT,
       description TEXT,
       author TEXT,
-      lastEdited TEXT
+      lastEdited TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS properties (
@@ -48,10 +88,12 @@ async function initDb() {
 
     CREATE TABLE IF NOT EXISTS workflows (
       id TEXT PRIMARY KEY,
+      organizationId TEXT,
       name TEXT NOT NULL,
       data TEXT NOT NULL,
       createdAt TEXT,
-      updatedAt TEXT
+      updatedAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
     );
   `);
 

@@ -2,12 +2,18 @@ const express = require('express');
 const cors = require('cors');
 const { initDb } = require('./db');
 require('dotenv').config();
+const cookieParser = require('cookie-parser');
+const { register, login, logout, authenticateToken, getMe } = require('./auth');
 
 const app = express();
 const PORT = 3001;
 
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:5173', // Vite default port
+    credentials: true
+}));
 app.use(express.json());
+app.use(cookieParser());
 
 let db;
 
@@ -25,10 +31,16 @@ initDb().then(database => {
 
 // --- Routes ---
 
+// Auth Routes
+app.post('/api/auth/register', register);
+app.post('/api/auth/login', login);
+app.post('/api/auth/logout', logout);
+app.get('/api/auth/me', authenticateToken, getMe);
+
 // GET all entities (with properties)
-app.get('/api/entities', async (req, res) => {
+app.get('/api/entities', authenticateToken, async (req, res) => {
     try {
-        const entities = await db.all('SELECT * FROM entities');
+        const entities = await db.all('SELECT * FROM entities WHERE organizationId = ?', [req.user.orgId]);
 
         const entitiesWithProps = await Promise.all(entities.map(async (entity) => {
             const properties = await db.all('SELECT * FROM properties WHERE entityId = ?', [entity.id]);
@@ -43,13 +55,13 @@ app.get('/api/entities', async (req, res) => {
 });
 
 // POST create entity
-app.post('/api/entities', async (req, res) => {
+app.post('/api/entities', authenticateToken, async (req, res) => {
     const { id, name, description, author, lastEdited, properties } = req.body;
 
     try {
         await db.run(
-            'INSERT INTO entities (id, name, description, author, lastEdited) VALUES (?, ?, ?, ?, ?)',
-            [id, name, description, author, lastEdited]
+            'INSERT INTO entities (id, organizationId, name, description, author, lastEdited) VALUES (?, ?, ?, ?, ?, ?)',
+            [id, req.user.orgId, name, description, author, lastEdited]
         );
 
         if (properties && properties.length > 0) {
@@ -69,7 +81,7 @@ app.post('/api/entities', async (req, res) => {
 });
 
 // DELETE entity
-app.delete('/api/entities/:id', async (req, res) => {
+app.delete('/api/entities/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
         await db.run('DELETE FROM entities WHERE id = ?', [id]);
@@ -82,7 +94,7 @@ app.delete('/api/entities/:id', async (req, res) => {
 });
 
 // POST add property
-app.post('/api/properties', async (req, res) => {
+app.post('/api/properties', authenticateToken, async (req, res) => {
     const { id, entityId, name, type, defaultValue, relatedEntityId } = req.body;
     try {
         await db.run(
@@ -97,7 +109,7 @@ app.post('/api/properties', async (req, res) => {
 });
 
 // DELETE property
-app.delete('/api/properties/:id', async (req, res) => {
+app.delete('/api/properties/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
         await db.run('DELETE FROM properties WHERE id = ?', [id]);
@@ -162,9 +174,16 @@ async function resolveRelationValue(db, value, relatedEntityId) {
 // --- Records Endpoints ---
 
 // GET /api/entities/:id/records
-app.get('/api/entities/:id/records', async (req, res) => {
+// GET /api/entities/:id/records
+app.get('/api/entities/:id/records', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
+        // Verify entity belongs to user's organization
+        const entity = await db.get('SELECT id FROM entities WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
+        if (!entity) {
+            return res.status(404).json({ error: 'Entity not found or access denied' });
+        }
+
         const records = await db.all('SELECT * FROM records WHERE entityId = ?', [id]);
 
         const recordsWithValues = await Promise.all(records.map(async (record) => {
@@ -184,12 +203,20 @@ app.get('/api/entities/:id/records', async (req, res) => {
 });
 
 // POST /api/records
-app.post('/api/records', async (req, res) => {
+// POST /api/records
+app.post('/api/records', authenticateToken, async (req, res) => {
     const { entityId, values } = req.body;
-    const recordId = Math.random().toString(36).substr(2, 9);
-    const createdAt = new Date().toISOString();
 
     try {
+        // Verify entity belongs to user's organization
+        const entity = await db.get('SELECT id FROM entities WHERE id = ? AND organizationId = ?', [entityId, req.user.orgId]);
+        if (!entity) {
+            return res.status(403).json({ error: 'Access denied to this entity' });
+        }
+
+        const recordId = Math.random().toString(36).substr(2, 9);
+        const createdAt = new Date().toISOString();
+
         await db.run(
             'INSERT INTO records (id, entityId, createdAt) VALUES (?, ?, ?)',
             [recordId, entityId, createdAt]
@@ -213,11 +240,24 @@ app.post('/api/records', async (req, res) => {
 });
 
 // PUT /api/records/:id
-app.put('/api/records/:id', async (req, res) => {
+// PUT /api/records/:id
+app.put('/api/records/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { values } = req.body;
 
     try {
+        // Verify record belongs to an entity in user's organization
+        const record = await db.get(`
+            SELECT r.id 
+            FROM records r 
+            JOIN entities e ON r.entityId = e.id 
+            WHERE r.id = ? AND e.organizationId = ?
+        `, [id, req.user.orgId]);
+
+        if (!record) {
+            return res.status(404).json({ error: 'Record not found or access denied' });
+        }
+
         if (values) {
             for (const [propId, val] of Object.entries(values)) {
                 const existing = await db.get(
@@ -248,9 +288,22 @@ app.put('/api/records/:id', async (req, res) => {
 });
 
 // DELETE /api/records/:id
-app.delete('/api/records/:id', async (req, res) => {
+// DELETE /api/records/:id
+app.delete('/api/records/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
+        // Verify record belongs to an entity in user's organization
+        const record = await db.get(`
+            SELECT r.id 
+            FROM records r 
+            JOIN entities e ON r.entityId = e.id 
+            WHERE r.id = ? AND e.organizationId = ?
+        `, [id, req.user.orgId]);
+
+        if (!record) {
+            return res.status(404).json({ error: 'Record not found or access denied' });
+        }
+
         await db.run('DELETE FROM records WHERE id = ?', [id]);
         res.json({ message: 'Record deleted' });
     } catch (error) {
@@ -260,7 +313,7 @@ app.delete('/api/records/:id', async (req, res) => {
 });
 
 // OpenAI Generation Endpoint
-app.post('/api/generate', async (req, res) => {
+app.post('/api/generate', authenticateToken, async (req, res) => {
     console.log('Received generation request');
     console.time('Total Request Time');
     try {
@@ -281,8 +334,8 @@ app.post('/api/generate', async (req, res) => {
         if (mentionedEntityIds && mentionedEntityIds.length > 0) {
             // Fetch all entities in parallel
             const entityPromises = mentionedEntityIds.map(async (entityId) => {
-                // Get Entity Metadata
-                const entity = await db.get('SELECT * FROM entities WHERE id = ?', [entityId]);
+                // Get Entity Metadata (Ensure it belongs to user's org)
+                const entity = await db.get('SELECT * FROM entities WHERE id = ? AND organizationId = ?', [entityId, req.user.orgId]);
                 if (!entity) return null;
 
                 // Get Properties
@@ -376,7 +429,7 @@ app.post('/api/generate', async (req, res) => {
 });
 
 // Python Execution Endpoint
-app.post('/api/python/execute', async (req, res) => {
+app.post('/api/python/execute', authenticateToken, async (req, res) => {
     const { code, inputData } = req.body;
     const fs = require('fs');
     const path = require('path');
@@ -509,7 +562,7 @@ if __name__ == "__main__":
 });
 
 // Python Code Generation Endpoint
-app.post('/api/python/generate', async (req, res) => {
+app.post('/api/python/generate', authenticateToken, async (req, res) => {
     const { prompt } = req.body;
 
     if (!process.env.OPENAI_API_KEY) {
@@ -559,7 +612,7 @@ app.post('/api/python/generate', async (req, res) => {
 });
 
 // OpenAI Widget Generation Endpoint
-app.post('/api/generate-widget', async (req, res) => {
+app.post('/api/generate-widget', authenticateToken, async (req, res) => {
     console.log('Received widget generation request');
     try {
         const { prompt, mentionedEntityIds } = req.body;
@@ -573,7 +626,7 @@ app.post('/api/generate-widget', async (req, res) => {
         let contextData = {};
         if (mentionedEntityIds && mentionedEntityIds.length > 0) {
             const entityPromises = mentionedEntityIds.map(async (entityId) => {
-                const entity = await db.get('SELECT * FROM entities WHERE id = ?', [entityId]);
+                const entity = await db.get('SELECT * FROM entities WHERE id = ? AND organizationId = ?', [entityId, req.user.orgId]);
                 if (!entity) return null;
                 const properties = await db.all('SELECT * FROM properties WHERE entityId = ?', [entityId]);
                 const records = await db.all('SELECT * FROM records WHERE entityId = ? LIMIT 50', [entityId]);
@@ -647,9 +700,9 @@ app.post('/api/generate-widget', async (req, res) => {
 });
 
 // Workflow Management Endpoints
-app.get('/api/workflows', async (req, res) => {
+app.get('/api/workflows', authenticateToken, async (req, res) => {
     try {
-        const workflows = await db.all('SELECT id, name, createdAt, updatedAt FROM workflows ORDER BY updatedAt DESC');
+        const workflows = await db.all('SELECT id, name, createdAt, updatedAt FROM workflows WHERE organizationId = ? ORDER BY updatedAt DESC', [req.user.orgId]);
         res.json(workflows);
     } catch (error) {
         console.error('Error fetching workflows:', error);
@@ -657,10 +710,10 @@ app.get('/api/workflows', async (req, res) => {
     }
 });
 
-app.get('/api/workflows/:id', async (req, res) => {
+app.get('/api/workflows/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const workflow = await db.get('SELECT * FROM workflows WHERE id = ?', [id]);
+        const workflow = await db.get('SELECT * FROM workflows WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
         if (!workflow) {
             return res.status(404).json({ error: 'Workflow not found' });
         }
@@ -673,7 +726,7 @@ app.get('/api/workflows/:id', async (req, res) => {
     }
 });
 
-app.post('/api/workflows', async (req, res) => {
+app.post('/api/workflows', authenticateToken, async (req, res) => {
     try {
         const { name, data } = req.body;
         const id = Math.random().toString(36).substr(2, 9);
@@ -681,8 +734,8 @@ app.post('/api/workflows', async (req, res) => {
 
         // Store data as JSON string
         await db.run(
-            'INSERT INTO workflows (id, name, data, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
-            [id, name, JSON.stringify(data), now, now]
+            'INSERT INTO workflows (id, organizationId, name, data, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
+            [id, req.user.orgId, name, JSON.stringify(data), now, now]
         );
 
         res.json({ id, name, createdAt: now, updatedAt: now });
@@ -692,15 +745,15 @@ app.post('/api/workflows', async (req, res) => {
     }
 });
 
-app.put('/api/workflows/:id', async (req, res) => {
+app.put('/api/workflows/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
         const { name, data } = req.body;
         const now = new Date().toISOString();
 
         await db.run(
-            'UPDATE workflows SET name = ?, data = ?, updatedAt = ? WHERE id = ?',
-            [name, JSON.stringify(data), now, id]
+            'UPDATE workflows SET name = ?, data = ?, updatedAt = ? WHERE id = ? AND organizationId = ?',
+            [name, JSON.stringify(data), now, id, req.user.orgId]
         );
 
         res.json({ message: 'Workflow updated' });
@@ -710,10 +763,10 @@ app.put('/api/workflows/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/workflows/:id', async (req, res) => {
+app.delete('/api/workflows/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        await db.run('DELETE FROM workflows WHERE id = ?', [id]);
+        await db.run('DELETE FROM workflows WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
         res.json({ message: 'Workflow deleted' });
     } catch (error) {
         console.error('Error deleting workflow:', error);
