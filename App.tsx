@@ -59,6 +59,9 @@ function AuthenticatedApp() {
     // Database Tab State
     const [databaseTab, setDatabaseTab] = useState<'company' | 'entities'>('entities');
 
+    // Entity Search State
+    const [entitySearchQuery, setEntitySearchQuery] = useState('');
+
     // Company Information State
     const [companyInfo, setCompanyInfo] = useState({
         name: '',
@@ -647,14 +650,19 @@ function AuthenticatedApp() {
                                             {/* Toolbar */}
                                             <div className="flex justify-between items-center">
                                                 <div className="text-sm text-slate-500">
-                                                    Total: {entities.length} entities
+                                                    {entitySearchQuery 
+                                                        ? `Showing ${entities.filter(e => e.name.toLowerCase().includes(entitySearchQuery.toLowerCase()) || e.description?.toLowerCase().includes(entitySearchQuery.toLowerCase())).length} of ${entities.length} entities`
+                                                        : `Total: ${entities.length} entities`
+                                                    }
                                                 </div>
                                                 <div className="flex space-x-3">
                                                     <div className="relative">
                                                         <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
                                                         <input
                                                             type="text"
-                                                            placeholder="Search..."
+                                                            placeholder="Search entities..."
+                                                            value={entitySearchQuery}
+                                                            onChange={(e) => setEntitySearchQuery(e.target.value)}
                                                             className="pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent w-64 shadow-sm"
                                                         />
                                                     </div>
@@ -674,7 +682,12 @@ function AuthenticatedApp() {
 
                                             {/* Grid */}
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
-                                                {entities.map(entity => (
+                                                {entities
+                                                    .filter(entity => 
+                                                        entity.name.toLowerCase().includes(entitySearchQuery.toLowerCase()) ||
+                                                        entity.description?.toLowerCase().includes(entitySearchQuery.toLowerCase())
+                                                    )
+                                                    .map(entity => (
                                                     <EntityCard
                                                         key={entity.id}
                                                         entity={entity}
