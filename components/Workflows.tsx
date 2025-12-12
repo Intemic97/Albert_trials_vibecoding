@@ -1489,63 +1489,108 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 /* Canvas View */
                 <>
                     {/* Sidebar */}
-                    <div className="w-80 bg-slate-50 border-r border-slate-200 flex flex-col shadow-sm z-10 h-full">
+                    <div className={`${isSidebarCollapsed ? 'w-14' : 'w-72'} bg-slate-50 border-r border-slate-200 flex flex-col shadow-sm z-10 h-full transition-all duration-300`}>
 
-                        <div className="p-4 border-b border-slate-200 bg-white">
-                            <h2 className="text-lg font-bold text-slate-800 mb-1">Components</h2>
-                            <p className="text-xs text-slate-500 mb-4">Drag & Drop</p>
-
-                            {/* Search */}
-                            <div className="relative mb-4">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                <input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            {/* Categories */}
-                            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                                {['All', 'Triggers', 'Data', 'Logic', 'Actions', 'Other'].map(cat => (
-                                    <button
-                                        key={cat}
-                                        onClick={() => setSelectedCategory(cat)}
-                                        className={`px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${selectedCategory === cat
-                                            ? 'bg-teal-100 text-teal-700 border border-teal-200'
-                                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                                            }`}
-                                    >
-                                        {cat}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
-                            {filteredItems.map((item) => (
-                                <div
-                                    key={item.label}
-                                    draggable
-                                    onDragStart={(e) => handleDragStart(e, item)}
-                                    className="flex items-start p-3 bg-white border border-slate-200 rounded-xl shadow-sm cursor-grab hover:border-teal-500 hover:shadow-md transition-all group"
-                                >
-                                    <div className={`p-2 rounded-lg mr-3 ${item.category === 'Triggers' ? 'bg-purple-100 text-purple-600' :
-                                        item.category === 'Data' ? 'bg-teal-100 text-teal-600' :
-                                            item.category === 'Logic' ? 'bg-amber-100 text-amber-600' :
-                                                'bg-blue-100 text-blue-600'
-                                        }`}>
-                                        <item.icon size={20} />
+                        {!isSidebarCollapsed ? (
+                            <>
+                                <div className="p-4 border-b border-slate-200 bg-white">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <h2 className="text-lg font-bold text-slate-800">Components</h2>
+                                        <button
+                                            onClick={() => setIsSidebarCollapsed(true)}
+                                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
+                                            title="Collapse panel"
+                                        >
+                                            <ChevronsLeft size={18} />
+                                        </button>
                                     </div>
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-slate-800 group-hover:text-teal-700 transition-colors">{item.label}</h3>
-                                        <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
+                                    <p className="text-xs text-slate-500 mb-4">Drag & Drop</p>
+
+                                    {/* Search */}
+                                    <div className="relative mb-4">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                        <input
+                                            type="text"
+                                            placeholder="Search..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                                        />
+                                    </div>
+
+                                    {/* Categories */}
+                                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                                        {['All', 'Triggers', 'Data', 'Logic', 'Actions', 'Other'].map(cat => (
+                                            <button
+                                                key={cat}
+                                                onClick={() => setSelectedCategory(cat)}
+                                                className={`px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${selectedCategory === cat
+                                                    ? 'bg-teal-100 text-teal-700 border border-teal-200'
+                                                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                                                    }`}
+                                            >
+                                                {cat}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
+
+                                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+                                    {filteredItems.map((item) => (
+                                        <div
+                                            key={item.label}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, item)}
+                                            className="flex items-start p-3 bg-white border border-slate-200 rounded-xl shadow-sm cursor-grab hover:border-teal-500 hover:shadow-md transition-all group"
+                                        >
+                                            <div className={`p-2 rounded-lg mr-3 ${item.category === 'Triggers' ? 'bg-purple-100 text-purple-600' :
+                                                item.category === 'Data' ? 'bg-teal-100 text-teal-600' :
+                                                    item.category === 'Logic' ? 'bg-amber-100 text-amber-600' :
+                                                        'bg-blue-100 text-blue-600'
+                                                }`}>
+                                                <item.icon size={20} />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-slate-800 group-hover:text-teal-700 transition-colors">{item.label}</h3>
+                                                <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        ) : (
+                            /* Collapsed view - icons only */
+                            <>
+                                <div className="p-2 border-b border-slate-200 bg-white flex justify-center">
+                                    <button
+                                        onClick={() => setIsSidebarCollapsed(false)}
+                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
+                                        title="Expand panel"
+                                    >
+                                        <ChevronsRight size={18} />
+                                    </button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto py-3 space-y-2">
+                                    {filteredItems.map((item) => (
+                                        <div
+                                            key={item.label}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, item)}
+                                            className="mx-2 p-2 bg-white border border-slate-200 rounded-lg shadow-sm cursor-grab hover:border-teal-500 hover:shadow-md transition-all group flex items-center justify-center"
+                                            title={item.label}
+                                        >
+                                            <div className={`p-1.5 rounded-md ${item.category === 'Triggers' ? 'bg-purple-100 text-purple-600' :
+                                                item.category === 'Data' ? 'bg-teal-100 text-teal-600' :
+                                                    item.category === 'Logic' ? 'bg-amber-100 text-amber-600' :
+                                                        'bg-blue-100 text-blue-600'
+                                                }`}>
+                                                <item.icon size={18} />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     {/* Canvas */}
