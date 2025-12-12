@@ -172,6 +172,40 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [currentView, setCurrentView] = useState<'list' | 'canvas'>('list');
     const [workflowSearchQuery, setWorkflowSearchQuery] = useState<string>('');
 
+    // Toast State
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+    // Export Modal State
+    const [showEmbedCode, setShowEmbedCode] = useState(false);
+
+    const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
+
+    // Generate shareable URL and embed code
+    const getShareableUrl = () => {
+        const baseUrl = window.location.origin;
+        return `${baseUrl}/workflow/${currentWorkflowId || 'draft'}`;
+    };
+
+    const getEmbedCode = () => {
+        const url = getShareableUrl();
+        return `<iframe 
+  src="${url}"
+  width="100%" 
+  height="600" 
+  frameborder="0"
+  style="border: 1px solid #e2e8f0; border-radius: 8px;"
+  allow="clipboard-write"
+></iframe>`;
+    };
+
+    const copyToClipboard = (text: string, message: string) => {
+        navigator.clipboard.writeText(text);
+        showToast(message, 'success');
+    };
+
     // Load workflows on mount
     useEffect(() => {
         fetchWorkflows();
@@ -250,10 +284,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             }
 
             await fetchWorkflows();
-            alert('Workflow saved successfully!');
+            showToast('Workflow saved successfully!', 'success');
         } catch (error) {
             console.error('Error saving workflow:', error);
-            alert('Failed to save workflow');
+            showToast('Failed to save workflow', 'error');
         } finally {
             setIsSaving(false);
         }
@@ -2738,7 +2772,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 {/* Header */}
                                 <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
                                     <div className="flex items-center justify-between">
-                                        <h2 className="text-xl font-bold text-slate-800">🚀 Run Workflow</h2>
+                                        <h2 className="text-xl font-bold text-slate-800">Export Workflow</h2>
                                         <button
                                             onClick={() => setShowRunnerModal(false)}
                                             className="text-slate-400 hover:text-slate-600 transition-colors"
@@ -2746,11 +2780,72 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             <X size={24} />
                                         </button>
                                     </div>
-                                    <p className="text-sm text-slate-500 mt-1">Fill in the inputs and click Submit to run your workflow</p>
+                                    <p className="text-sm text-slate-500 mt-1">Export and share your workflow as a form</p>
                                 </div>
 
                                 {/* Content */}
                                 <div className="flex-1 overflow-y-auto p-6">
+                                    {/* Share & Embed Section */}
+                                    <div className="mb-6 space-y-4">
+                                        {/* Shareable Link */}
+                                        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 rounded-xl p-4 border border-teal-100">
+                                            <label className="block text-sm font-semibold text-teal-800 mb-2 flex items-center gap-2">
+                                                <Globe size={16} />
+                                                Published Interface
+                                            </label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    readOnly
+                                                    value={getShareableUrl()}
+                                                    className="flex-1 px-3 py-2 bg-white border border-teal-200 rounded-lg text-sm text-slate-600 focus:outline-none"
+                                                />
+                                                <button
+                                                    onClick={() => copyToClipboard(getShareableUrl(), 'Link copied to clipboard!')}
+                                                    className="px-4 py-2 bg-white border border-teal-200 rounded-lg hover:bg-teal-50 transition-colors text-teal-700 font-medium text-sm flex items-center gap-2"
+                                                >
+                                                    <Share2 size={16} />
+                                                    Copy
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Embed Code Toggle */}
+                                        <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                            <button
+                                                onClick={() => setShowEmbedCode(!showEmbedCode)}
+                                                className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-100 transition-colors"
+                                            >
+                                                <span className="font-semibold text-slate-700 flex items-center gap-2">
+                                                    <Code size={16} />
+                                                    Embed Code
+                                                </span>
+                                                <span className={`text-slate-400 transition-transform ${showEmbedCode ? 'rotate-180' : ''}`}>
+                                                    ▼
+                                                </span>
+                                            </button>
+                                            {showEmbedCode && (
+                                                <div className="px-4 pb-4 border-t border-slate-200 pt-3">
+                                                    <p className="text-xs text-slate-500 mb-2">Copy this code to embed the form in your website or application:</p>
+                                                    <div className="relative">
+                                                        <pre className="bg-slate-800 text-slate-100 p-3 rounded-lg text-xs overflow-x-auto font-mono">
+                                                            {getEmbedCode()}
+                                                        </pre>
+                                                        <button
+                                                            onClick={() => copyToClipboard(getEmbedCode(), 'Embed code copied!')}
+                                                            className="absolute top-2 right-2 px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs font-medium transition-colors"
+                                                        >
+                                                            Copy
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Divider */}
+                                    <div className="border-t border-slate-200 my-6"></div>
+
                                     {/* Input Form */}
                                     {Object.keys(runnerInputs).length > 0 ? (
                                         <div className="space-y-4 mb-6">
@@ -2835,6 +2930,36 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         </div>
                     )}
                 </>
+            )}
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-lg border animate-in slide-in-from-bottom-4 fade-in duration-300 ${
+                    toast.type === 'success' 
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                        : 'bg-red-50 border-red-200 text-red-800'
+                }`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        toast.type === 'success' ? 'bg-emerald-100' : 'bg-red-100'
+                    }`}>
+                        {toast.type === 'success' ? (
+                            <Check size={18} className="text-emerald-600" />
+                        ) : (
+                            <X size={18} className="text-red-600" />
+                        )}
+                    </div>
+                    <span className="font-medium text-sm">{toast.message}</span>
+                    <button 
+                        onClick={() => setToast(null)}
+                        className={`ml-2 p-1 rounded-full transition-colors ${
+                            toast.type === 'success' 
+                                ? 'hover:bg-emerald-100 text-emerald-500' 
+                                : 'hover:bg-red-100 text-red-500'
+                        }`}
+                    >
+                        <X size={14} />
+                    </button>
+                </div>
             )}
         </div>
 
