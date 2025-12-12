@@ -15,16 +15,17 @@ async function initDb() {
   await db.exec('PRAGMA foreign_keys = ON;');
 
   // DROP tables to ensure fresh schema (User approved data deletion)
-  await db.exec(`
-    DROP TABLE IF EXISTS record_values;
-    DROP TABLE IF EXISTS records;
-    DROP TABLE IF EXISTS properties;
-    DROP TABLE IF EXISTS entities;
-    DROP TABLE IF EXISTS workflows;
-    DROP TABLE IF EXISTS user_organizations;
-    DROP TABLE IF EXISTS organizations;
-    DROP TABLE IF EXISTS users;
-  `);
+  // DROP tables removed to ensure data persistence
+  // await db.exec(`
+  //   DROP TABLE IF EXISTS record_values;
+  //   DROP TABLE IF EXISTS records;
+  //   DROP TABLE IF EXISTS properties;
+  //   DROP TABLE IF EXISTS entities;
+  //   DROP TABLE IF EXISTS workflows;
+  //   DROP TABLE IF EXISTS user_organizations;
+  //   DROP TABLE IF EXISTS organizations;
+  //   DROP TABLE IF EXISTS users;
+  // `);
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
