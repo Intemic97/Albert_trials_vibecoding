@@ -5,6 +5,7 @@ import { Database, TrendingUp, Layers, Activity, Sparkles, X, Info } from 'lucid
 import { PromptInput } from './PromptInput';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { ProfileMenu } from './ProfileMenu';
+import { API_BASE } from '../config';
 
 interface DashboardProps {
     entities: Entity[];
@@ -113,7 +114,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
 
     const fetchWidgets = async () => {
         try {
-            const res = await fetch('/api/widgets', { credentials: 'include' });
+            const res = await fetch(`${API_BASE}/widgets`, { credentials: 'include' });
             const data = await res.json();
             if (Array.isArray(data)) {
                 setSavedWidgets(data.map((w: any) => ({ ...w.config, id: w.id })));
@@ -178,7 +179,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     const handleGenerateWidget = async (prompt: string, mentionedEntityIds: string[]) => {
         setIsGenerating(true);
         try {
-            const res = await fetch('/api/generate-widget', {
+            const res = await fetch(`${API_BASE}/generate-widget`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -205,7 +206,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     const handleSaveWidget = async (widget: WidgetConfig) => {
         try {
             const id = crypto.randomUUID();
-            const res = await fetch('/api/widgets', {
+            const res = await fetch(`${API_BASE}/widgets`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -231,7 +232,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     const removeWidget = async (index: number, isSaved: boolean = false, widgetId?: string) => {
         if (isSaved && widgetId) {
             try {
-                await fetch(`/api/widgets/${widgetId}`, {
+                await fetch(`${API_BASE}/widgets/${widgetId}`, {
                     method: 'DELETE',
                     credentials: 'include'
                 });

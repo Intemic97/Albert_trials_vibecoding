@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Entity, Property, PropertyType } from './types';
 import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X, Code } from 'lucide-react';
 import { ProfileMenu } from './components/ProfileMenu';
+import { API_BASE } from './config';
 
 export default function App() {
     return (
@@ -92,7 +93,7 @@ function AuthenticatedApp() {
 
     const fetchEntities = async () => {
         try {
-            const res = await fetch('/api/entities', { credentials: 'include' });
+            const res = await fetch(`${API_BASE}/entities`, { credentials: 'include' });
             const data = await res.json();
             setEntities(data);
         } catch (error) {
@@ -102,7 +103,7 @@ function AuthenticatedApp() {
 
     const fetchCompanyInfo = async () => {
         try {
-            const res = await fetch('/api/company', { credentials: 'include' });
+            const res = await fetch(`${API_BASE}/company`, { credentials: 'include' });
             if (res.ok) {
                 const data = await res.json();
                 setCompanyInfo(data);
@@ -114,7 +115,7 @@ function AuthenticatedApp() {
 
     const updateCompanyInfo = async () => {
         try {
-            await fetch('/api/company', {
+            await fetch(`${API_BASE}/company`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(companyInfo),
@@ -130,7 +131,7 @@ function AuthenticatedApp() {
     const fetchRecords = async () => {
         if (!activeEntityId) return;
         try {
-            const res = await fetch(`/api/entities/${activeEntityId}/records`, { credentials: 'include' });
+            const res = await fetch(`${API_BASE}/entities/${activeEntityId}/records`, { credentials: 'include' });
             const data = await res.json();
             setRecords(data);
         } catch (error) {
@@ -150,7 +151,7 @@ function AuthenticatedApp() {
                 const relatedEntity = entities.find(e => e.id === prop.relatedEntityId);
 
                 if (relatedEntity) {
-                    const res = await fetch(`/api/entities/${prop.relatedEntityId}/records`, { credentials: 'include' });
+                    const res = await fetch(`${API_BASE}/entities/${prop.relatedEntityId}/records`, { credentials: 'include' });
                     const records = await res.json();
                     newRelatedData[prop.relatedEntityId] = { entity: relatedEntity, records };
                 }
@@ -172,7 +173,7 @@ function AuthenticatedApp() {
 
             for (const prop of pointingProps) {
                 try {
-                    const res = await fetch(`/api/entities/${entity.id}/records`, { credentials: 'include' });
+                    const res = await fetch(`${API_BASE}/entities/${entity.id}/records`, { credentials: 'include' });
                     const records = await res.json();
                     newIncomingData[prop.id] = { sourceEntity: entity, sourceProperty: prop, records };
                 } catch (error) {
@@ -196,7 +197,7 @@ function AuthenticatedApp() {
         };
 
         try {
-            await fetch('/api/entities', {
+            await fetch(`${API_BASE}/entities`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newEntity),
@@ -216,7 +217,7 @@ function AuthenticatedApp() {
 
     const handleDeleteEntity = async (entity: Entity) => {
         try {
-            await fetch(`/api/entities/${entity.id}`, {
+            await fetch(`${API_BASE}/entities/${entity.id}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
@@ -238,7 +239,7 @@ function AuthenticatedApp() {
         };
 
         try {
-            await fetch('/api/properties', {
+            await fetch(`${API_BASE}/properties`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...newProp, entityId: activeEntityId }),
@@ -261,7 +262,7 @@ function AuthenticatedApp() {
 
     const deleteProperty = async (propId: string) => {
         try {
-            await fetch(`/api/properties/${propId}`, {
+            await fetch(`${API_BASE}/properties/${propId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
@@ -286,7 +287,7 @@ function AuthenticatedApp() {
         try {
             if (editingRecordId) {
                 // Update existing record
-                await fetch(`/api/records/${editingRecordId}`, {
+                await fetch(`${API_BASE}/records/${editingRecordId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -296,7 +297,7 @@ function AuthenticatedApp() {
                 });
             } else {
                 // Create new record
-                await fetch('/api/records', {
+                await fetch(`${API_BASE}/records`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -352,7 +353,7 @@ function AuthenticatedApp() {
 
     const deleteRecord = async (recordId: string) => {
         try {
-            await fetch(`/api/records/${recordId}`, {
+            await fetch(`${API_BASE}/records/${recordId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });

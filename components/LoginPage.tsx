@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { User, Building2, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { API_BASE } from '../config';
 
 export function LoginPage() {
     const { login } = useAuth();

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Plus, X, Search, Building } from 'lucide-react';
 import { ProfileMenu } from './ProfileMenu';
+import { API_BASE } from '../config';
 
 interface SettingsProps {
     onViewChange?: (view: string) => void;
@@ -28,7 +29,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange }) => {
 
     const fetchUsers = async () => {
         try {
-            const res = await fetch('/api/organization/users', {
+            const res = await fetch(`${API_BASE}/organization/users`, {
                 credentials: 'include'
             });
             if (res.ok) {
@@ -43,7 +44,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange }) => {
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch('/api/organization/invite', {
+            const res = await fetch(`${API_BASE}/organization/invite`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: inviteEmail }),

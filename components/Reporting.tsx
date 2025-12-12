@@ -6,6 +6,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu } from './ProfileMenu';
+import { API_BASE } from '../config';
 
 interface ReportingProps {
     entities: Entity[];
@@ -312,7 +313,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
         setReport(null);
 
         try {
-            const res = await fetch('/api/generate', {
+            const res = await fetch(`${API_BASE}/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 
 interface User {
     id: string;
@@ -36,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const checkAuth = async () => {
         try {
-            const res = await fetch('/api/auth/me', {
+            const res = await fetch(`${API_BASE}/auth/me`, {
                 credentials: 'include'
             });
             if (res.ok) {
@@ -57,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const fetchOrganizations = async () => {
         try {
-            const res = await fetch('/api/auth/organizations', {
+            const res = await fetch(`${API_BASE}/auth/organizations`, {
                 credentials: 'include'
             });
             if (res.ok) {
@@ -76,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const logout = async () => {
         try {
-            await fetch('/api/auth/logout', {
+            await fetch(`${API_BASE}/auth/logout`, {
                 method: 'POST',
                 credentials: 'include'
             });
@@ -89,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const switchOrganization = async (orgId: string) => {
         try {
-            const res = await fetch('/api/auth/switch-org', {
+            const res = await fetch(`${API_BASE}/auth/switch-org`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ orgId }),
