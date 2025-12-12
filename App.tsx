@@ -92,7 +92,7 @@ function AuthenticatedApp() {
 
     const fetchEntities = async () => {
         try {
-            const res = await fetch('http://localhost:3001/api/entities', { credentials: 'include' });
+            const res = await fetch('/api/entities', { credentials: 'include' });
             const data = await res.json();
             setEntities(data);
         } catch (error) {
@@ -102,7 +102,7 @@ function AuthenticatedApp() {
 
     const fetchCompanyInfo = async () => {
         try {
-            const res = await fetch('http://localhost:3001/api/company', { credentials: 'include' });
+            const res = await fetch('/api/company', { credentials: 'include' });
             if (res.ok) {
                 const data = await res.json();
                 setCompanyInfo(data);
@@ -114,7 +114,7 @@ function AuthenticatedApp() {
 
     const updateCompanyInfo = async () => {
         try {
-            await fetch('http://localhost:3001/api/company', {
+            await fetch('/api/company', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(companyInfo),
@@ -130,7 +130,7 @@ function AuthenticatedApp() {
     const fetchRecords = async () => {
         if (!activeEntityId) return;
         try {
-            const res = await fetch(`http://localhost:3001/api/entities/${activeEntityId}/records`, { credentials: 'include' });
+            const res = await fetch(`/api/entities/${activeEntityId}/records`, { credentials: 'include' });
             const data = await res.json();
             setRecords(data);
         } catch (error) {
@@ -150,7 +150,7 @@ function AuthenticatedApp() {
                 const relatedEntity = entities.find(e => e.id === prop.relatedEntityId);
 
                 if (relatedEntity) {
-                    const res = await fetch(`http://localhost:3001/api/entities/${prop.relatedEntityId}/records`, { credentials: 'include' });
+                    const res = await fetch(`/api/entities/${prop.relatedEntityId}/records`, { credentials: 'include' });
                     const records = await res.json();
                     newRelatedData[prop.relatedEntityId] = { entity: relatedEntity, records };
                 }
@@ -172,7 +172,7 @@ function AuthenticatedApp() {
 
             for (const prop of pointingProps) {
                 try {
-                    const res = await fetch(`http://localhost:3001/api/entities/${entity.id}/records`, { credentials: 'include' });
+                    const res = await fetch(`/api/entities/${entity.id}/records`, { credentials: 'include' });
                     const records = await res.json();
                     newIncomingData[prop.id] = { sourceEntity: entity, sourceProperty: prop, records };
                 } catch (error) {
@@ -196,7 +196,7 @@ function AuthenticatedApp() {
         };
 
         try {
-            await fetch('http://localhost:3001/api/entities', {
+            await fetch('/api/entities', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newEntity),
@@ -216,7 +216,7 @@ function AuthenticatedApp() {
 
     const handleDeleteEntity = async (entity: Entity) => {
         try {
-            await fetch(`http://localhost:3001/api/entities/${entity.id}`, {
+            await fetch(`/api/entities/${entity.id}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
@@ -238,7 +238,7 @@ function AuthenticatedApp() {
         };
 
         try {
-            await fetch('http://localhost:3001/api/properties', {
+            await fetch('/api/properties', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...newProp, entityId: activeEntityId }),
@@ -261,7 +261,7 @@ function AuthenticatedApp() {
 
     const deleteProperty = async (propId: string) => {
         try {
-            await fetch(`http://localhost:3001/api/properties/${propId}`, {
+            await fetch(`/api/properties/${propId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
@@ -286,7 +286,7 @@ function AuthenticatedApp() {
         try {
             if (editingRecordId) {
                 // Update existing record
-                await fetch(`http://localhost:3001/api/records/${editingRecordId}`, {
+                await fetch(`/api/records/${editingRecordId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -296,7 +296,7 @@ function AuthenticatedApp() {
                 });
             } else {
                 // Create new record
-                await fetch('http://localhost:3001/api/records', {
+                await fetch('/api/records', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -352,7 +352,7 @@ function AuthenticatedApp() {
 
     const deleteRecord = async (recordId: string) => {
         try {
-            await fetch(`http://localhost:3001/api/records/${recordId}`, {
+            await fetch(`/api/records/${recordId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });

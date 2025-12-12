@@ -228,7 +228,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
     const fetchWorkflows = async () => {
         try {
-            const res = await fetch('http://localhost:3001/api/workflows', { credentials: 'include' });
+            const res = await fetch('/api/workflows', { credentials: 'include' });
             if (!res.ok) {
                 console.error('Failed to fetch workflows');
                 setSavedWorkflows([]);
@@ -254,7 +254,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
     const loadWorkflow = async (id: string) => {
         try {
-            const res = await fetch(`http://localhost:3001/api/workflows/${id}`, { credentials: 'include' });
+            const res = await fetch(`/api/workflows/${id}`, { credentials: 'include' });
             if (!res.ok) throw new Error('Failed to load workflow');
             const workflow = await res.json();
             setWorkflowName(workflow.name);
@@ -278,7 +278,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             if (currentWorkflowId) {
                 // Update existing
-                const res = await fetch(`http://localhost:3001/api/workflows/${currentWorkflowId}`, {
+                const res = await fetch(`/api/workflows/${currentWorkflowId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: workflowName, data }),
@@ -287,7 +287,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 if (!res.ok) throw new Error('Failed to update workflow');
             } else {
                 // Create new
-                const res = await fetch('http://localhost:3001/api/workflows', {
+                const res = await fetch('/api/workflows', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: workflowName, data }),
@@ -312,7 +312,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (!confirm('Are you sure you want to delete this workflow?')) return;
 
         try {
-            const res = await fetch(`http://localhost:3001/api/workflows/${id}`, {
+            const res = await fetch(`/api/workflows/${id}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
@@ -471,7 +471,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             if (equipmentEntity) {
                 setIsLoadingEquipments(true);
                 try {
-                    const res = await fetch(`http://localhost:3001/api/entities/${equipmentEntity.id}/records`, { credentials: 'include' });
+                    const res = await fetch(`/api/entities/${equipmentEntity.id}/records`, { credentials: 'include' });
                     const data = await res.json();
                     setEquipmentRecords(data);
                 } catch (error) {
@@ -683,7 +683,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setClimatiqSelectedIndex(null);
 
         try {
-            const response = await fetch('http://localhost:3001/api/proxy', {
+            const response = await fetch('/api/proxy', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -751,7 +751,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
         setIsGeneratingCode(true);
         try {
-            const response = await fetch('http://localhost:3001/api/python/generate', {
+            const response = await fetch('/api/python/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ prompt: pythonAiPrompt }),
@@ -783,7 +783,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // Human Approval Node Functions
     const fetchOrganizationUsers = async () => {
         try {
-            const res = await fetch('http://localhost:3001/api/organization/users', { credentials: 'include' });
+            const res = await fetch('/api/organization/users', { credentials: 'include' });
             if (res.ok) {
                 const users = await res.json();
                 setOrganizationUsers(users);
@@ -922,7 +922,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             }
 
             try {
-                const res = await fetch(`http://localhost:3001/api/entities/${node.config.entityId}/records`, { credentials: 'include' });
+                const res = await fetch(`/api/entities/${node.config.entityId}/records`, { credentials: 'include' });
                 const records = await res.json();
 
                 // Flatten data using entity schema
@@ -973,7 +973,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     throw new Error('Equipment entity not found');
                 }
 
-                const res = await fetch(`http://localhost:3001/api/entities/${equipmentEntity.id}/records`, { credentials: 'include' });
+                const res = await fetch(`/api/entities/${equipmentEntity.id}/records`, { credentials: 'include' });
                 const records = await res.json();
                 const record = records.find((r: any) => r.id === node.config?.recordId);
 
@@ -1057,7 +1057,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 // Remove id to let database generate it
                                 const { id, ...recordWithoutId } = record;
 
-                                const response = await fetch(`http://localhost:3001/api/entities/${node.config.entityId}/records`, {
+                                const response = await fetch(`/api/entities/${node.config.entityId}/records`, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify(recordWithoutId),
@@ -1087,7 +1087,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 case 'python':
                     if (node.config?.pythonCode) {
                         try {
-                            const response = await fetch('http://localhost:3001/api/python/execute', {
+                            const response = await fetch('/api/python/execute', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
@@ -1117,7 +1117,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 case 'llm':
                     if (node.config?.llmPrompt) {
                         try {
-                            const response = await fetch('http://localhost:3001/api/generate', {
+                            const response = await fetch('/api/generate', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
@@ -1163,7 +1163,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 case 'http':
                     if (node.config?.httpUrl) {
                         try {
-                            const response = await fetch('http://localhost:3001/api/proxy', {
+                            const response = await fetch('/api/proxy', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
@@ -1206,7 +1206,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     const url = `https://api.esios.ree.es/indicators/${indicatorId}?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`;
 
                     try {
-                        const response = await fetch('http://localhost:3001/api/proxy', {
+                        const response = await fetch('/api/proxy', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({

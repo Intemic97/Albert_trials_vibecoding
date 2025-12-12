@@ -113,7 +113,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
 
     const fetchWidgets = async () => {
         try {
-            const res = await fetch('http://localhost:3001/api/widgets', { credentials: 'include' });
+            const res = await fetch('/api/widgets', { credentials: 'include' });
             const data = await res.json();
             if (Array.isArray(data)) {
                 setSavedWidgets(data.map((w: any) => ({ ...w.config, id: w.id })));
@@ -178,7 +178,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     const handleGenerateWidget = async (prompt: string, mentionedEntityIds: string[]) => {
         setIsGenerating(true);
         try {
-            const res = await fetch('http://localhost:3001/api/generate-widget', {
+            const res = await fetch('/api/generate-widget', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -205,7 +205,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     const handleSaveWidget = async (widget: WidgetConfig) => {
         try {
             const id = crypto.randomUUID();
-            const res = await fetch('http://localhost:3001/api/widgets', {
+            const res = await fetch('/api/widgets', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -231,7 +231,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     const removeWidget = async (index: number, isSaved: boolean = false, widgetId?: string) => {
         if (isSaved && widgetId) {
             try {
-                await fetch(`http://localhost:3001/api/widgets/${widgetId}`, {
+                await fetch(`/api/widgets/${widgetId}`, {
                     method: 'DELETE',
                     credentials: 'include'
                 });

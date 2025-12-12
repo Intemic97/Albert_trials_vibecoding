@@ -28,7 +28,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange }) => {
 
     const fetchUsers = async () => {
         try {
-            const res = await fetch('http://localhost:3001/api/organization/users', {
+            const res = await fetch('/api/organization/users', {
                 credentials: 'include'
             });
             if (res.ok) {
@@ -43,7 +43,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange }) => {
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch('http://localhost:3001/api/organization/invite', {
+            const res = await fetch('/api/organization/invite', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: inviteEmail }),
