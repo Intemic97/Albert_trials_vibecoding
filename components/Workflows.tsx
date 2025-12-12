@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu } from './ProfileMenu';
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq';
     label: string;
     x: number;
     y: number;
@@ -34,6 +34,8 @@ interface WorkflowNode {
         // For esios nodes:
         esiosArchiveId?: string;
         esiosDate?: string;
+        // For climatiq nodes:
+        climatiqQuery?: string;
     };
     executionResult?: string;
     data?: any;
@@ -50,7 +52,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -65,6 +67,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'equipment', label: 'Equipment', icon: Wrench, description: 'Use specific equipment data', category: 'Data' },
     { type: 'http', label: 'HTTP Request', icon: Globe, description: 'Fetch data from an external API', category: 'Data' },
     { type: 'esios', label: 'Energy Prices', icon: Zap, description: 'Fetch prices from Red Eléctrica', category: 'Data' },
+    { type: 'climatiq', label: 'Emission Factors', icon: Leaf, description: 'Search CO2 emission factors', category: 'Data' },
     { type: 'manualInput', label: 'Manual Data Input', icon: Edit, description: 'Define a variable with a value', category: 'Data' },
     { type: 'condition', label: 'If / Else', icon: AlertCircle, description: 'Branch based on conditions', category: 'Logic' },
     { type: 'llm', label: 'AI Generation', icon: Sparkles, description: 'Generate text using AI', category: 'Logic' },
@@ -141,6 +144,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [configuringEsiosNodeId, setConfiguringEsiosNodeId] = useState<string | null>(null);
     const [esiosArchiveId, setEsiosArchiveId] = useState<string>('1001'); // PVPC indicator ID
     const [esiosDate, setEsiosDate] = useState<string>(new Date().toISOString().split('T')[0]); // Today YYYY-MM-DD
+
+    // Climatiq Node State
+    const [configuringClimatiqNodeId, setConfiguringClimatiqNodeId] = useState<string | null>(null);
+    const [climatiqQuery, setClimatiqQuery] = useState<string>('Passenger Car');
 
     const [dataViewTab, setDataViewTab] = useState<'input' | 'output'>('output');
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
@@ -577,6 +584,32 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setEsiosDate(new Date().toISOString().split('T')[0]);
     };
 
+    const openClimatiqConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'climatiq') {
+            setConfiguringClimatiqNodeId(nodeId);
+            setClimatiqQuery(node.config?.climatiqQuery || 'Passenger Car');
+        }
+    };
+
+    const saveClimatiqConfig = () => {
+        if (!configuringClimatiqNodeId || !climatiqQuery.trim()) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringClimatiqNodeId
+                ? {
+                    ...n,
+                    config: {
+                        ...n.config,
+                        climatiqQuery
+                    }
+                }
+                : n
+        ));
+        setConfiguringClimatiqNodeId(null);
+        setClimatiqQuery('Passenger Car');
+    };
+
     const generatePythonCode = async () => {
         if (!pythonAiPrompt.trim()) return;
 
@@ -949,6 +982,38 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         }
                     } catch (error) {
                         console.error('ESIOS request error:', error);
+                        result = `Error: ${error.message || 'Failed to fetch'}`;
+                        nodeData = [{ error: error.message }];
+                    }
+                    break;
+                case 'climatiq':
+                    const query = node.config?.climatiqQuery || 'Passenger Car';
+                    const climatiqUrl = `https://api.climatiq.io/data/v1/search?query=${encodeURIComponent(query)}`;
+
+                    try {
+                        const response = await fetch('http://localhost:3001/api/proxy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                url: climatiqUrl,
+                                method: 'GET',
+                                headers: {
+                                    'Authorization': 'Bearer TWCZKXAGES4F76M3F468EE3VMC'
+                                }
+                            }),
+                            credentials: 'include'
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            nodeData = [data]; // Wrap the full response object
+                            result = `Found emission factors for "${query}"`;
+                        } else {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || `Climatiq Request failed: ${response.status}`);
+                        }
+                    } catch (error) {
+                        console.error('Climatiq request error:', error);
                         result = `Error: ${error.message || 'Failed to fetch'}`;
                         nodeData = [{ error: error.message }];
                     }
@@ -1464,6 +1529,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         openHttpConfig(node.id);
                                     } else if (node.type === 'esios') {
                                         openEsiosConfig(node.id);
+                                    } else if (node.type === 'climatiq') {
+                                        openClimatiqConfig(node.id);
                                     }
                                 }}
                                 onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
@@ -1749,6 +1816,49 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <button
                                     onClick={saveEsiosConfig}
                                     disabled={!esiosArchiveId.trim()}
+                                    className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium"
+                                >
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Climatiq Configuration Modal */}
+                {configuringClimatiqNodeId && (
+                    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringClimatiqNodeId(null)}>
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
+                            <h3 className="text-lg font-bold text-slate-800 mb-4">Configure Emission Factors</h3>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Search Query
+                                </label>
+                                <input
+                                    type="text"
+                                    value={climatiqQuery}
+                                    onChange={(e) => setClimatiqQuery(e.target.value)}
+                                    placeholder="e.g., Passenger Car, Electricity, Natural Gas"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">
+                                    💡 Try: "Flight", "Diesel", "Solar", "Steel Production"
+                                </p>
+                            </div>
+                            <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <p className="text-xs text-slate-600 font-medium">Using Climatiq API</p>
+                                <code className="text-[10px] text-slate-500 break-all">Token: TWCZ...3VMC</code>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                                <button
+                                    onClick={() => setConfiguringClimatiqNodeId(null)}
+                                    className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={saveClimatiqConfig}
+                                    disabled={!climatiqQuery.trim()}
                                     className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium"
                                 >
                                     Save
