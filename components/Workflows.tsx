@@ -162,6 +162,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [panStart, setPanStart] = useState({ x: 0, y: 0 });
     const canvasRef = useRef<HTMLDivElement>(null);
 
+    // Workflow Runner State
+    const [showRunnerModal, setShowRunnerModal] = useState<boolean>(false);
+    const [runnerInputs, setRunnerInputs] = useState<{ [nodeId: string]: string }>({});
+    const [runnerOutputs, setRunnerOutputs] = useState<{ [nodeId: string]: any }>({});
+    const [isRunningWorkflow, setIsRunningWorkflow] = useState<boolean>(false);
+
     // Load workflows on mount
     useEffect(() => {
         fetchWorkflows();
@@ -703,6 +709,53 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         } finally {
             setIsGeneratingCode(false);
         }
+    };
+
+    // Workflow Runner Functions
+    const openWorkflowRunner = () => {
+        const inputNodes = nodes.filter(n => n.type === 'manualInput');
+        const initialInputs: { [nodeId: string]: string } = {};
+
+        inputNodes.forEach(node => {
+            initialInputs[node.id] = node.config?.inputVarValue || '';
+        });
+
+        setRunnerInputs(initialInputs);
+        setRunnerOutputs({});
+        setShowRunnerModal(true);
+    };
+
+    const runWorkflowFromRunner = async () => {
+        setIsRunningWorkflow(true);
+        setRunnerOutputs({});
+
+        // Update manual input node values
+        setNodes(prev => prev.map(node => {
+            if (node.type === 'manualInput' && runnerInputs[node.id] !== undefined) {
+                return {
+                    ...node,
+                    config: {
+                        ...node.config,
+                        inputVarValue: runnerInputs[node.id]
+                    }
+                };
+            }
+            return node;
+        }));
+
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await runWorkflow();
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const outputNodes = nodes.filter(n => n.type === 'output');
+        const outputs: { [nodeId: string]: any } = {};
+
+        outputNodes.forEach((node) => {
+            outputs[node.id] = node.outputData || null;
+        });
+
+        setRunnerOutputs(outputs);
+        setIsRunningWorkflow(false);
     };
 
 
@@ -1434,6 +1487,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         >
                             <PlayCircle size={16} className="mr-2" />
                             {isRunning ? 'Running...' : 'Run'}
+                        </button>
+                        <button
+                            onClick={openWorkflowRunner}
+                            disabled={nodes.length === 0}
+                            className={`flex items-center px-4 py-2 rounded-lg shadow-sm transition-colors text-sm font-medium ${nodes.length === 0
+                                ? 'bg-slate-300 cursor-not-allowed text-slate-500'
+                                : 'bg-teal-600 hover:bg-teal-700 text-white'
+                                }`}
+                        >
+                            <PlayCircle size={16} className="mr-2" />
+                            Export & Run
                         </button>
                         <div className="ml-2 border-l border-slate-300 pl-4">
                             <ProfileMenu onNavigate={onViewChange} />
@@ -2515,6 +2579,110 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                 Save
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Workflow Runner Modal */}
+            {showRunnerModal && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowRunnerModal(false)}>
+                    <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-xl font-bold text-slate-800">🚀 Run Workflow</h2>
+                                <button
+                                    onClick={() => setShowRunnerModal(false)}
+                                    className="text-slate-400 hover:text-slate-600 transition-colors"
+                                >
+                                    <X size={24} />
+                                </button>
+                            </div>
+                            <p className="text-sm text-slate-500 mt-1">Fill in the inputs and click Submit to run your workflow</p>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {/* Input Form */}
+                            {Object.keys(runnerInputs).length > 0 ? (
+                                <div className="space-y-4 mb-6">
+                                    <h3 className="font-semibold text-slate-700 flex items-center gap-2">
+                                        <Edit size={18} />
+                                        Inputs
+                                    </h3>
+                                    {Object.entries(runnerInputs).map(([nodeId, value]) => {
+                                        const node = nodes.find(n => n.id === nodeId);
+                                        return (
+                                            <div key={nodeId} className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                    {node?.config?.inputVarName || 'Input'}
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={value}
+                                                    onChange={(e) => setRunnerInputs(prev => ({
+                                                        ...prev,
+                                                        [nodeId]: e.target.value
+                                                    }))}
+                                                    placeholder="Enter value..."
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-slate-500">
+                                    <p>No manual input nodes found in this workflow.</p>
+                                    <p className="text-sm mt-1">Add "Manual Data Input" nodes to create form fields.</p>
+                                </div>
+                            )}
+
+                            {/* Submit Button */}
+                            <button
+                                onClick={runWorkflowFromRunner}
+                                disabled={isRunningWorkflow}
+                                className={`w-full py-3 rounded-lg font-semibold text-white flex items-center justify-center gap-2 transition-all ${isRunningWorkflow
+                                        ? 'bg-slate-400 cursor-not-allowed'
+                                        : 'bg-slate-800 hover:bg-slate-900 shadow-lg hover:shadow-xl'
+                                    }`}
+                            >
+                                {isRunningWorkflow ? (
+                                    <>
+                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        Running...
+                                    </>
+                                ) : (
+                                    <>
+                                        <PlayCircle size={20} />
+                                        Submit
+                                    </>
+                                )}
+                            </button>
+
+                            {/* Output Display */}
+                            {Object.keys(runnerOutputs).length > 0 && (
+                                <div className="mt-6 space-y-4">
+                                    <h3 className="font-semibold text-slate-700 flex items-center gap-2 border-t pt-6">
+                                        <Database size={18} />
+                                        Output
+                                    </h3>
+                                    {Object.entries(runnerOutputs).map(([nodeId, data]) => {
+                                        const node = nodes.find(n => n.id === nodeId);
+                                        return (
+                                            <div key={nodeId} className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                                                <h4 className="font-medium text-slate-700 mb-2">{node?.label || 'Output'}</h4>
+                                                <div className="bg-white p-3 rounded border border-slate-300 max-h-64 overflow-auto">
+                                                    <pre className="text-xs text-slate-600 whitespace-pre-wrap">
+                                                        {JSON.stringify(data, null, 2)}
+                                                    </pre>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
