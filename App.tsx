@@ -5,6 +5,7 @@ import { Reporting } from './components/Reporting';
 import { Dashboard } from './components/Dashboard';
 import { Workflows } from './components/Workflows';
 import { LoginPage } from './components/LoginPage';
+import { Settings } from './components/Settings';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Entity, Property, PropertyType } from './types';
 import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X, Code } from 'lucide-react';
@@ -465,11 +466,14 @@ function AuthenticatedApp() {
                             setCurrentView('database');
                             setActiveTab('data');
                         }}
+                        onViewChange={setCurrentView}
                     />
                 ) : currentView === 'workflows' ? (
-                    <Workflows entities={entities} />
+                    <Workflows entities={entities} onViewChange={setCurrentView} />
                 ) : currentView === 'reports' ? (
-                    <Reporting entities={entities} companyInfo={companyInfo} />
+                    <Reporting entities={entities} companyInfo={companyInfo} onViewChange={setCurrentView} />
+                ) : currentView === 'settings' ? (
+                    <Settings onViewChange={setCurrentView} />
                 ) : (
                     <>
                         {/* Top Header */}
@@ -498,7 +502,7 @@ function AuthenticatedApp() {
                             )}
 
                             <div className="flex items-center space-x-4">
-                                <ProfileMenu />
+                                <ProfileMenu onNavigate={setCurrentView} />
                             </div>
                         </header>
 

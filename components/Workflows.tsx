@@ -71,9 +71,10 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
 
 interface WorkflowsProps {
     entities: any[];
+    onViewChange?: (view: string) => void;
 }
 
-export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
+export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) => {
     const [nodes, setNodes] = useState<WorkflowNode[]>([]);
     const [connections, setConnections] = useState<Connection[]>([]);
     const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
@@ -1166,6 +1167,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities }) => {
                             <PlayCircle size={16} className="mr-2" />
                             {isRunning ? 'Running...' : 'Run'}
                         </button>
+                        <div className="ml-2 border-l border-slate-300 pl-4">
+                            <ProfileMenu onNavigate={onViewChange} />
+                        </div>
                     </div>
                 </div>
 

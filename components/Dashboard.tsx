@@ -9,6 +9,7 @@ import { ProfileMenu } from './ProfileMenu';
 interface DashboardProps {
     entities: Entity[];
     onNavigate?: (entityId: string) => void;
+    onViewChange?: (view: string) => void;
 }
 
 const COLORS = ['#0d9488', '#14b8a6', '#2dd4bf', '#5eead4', '#99f6e4', '#ccfbf1'];
@@ -100,7 +101,7 @@ const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSav
     );
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onViewChange }) => {
     const [generatedWidgets, setGeneratedWidgets] = useState<WidgetConfig[]>([]);
     const [savedWidgets, setSavedWidgets] = useState<WidgetConfig[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -255,7 +256,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate }) =>
                     </div>
                 </div>
                 <div className="flex items-center space-x-4">
-                    <ProfileMenu />
+                    <ProfileMenu onNavigate={onViewChange} />
                 </div>
             </header>
 

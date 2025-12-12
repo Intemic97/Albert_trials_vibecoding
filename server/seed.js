@@ -1,4 +1,5 @@
 const { initDb } = require('./db');
+const bcrypt = require('bcrypt');
 
 const initialEntities = [
     {
@@ -33,30 +34,17 @@ const initialEntities = [
         properties: [
             { id: 'p6', name: 'Formula Code', type: 'text', defaultValue: 'F-221' }
         ]
-    },
+    }
+];
+
+const communityEntities = [
     {
-        id: '4',
-        name: 'Customers',
-        description: 'Client database and contact information.',
-        author: 'albert_mestre',
-        lastEdited: 'November 30, 2025',
-        properties: []
-    },
-    {
-        id: '5',
-        name: 'Reports',
-        description: 'Generated production reports.',
-        author: 'System',
-        lastEdited: 'December 1, 2025',
-        properties: []
-    },
-    {
-        id: '6',
-        name: 'Alerts/Events',
-        description: 'System generated anomalies and logs.',
+        id: 'c1',
+        name: 'Public Templates',
+        description: 'Shared community templates.',
         author: 'System',
         lastEdited: 'Today',
-        properties: []
+        properties: [{ id: 'cp1', name: 'Template Name', type: 'text', defaultValue: 'T-100' }]
     }
 ];
 
@@ -64,14 +52,64 @@ async function seed() {
     const db = await initDb();
 
     console.log('Clearing database...');
+    // Clear all tables to ensure clean state
+    await db.run('DELETE FROM record_values');
+    await db.run('DELETE FROM records');
     await db.run('DELETE FROM properties');
     await db.run('DELETE FROM entities');
+    await db.run('DELETE FROM user_organizations');
+    await db.run('DELETE FROM organizations');
+    await db.run('DELETE FROM users');
 
-    console.log('Seeding entities...');
+    console.log('Creating organizations...');
+    const now = new Date().toISOString();
+    const org1Id = 'org_intemic';
+    const org2Id = 'org_community';
+
+    await db.run('INSERT INTO organizations (id, name, createdAt) VALUES (?, ?, ?)', org1Id, 'Intemic', now);
+    await db.run('INSERT INTO organizations (id, name, createdAt) VALUES (?, ?, ?)', org2Id, 'Community', now);
+
+    console.log('Creating user...');
+    const userId = 'user_albert';
+    const hashedPassword = await bcrypt.hash('password123', 10);
+
+    await db.run(
+        'INSERT INTO users (id, email, password, name, createdAt) VALUES (?, ?, ?, ?, ?)',
+        userId, 'u@example.com', hashedPassword, 'Albert Mestre', now
+    );
+
+    console.log('Linking user to organizations...');
+    // Link to Intemic (Admin)
+    await db.run(
+        'INSERT INTO user_organizations (userId, organizationId, role) VALUES (?, ?, ?)',
+        userId, org1Id, 'admin'
+    );
+    // Link to Community (Member)
+    await db.run(
+        'INSERT INTO user_organizations (userId, organizationId, role) VALUES (?, ?, ?)',
+        userId, org2Id, 'member'
+    );
+
+    console.log('Seeding entities for Intemic...');
     for (const entity of initialEntities) {
         await db.run(
-            'INSERT INTO entities (id, name, description, author, lastEdited) VALUES (?, ?, ?, ?, ?)',
-            entity.id, entity.name, entity.description, entity.author, entity.lastEdited
+            'INSERT INTO entities (id, organizationId, name, description, author, lastEdited) VALUES (?, ?, ?, ?, ?, ?)',
+            entity.id, org1Id, entity.name, entity.description, entity.author, entity.lastEdited
+        );
+
+        for (const prop of entity.properties) {
+            await db.run(
+                'INSERT INTO properties (id, entityId, name, type, defaultValue, relatedEntityId) VALUES (?, ?, ?, ?, ?, ?)',
+                prop.id, entity.id, prop.name, prop.type, prop.defaultValue, prop.relatedEntityId
+            );
+        }
+    }
+
+    console.log('Seeding entities for Community...');
+    for (const entity of communityEntities) {
+        await db.run(
+            'INSERT INTO entities (id, organizationId, name, description, author, lastEdited) VALUES (?, ?, ?, ?, ?, ?)',
+            entity.id, org2Id, entity.name, entity.description, entity.author, entity.lastEdited
         );
 
         for (const prop of entity.properties) {
@@ -83,6 +121,11 @@ async function seed() {
     }
 
     console.log('Seeding complete!');
+    console.log('-----------------------------------');
+    console.log('User Credentials:');
+    console.log('Email: u@example.com');
+    console.log('Password: password123');
+    console.log('-----------------------------------');
 }
 
 seed().catch(err => {

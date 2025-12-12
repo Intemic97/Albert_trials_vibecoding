@@ -78,7 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
       </div>
 
       <div className="p-4">
-        <NavItem icon={Settings} label="Settings" />
+        <NavItem icon={Settings} label="Settings" view="settings" active={activeView === 'settings'} />
       </div>
     </div>
   );

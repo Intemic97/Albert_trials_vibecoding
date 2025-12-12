@@ -149,4 +149,122 @@ async function getMe(req, res) {
     }
 }
 
-module.exports = { register, login, logout, authenticateToken, getMe };
+async function getOrganizations(req, res) {
+    // req.user is populated by authenticateToken
+    const db = await openDb();
+    try {
+        const orgs = await db.all(`
+            SELECT o.id, o.name, uo.role 
+            FROM organizations o
+            JOIN user_organizations uo ON o.id = uo.organizationId
+            WHERE uo.userId = ?
+        `, [req.user.sub]);
+
+        res.json(orgs);
+    } catch (error) {
+        console.error('GetOrganizations error:', error);
+        res.status(500).json({ error: 'Failed to fetch organizations' });
+    }
+}
+
+async function switchOrganization(req, res) {
+    const { orgId } = req.body;
+    const userId = req.user.sub; // From current valid token
+
+    if (!orgId) {
+        return res.status(400).json({ error: 'Organization ID is required' });
+    }
+
+    const db = await openDb();
+
+    try {
+        // Verify user belongs to the target organization
+        const membership = await db.get(
+            'SELECT role FROM user_organizations WHERE userId = ? AND organizationId = ?',
+            [userId, orgId]
+        );
+
+        if (!membership) {
+            return res.status(403).json({ error: 'User does not belong to this organization' });
+        }
+
+        // Generate new token with updated orgId
+        const token = jwt.sign({ sub: userId, email: req.user.email, orgId }, JWT_SECRET, { expiresIn: '24h' });
+
+        res.cookie('auth_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        });
+
+        res.json({ message: 'Switched organization', orgId });
+
+    } catch (error) {
+        console.error('SwitchOrganization error:', error);
+        res.status(500).json({ error: 'Failed to switch organization' });
+    }
+}
+
+async function getOrganizationUsers(req, res) {
+    const db = await openDb();
+    try {
+        const users = await db.all(`
+            SELECT u.id, u.name, u.email, uo.role, uo.organizationId
+            FROM users u
+            JOIN user_organizations uo ON u.id = uo.userId
+            WHERE uo.organizationId = ?
+        `, [req.user.orgId]);
+
+        res.json(users);
+    } catch (error) {
+        console.error('GetOrganizationUsers error:', error);
+        res.status(500).json({ error: 'Failed to fetch organization users' });
+    }
+}
+
+async function inviteUser(req, res) {
+    const { email } = req.body;
+    const orgId = req.user.orgId;
+
+    if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const db = await openDb();
+
+    try {
+        // Check if user exists
+        const user = await db.get('SELECT id FROM users WHERE email = ?', [email]);
+
+        if (user) {
+            // Check if already in org
+            const existingMember = await db.get(
+                'SELECT * FROM user_organizations WHERE userId = ? AND organizationId = ?',
+                [user.id, orgId]
+            );
+
+            if (existingMember) {
+                return res.status(400).json({ error: 'User is already a member of this organization' });
+            }
+
+            // Add to org
+            await db.run(
+                'INSERT INTO user_organizations (userId, organizationId, role) VALUES (?, ?, ?)',
+                [user.id, orgId, 'member']
+            );
+
+            res.json({ message: 'User added to organization', added: true });
+        } else {
+            // Mock invite for non-existing user
+            // In a real app, this would send an email and create a pending invite record
+            res.json({ message: 'Invitation email sent', added: false });
+        }
+
+    } catch (error) {
+        console.error('InviteUser error:', error);
+        res.status(500).json({ error: 'Failed to invite user' });
+    }
+}
+
+module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser };

@@ -10,6 +10,7 @@ import { ProfileMenu } from './ProfileMenu';
 interface ReportingProps {
     entities: Entity[];
     companyInfo?: any;
+    onViewChange?: (view: string) => void;
 }
 
 interface ReportTemplate {
@@ -291,7 +292,7 @@ Provide thorough analysis with actionable recommendations.`
     }
 ];
 
-export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo }) => {
+export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onViewChange }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [report, setReport] = useState<string | null>(null);
     const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
@@ -412,7 +413,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo }) =
                     </div>
                 </div>
                 <div className="flex items-center space-x-4">
-                    <ProfileMenu />
+                    <ProfileMenu onNavigate={onViewChange} />
                 </div>
             </header>
 

@@ -3,7 +3,7 @@ const cors = require('cors');
 const { initDb } = require('./db');
 require('dotenv').config();
 const cookieParser = require('cookie-parser');
-const { register, login, logout, authenticateToken, getMe } = require('./auth');
+const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser } = require('./auth');
 
 const app = express();
 const PORT = 3001;
@@ -36,6 +36,10 @@ app.post('/api/auth/register', register);
 app.post('/api/auth/login', login);
 app.post('/api/auth/logout', logout);
 app.get('/api/auth/me', authenticateToken, getMe);
+app.get('/api/auth/organizations', authenticateToken, getOrganizations);
+app.post('/api/auth/switch-org', authenticateToken, switchOrganization);
+app.get('/api/organization/users', authenticateToken, getOrganizationUsers);
+app.post('/api/organization/invite', authenticateToken, inviteUser);
 
 // GET all entities (with properties)
 app.get('/api/entities', authenticateToken, async (req, res) => {
