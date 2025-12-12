@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu } from './ProfileMenu';
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http';
     label: string;
     x: number;
     y: number;
@@ -29,6 +29,8 @@ interface WorkflowNode {
         inputVarValue?: string;
         // For comment nodes:
         commentText?: string;
+        // For http nodes:
+        httpUrl?: string;
     };
     executionResult?: string;
     data?: any;
@@ -45,7 +47,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -58,6 +60,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'fetchData', label: 'Fetch Data', icon: Database, description: 'Get records from an entity', category: 'Data' },
     { type: 'saveRecords', label: 'Save Records', icon: Database, description: 'Create or update records', category: 'Data' },
     { type: 'equipment', label: 'Equipment', icon: Wrench, description: 'Use specific equipment data', category: 'Data' },
+    { type: 'http', label: 'HTTP Request', icon: Globe, description: 'Fetch data from an external API', category: 'Data' },
     { type: 'manualInput', label: 'Manual Data Input', icon: Edit, description: 'Define a variable with a value', category: 'Data' },
     { type: 'condition', label: 'If / Else', icon: AlertCircle, description: 'Branch based on conditions', category: 'Logic' },
     { type: 'llm', label: 'AI Generation', icon: Sparkles, description: 'Generate text using AI', category: 'Logic' },
@@ -125,6 +128,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [configuringManualInputNodeId, setConfiguringManualInputNodeId] = useState<string | null>(null);
     const [manualInputVarName, setManualInputVarName] = useState<string>('');
     const [manualInputVarValue, setManualInputVarValue] = useState<string>('');
+
+    // HTTP Node State
+    const [configuringHttpNodeId, setConfiguringHttpNodeId] = useState<string | null>(null);
+    const [httpUrl, setHttpUrl] = useState<string>('');
 
     const [dataViewTab, setDataViewTab] = useState<'input' | 'output'>('output');
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
@@ -506,6 +513,32 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setManualInputVarValue('');
     };
 
+    const openHttpConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'http') {
+            setConfiguringHttpNodeId(nodeId);
+            setHttpUrl(node.config?.httpUrl || '');
+        }
+    };
+
+    const saveHttpConfig = () => {
+        if (!configuringHttpNodeId || !httpUrl.trim()) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringHttpNodeId
+                ? {
+                    ...n,
+                    config: {
+                        ...n.config,
+                        httpUrl
+                    }
+                }
+                : n
+        ));
+        setConfiguringHttpNodeId(null);
+        setHttpUrl('');
+    };
+
     const generatePythonCode = async () => {
         if (!pythonAiPrompt.trim()) return;
 
@@ -806,6 +839,43 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         result = `Set ${varName} = ${parsedValue}`;
                     } else {
                         result = 'Not configured';
+                    }
+                    break;
+                case 'http':
+                    if (node.config?.httpUrl) {
+                        try {
+                            const response = await fetch('http://localhost:3001/api/proxy', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    url: node.config.httpUrl,
+                                    method: 'GET'
+                                }),
+                                credentials: 'include'
+                            });
+
+                            if (response.ok) {
+                                const data = await response.json();
+                                // Ensure output is an array of objects if possible, for compatibility
+                                if (Array.isArray(data)) {
+                                    nodeData = data;
+                                } else if (typeof data === 'object') {
+                                    nodeData = [data];
+                                } else {
+                                    nodeData = [{ result: data }];
+                                }
+                                result = `Fetched from ${node.config.httpUrl}`;
+                            } else {
+                                const errorData = await response.json();
+                                throw new Error(errorData.error || 'Request failed');
+                            }
+                        } catch (error) {
+                            console.error('HTTP request error:', error);
+                            result = `Error: ${error.message || 'Failed to fetch'}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'URL not configured';
                     }
                     break;
                 case 'output':
@@ -1315,6 +1385,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         openPythonConfig(node.id);
                                     } else if (node.type === 'manualInput') {
                                         openManualInputConfig(node.id);
+                                    } else if (node.type === 'http') {
+                                        openHttpConfig(node.id);
                                     }
                                 }}
                                 onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
@@ -1507,6 +1579,45 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <button
                                     onClick={saveNodeConfig}
                                     disabled={!selectedEntityId}
+                                    className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium"
+                                >
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* HTTP Configuration Modal */}
+                {configuringHttpNodeId && (
+                    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringHttpNodeId(null)}>
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
+                            <h3 className="text-lg font-bold text-slate-800 mb-4">Configure HTTP Request</h3>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    URL
+                                </label>
+                                <input
+                                    type="text"
+                                    value={httpUrl}
+                                    onChange={(e) => setHttpUrl(e.target.value)}
+                                    placeholder="https://api.example.com/data"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Enter the full URL to fetch data from (GET request).
+                                </p>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                                <button
+                                    onClick={() => setConfiguringHttpNodeId(null)}
+                                    className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={saveHttpConfig}
+                                    disabled={!httpUrl.trim()}
                                     className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium"
                                 >
                                     Save

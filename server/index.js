@@ -778,3 +778,40 @@ app.delete('/api/workflows/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// HTTP Proxy Endpoint
+app.post('/api/proxy', authenticateToken, async (req, res) => {
+    const { url, method = 'GET', headers = {} } = req.body;
+
+    if (!url) {
+        return res.status(400).json({ error: 'URL is required' });
+    }
+
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: {
+                ...headers,
+                'User-Agent': 'Intemic-Workflow-Agent/1.0'
+            }
+        });
+
+        const contentType = response.headers.get('content-type');
+        let data;
+
+        if (contentType && contentType.includes('application/json')) {
+            data = await response.json();
+        } else {
+            data = await response.text();
+        }
+
+        if (!response.ok) {
+            return res.status(response.status).json({ error: `Request failed: ${response.statusText}`, details: data });
+        }
+
+        res.json(data);
+    } catch (error) {
+        console.error('Proxy request error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
