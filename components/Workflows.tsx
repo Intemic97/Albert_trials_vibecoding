@@ -166,7 +166,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
     const loadWorkflow = async (id: string) => {
         try {
-            const res = await fetch(`http://localhost:3001/api/workflows/${id}`);
+            const res = await fetch(`http://localhost:3001/api/workflows/${id}`, { credentials: 'include' });
+            if (!res.ok) throw new Error('Failed to load workflow');
             const workflow = await res.json();
             setWorkflowName(workflow.name);
             setCurrentWorkflowId(workflow.id);
@@ -189,18 +190,22 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             if (currentWorkflowId) {
                 // Update existing
-                await fetch(`http://localhost:3001/api/workflows/${currentWorkflowId}`, {
+                const res = await fetch(`http://localhost:3001/api/workflows/${currentWorkflowId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: workflowName, data })
+                    body: JSON.stringify({ name: workflowName, data }),
+                    credentials: 'include'
                 });
+                if (!res.ok) throw new Error('Failed to update workflow');
             } else {
                 // Create new
                 const res = await fetch('http://localhost:3001/api/workflows', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: workflowName, data })
+                    body: JSON.stringify({ name: workflowName, data }),
+                    credentials: 'include'
                 });
+                if (!res.ok) throw new Error('Failed to create workflow');
                 const newWorkflow = await res.json();
                 setCurrentWorkflowId(newWorkflow.id);
             }
@@ -219,7 +224,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (!confirm('Are you sure you want to delete this workflow?')) return;
 
         try {
-            await fetch(`http://localhost:3001/api/workflows/${id}`, { method: 'DELETE' });
+            const res = await fetch(`http://localhost:3001/api/workflows/${id}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            if (!res.ok) throw new Error('Failed to delete workflow');
             await fetchWorkflows();
             if (currentWorkflowId === id) {
                 setCurrentWorkflowId(null);
