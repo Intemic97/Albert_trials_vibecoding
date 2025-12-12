@@ -4,6 +4,19 @@ import { PromptInput } from './PromptInput';
 import { ProfileMenu } from './ProfileMenu';
 import { API_BASE } from '../config';
 
+// Generate UUID that works in non-HTTPS contexts
+const generateUUID = (): string => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    // Fallback for HTTP contexts
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
+
 interface WorkflowNode {
     id: string;
     type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval';
@@ -1459,7 +1472,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         const y = (e.clientY - canvasRect.top - canvasOffset.y) / canvasZoom;
 
         const newNode: WorkflowNode = {
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             type: draggingItem.type,
             label: draggingItem.label,
             x,
@@ -1509,7 +1522,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             }
 
             const newConnection: Connection = {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 fromNodeId: dragConnectionStart.nodeId,
                 toNodeId: targetNodeId,
                 outputType: finalOutputType

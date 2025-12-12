@@ -7,6 +7,19 @@ import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { ProfileMenu } from './ProfileMenu';
 import { API_BASE } from '../config';
 
+// Generate UUID that works in non-HTTPS contexts
+const generateUUID = (): string => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    // Fallback for HTTP contexts
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
+
 interface DashboardProps {
     entities: Entity[];
     onNavigate?: (entityId: string) => void;
@@ -205,7 +218,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
 
     const handleSaveWidget = async (widget: WidgetConfig) => {
         try {
-            const id = crypto.randomUUID();
+            const id = generateUUID();
             const res = await fetch(`${API_BASE}/widgets`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
