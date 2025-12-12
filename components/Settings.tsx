@@ -34,10 +34,16 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange }) => {
             });
             if (res.ok) {
                 const data = await res.json();
-                setUsers(data);
+                if (Array.isArray(data)) {
+                    setUsers(data);
+                } else {
+                    console.error('Expected array from users API, got:', data);
+                    setUsers([]);
+                }
             }
         } catch (error) {
             console.error('Failed to fetch users:', error);
+            setUsers([]);
         }
     };
 

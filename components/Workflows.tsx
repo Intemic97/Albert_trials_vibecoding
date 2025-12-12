@@ -474,7 +474,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 try {
                     const res = await fetch(`${API_BASE}/entities/${equipmentEntity.id}/records`, { credentials: 'include' });
                     const data = await res.json();
-                    setEquipmentRecords(data);
+                    if (Array.isArray(data)) {
+                        setEquipmentRecords(data);
+                    } else {
+                        console.error('Expected array from equipment records API, got:', data);
+                        setEquipmentRecords([]);
+                    }
                 } catch (error) {
                     console.error('Error fetching equipment records:', error);
                     setEquipmentRecords([]);
@@ -787,10 +792,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             const res = await fetch(`${API_BASE}/organization/users`, { credentials: 'include' });
             if (res.ok) {
                 const users = await res.json();
-                setOrganizationUsers(users);
+                if (Array.isArray(users)) {
+                    setOrganizationUsers(users);
+                } else {
+                    console.error('Expected array from organization users API, got:', users);
+                    setOrganizationUsers([]);
+                }
             }
         } catch (error) {
             console.error('Error fetching organization users:', error);
+            setOrganizationUsers([]);
         }
     };
 

@@ -95,9 +95,16 @@ function AuthenticatedApp() {
         try {
             const res = await fetch(`${API_BASE}/entities`, { credentials: 'include' });
             const data = await res.json();
-            setEntities(data);
+            // Ensure data is an array before setting
+            if (Array.isArray(data)) {
+                setEntities(data);
+            } else {
+                console.error('Expected array from entities API, got:', data);
+                setEntities([]);
+            }
         } catch (error) {
             console.error('Error fetching entities:', error);
+            setEntities([]);
         }
     };
 
@@ -133,9 +140,15 @@ function AuthenticatedApp() {
         try {
             const res = await fetch(`${API_BASE}/entities/${activeEntityId}/records`, { credentials: 'include' });
             const data = await res.json();
-            setRecords(data);
+            if (Array.isArray(data)) {
+                setRecords(data);
+            } else {
+                console.error('Expected array from records API, got:', data);
+                setRecords([]);
+            }
         } catch (error) {
             console.error('Error fetching records:', error);
+            setRecords([]);
         }
     };
 

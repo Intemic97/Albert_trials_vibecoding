@@ -63,10 +63,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
             if (res.ok) {
                 const data = await res.json();
-                setOrganizations(data);
+                if (Array.isArray(data)) {
+                    setOrganizations(data);
+                } else {
+                    console.error('Expected array from organizations API, got:', data);
+                    setOrganizations([]);
+                }
             }
         } catch (error) {
             console.error('Failed to fetch organizations:', error);
+            setOrganizations([]);
         }
     };
 
