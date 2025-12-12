@@ -1,15 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2 } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu } from './ProfileMenu';
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval';
     label: string;
     x: number;
     y: number;
-    status?: 'idle' | 'running' | 'completed' | 'error';
+    status?: 'idle' | 'running' | 'completed' | 'error' | 'waiting';
     config?: {
         entityId?: string;
         entityName?: string;
@@ -39,6 +39,10 @@ interface WorkflowNode {
         climatiqFactor?: number;
         climatiqUnit?: string;
         climatiqDescription?: string;
+        // For human approval nodes:
+        assignedUserId?: string;
+        assignedUserName?: string;
+        approvalStatus?: 'pending' | 'approved' | 'rejected';
     };
     executionResult?: string;
     data?: any;
@@ -55,7 +59,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -76,6 +80,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'llm', label: 'AI Generation', icon: Sparkles, description: 'Generate text using AI', category: 'Logic' },
     { type: 'python', label: 'Python Code', icon: Code, description: 'Run Python script', category: 'Logic' },
     { type: 'addField', label: 'Add Field', icon: CheckCircle, description: 'Add a new field to data', category: 'Logic' },
+    { type: 'humanApproval', label: 'Human in the Loop', icon: UserCheck, description: 'Wait for user approval to continue', category: 'Logic' },
     { type: 'action', label: 'Send Email', icon: Zap, description: 'Send an email notification', category: 'Actions' },
     { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },
     { type: 'output', label: 'Output', icon: LogOut, description: 'Display workflow output data', category: 'Actions' },
@@ -155,6 +160,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [climatiqSelectedIndex, setClimatiqSelectedIndex] = useState<number | null>(null);
     const [climatiqSearching, setClimatiqSearching] = useState<boolean>(false);
 
+    // Human Approval Node State
+    const [configuringHumanApprovalNodeId, setConfiguringHumanApprovalNodeId] = useState<string | null>(null);
+    const [organizationUsers, setOrganizationUsers] = useState<any[]>([]);
+    const [selectedApproverUserId, setSelectedApproverUserId] = useState<string>('');
+    const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(false);
+
     const [dataViewTab, setDataViewTab] = useState<'input' | 'output'>('output');
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
     const [canvasZoom, setCanvasZoom] = useState(1);
@@ -177,6 +188,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
     // Export Modal State
     const [showEmbedCode, setShowEmbedCode] = useState(false);
+
+    // Human Approval Waiting State
+    const [waitingApprovalNodeId, setWaitingApprovalNodeId] = useState<string | null>(null);
+    const [pendingApprovalData, setPendingApprovalData] = useState<{ inputData: any, resolve: () => void } | null>(null);
 
     const showToast = (message: string, type: 'success' | 'error' = 'success') => {
         setToast({ message, type });
@@ -765,6 +780,71 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         }
     };
 
+    // Human Approval Node Functions
+    const fetchOrganizationUsers = async () => {
+        try {
+            const res = await fetch('http://localhost:3001/api/organization/users', { credentials: 'include' });
+            if (res.ok) {
+                const users = await res.json();
+                setOrganizationUsers(users);
+            }
+        } catch (error) {
+            console.error('Error fetching organization users:', error);
+        }
+    };
+
+    const openHumanApprovalConfig = async (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'humanApproval') {
+            setConfiguringHumanApprovalNodeId(nodeId);
+            await fetchOrganizationUsers();
+        }
+    };
+
+    const saveHumanApprovalConfig = (userId: string, userName: string) => {
+        if (!configuringHumanApprovalNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringHumanApprovalNodeId
+                ? {
+                    ...n,
+                    label: `Approval: ${userName}`,
+                    config: {
+                        ...n.config,
+                        assignedUserId: userId,
+                        assignedUserName: userName,
+                        approvalStatus: 'pending'
+                    }
+                }
+                : n
+        ));
+        setConfiguringHumanApprovalNodeId(null);
+    };
+
+    const handleApproval = (approved: boolean) => {
+        if (!waitingApprovalNodeId || !pendingApprovalData) return;
+
+        if (approved) {
+            // Resolve the promise to continue workflow
+            pendingApprovalData.resolve();
+            showToast(`Step approved! Workflow continuing...`, 'success');
+        } else {
+            // Set node to error state
+            setNodes(prev => prev.map(n =>
+                n.id === waitingApprovalNodeId 
+                    ? { ...n, status: 'error' as const, executionResult: 'Rejected by user' } 
+                    : n
+            ));
+            // Stop the workflow execution
+            setIsRunning(false);
+            setIsRunningWorkflow(false);
+            showToast('Step rejected. Workflow stopped.', 'error');
+        }
+
+        setWaitingApprovalNodeId(null);
+        setPendingApprovalData(null);
+    };
+
     // Workflow Runner Functions
     const openWorkflowRunner = () => {
         const inputNodes = nodes.filter(n => n.type === 'manualInput');
@@ -1186,6 +1266,31 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         result = 'No input data';
                     }
                     break;
+                case 'humanApproval':
+                    // Human approval node - wait for user acceptance
+                    if (!node.config?.assignedUserId) {
+                        result = 'Error: No user assigned';
+                        setNodes(prev => prev.map(n =>
+                            n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
+                        ));
+                        return;
+                    }
+
+                    // Set to waiting status
+                    setNodes(prev => prev.map(n =>
+                        n.id === nodeId ? { ...n, status: 'waiting' as const, inputData } : n
+                    ));
+                    setWaitingApprovalNodeId(nodeId);
+
+                    // Wait for user approval
+                    await new Promise<void>((resolve) => {
+                        setPendingApprovalData({ inputData, resolve });
+                    });
+
+                    // After approval, continue
+                    nodeData = inputData;
+                    result = `Approved by ${node.config.assignedUserName}`;
+                    break;
             }
         }
 
@@ -1408,6 +1513,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (status === 'running') return 'bg-yellow-100 border-yellow-400 text-yellow-900 animate-pulse';
         if (status === 'completed') return 'bg-green-100 border-green-400 text-green-900';
         if (status === 'error') return 'bg-red-100 border-red-400 text-red-900';
+        if (status === 'waiting') return 'bg-orange-100 border-orange-400 text-orange-900 animate-pulse';
 
         switch (type) {
             case 'trigger': return 'bg-purple-100 border-purple-300 text-purple-800';
@@ -1415,6 +1521,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'condition': return 'bg-amber-100 border-amber-300 text-amber-800';
             case 'fetchData': return 'bg-teal-100 border-teal-300 text-teal-800';
             case 'equipment': return 'bg-orange-100 border-orange-300 text-orange-800';
+            case 'humanApproval': return 'bg-orange-100 border-orange-300 text-orange-800';
             case 'addField': return 'bg-indigo-100 border-indigo-300 text-indigo-800';
             case 'saveRecords': return 'bg-emerald-100 border-emerald-300 text-emerald-800';
             case 'llm': return 'bg-violet-100 border-violet-300 text-violet-800';
@@ -1825,6 +1932,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openEsiosConfig(node.id);
                                             } else if (node.type === 'climatiq') {
                                                 openClimatiqConfig(node.id);
+                                            } else if (node.type === 'humanApproval') {
+                                                openHumanApprovalConfig(node.id);
                                             }
                                         }}
                                         onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
@@ -1901,11 +2010,44 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     {node.status === 'completed' && <Check size={16} className="text-green-600 flex-shrink-0 ml-1" />}
                                                     {node.status === 'error' && <XCircle size={16} className="text-red-600 flex-shrink-0 ml-1" />}
                                                     {node.status === 'running' && <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin ml-1" />}
+                                                    {node.status === 'waiting' && <UserCheck size={16} className="text-orange-600 flex-shrink-0 ml-1 animate-pulse" />}
                                                 </div>
 
                                                 {node.executionResult && (
                                                     <div className="mt-2 text-xs italic opacity-75">
                                                         {node.executionResult}
+                                                    </div>
+                                                )}
+
+                                                {/* Human Approval Waiting UI */}
+                                                {node.type === 'humanApproval' && node.status === 'waiting' && (
+                                                    <div className="mt-3 space-y-2">
+                                                        <div className="text-xs text-orange-700 font-medium flex items-center gap-1">
+                                                            <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                                                            Waiting for approval...
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleApproval(true);
+                                                                }}
+                                                                className="flex-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-md transition-colors flex items-center justify-center gap-1"
+                                                            >
+                                                                <Check size={14} />
+                                                                Accept
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleApproval(false);
+                                                                }}
+                                                                className="flex-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-md transition-colors flex items-center justify-center gap-1"
+                                                            >
+                                                                <X size={14} />
+                                                                Reject
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </>
@@ -2221,6 +2363,81 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
                                         >
                                             Save
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Human Approval Configuration Modal */}
+                        {configuringHumanApprovalNodeId && (
+                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringHumanApprovalNodeId(null)}>
+                                <div className="bg-white rounded-lg shadow-xl p-6 w-[450px]" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                                            <UserCheck size={20} className="text-orange-600" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-lg font-bold text-slate-800">Human in the Loop</h3>
+                                            <p className="text-sm text-slate-500">Assign a user to approve this step</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mb-6">
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Assign to
+                                        </label>
+                                        {organizationUsers.length === 0 ? (
+                                            <div className="flex items-center justify-center py-8 text-slate-400">
+                                                <div className="w-5 h-5 border-2 border-slate-300 border-t-teal-500 rounded-full animate-spin mr-2" />
+                                                Loading users...
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                                                {organizationUsers.map((user) => {
+                                                    const currentNode = nodes.find(n => n.id === configuringHumanApprovalNodeId);
+                                                    const isSelected = currentNode?.config?.assignedUserId === user.id;
+                                                    return (
+                                                        <button
+                                                            key={user.id}
+                                                            onClick={() => saveHumanApprovalConfig(user.id, user.name || user.email)}
+                                                            className={`w-full p-3 rounded-lg border-2 text-left transition-all flex items-center gap-3 ${
+                                                                isSelected
+                                                                    ? 'border-orange-500 bg-orange-50'
+                                                                    : 'border-slate-200 hover:border-orange-300 hover:bg-orange-50/50'
+                                                            }`}
+                                                        >
+                                                            <div className="w-9 h-9 bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                                                                {(user.name || user.email || '?').charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="font-medium text-slate-800 truncate">
+                                                                    {user.name || 'Unnamed User'}
+                                                                </div>
+                                                                <div className="text-xs text-slate-500 truncate">
+                                                                    {user.email}
+                                                                </div>
+                                                            </div>
+                                                            <span className={`text-xs px-2 py-1 rounded-full ${
+                                                                user.role === 'admin' 
+                                                                    ? 'bg-purple-100 text-purple-700' 
+                                                                    : 'bg-slate-100 text-slate-600'
+                                                            }`}>
+                                                                {user.role}
+                                                            </span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex gap-2 justify-end pt-4 border-t border-slate-100">
+                                        <button
+                                            onClick={() => setConfiguringHumanApprovalNodeId(null)}
+                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                        >
+                                            Cancel
                                         </button>
                                     </div>
                                 </div>
