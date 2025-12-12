@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2 } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu } from './ProfileMenu';
 
@@ -1564,7 +1564,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 </p>
                             </div>
                             <div className="flex gap-2">
-                                                                <button
+                                <button
                                     onClick={backToList}
                                     className="px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium flex items-center gap-2"
                                 >
@@ -1598,8 +1598,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         : 'bg-teal-600 hover:bg-teal-700 text-white'
                                         }`}
                                 >
-                                    <PlayCircle size={16} className="mr-2" />
-                                    Export & Run
+                                    <Share2 size={16} className="mr-2" />
+                                    Export
                                 </button>
                                 <div className="ml-2 border-l border-slate-300 pl-4">
                                     <ProfileMenu onNavigate={onViewChange} />
