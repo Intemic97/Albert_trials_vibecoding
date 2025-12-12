@@ -36,6 +36,9 @@ interface WorkflowNode {
         esiosDate?: string;
         // For climatiq nodes:
         climatiqQuery?: string;
+        climatiqFactor?: number;
+        climatiqUnit?: string;
+        climatiqDescription?: string;
     };
     executionResult?: string;
     data?: any;
@@ -148,6 +151,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // Climatiq Node State
     const [configuringClimatiqNodeId, setConfiguringClimatiqNodeId] = useState<string | null>(null);
     const [climatiqQuery, setClimatiqQuery] = useState<string>('Passenger Car');
+    const [climatiqSearchResults, setClimatiqSearchResults] = useState<any[]>([]);
+    const [climatiqSelectedIndex, setClimatiqSelectedIndex] = useState<number | null>(null);
+    const [climatiqSearching, setClimatiqSearching] = useState<boolean>(false);
 
     const [dataViewTab, setDataViewTab] = useState<'input' | 'output'>('output');
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
@@ -589,25 +595,80 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (node && node.type === 'climatiq') {
             setConfiguringClimatiqNodeId(nodeId);
             setClimatiqQuery(node.config?.climatiqQuery || 'Passenger Car');
+            setClimatiqSearchResults([]);
+            setClimatiqSelectedIndex(null);
+        }
+    };
+
+    const searchClimatiq = async () => {
+        if (!climatiqQuery.trim()) return;
+
+        setClimatiqSearching(true);
+        setClimatiqSearchResults([]);
+        setClimatiqSelectedIndex(null);
+
+        try {
+            const response = await fetch('http://localhost:3001/api/proxy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    url: `https://api.climatiq.io/data/v1/search?query=${encodeURIComponent(climatiqQuery)}&data_version=^20`,
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer TWCZKXAGES4F76M3F468EE3VMC'
+                    }
+                }),
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Climatiq search response:', data);
+                // Extract top 10 results
+                const results = data.results?.slice(0, 10) || [];
+                setClimatiqSearchResults(results);
+            } else {
+                const errorText = await response.text();
+                console.error('Climatiq search failed:', response.status, errorText);
+                alert(`Search failed: ${response.status} - ${errorText.substring(0, 100)}`);
+            }
+        } catch (error) {
+            console.error('Climatiq search error:', error);
+        } finally {
+            setClimatiqSearching(false);
         }
     };
 
     const saveClimatiqConfig = () => {
-        if (!configuringClimatiqNodeId || !climatiqQuery.trim()) return;
+        if (!configuringClimatiqNodeId) return;
+
+        // Check if a factor is selected
+        if (climatiqSelectedIndex === null || !climatiqSearchResults[climatiqSelectedIndex]) {
+            alert('Please search and select an emission factor first');
+            return;
+        }
+
+        const selected = climatiqSearchResults[climatiqSelectedIndex];
 
         setNodes(prev => prev.map(n =>
             n.id === configuringClimatiqNodeId
                 ? {
                     ...n,
+                    label: `${selected.name || 'Emission Factor'}`,
                     config: {
                         ...n.config,
-                        climatiqQuery
+                        climatiqQuery,
+                        climatiqFactor: selected.factor,
+                        climatiqUnit: selected.unit,
+                        climatiqDescription: `${selected.name} (${selected.region_name || selected.region})`
                     }
                 }
                 : n
         ));
         setConfiguringClimatiqNodeId(null);
         setClimatiqQuery('Passenger Car');
+        setClimatiqSearchResults([]);
+        setClimatiqSelectedIndex(null);
     };
 
     const generatePythonCode = async () => {
@@ -987,35 +1048,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     }
                     break;
                 case 'climatiq':
-                    const query = node.config?.climatiqQuery || 'Passenger Car';
-                    const climatiqUrl = `https://api.climatiq.io/data/v1/search?query=${encodeURIComponent(query)}`;
+                    // Check if factor is configured
+                    if (node.config?.climatiqFactor !== undefined) {
+                        // Return the stored emission factor
+                        const factor = node.config.climatiqFactor;
+                        const unit = node.config.climatiqUnit || 'kg CO2e';
+                        const description = node.config.climatiqDescription || 'Emission factor';
 
-                    try {
-                        const response = await fetch('http://localhost:3001/api/proxy', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                url: climatiqUrl,
-                                method: 'GET',
-                                headers: {
-                                    'Authorization': 'Bearer TWCZKXAGES4F76M3F468EE3VMC'
-                                }
-                            }),
-                            credentials: 'include'
-                        });
-
-                        if (response.ok) {
-                            const data = await response.json();
-                            nodeData = [data]; // Wrap the full response object
-                            result = `Found emission factors for "${query}"`;
-                        } else {
-                            const errorData = await response.json();
-                            throw new Error(errorData.error || `Climatiq Request failed: ${response.status}`);
-                        }
-                    } catch (error) {
-                        console.error('Climatiq request error:', error);
-                        result = `Error: ${error.message || 'Failed to fetch'}`;
-                        nodeData = [{ error: error.message }];
+                        nodeData = [{
+                            factor: factor,
+                            unit: unit,
+                            description: description,
+                            query: node.config.climatiqQuery
+                        }];
+                        result = `Using ${description}: ${factor} ${unit}`;
+                    } else {
+                        result = 'Not configured - please select an emission factor';
+                        nodeData = [{ error: 'No emission factor selected' }];
                     }
                     break;
                 case 'output':
@@ -1828,38 +1877,103 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 {/* Climatiq Configuration Modal */}
                 {configuringClimatiqNodeId && (
                     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringClimatiqNodeId(null)}>
-                        <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
-                            <h3 className="text-lg font-bold text-slate-800 mb-4">Configure Emission Factors</h3>
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+                            <h3 className="text-lg font-bold text-slate-800 mb-4">🌱 Ask AI about the activity</h3>
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Search Query
-                                </label>
-                                <input
-                                    type="text"
-                                    value={climatiqQuery}
-                                    onChange={(e) => setClimatiqQuery(e.target.value)}
-                                    placeholder="e.g., Passenger Car, Electricity, Natural Gas"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                />
-                                <p className="text-xs text-slate-500 mt-1">
-                                    💡 Try: "Flight", "Diesel", "Solar", "Steel Production"
-                                </p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={climatiqQuery}
+                                        onChange={(e) => setClimatiqQuery(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && searchClimatiq()}
+                                        placeholder="e.g., Passenger diesel car"
+                                        className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                    />
+                                    <button
+                                        onClick={searchClimatiq}
+                                        disabled={climatiqSearching || !climatiqQuery.trim()}
+                                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    >
+                                        {climatiqSearching ? (
+                                            <>
+                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                Searching...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles size={16} />
+                                                Search
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
-                            <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                                <p className="text-xs text-slate-600 font-medium">Using Climatiq API</p>
-                                <code className="text-[10px] text-slate-500 break-all">Token: TWCZ...3VMC</code>
-                            </div>
-                            <div className="flex gap-2 justify-end">
+
+                            {/* Results List */}
+                            {climatiqSearchResults.length > 0 && (
+                                <div className="mb-4 flex-1 overflow-y-auto">
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        Similar activities and its Emission factors
+                                    </label>
+                                    <div className="space-y-2">
+                                        {climatiqSearchResults.map((result, index) => (
+                                            <div
+                                                key={index}
+                                                onClick={() => setClimatiqSelectedIndex(index)}
+                                                className={`p-3 border rounded-lg cursor-pointer transition-all ${climatiqSelectedIndex === index
+                                                    ? 'border-blue-600 bg-blue-50'
+                                                    : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                                                    }`}
+                                            >
+                                                <div className="flex items-start gap-2">
+                                                    <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 ${climatiqSelectedIndex === index
+                                                        ? 'border-blue-600 bg-blue-600'
+                                                        : 'border-slate-300'
+                                                        }`}>
+                                                        {climatiqSelectedIndex === index && (
+                                                            <Check size={12} className="text-white" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-semibold text-sm text-slate-800">
+                                                            {result.factor} {result.unit}
+                                                        </p>
+                                                        <p className="text-xs text-slate-600 truncate">
+                                                            {result.name} ({result.region_name || result.region})
+                                                        </p>
+                                                        <p className="text-[10px] text-slate-500">
+                                                            Source: {result.source} • Year: {result.year}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* No results message */}
+                            {!climatiqSearching && climatiqSearchResults.length === 0 && climatiqQuery && (
+                                <div className="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200 text-center text-slate-600 text-sm">
+                                    Click "Search" to find emission factors
+                                </div>
+                            )}
+
+                            <div className="flex gap-2 justify-end pt-4 border-t">
                                 <button
-                                    onClick={() => setConfiguringClimatiqNodeId(null)}
+                                    onClick={() => {
+                                        setConfiguringClimatiqNodeId(null);
+                                        setClimatiqSearchResults([]);
+                                        setClimatiqSelectedIndex(null);
+                                    }}
                                     className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={saveClimatiqConfig}
-                                    disabled={!climatiqQuery.trim()}
-                                    className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium"
+                                    disabled={climatiqSelectedIndex === null}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
                                 >
                                     Save
                                 </button>
