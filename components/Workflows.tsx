@@ -1563,45 +1563,45 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     {nodes.length} nodes • {connections.length} connections {currentWorkflowId && '• Saved'}
                                 </p>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-1.5">
                                 <button
                                     onClick={backToList}
-                                    className="px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium flex items-center gap-2"
+                                    className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-md hover:bg-slate-50 transition-colors text-xs font-medium flex items-center gap-1.5"
                                 >
-                                    <ArrowLeft size={16} />
-                                    Back to Workflows
+                                    <ArrowLeft size={14} />
+                                    Back
                                 </button>
                                 <button
                                     onClick={saveWorkflow}
                                     disabled={isSaving}
-                                    className="flex items-center px-4 py-2 bg-slate-800 border-none text-white rounded-lg hover:bg-slate-900 transition-colors shadow-sm text-sm font-medium disabled:opacity-50"
+                                    className="flex items-center px-2.5 py-1.5 bg-slate-800 border-none text-white rounded-md hover:bg-slate-900 transition-colors shadow-sm text-xs font-medium disabled:opacity-50"
                                 >
-                                    {isSaving ? <span className="animate-spin mr-2">⟳</span> : <Save size={16} className="mr-2" />}
+                                    {isSaving ? <span className="animate-spin mr-1">⟳</span> : <Save size={14} className="mr-1" />}
                                     Save
                                 </button>
                                 <button
                                     onClick={runWorkflow}
                                     disabled={isRunning || nodes.length === 0}
-                                    className={`flex items-center px-4 py-2 rounded-lg text-white shadow-sm transition-colors text-sm font-medium ${isRunning || nodes.length === 0
+                                    className={`flex items-center px-2.5 py-1.5 rounded-md text-white shadow-sm transition-colors text-xs font-medium ${isRunning || nodes.length === 0
                                         ? 'bg-slate-300 cursor-not-allowed'
                                         : 'bg-slate-800 hover:bg-slate-900'
                                         }`}
                                 >
-                                    <PlayCircle size={16} className="mr-2" />
+                                    <PlayCircle size={14} className="mr-1" />
                                     {isRunning ? 'Running...' : 'Run'}
                                 </button>
                                 <button
                                     onClick={openWorkflowRunner}
                                     disabled={nodes.length === 0}
-                                    className={`flex items-center px-4 py-2 rounded-lg shadow-sm transition-colors text-sm font-medium ${nodes.length === 0
+                                    className={`flex items-center px-2.5 py-1.5 rounded-md shadow-sm transition-colors text-xs font-medium ${nodes.length === 0
                                         ? 'bg-slate-300 cursor-not-allowed text-slate-500'
                                         : 'bg-teal-600 hover:bg-teal-700 text-white'
                                         }`}
                                 >
-                                    <Share2 size={16} className="mr-2" />
+                                    <Share2 size={14} className="mr-1" />
                                     Export
                                 </button>
-                                <div className="ml-2 border-l border-slate-300 pl-4">
+                                <div className="ml-1.5 border-l border-slate-300 pl-2">
                                     <ProfileMenu onNavigate={onViewChange} />
                                 </div>
                             </div>
