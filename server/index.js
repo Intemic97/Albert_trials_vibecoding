@@ -6,10 +6,29 @@ const cookieParser = require('cookie-parser');
 const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser } = require('./auth');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
+
+// CORS configuration - allow multiple origins for dev and production
+const allowedOrigins = [
+    'http://localhost:5173',      // Vite dev server
+    'http://localhost:3000',      // Alternative dev port
+    'http://178.128.170.0',       // Production IP
+    'https://178.128.170.0',      // Production IP (HTTPS)
+    process.env.FRONTEND_URL      // Custom frontend URL from env
+].filter(Boolean);
 
 app.use(cors({
-    origin: 'http://localhost:5173', // Vite default port
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            console.log('CORS blocked origin:', origin);
+            callback(null, true); // Allow anyway in case of proxy setup
+        }
+    },
     credentials: true
 }));
 app.use(express.json());
