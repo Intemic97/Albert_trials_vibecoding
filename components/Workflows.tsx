@@ -5,7 +5,7 @@ import { ProfileMenu } from './ProfileMenu';
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios';
     label: string;
     x: number;
     y: number;
@@ -31,6 +31,9 @@ interface WorkflowNode {
         commentText?: string;
         // For http nodes:
         httpUrl?: string;
+        // For esios nodes:
+        esiosArchiveId?: string;
+        esiosDate?: string;
     };
     executionResult?: string;
     data?: any;
@@ -47,7 +50,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -61,6 +64,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'saveRecords', label: 'Save Records', icon: Database, description: 'Create or update records', category: 'Data' },
     { type: 'equipment', label: 'Equipment', icon: Wrench, description: 'Use specific equipment data', category: 'Data' },
     { type: 'http', label: 'HTTP Request', icon: Globe, description: 'Fetch data from an external API', category: 'Data' },
+    { type: 'esios', label: 'Energy Prices', icon: Zap, description: 'Fetch prices from Red Eléctrica', category: 'Data' },
     { type: 'manualInput', label: 'Manual Data Input', icon: Edit, description: 'Define a variable with a value', category: 'Data' },
     { type: 'condition', label: 'If / Else', icon: AlertCircle, description: 'Branch based on conditions', category: 'Logic' },
     { type: 'llm', label: 'AI Generation', icon: Sparkles, description: 'Generate text using AI', category: 'Logic' },
@@ -132,6 +136,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // HTTP Node State
     const [configuringHttpNodeId, setConfiguringHttpNodeId] = useState<string | null>(null);
     const [httpUrl, setHttpUrl] = useState<string>('');
+
+    // ESIOS Node State
+    const [configuringEsiosNodeId, setConfiguringEsiosNodeId] = useState<string | null>(null);
+    const [esiosArchiveId, setEsiosArchiveId] = useState<string>('1001'); // PVPC indicator ID
+    const [esiosDate, setEsiosDate] = useState<string>(new Date().toISOString().split('T')[0]); // Today YYYY-MM-DD
 
     const [dataViewTab, setDataViewTab] = useState<'input' | 'output'>('output');
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
@@ -539,6 +548,35 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setHttpUrl('');
     };
 
+    const openEsiosConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'esios') {
+            setConfiguringEsiosNodeId(nodeId);
+            setEsiosArchiveId(node.config?.esiosArchiveId || '1001');
+            setEsiosDate(node.config?.esiosDate || new Date().toISOString().split('T')[0]);
+        }
+    };
+
+    const saveEsiosConfig = () => {
+        if (!configuringEsiosNodeId || !esiosArchiveId.trim()) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringEsiosNodeId
+                ? {
+                    ...n,
+                    config: {
+                        ...n.config,
+                        esiosArchiveId,
+                        esiosDate
+                    }
+                }
+                : n
+        ));
+        setConfiguringEsiosNodeId(null);
+        setEsiosArchiveId('1001');
+        setEsiosDate(new Date().toISOString().split('T')[0]);
+    };
+
     const generatePythonCode = async () => {
         if (!pythonAiPrompt.trim()) return;
 
@@ -876,6 +914,43 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         }
                     } else {
                         result = 'URL not configured';
+                    }
+                    break;
+                case 'esios':
+                    const indicatorId = node.config?.esiosArchiveId || '1001';
+                    const esiosDate = node.config?.esiosDate || new Date().toISOString().split('T')[0];
+                    // Use indicators endpoint with start_date and end_date
+                    const startDate = `${esiosDate}T00:00`;
+                    const endDate = `${esiosDate}T23:59`;
+                    const url = `https://api.esios.ree.es/indicators/${indicatorId}?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`;
+
+                    try {
+                        const response = await fetch('http://localhost:3001/api/proxy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                url: url,
+                                method: 'GET',
+                                headers: {
+                                    'Accept': 'application/json; application/vnd.esios-api-v1+json',
+                                    'x-api-key': 'd668c991cd9fbd6873796a76b80bca256bf0f26db8d4c1de702546642fecda64'
+                                }
+                            }),
+                            credentials: 'include'
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            nodeData = [data]; // Wrap the full response object
+                            result = `Fetched ESIOS Indicator ${indicatorId} for ${esiosDate}`;
+                        } else {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || `ESIOS Request failed: ${response.status}`);
+                        }
+                    } catch (error) {
+                        console.error('ESIOS request error:', error);
+                        result = `Error: ${error.message || 'Failed to fetch'}`;
+                        nodeData = [{ error: error.message }];
                     }
                     break;
                 case 'output':
@@ -1387,6 +1462,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         openManualInputConfig(node.id);
                                     } else if (node.type === 'http') {
                                         openHttpConfig(node.id);
+                                    } else if (node.type === 'esios') {
+                                        openEsiosConfig(node.id);
                                     }
                                 }}
                                 onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
@@ -1618,6 +1695,60 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <button
                                     onClick={saveHttpConfig}
                                     disabled={!httpUrl.trim()}
+                                    className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium"
+                                >
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ESIOS Configuration Modal */}
+                {configuringEsiosNodeId && (
+                    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringEsiosNodeId(null)}>
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
+                            <h3 className="text-lg font-bold text-slate-800 mb-4">Configure ESIOS Energy Prices</h3>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Indicator ID
+                                </label>
+                                <input
+                                    type="text"
+                                    value={esiosArchiveId}
+                                    onChange={(e) => setEsiosArchiveId(e.target.value)}
+                                    placeholder="e.g., 1001 for PVPC"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">
+                                    1001 = PVPC prices, 1739 = Spot prices, 10211 = Market price
+                                </p>
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Date
+                                </label>
+                                <input
+                                    type="date"
+                                    value={esiosDate}
+                                    onChange={(e) => setEsiosDate(e.target.value)}
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                />
+                            </div>
+                            <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <p className="text-xs text-slate-600 font-medium">Using Token:</p>
+                                <code className="text-[10px] text-slate-500 break-all">d668...da64</code>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                                <button
+                                    onClick={() => setConfiguringEsiosNodeId(null)}
+                                    className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={saveEsiosConfig}
+                                    disabled={!esiosArchiveId.trim()}
                                     className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium"
                                 >
                                     Save
