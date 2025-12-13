@@ -338,8 +338,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 setNodes([]);
                 setConnections([]);
             }
+            setToast({ message: 'Workflow deleted successfully', type: 'success' });
+            setTimeout(() => setToast(null), 3000);
         } catch (error) {
             console.error('Error deleting workflow:', error);
+            setToast({ message: 'Failed to delete workflow', type: 'error' });
+            setTimeout(() => setToast(null), 3000);
         }
     };
 
@@ -365,7 +369,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         newWorkflow();
         setCurrentView('canvas');
     };
-
 
     const openNodeConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
@@ -1567,41 +1570,48 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     );
 
     return (
-        <div className="flex h-full bg-slate-50">
+        <div className="flex flex-col h-full bg-slate-50">
             {currentView === 'list' ? (
                 /* Workflows List View */
-                <div className="flex-1 p-8">
-                    {/* Header */}
-                    <div className="mb-6">
-                        <h1 className="text-3xl font-bold text-slate-900">Workflows</h1>
-                        <p className="text-slate-600 mt-1">Manage and execute your automation workflows</p>
-                    </div>
-
-                    {/* Toolbar */}
-                    <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-4">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                <input
-                                    type="text"
-                                    placeholder="Search workflows..."
-                                    value={workflowSearchQuery}
-                                    onChange={(e) => setWorkflowSearchQuery(e.target.value)}
-                                    className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 w-80"
-                                />
-                            </div>
-                            <p className="text-sm text-slate-500">
-                                {filteredWorkflows.length} {filteredWorkflows.length === 1 ? 'workflow' : 'workflows'}
-                            </p>
+                <>
+                    {/* Top Header */}
+                    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
+                        <div>
+                            <h1 className="text-2xl font-bold text-slate-800">Workflows</h1>
+                            <p className="text-sm text-slate-500">Manage and execute your automation workflows</p>
                         </div>
-                        <button
-                            onClick={createNewWorkflow}
-                            className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors shadow-sm font-medium"
-                        >
-                            <Workflow size={18} />
-                            Create Workflow
-                        </button>
-                    </div>
+                        <div className="flex items-center space-x-4">
+                            <ProfileMenu onNavigate={onViewChange} />
+                        </div>
+                    </header>
+
+                    {/* Content Area */}
+                    <div className="flex-1 overflow-y-auto p-8">
+                        {/* Toolbar */}
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-4">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                    <input
+                                        type="text"
+                                        placeholder="Search workflows..."
+                                        value={workflowSearchQuery}
+                                        onChange={(e) => setWorkflowSearchQuery(e.target.value)}
+                                        className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 w-80"
+                                    />
+                                </div>
+                                <p className="text-sm text-slate-500">
+                                    {filteredWorkflows.length} {filteredWorkflows.length === 1 ? 'workflow' : 'workflows'}
+                                </p>
+                            </div>
+                            <button
+                                onClick={createNewWorkflow}
+                                className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors shadow-sm font-medium"
+                            >
+                                <Workflow size={18} />
+                                Create Workflow
+                            </button>
+                        </div>
 
                     {/* Workflows Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1609,40 +1619,57 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <div
                                 key={workflow.id}
                                 onClick={() => openWorkflow(workflow.id)}
-                                className="bg-white border border-slate-200 rounded-lg p-5 hover:border-teal-500 hover:shadow-lg transition-all cursor-pointer group"
+                                className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 cursor-pointer group relative flex flex-col justify-between min-h-[200px]"
                             >
-                                <div className="flex items-start justify-between mb-3">
-                                    <div className="flex items-center gap-2">
-                                        <div className="p-2 bg-teal-100 rounded-lg">
-                                            <Workflow size={20} className="text-teal-600" />
-                                        </div>
-                                        <h3 className="font-semibold text-slate-900 group-hover:text-teal-600 transition-colors">
+                                <div>
+                                    <div className="flex justify-between items-start mb-4">
+                                        <h3 className="text-lg font-semibold text-slate-800 group-hover:text-teal-600 transition-colors">
                                             {workflow.name}
                                         </h3>
+                                        <div className="flex space-x-1">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteWorkflow(workflow.id);
+                                                }}
+                                                className="text-slate-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-colors"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2 mt-4">
+                                        <p className="text-xs text-slate-400">
+                                            Nodes: <span className="text-slate-600 font-medium">{workflow.data?.nodes?.length || 0}</span>
+                                        </p>
+                                        <p className="text-xs text-slate-400">
+                                            Connections: <span className="text-slate-600 font-medium">{workflow.data?.connections?.length || 0}</span>
+                                        </p>
+                                        <p className="text-xs text-slate-400">
+                                            Last edited: <span className="text-slate-600">{new Date(workflow.updated_at).toLocaleDateString()}</span>
+                                        </p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4 text-xs text-slate-500">
-                                    <span>{workflow.data?.nodes?.length || 0} nodes</span>
-                                    <span>•</span>
-                                    <span>{workflow.data?.connections?.length || 0} connections</span>
-                                </div>
-                                <div className="mt-3 text-xs text-slate-400">
-                                    Updated {new Date(workflow.updated_at).toLocaleDateString()}
+
+                                <div className="flex justify-end mt-4">
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-700 border border-teal-100 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        Edit
+                                    </span>
                                 </div>
                             </div>
                         ))}
 
                         {/* Create New Card */}
-                        {filteredWorkflows.length === 0 && workflowSearchQuery === '' && (
-                            <div
-                                onClick={createNewWorkflow}
-                                className="border-2 border-dashed border-slate-300 rounded-lg p-8 hover:border-teal-500 hover:bg-teal-50/50 transition-all cursor-pointer flex flex-col items-center justify-center text-center group"
-                            >
-                                <Workflow size={32} className="text-slate-400 group-hover:text-teal-500 mb-2" />
-                                <p className="font-medium text-slate-600 group-hover:text-teal-600">Create your first workflow</p>
-                                <p className="text-xs text-slate-500 mt-1">Click to start building</p>
+                        <div
+                            onClick={createNewWorkflow}
+                            className="border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center min-h-[200px] text-slate-400 hover:border-teal-500 hover:text-teal-600 hover:bg-teal-50 transition-all cursor-pointer group"
+                        >
+                            <div className="p-4 bg-slate-100 rounded-full mb-3 group-hover:bg-white">
+                                <Workflow size={24} />
                             </div>
-                        )}
+                            <span className="font-medium">Create new workflow</span>
+                        </div>
 
                         {filteredWorkflows.length === 0 && workflowSearchQuery !== '' && (
                             <div className="col-span-full text-center py-12 text-slate-500">
@@ -1650,10 +1677,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             </div>
                         )}
                     </div>
-                </div>
+                    </div>
+                </>
             ) : (
                 /* Canvas View */
-                <>
+                <div className="flex flex-1 h-full">
                     {/* Sidebar */}
                     <div className={`${isSidebarCollapsed ? 'w-14' : 'w-72'} bg-slate-50 border-r border-slate-200 flex flex-col shadow-sm z-10 h-full transition-all duration-300`}>
 
@@ -3171,7 +3199,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             </div>
                         </div>
                     )}
-                </>
+                </div>
             )}
 
             {/* Toast Notification */}
