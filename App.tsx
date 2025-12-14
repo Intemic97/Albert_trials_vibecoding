@@ -8,7 +8,7 @@ import { LoginPage } from './components/LoginPage';
 import { Settings } from './components/Settings';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Entity, Property, PropertyType } from './types';
-import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X, Code } from 'lucide-react';
+import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X, Code, Paperclip, Download, Loader2 } from 'lucide-react';
 import { ProfileMenu } from './components/ProfileMenu';
 import { API_BASE } from './config';
 
@@ -55,7 +55,41 @@ function AuthenticatedApp() {
     // Editing Schema State (for editing records from side panel)
     const [editingSchema, setEditingSchema] = useState<Entity | null>(null);
 
+    // File Upload State
+    const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
+
     const activeEntity = entities.find(e => e.id === activeEntityId);
+
+    // File upload handler
+    const handleFileUpload = async (propId: string, file: File) => {
+        setUploadingFiles(prev => ({ ...prev, [propId]: true }));
+        
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const response = await fetch(`${API_BASE}/upload`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+            
+            if (!response.ok) {
+                throw new Error('Upload failed');
+            }
+            
+            const fileData = await response.json();
+            setNewRecordValues(prev => ({
+                ...prev,
+                [propId]: JSON.stringify(fileData)
+            }));
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            alert('Failed to upload file');
+        } finally {
+            setUploadingFiles(prev => ({ ...prev, [propId]: false }));
+        }
+    };
 
     // Database Tab State
     const [databaseTab, setDatabaseTab] = useState<'company' | 'entities'>('entities');
@@ -420,6 +454,28 @@ function AuthenticatedApp() {
             );
         }
 
+        if (prop.type === 'file') {
+            try {
+                const fileData = typeof value === 'string' ? JSON.parse(value) : value;
+                if (fileData && fileData.filename) {
+                    return (
+                        <a
+                            href={`${API_BASE}/files/${fileData.filename}/download?originalName=${encodeURIComponent(fileData.originalName || fileData.filename)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800 hover:bg-purple-200 transition-colors gap-1"
+                        >
+                            <Paperclip size={12} />
+                            {fileData.originalName || fileData.filename}
+                            <Download size={12} />
+                        </a>
+                    );
+                }
+            } catch (e) {
+                return value;
+            }
+        }
+
         if (prop.type === 'relation' && prop.relatedEntityId) {
             try {
                 const ids = JSON.parse(value);
@@ -457,6 +513,7 @@ function AuthenticatedApp() {
             case 'number': return <Hash size={16} className="text-slate-400" />;
             case 'relation': return <LinkIcon size={16} className="text-teal-500" />;
             case 'json': return <Code size={16} className="text-amber-500" />;
+            case 'file': return <Paperclip size={16} className="text-purple-500" />;
         }
     };
 
@@ -820,7 +877,7 @@ function AuthenticatedApp() {
                                                                     <div className="text-xs text-right text-slate-400 mr-4">
                                                                         Example Value:<br />
                                                                         <span className="text-slate-600 font-mono">
-                                                                            {prop.type === 'relation' ? 'ID-REF-123' : prop.defaultValue}
+                                                                            {prop.type === 'relation' ? 'ID-REF-123' : prop.type === 'file' ? 'document.pdf' : prop.defaultValue}
                                                                         </span>
                                                                     </div>
                                                                     <button
@@ -862,6 +919,7 @@ function AuthenticatedApp() {
                                                                     <option value="number">Number</option>
                                                                     <option value="json">JSON</option>
                                                                     <option value="relation">Relation</option>
+                                                                    <option value="file">File</option>
                                                                 </select>
                                                             </div>
 
@@ -1147,6 +1205,68 @@ function AuthenticatedApp() {
                                                             ))}
                                                         </select>
                                                         <p className="text-xs text-slate-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+                                                    </div>
+                                                );
+                                            }
+                                            if (prop.type === 'file') {
+                                                const currentFile = newRecordValues[prop.id];
+                                                let fileInfo = null;
+                                                try {
+                                                    fileInfo = currentFile ? JSON.parse(currentFile) : null;
+                                                } catch (e) {}
+                                                
+                                                return (
+                                                    <div key={prop.id}>
+                                                        <label className="block text-sm font-medium text-slate-700 mb-1">{prop.name}</label>
+                                                        <div className="space-y-2">
+                                                            {fileInfo && (
+                                                                <div className="flex items-center gap-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
+                                                                    <Paperclip size={16} className="text-purple-500" />
+                                                                    <span className="text-sm text-purple-800 truncate flex-1">
+                                                                        {fileInfo.originalName || fileInfo.filename}
+                                                                    </span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setNewRecordValues({ ...newRecordValues, [prop.id]: '' })}
+                                                                        className="p-1 hover:bg-purple-200 rounded transition-colors"
+                                                                    >
+                                                                        <X size={14} className="text-purple-600" />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                            <div className="relative">
+                                                                <input
+                                                                    type="file"
+                                                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.jpg,.jpeg,.png,.gif"
+                                                                    onChange={(e) => {
+                                                                        const file = e.target.files?.[0];
+                                                                        if (file) handleFileUpload(prop.id, file);
+                                                                    }}
+                                                                    className="hidden"
+                                                                    id={`file-input-${prop.id}`}
+                                                                    disabled={uploadingFiles[prop.id]}
+                                                                />
+                                                                <label
+                                                                    htmlFor={`file-input-${prop.id}`}
+                                                                    className={`flex items-center justify-center gap-2 w-full px-3 py-2 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-colors ${uploadingFiles[prop.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                                >
+                                                                    {uploadingFiles[prop.id] ? (
+                                                                        <>
+                                                                            <Loader2 size={16} className="animate-spin text-purple-500" />
+                                                                            <span className="text-sm text-slate-500">Uploading...</span>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Paperclip size={16} className="text-slate-400" />
+                                                                            <span className="text-sm text-slate-500">
+                                                                                {fileInfo ? 'Replace file' : 'Choose file'}
+                                                                            </span>
+                                                                        </>
+                                                                    )}
+                                                                </label>
+                                                            </div>
+                                                            <p className="text-xs text-slate-500">PDF, Word, Excel, images, or text files (max 50MB)</p>
+                                                        </div>
                                                     </div>
                                                 );
                                             }

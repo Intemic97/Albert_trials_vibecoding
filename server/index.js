@@ -1,6 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+const pdfParse = require('pdf-parse');
 const { initDb } = require('./db');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const cookieParser = require('cookie-parser');
@@ -8,6 +11,48 @@ const { register, login, logout, authenticateToken, getMe, getOrganizations, swi
 
 const app = express();
 const PORT = 3001;
+
+// Configure multer for file uploads
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadsDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, uniqueSuffix + ext);
+    }
+});
+
+const upload = multer({
+    storage,
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+    fileFilter: (req, file, cb) => {
+        // Allow common file types
+        const allowedTypes = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'text/plain',
+            'text/csv',
+            'image/jpeg',
+            'image/png',
+            'image/gif'
+        ];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('File type not allowed'), false);
+        }
+    }
+});
 
 app.use(cors({
     origin: 'http://localhost:5173', // Vite default port
@@ -41,6 +86,124 @@ app.get('/api/auth/organizations', authenticateToken, getOrganizations);
 app.post('/api/auth/switch-org', authenticateToken, switchOrganization);
 app.get('/api/organization/users', authenticateToken, getOrganizationUsers);
 app.post('/api/organization/invite', authenticateToken, inviteUser);
+
+// File Upload Endpoint
+app.post('/api/upload', authenticateToken, upload.single('file'), (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+        
+        // Return file info
+        res.json({
+            filename: req.file.filename,
+            originalName: req.file.originalname,
+            size: req.file.size,
+            mimetype: req.file.mimetype,
+            url: `/api/files/${req.file.filename}`
+        });
+    } catch (error) {
+        console.error('Error uploading file:', error);
+        res.status(500).json({ error: 'Failed to upload file' });
+    }
+});
+
+// File Serve Endpoint
+app.get('/api/files/:filename', (req, res) => {
+    const { filename } = req.params;
+    const filePath = path.join(uploadsDir, filename);
+    
+    // Security check: prevent directory traversal
+    if (!filePath.startsWith(uploadsDir)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'File not found' });
+    }
+    
+    res.sendFile(filePath);
+});
+
+// File Download Endpoint (forces download with original name)
+app.get('/api/files/:filename/download', async (req, res) => {
+    const { filename } = req.params;
+    const { originalName } = req.query;
+    const filePath = path.join(uploadsDir, filename);
+    
+    // Security check: prevent directory traversal
+    if (!filePath.startsWith(uploadsDir)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'File not found' });
+    }
+    
+    res.download(filePath, originalName || filename);
+});
+
+// Helper function to extract text from files
+async function extractFileContent(filename) {
+    const filePath = path.join(uploadsDir, filename);
+    
+    if (!fs.existsSync(filePath)) {
+        return null;
+    }
+    
+    const ext = path.extname(filename).toLowerCase();
+    
+    try {
+        if (ext === '.pdf') {
+            const dataBuffer = fs.readFileSync(filePath);
+            const data = await pdfParse(dataBuffer);
+            return {
+                type: 'pdf',
+                text: data.text,
+                pages: data.numpages,
+                info: data.info
+            };
+        } else if (ext === '.txt' || ext === '.csv') {
+            const text = fs.readFileSync(filePath, 'utf8');
+            return {
+                type: ext.slice(1),
+                text: text
+            };
+        } else {
+            // For other file types, return info only
+            return {
+                type: ext.slice(1),
+                text: null,
+                message: 'Text extraction not supported for this file type'
+            };
+        }
+    } catch (error) {
+        console.error('Error extracting file content:', error);
+        return {
+            type: ext.slice(1),
+            text: null,
+            error: error.message
+        };
+    }
+}
+
+// File Content Extraction Endpoint
+app.get('/api/files/:filename/content', authenticateToken, async (req, res) => {
+    const { filename } = req.params;
+    const filePath = path.join(uploadsDir, filename);
+    
+    // Security check: prevent directory traversal
+    if (!filePath.startsWith(uploadsDir)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'File not found' });
+    }
+    
+    const content = await extractFileContent(filename);
+    res.json(content);
+});
 
 // GET all entities (with properties)
 app.get('/api/entities', authenticateToken, async (req, res) => {
@@ -363,6 +526,27 @@ app.post('/api/generate', authenticateToken, async (req, res) => {
                         let value = v.value;
                         if (prop && prop.type === 'relation' && prop.relatedEntityId) {
                             value = await resolveRelationValue(db, v.value, prop.relatedEntityId);
+                        } else if (prop && prop.type === 'file' && v.value) {
+                            // Extract file content for file type properties
+                            try {
+                                const fileData = JSON.parse(v.value);
+                                if (fileData && fileData.filename) {
+                                    const fileContent = await extractFileContent(fileData.filename);
+                                    if (fileContent && fileContent.text) {
+                                        value = {
+                                            filename: fileData.originalName || fileData.filename,
+                                            content: fileContent.text.substring(0, 50000) // Limit to ~50k chars to avoid token limits
+                                        };
+                                    } else {
+                                        value = {
+                                            filename: fileData.originalName || fileData.filename,
+                                            content: '[File content could not be extracted]'
+                                        };
+                                    }
+                                }
+                            } catch (e) {
+                                console.error('Error processing file value:', e);
+                            }
                         }
 
                         valuesMap[key] = value;
@@ -646,6 +830,27 @@ app.post('/api/generate-widget', authenticateToken, async (req, res) => {
                         let value = v.value;
                         if (prop && prop.type === 'relation' && prop.relatedEntityId) {
                             value = await resolveRelationValue(db, v.value, prop.relatedEntityId);
+                        } else if (prop && prop.type === 'file' && v.value) {
+                            // Extract file content for file type properties
+                            try {
+                                const fileData = JSON.parse(v.value);
+                                if (fileData && fileData.filename) {
+                                    const fileContent = await extractFileContent(fileData.filename);
+                                    if (fileContent && fileContent.text) {
+                                        value = {
+                                            filename: fileData.originalName || fileData.filename,
+                                            content: fileContent.text.substring(0, 50000)
+                                        };
+                                    } else {
+                                        value = {
+                                            filename: fileData.originalName || fileData.filename,
+                                            content: '[File content could not be extracted]'
+                                        };
+                                    }
+                                }
+                            } catch (e) {
+                                console.error('Error processing file value:', e);
+                            }
                         }
 
                         valuesMap[key] = value;
