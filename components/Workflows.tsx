@@ -84,7 +84,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'trigger', label: 'Manual Trigger', icon: Play, description: 'Manually start the workflow', category: 'Triggers' },
     { type: 'trigger', label: 'Schedule', icon: Workflow, description: 'Run on a specific schedule', category: 'Triggers' },
     { type: 'fetchData', label: 'Fetch Data', icon: Database, description: 'Get records from an entity', category: 'Data' },
-    { type: 'saveRecords', label: 'Save Records', icon: Database, description: 'Create or update records', category: 'Data' },
+    { type: 'saveRecords', label: 'Save to Database', icon: Database, description: 'Create or update records', category: 'Data' },
     { type: 'equipment', label: 'Equipment', icon: Wrench, description: 'Use specific equipment data', category: 'Data' },
     { type: 'http', label: 'HTTP Request', icon: Globe, description: 'Fetch data from an external API', category: 'Data' },
     { type: 'esios', label: 'Energy Prices', icon: Zap, description: 'Fetch prices from Red Eléctrica', category: 'Data' },
@@ -2318,7 +2318,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         {configuringClimatiqNodeId && (
                             <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringClimatiqNodeId(null)}>
                                 <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-slate-800 mb-4">🌱 Ask AI about the activity</h3>
+                                    <h3 className="text-lg font-bold text-slate-800 mb-2">🌱 Get Emission Factors</h3>
+                                    <p className="text-sm text-slate-600 mb-4">Search emission factors in the Climatiq database, to calculate your process and company emissions.</p>
                                     <div className="mb-4">
                                         <div className="flex gap-2">
                                             <input
@@ -2395,7 +2396,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     {/* No results message */}
                                     {!climatiqSearching && climatiqSearchResults.length === 0 && climatiqQuery && (
                                         <div className="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200 text-center text-slate-600 text-sm">
-                                            Click "Search" to find emission factors
+                                            Introduce your activity and click search
                                         </div>
                                     )}
 
@@ -2706,7 +2707,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         {configuringSaveNodeId && (
                             <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringSaveNodeId(null)}>
                                 <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-slate-800 mb-4">Save Records to Entity</h3>
+                                    <h3 className="text-lg font-bold text-slate-800 mb-4">Save to Database</h3>
                                     <div className="mb-4">
                                         <label className="block text-sm font-medium text-slate-700 mb-2">
                                             Select Entity

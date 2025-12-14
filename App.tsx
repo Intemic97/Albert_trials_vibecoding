@@ -55,6 +55,18 @@ function AuthenticatedApp() {
     // Editing Schema State (for editing records from side panel)
     const [editingSchema, setEditingSchema] = useState<Entity | null>(null);
 
+    // Incoming Relation Edit State (for standalone modal - keeping for potential future use)
+    const [editingIncomingRelation, setEditingIncomingRelation] = useState<{
+        targetRecordId: string;
+        sourceEntity: Entity;
+        sourceProperty: Property;
+        sourceRecords: any[];
+        selectedSourceRecordIds: string[];
+    } | null>(null);
+
+    // Incoming relations selections when editing a record
+    const [editingIncomingSelections, setEditingIncomingSelections] = useState<Record<string, string[]>>({});
+
     // File Upload State
     const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
 
@@ -342,9 +354,47 @@ function AuthenticatedApp() {
                     }),
                     credentials: 'include'
                 });
+
+                // Save incoming relation changes
+                for (const [propId, { records: sourceRecords, sourceProperty }] of Object.entries(incomingData)) {
+                    const selectedIds = editingIncomingSelections[propId] || [];
+                    
+                    for (const sourceRecord of sourceRecords) {
+                        const currentVal = sourceRecord.values[sourceProperty.id];
+                        let currentIds: string[] = [];
+                        
+                        try {
+                            const parsed = JSON.parse(currentVal || '[]');
+                            currentIds = Array.isArray(parsed) ? parsed : [];
+                        } catch {
+                            currentIds = currentVal ? [currentVal] : [];
+                        }
+
+                        const isCurrentlyLinked = currentIds.includes(editingRecordId);
+                        const shouldBeLinked = selectedIds.includes(sourceRecord.id);
+
+                        if (isCurrentlyLinked !== shouldBeLinked) {
+                            let newIds: string[];
+                            if (shouldBeLinked) {
+                                newIds = [...currentIds, editingRecordId];
+                            } else {
+                                newIds = currentIds.filter(id => id !== editingRecordId);
+                            }
+
+                            await fetch(`${API_BASE}/records/${sourceRecord.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    values: { [sourceProperty.id]: JSON.stringify(newIds) }
+                                }),
+                                credentials: 'include'
+                            });
+                        }
+                    }
+                }
             } else {
                 // Create new record
-                await fetch(`${API_BASE}/records`, {
+                const createResponse = await fetch(`${API_BASE}/records`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -353,6 +403,45 @@ function AuthenticatedApp() {
                     }),
                     credentials: 'include'
                 });
+
+                // Save incoming relation changes for new record
+                if (createResponse.ok) {
+                    const createData = await createResponse.json();
+                    const newRecordId = createData.id;
+
+                    if (newRecordId && Object.keys(editingIncomingSelections).length > 0) {
+                        for (const [propId, { records: sourceRecords, sourceProperty }] of Object.entries(incomingData)) {
+                            const selectedIds = editingIncomingSelections[propId] || [];
+                            
+                            for (const sourceRecord of sourceRecords) {
+                                const shouldBeLinked = selectedIds.includes(sourceRecord.id);
+
+                                if (shouldBeLinked) {
+                                    const currentVal = sourceRecord.values[sourceProperty.id];
+                                    let currentIds: string[] = [];
+                                    
+                                    try {
+                                        const parsed = JSON.parse(currentVal || '[]');
+                                        currentIds = Array.isArray(parsed) ? parsed : [];
+                                    } catch {
+                                        currentIds = currentVal ? [currentVal] : [];
+                                    }
+
+                                    const newIds = [...currentIds, newRecordId];
+
+                                    await fetch(`${API_BASE}/records/${sourceRecord.id}`, {
+                                        method: 'PUT',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            values: { [sourceProperty.id]: JSON.stringify(newIds) }
+                                        }),
+                                        credentials: 'include'
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Refresh all data to ensure consistency
@@ -366,6 +455,7 @@ function AuthenticatedApp() {
             setEditingRecordId(null);
             setEditingSchema(null);
             setNewRecordValues({});
+            setEditingIncomingSelections({});
         } catch (error) {
             console.error('Error saving record:', error);
         }
@@ -392,9 +482,28 @@ function AuthenticatedApp() {
             }
         });
 
+        // Prepare incoming relation selections
+        const incomingSelections: Record<string, string[]> = {};
+        Object.entries(incomingData).forEach(([propId, { records: sourceRecords, sourceProperty }]) => {
+            const linkedRecordIds = sourceRecords
+                .filter(r => {
+                    const val = r.values[sourceProperty.id];
+                    if (!val) return false;
+                    try {
+                        const ids = JSON.parse(val);
+                        return Array.isArray(ids) && ids.includes(record.id);
+                    } catch {
+                        return val === record.id;
+                    }
+                })
+                .map(r => r.id);
+            incomingSelections[propId] = linkedRecordIds;
+        });
+
         setNewRecordValues(values);
         setEditingRecordId(record.id);
         setEditingSchema(schema);
+        setEditingIncomingSelections(incomingSelections);
         setIsAddingRecord(true);
     };
 
@@ -407,6 +516,90 @@ function AuthenticatedApp() {
             await fetchRecords();
         } catch (error) {
             console.error('Error deleting record:', error);
+        }
+    };
+
+    // Open incoming relation edit modal
+    const openIncomingRelationEdit = (
+        targetRecordId: string,
+        sourceEntity: Entity,
+        sourceProperty: Property,
+        sourceRecords: any[]
+    ) => {
+        // Find which source records currently link to this target record
+        const selectedIds = sourceRecords
+            .filter(r => {
+                const val = r.values[sourceProperty.id];
+                if (!val) return false;
+                try {
+                    const ids = JSON.parse(val);
+                    return Array.isArray(ids) && ids.includes(targetRecordId);
+                } catch {
+                    return val === targetRecordId;
+                }
+            })
+            .map(r => r.id);
+
+        setEditingIncomingRelation({
+            targetRecordId,
+            sourceEntity,
+            sourceProperty,
+            sourceRecords,
+            selectedSourceRecordIds: selectedIds
+        });
+    };
+
+    // Save incoming relation changes
+    const saveIncomingRelationChanges = async () => {
+        if (!editingIncomingRelation) return;
+
+        const { targetRecordId, sourceProperty, sourceRecords, selectedSourceRecordIds } = editingIncomingRelation;
+
+        try {
+            // For each source record, update its relation value
+            for (const sourceRecord of sourceRecords) {
+                const currentVal = sourceRecord.values[sourceProperty.id];
+                let currentIds: string[] = [];
+                
+                try {
+                    const parsed = JSON.parse(currentVal || '[]');
+                    currentIds = Array.isArray(parsed) ? parsed : [];
+                } catch {
+                    currentIds = currentVal ? [currentVal] : [];
+                }
+
+                const isCurrentlyLinked = currentIds.includes(targetRecordId);
+                const shouldBeLinked = selectedSourceRecordIds.includes(sourceRecord.id);
+
+                if (isCurrentlyLinked !== shouldBeLinked) {
+                    let newIds: string[];
+                    if (shouldBeLinked) {
+                        // Add targetRecordId to this source record's relation
+                        newIds = [...currentIds, targetRecordId];
+                    } else {
+                        // Remove targetRecordId from this source record's relation
+                        newIds = currentIds.filter(id => id !== targetRecordId);
+                    }
+
+                    // Update the source record
+                    await fetch(`${API_BASE}/records/${sourceRecord.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            values: { [sourceProperty.id]: JSON.stringify(newIds) }
+                        }),
+                        credentials: 'include'
+                    });
+                }
+            }
+
+            // Refresh data
+            await fetchRecords();
+            await fetchIncomingData();
+            setEditingIncomingRelation(null);
+        } catch (error) {
+            console.error('Error saving incoming relation:', error);
+            alert('Failed to save changes');
         }
     };
 
@@ -971,17 +1164,26 @@ function AuthenticatedApp() {
                                                     <h2 className="text-lg font-semibold text-slate-800">Data Records</h2>
                                                     <p className="text-sm text-slate-500">Manage the actual data for this entity.</p>
                                                 </div>
-                                                <button
-                                                    onClick={() => {
-                                                        setEditingRecordId(null);
-                                                        setNewRecordValues({});
-                                                        setIsAddingRecord(true);
-                                                    }}
-                                                    className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-sm transition-colors"
-                                                >
-                                                    <Plus size={16} className="mr-2" />
-                                                    Add Record
-                                                </button>
+                                                <div className="relative group/addrecord">
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingRecordId(null);
+                                                            setNewRecordValues({});
+                                                            setIsAddingRecord(true);
+                                                        }}
+                                                        disabled={activeEntity.properties.length === 0}
+                                                        className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
+                                                    >
+                                                        <Plus size={16} className="mr-2" />
+                                                        Add Record
+                                                    </button>
+                                                    {activeEntity.properties.length === 0 && (
+                                                        <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/addrecord:opacity-100 transition-opacity pointer-events-none z-50">
+                                                            Add properties to your entity to start adding records
+                                                            <div className="absolute top-full right-4 border-4 border-transparent border-t-slate-900"></div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
 
                                             <div className="overflow-x-auto">
@@ -1005,8 +1207,10 @@ function AuthenticatedApp() {
                                                     <tbody className="divide-y divide-slate-100">
                                                         {records.length === 0 ? (
                                                             <tr>
-                                                                <td colSpan={activeEntity.properties.length + 1 + Object.keys(incomingData).length} className="p-12 text-center text-slate-500">
-                                                                    No records found. Click "Add Record" to create one.
+                                                                <td colSpan={Math.max(activeEntity.properties.length, 1) + 1 + Object.keys(incomingData).length} className="p-12 text-center text-slate-500">
+                                                                    {activeEntity.properties.length === 0 
+                                                                        ? 'Add properties to your entity first, then you can start adding records.'
+                                                                        : 'No records found. Click "Add Record" to create one.'}
                                                                 </td>
                                                             </tr>
                                                         ) : (
@@ -1293,11 +1497,48 @@ function AuthenticatedApp() {
                                                 </div>
                                             );
                                         })}
+
+                                        {/* Incoming Relations Section */}
+                                        {Object.keys(incomingData).length > 0 && (
+                                            <>
+                                                <div className="border-t border-slate-200 pt-4 mt-4">
+                                                    <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-3">
+                                                        Incoming Relations
+                                                    </p>
+                                                </div>
+                                                {Object.entries(incomingData).map(([propId, { sourceEntity, sourceProperty, records: sourceRecords }]) => (
+                                                    <div key={propId}>
+                                                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                            {sourceEntity.name} <span className="text-slate-400 font-normal">({sourceProperty.name})</span>
+                                                        </label>
+                                                        <select
+                                                            multiple
+                                                            value={editingIncomingSelections[propId] || []}
+                                                            onChange={(e) => {
+                                                                const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+                                                                setEditingIncomingSelections(prev => ({
+                                                                    ...prev,
+                                                                    [propId]: selectedOptions
+                                                                }));
+                                                            }}
+                                                            className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none min-h-[100px]"
+                                                        >
+                                                            {sourceRecords.map(rec => (
+                                                                <option key={rec.id} value={rec.id}>
+                                                                    {getRecordDisplayName(rec, sourceEntity)}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        <p className="text-xs text-slate-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+                                                    </div>
+                                                ))}
+                                            </>
+                                        )}
                                     </div>
 
                                     <div className="flex justify-end space-x-3 mt-6">
                                         <button
-                                            onClick={() => { setIsAddingRecord(false); setNewRecordValues({}); setEditingRecordId(null); setEditingSchema(null); }}
+                                            onClick={() => { setIsAddingRecord(false); setNewRecordValues({}); setEditingRecordId(null); setEditingSchema(null); setEditingIncomingSelections({}); }}
                                             className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
                                         >
                                             Cancel
@@ -1307,6 +1548,72 @@ function AuthenticatedApp() {
                                             className="px-4 py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 transition-colors"
                                         >
                                             {editingRecordId ? 'Save Changes' : 'Add Record'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Edit Incoming Relation Modal */}
+                        {editingIncomingRelation && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+                                <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+                                    <h2 className="text-xl font-bold text-slate-800 mb-2">
+                                        Edit Relation
+                                    </h2>
+                                    <p className="text-sm text-slate-500 mb-4">
+                                        Select which <span className="font-medium text-indigo-600">{editingIncomingRelation.sourceEntity.name}</span> records 
+                                        should link to this record via <span className="font-medium">{editingIncomingRelation.sourceProperty.name}</span>
+                                    </p>
+
+                                    <div className="max-h-[300px] overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                                        {editingIncomingRelation.sourceRecords.length === 0 ? (
+                                            <div className="p-4 text-center text-slate-500 text-sm">
+                                                No records available in {editingIncomingRelation.sourceEntity.name}
+                                            </div>
+                                        ) : (
+                                            editingIncomingRelation.sourceRecords.map(record => {
+                                                const isSelected = editingIncomingRelation.selectedSourceRecordIds.includes(record.id);
+                                                return (
+                                                    <label
+                                                        key={record.id}
+                                                        className={`flex items-center p-3 cursor-pointer hover:bg-slate-50 transition-colors ${isSelected ? 'bg-indigo-50' : ''}`}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected}
+                                                            onChange={(e) => {
+                                                                setEditingIncomingRelation(prev => {
+                                                                    if (!prev) return null;
+                                                                    const newIds = e.target.checked
+                                                                        ? [...prev.selectedSourceRecordIds, record.id]
+                                                                        : prev.selectedSourceRecordIds.filter(id => id !== record.id);
+                                                                    return { ...prev, selectedSourceRecordIds: newIds };
+                                                                });
+                                                            }}
+                                                            className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                                                        />
+                                                        <span className={`ml-3 text-sm ${isSelected ? 'text-indigo-800 font-medium' : 'text-slate-700'}`}>
+                                                            {getRecordDisplayName(record, editingIncomingRelation.sourceEntity)}
+                                                        </span>
+                                                    </label>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+
+                                    <div className="flex justify-end space-x-3 mt-6">
+                                        <button
+                                            onClick={() => setEditingIncomingRelation(null)}
+                                            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveIncomingRelationChanges}
+                                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+                                        >
+                                            Save Changes
                                         </button>
                                     </div>
                                 </div>
