@@ -2586,72 +2586,117 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         })()}
 
                         {/* Condition Configuration Modal */}
-                        {configuringConditionNodeId && (
-                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringConditionNodeId(null)}>
-                                <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-slate-800 mb-4">Configure Condition</h3>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                                Field Name
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={conditionField}
-                                                onChange={(e) => setConditionField(e.target.value)}
-                                                placeholder="e.g., status, price, name"
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                                Operator
-                                            </label>
-                                            <select
-                                                value={conditionOperator}
-                                                onChange={(e) => setConditionOperator(e.target.value)}
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                            >
-                                                <option value="isText">Is Text</option>
-                                                <option value="isNumber">Is Number</option>
-                                                <option value="equals">Equals</option>
-                                                <option value="greaterThan">Greater Than</option>
-                                                <option value="lessThan">Less Than</option>
-                                            </select>
-                                        </div>
-                                        {['equals', 'greaterThan', 'lessThan'].includes(conditionOperator) && (
+                        {configuringConditionNodeId && (() => {
+                            // Find the parent node to get available fields
+                            const parentConnection = connections.find(c => c.toNodeId === configuringConditionNodeId);
+                            const parentNode = parentConnection ? nodes.find(n => n.id === parentConnection.fromNodeId) : null;
+                            const parentOutputData = parentNode?.outputData || parentNode?.data || [];
+                            
+                            // Extract field names from the parent's output data
+                            const availableFields: string[] = [];
+                            if (Array.isArray(parentOutputData) && parentOutputData.length > 0) {
+                                const firstRecord = parentOutputData[0];
+                                if (firstRecord && typeof firstRecord === 'object') {
+                                    Object.keys(firstRecord).forEach(key => {
+                                        if (!availableFields.includes(key)) {
+                                            availableFields.push(key);
+                                        }
+                                    });
+                                }
+                            }
+                            
+                            const hasAvailableFields = availableFields.length > 0;
+                            
+                            return (
+                                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringConditionNodeId(null)}>
+                                    <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
+                                        <h3 className="text-lg font-bold text-slate-800 mb-4">Configure Condition</h3>
+                                        <div className="space-y-4">
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                                                    Value
+                                                    Field Name
                                                 </label>
-                                                <input
-                                                    type="text"
-                                                    value={conditionValue}
-                                                    onChange={(e) => setConditionValue(e.target.value)}
-                                                    placeholder="Comparison value"
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                                />
+                                                {hasAvailableFields ? (
+                                                    <>
+                                                        <select
+                                                            value={conditionField}
+                                                            onChange={(e) => setConditionField(e.target.value)}
+                                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                                        >
+                                                            <option value="">Select a field...</option>
+                                                            {availableFields.map(field => (
+                                                                <option key={field} value={field}>{field}</option>
+                                                            ))}
+                                                        </select>
+                                                        <p className="text-xs text-slate-500 mt-1">
+                                                            Fields from {parentNode?.label || 'previous node'}
+                                                        </p>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <input
+                                                            type="text"
+                                                            value={conditionField}
+                                                            onChange={(e) => setConditionField(e.target.value)}
+                                                            placeholder="e.g., status, price, name"
+                                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                                        />
+                                                        <p className="text-xs text-amber-600 mt-1">
+                                                            ⚠️ Run the previous node first to see available fields
+                                                        </p>
+                                                    </>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="flex gap-2 justify-end mt-6">
-                                        <button
-                                            onClick={() => setConfiguringConditionNodeId(null)}
-                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={saveConditionConfig}
-                                            disabled={!conditionField}
-                                            className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 text-sm font-medium"
-                                        >
-                                            Save
-                                        </button>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                    Operator
+                                                </label>
+                                                <select
+                                                    value={conditionOperator}
+                                                    onChange={(e) => setConditionOperator(e.target.value)}
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                                >
+                                                    <option value="isText">Is Text</option>
+                                                    <option value="isNumber">Is Number</option>
+                                                    <option value="equals">Equals</option>
+                                                    <option value="greaterThan">Greater Than</option>
+                                                    <option value="lessThan">Less Than</option>
+                                                </select>
+                                            </div>
+                                            {['equals', 'greaterThan', 'lessThan'].includes(conditionOperator) && (
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                        Value
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={conditionValue}
+                                                        onChange={(e) => setConditionValue(e.target.value)}
+                                                        placeholder="Comparison value"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-2 justify-end mt-6">
+                                            <button
+                                                onClick={() => setConfiguringConditionNodeId(null)}
+                                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveConditionConfig}
+                                                disabled={!conditionField}
+                                                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 text-sm font-medium"
+                                            >
+                                                Save
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })()}
 
                         {/* Add Field Configuration Modal */}
                         {configuringAddFieldNodeId && (

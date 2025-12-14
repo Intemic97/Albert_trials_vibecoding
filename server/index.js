@@ -639,6 +639,99 @@ app.post('/api/generate', authenticateToken, async (req, res) => {
                     contextData[result.name] = result.data;
                 }
             });
+
+            // 2. Fetch related entities (both outgoing and incoming relations)
+            const relatedEntityIds = new Set();
+            
+            // Find outgoing relations (entities this entity links TO)
+            for (const entityId of mentionedEntityIds) {
+                const relationProps = await db.all(
+                    'SELECT relatedEntityId FROM properties WHERE entityId = ? AND type = ? AND relatedEntityId IS NOT NULL',
+                    [entityId, 'relation']
+                );
+                relationProps.forEach(p => relatedEntityIds.add(p.relatedEntityId));
+            }
+
+            // Find incoming relations (entities that link TO this entity)
+            for (const entityId of mentionedEntityIds) {
+                const incomingProps = await db.all(
+                    'SELECT DISTINCT entityId FROM properties WHERE type = ? AND relatedEntityId = ?',
+                    ['relation', entityId]
+                );
+                incomingProps.forEach(p => relatedEntityIds.add(p.entityId));
+            }
+
+            // Remove already mentioned entities
+            mentionedEntityIds.forEach(id => relatedEntityIds.delete(id));
+
+            // Fetch data for related entities
+            if (relatedEntityIds.size > 0) {
+                console.log('Found related entities:', Array.from(relatedEntityIds));
+                
+                const relatedPromises = Array.from(relatedEntityIds).map(async (entityId) => {
+                    const entity = await db.get('SELECT * FROM entities WHERE id = ? AND organizationId = ?', [entityId, req.user.orgId]);
+                    if (!entity) return null;
+
+                    const properties = await db.all('SELECT * FROM properties WHERE entityId = ?', [entityId]);
+                    const records = await db.all('SELECT * FROM records WHERE entityId = ? LIMIT 50', [entityId]);
+
+                    const recordsWithValues = await Promise.all(records.map(async (r) => {
+                        const values = await db.all('SELECT * FROM record_values WHERE recordId = ?', [r.id]);
+                        const valuesMap = {};
+
+                        await Promise.all(values.map(async v => {
+                            const prop = properties.find(p => p.id === v.propertyId);
+                            const key = prop ? prop.name : v.propertyId;
+
+                            let value = v.value;
+                            if (prop && prop.type === 'relation' && prop.relatedEntityId) {
+                                value = await resolveRelationValue(db, v.value, prop.relatedEntityId);
+                            } else if (prop && prop.type === 'file' && v.value) {
+                                try {
+                                    const fileData = JSON.parse(v.value);
+                                    if (fileData && fileData.filename) {
+                                        const fileContent = await extractFileContent(fileData.filename);
+                                        if (fileContent && fileContent.text) {
+                                            value = {
+                                                filename: fileData.originalName || fileData.filename,
+                                                content: fileContent.text.substring(0, 50000)
+                                            };
+                                        } else {
+                                            value = {
+                                                filename: fileData.originalName || fileData.filename,
+                                                content: '[File content could not be extracted]'
+                                            };
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.error('Error processing file value:', e);
+                                }
+                            }
+
+                            valuesMap[key] = value;
+                        }));
+
+                        return { id: r.id, createdAt: r.createdAt, ...valuesMap };
+                    }));
+
+                    return {
+                        name: entity.name,
+                        data: {
+                            description: entity.description,
+                            properties: properties.map(p => ({ name: p.name, type: p.type, relatedTo: p.relatedEntityId ? 'linked' : null })),
+                            records: recordsWithValues,
+                            _isRelatedEntity: true
+                        }
+                    };
+                });
+
+                const relatedResults = await Promise.all(relatedPromises);
+                relatedResults.forEach(result => {
+                    if (result && !contextData[result.name]) {
+                        contextData[result.name] = result.data;
+                    }
+                });
+            }
         }
         console.timeEnd('DB Fetch Time');
         console.log('Context Data Keys:', Object.keys(contextData));
@@ -928,6 +1021,66 @@ app.post('/api/generate-widget', authenticateToken, async (req, res) => {
             });
             const results = await Promise.all(entityPromises);
             results.forEach(result => { if (result) contextData[result.name] = result.data; });
+
+            // Fetch related entities (both outgoing and incoming relations)
+            const relatedEntityIds = new Set();
+            
+            for (const entityId of mentionedEntityIds) {
+                const relationProps = await db.all(
+                    'SELECT relatedEntityId FROM properties WHERE entityId = ? AND type = ? AND relatedEntityId IS NOT NULL',
+                    [entityId, 'relation']
+                );
+                relationProps.forEach(p => relatedEntityIds.add(p.relatedEntityId));
+            }
+
+            for (const entityId of mentionedEntityIds) {
+                const incomingProps = await db.all(
+                    'SELECT DISTINCT entityId FROM properties WHERE type = ? AND relatedEntityId = ?',
+                    ['relation', entityId]
+                );
+                incomingProps.forEach(p => relatedEntityIds.add(p.entityId));
+            }
+
+            mentionedEntityIds.forEach(id => relatedEntityIds.delete(id));
+
+            if (relatedEntityIds.size > 0) {
+                const relatedPromises = Array.from(relatedEntityIds).map(async (entityId) => {
+                    const entity = await db.get('SELECT * FROM entities WHERE id = ? AND organizationId = ?', [entityId, req.user.orgId]);
+                    if (!entity) return null;
+
+                    const properties = await db.all('SELECT * FROM properties WHERE entityId = ?', [entityId]);
+                    const records = await db.all('SELECT * FROM records WHERE entityId = ? LIMIT 50', [entityId]);
+
+                    const recordsWithValues = await Promise.all(records.map(async (r) => {
+                        const values = await db.all('SELECT * FROM record_values WHERE recordId = ?', [r.id]);
+                        const valuesMap = {};
+
+                        await Promise.all(values.map(async v => {
+                            const prop = properties.find(p => p.id === v.propertyId);
+                            const key = prop ? prop.name : v.propertyId;
+                            let value = v.value;
+                            if (prop && prop.type === 'relation' && prop.relatedEntityId) {
+                                value = await resolveRelationValue(db, v.value, prop.relatedEntityId);
+                            }
+                            valuesMap[key] = value;
+                        }));
+
+                        return { id: r.id, ...valuesMap };
+                    }));
+
+                    return {
+                        name: entity.name,
+                        data: { properties: properties.map(p => ({ name: p.name, type: p.type })), records: recordsWithValues }
+                    };
+                });
+
+                const relatedResults = await Promise.all(relatedPromises);
+                relatedResults.forEach(result => {
+                    if (result && !contextData[result.name]) {
+                        contextData[result.name] = result.data;
+                    }
+                });
+            }
         }
 
         // 2. Call OpenAI for Widget Config
