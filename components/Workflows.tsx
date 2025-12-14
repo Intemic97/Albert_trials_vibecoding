@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu } from './ProfileMenu';
 import { API_BASE } from '../config';
@@ -19,7 +19,7 @@ const generateUUID = (): string => {
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join';
     label: string;
     x: number;
     y: number;
@@ -57,10 +57,16 @@ interface WorkflowNode {
         assignedUserId?: string;
         assignedUserName?: string;
         approvalStatus?: 'pending' | 'approved' | 'rejected';
+        // For join nodes:
+        joinStrategy?: 'concat' | 'mergeByKey';
+        joinType?: 'inner' | 'outer';  // inner = only matching, outer = all records
+        joinKey?: string;
     };
     executionResult?: string;
     data?: any;
     inputData?: any;
+    inputDataA?: any;  // For join nodes - input from port A
+    inputDataB?: any;  // For join nodes - input from port B
     outputData?: any;
     conditionResult?: boolean;  // Store evaluation result
 }
@@ -70,10 +76,11 @@ interface Connection {
     fromNodeId: string;
     toNodeId: string;
     outputType?: 'true' | 'false';  // For condition nodes
+    inputPort?: 'A' | 'B';  // For join nodes
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -91,6 +98,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'climatiq', label: 'Emission Factors', icon: Leaf, description: 'Search CO2 emission factors', category: 'Data' },
     { type: 'manualInput', label: 'Manual Data Input', icon: Edit, description: 'Define a variable with a value', category: 'Data' },
     { type: 'condition', label: 'If / Else', icon: AlertCircle, description: 'Branch based on conditions', category: 'Logic' },
+    { type: 'join', label: 'Join', icon: GitMerge, description: 'Combine data from two sources', category: 'Logic' },
     { type: 'llm', label: 'AI Generation', icon: Sparkles, description: 'Generate text using AI', category: 'Logic' },
     { type: 'python', label: 'Python Code', icon: Code, description: 'Run Python script', category: 'Logic' },
     { type: 'addField', label: 'Add Field', icon: CheckCircle, description: 'Add a new field to data', category: 'Logic' },
@@ -152,6 +160,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [pythonCode, setPythonCode] = useState<string>('def process(data):\n    # Modify data here\n    return data');
     const [pythonAiPrompt, setPythonAiPrompt] = useState<string>('');
     const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+
+    // Join Node State
+    const [configuringJoinNodeId, setConfiguringJoinNodeId] = useState<string | null>(null);
+    const [joinStrategy, setJoinStrategy] = useState<'concat' | 'mergeByKey'>('concat');
+    const [joinType, setJoinType] = useState<'inner' | 'outer'>('inner');
+    const [joinKey, setJoinKey] = useState<string>('');
 
     // Manual Input Node State
     const [configuringManualInputNodeId, setConfiguringManualInputNodeId] = useState<string | null>(null);
@@ -450,6 +464,38 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setConfiguringAddFieldNodeId(null);
         setAddFieldName('');
         setAddFieldValue('');
+    };
+
+    const openJoinConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'join') {
+            setConfiguringJoinNodeId(nodeId);
+            setJoinStrategy(node.config?.joinStrategy || 'concat');
+            setJoinType(node.config?.joinType || 'inner');
+            setJoinKey(node.config?.joinKey || '');
+        }
+    };
+
+    const saveJoinConfig = () => {
+        if (!configuringJoinNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringJoinNodeId
+                ? {
+                    ...n,
+                    config: {
+                        ...n.config,
+                        joinStrategy,
+                        joinType,
+                        joinKey
+                    }
+                }
+                : n
+        ));
+        setConfiguringJoinNodeId(null);
+        setJoinStrategy('concat');
+        setJoinType('inner');
+        setJoinKey('');
     };
 
     const openSaveRecordsConfig = (nodeId: string) => {
@@ -1282,6 +1328,103 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         nodeData = [{ error: 'No emission factor selected' }];
                     }
                     break;
+                case 'join':
+                    // Join node - merge data from two inputs
+                    if (inputData && inputData.A && inputData.B) {
+                        const dataA = Array.isArray(inputData.A) ? inputData.A : [inputData.A];
+                        const dataB = Array.isArray(inputData.B) ? inputData.B : [inputData.B];
+                        
+                        const strategy = node.config?.joinStrategy || 'concat';
+                        
+                        if (strategy === 'concat') {
+                            // Simple concatenation
+                            nodeData = [...dataA, ...dataB];
+                            result = `Concatenated ${dataA.length} + ${dataB.length} = ${nodeData.length} records`;
+                        } else if (strategy === 'mergeByKey' && node.config?.joinKey) {
+                            // Merge by common key
+                            const key = node.config.joinKey;
+                            const joinTypeConfig = node.config?.joinType || 'inner';
+                            const merged: any[] = [];
+                            
+                            // Get field names from A and B to detect conflicts and normalize
+                            const fieldsInA = dataA.length > 0 ? Object.keys(dataA[0]) : [];
+                            const fieldsInB = dataB.length > 0 ? Object.keys(dataB[0]) : [];
+                            
+                            // Build the complete set of output fields
+                            const allOutputFields = new Set<string>(fieldsInA);
+                            for (const field of fieldsInB) {
+                                if (field === key) continue; // Key field handled separately
+                                if (fieldsInA.includes(field)) {
+                                    allOutputFields.add(`B_${field}`);
+                                } else {
+                                    allOutputFields.add(field);
+                                }
+                            }
+                            
+                            // Process records from A
+                            for (const recordA of dataA) {
+                                const keyValue = recordA[key];
+                                const matchingB = dataB.find((b: any) => b[key] === keyValue);
+                                
+                                if (matchingB) {
+                                    // Merge fields from B, prefixing conflicting field names
+                                    const mergedRecord: any = { ...recordA };
+                                    for (const [fieldName, fieldValue] of Object.entries(matchingB)) {
+                                        if (fieldName === key) {
+                                            continue; // Skip the join key
+                                        } else if (fieldsInA.includes(fieldName)) {
+                                            mergedRecord[`B_${fieldName}`] = fieldValue;
+                                        } else {
+                                            mergedRecord[fieldName] = fieldValue;
+                                        }
+                                    }
+                                    merged.push(mergedRecord);
+                                } else if (joinTypeConfig === 'outer') {
+                                    // Outer join: include unmatched A records with empty B fields
+                                    merged.push(recordA);
+                                }
+                                // Inner join: skip unmatched A records
+                            }
+                            
+                            // For outer join, add unmatched B records
+                            if (joinTypeConfig === 'outer') {
+                                for (const recordB of dataB) {
+                                    const keyValue = recordB[key];
+                                    const existsInA = dataA.some((a: any) => a[key] === keyValue);
+                                    if (!existsInA) {
+                                        const prefixedRecord: any = {};
+                                        for (const [fieldName, fieldValue] of Object.entries(recordB)) {
+                                            if (fieldsInA.includes(fieldName) && fieldName !== key) {
+                                                prefixedRecord[`B_${fieldName}`] = fieldValue;
+                                            } else {
+                                                prefixedRecord[fieldName] = fieldValue;
+                                            }
+                                        }
+                                        merged.push(prefixedRecord);
+                                    }
+                                }
+                            }
+                            
+                            // Normalize all records to have the same columns
+                            const normalizedMerged = merged.map(record => {
+                                const normalized: any = {};
+                                for (const field of allOutputFields) {
+                                    normalized[field] = record[field] !== undefined ? record[field] : '';
+                                }
+                                return normalized;
+                            });
+                            
+                            nodeData = normalizedMerged;
+                            const joinTypeName = joinTypeConfig === 'inner' ? 'Inner' : 'Outer';
+                            result = `${joinTypeName} Join by "${key}": ${nodeData.length} records`;
+                        } else {
+                            nodeData = [...dataA, ...dataB];
+                            result = `Concatenated (no key configured): ${nodeData.length} records`;
+                        }
+                    } else {
+                        result = 'Waiting for both inputs...';
+                    }
+                    break;
                 case 'output':
                     // Output node just displays the input data
                     if (inputData && Array.isArray(inputData) && inputData.length > 0) {
@@ -1343,8 +1486,60 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 : nextConnections;
 
             for (const conn of toExecute) {
-                await executeNode(conn.toNodeId, nodeData);
+                const targetNode = nodes.find(n => n.id === conn.toNodeId);
+                
+                // For join nodes, we need to handle inputs differently
+                if (targetNode?.type === 'join') {
+                    await executeJoinInput(conn.toNodeId, nodeData, conn.inputPort || 'A');
+                } else {
+                    await executeNode(conn.toNodeId, nodeData);
+                }
             }
+        }
+    };
+
+    // Special handler for join node inputs
+    const executeJoinInput = async (nodeId: string, inputData: any, inputPort: 'A' | 'B') => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (!node || node.type !== 'join') return;
+
+        // Store the input data for the appropriate port
+        setNodes(prev => prev.map(n => {
+            if (n.id === nodeId) {
+                const updated = { ...n };
+                if (inputPort === 'A') {
+                    updated.inputDataA = inputData;
+                } else {
+                    updated.inputDataB = inputData;
+                }
+                return updated;
+            }
+            return n;
+        }));
+
+        // Wait for state to update
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Get the updated node to check if both inputs are available
+        // We need to read from the current state
+        const updatedNodes = await new Promise<WorkflowNode[]>(resolve => {
+            setNodes(prev => {
+                resolve(prev);
+                return prev;
+            });
+        });
+
+        const updatedNode = updatedNodes.find(n => n.id === nodeId);
+        
+        // Check if both inputs are now available
+        if (updatedNode?.inputDataA && updatedNode?.inputDataB) {
+            // Both inputs available, execute the join
+            await executeNode(nodeId, { A: updatedNode.inputDataA, B: updatedNode.inputDataB });
+        } else {
+            // Only one input available, mark as waiting
+            setNodes(prev => prev.map(n =>
+                n.id === nodeId ? { ...n, status: 'waiting' as const, executionResult: `Waiting for input ${inputPort === 'A' ? 'B' : 'A'}...` } : n
+            ));
         }
     };
 
@@ -1352,8 +1547,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (isRunning) return;
         setIsRunning(true);
 
-        // Reset all nodes to idle
-        setNodes(prev => prev.map(n => ({ ...n, status: 'idle' as const, executionResult: undefined })));
+        // Reset all nodes to idle (and clear join node inputs)
+        setNodes(prev => prev.map(n => ({ 
+            ...n, 
+            status: 'idle' as const, 
+            executionResult: undefined,
+            inputDataA: undefined,
+            inputDataB: undefined
+        })));
 
         // Find trigger nodes (nodes with no incoming connections)
         const triggerNodes = nodes.filter(node =>
@@ -1377,13 +1578,50 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const handleRunNode = async (nodeId: string) => {
         if (isRunning) return;
 
+        const node = nodes.find(n => n.id === nodeId);
+        
+        // Special handling for join nodes
+        if (node?.type === 'join') {
+            // Use the stored inputDataA and inputDataB
+            if (node.inputDataA && node.inputDataB) {
+                await executeNode(nodeId, { A: node.inputDataA, B: node.inputDataB }, false);
+            } else {
+                // Try to get data from parent nodes
+                const incomingConnections = connections.filter(c => c.toNodeId === nodeId);
+                let dataA = node.inputDataA;
+                let dataB = node.inputDataB;
+                
+                for (const conn of incomingConnections) {
+                    const parentNode = nodes.find(n => n.id === conn.fromNodeId);
+                    if (parentNode?.outputData) {
+                        if (conn.inputPort === 'A') {
+                            dataA = parentNode.outputData;
+                        } else if (conn.inputPort === 'B') {
+                            dataB = parentNode.outputData;
+                        }
+                    }
+                }
+                
+                // Update the node with the new data
+                setNodes(prev => prev.map(n => 
+                    n.id === nodeId ? { ...n, inputDataA: dataA, inputDataB: dataB } : n
+                ));
+                
+                if (dataA && dataB) {
+                    await executeNode(nodeId, { A: dataA, B: dataB }, false);
+                } else {
+                    alert(`Join node needs both inputs. Missing: ${!dataA ? 'A' : ''} ${!dataB ? 'B' : ''}`);
+                }
+            }
+            return;
+        }
+
         // Find input data from parent nodes if available
         const incomingConnections = connections.filter(c => c.toNodeId === nodeId);
         let inputData = null;
 
         if (incomingConnections.length > 0) {
             // Use the data from the first connected parent that has output data
-            // This is a simplification; in a real runner, we might need to wait for all or handle multiple inputs
             for (const conn of incomingConnections) {
                 const parentNode = nodes.find(n => n.id === conn.fromNodeId);
                 if (parentNode && parentNode.outputData) {
@@ -1509,13 +1747,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setDragConnectionCurrent({ x, y });
     };
 
-    const handleConnectorMouseUp = (e: React.MouseEvent, targetNodeId: string) => {
+    const handleConnectorMouseUp = (e: React.MouseEvent, targetNodeId: string, inputPort?: 'A' | 'B') => {
         e.stopPropagation();
         e.preventDefault();
 
         if (dragConnectionStart && dragConnectionStart.nodeId !== targetNodeId) {
             // Complete connection
             let finalOutputType = dragConnectionStart.outputType;
+            let finalInputPort = inputPort;
 
             // If connecting from a condition node and no type was set, ask the user
             // (This is a fallback - users should use the colored TRUE/FALSE connectors)
@@ -1525,11 +1764,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 finalOutputType = choice ? 'true' : 'false';
             }
 
+            // If connecting to a join node and no input port was set, ask the user
+            const toNode = nodes.find(n => n.id === targetNodeId);
+            if (toNode?.type === 'join' && !finalInputPort) {
+                const choice = window.confirm('Use the A or B input connectors on the Join node.\n\nAs fallback: OK = Input A, Cancel = Input B');
+                finalInputPort = choice ? 'A' : 'B';
+            }
+
             const newConnection: Connection = {
                 id: generateUUID(),
                 fromNodeId: dragConnectionStart.nodeId,
                 toNodeId: targetNodeId,
-                outputType: finalOutputType
+                outputType: finalOutputType,
+                inputPort: finalInputPort
             };
             setConnections(prev => [...prev, newConnection]);
         }
@@ -1554,6 +1801,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'addField': return 'bg-indigo-100 border-indigo-300 text-indigo-800';
             case 'saveRecords': return 'bg-emerald-100 border-emerald-300 text-emerald-800';
             case 'llm': return 'bg-violet-100 border-violet-300 text-violet-800';
+            case 'join': return 'bg-cyan-100 border-cyan-300 text-cyan-800';
             case 'comment': return 'bg-amber-50 border-amber-200 text-amber-900';
             default: return 'bg-slate-100 border-slate-300';
         }
@@ -1929,7 +2177,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         }
                                         
                                         const x2 = toNode.x - 96;
-                                        const y2 = toNode.y;
+                                        
+                                        // For join nodes, adjust Y position based on input port
+                                        let y2 = toNode.y;
+                                        if (toNode.type === 'join') {
+                                            if (conn.inputPort === 'A') {
+                                                y2 = toNode.y - 20; // Input A position
+                                            } else if (conn.inputPort === 'B') {
+                                                y2 = toNode.y + 20; // Input B position
+                                            }
+                                        }
 
                                         // Control points for Bezier curve
                                         const c1x = x1 + Math.abs(x2 - x1) / 2;
@@ -2026,6 +2283,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openClimatiqConfig(node.id);
                                             } else if (node.type === 'humanApproval') {
                                                 openHumanApprovalConfig(node.id);
+                                            } else if (node.type === 'join') {
+                                                openJoinConfig(node.id);
                                             }
                                         }}
                                         onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
@@ -2154,6 +2413,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </div>
                                         )}
 
+                                        {node.type === 'join' && (
+                                            <div className="mt-2 text-xs font-medium text-cyan-700">
+                                                {node.config?.joinStrategy === 'mergeByKey' 
+                                                    ? `${node.config?.joinType === 'outer' ? 'Outer' : 'Inner'} Join: ${node.config?.joinKey || 'key not set'}`
+                                                    : 'Strategy: Concatenate'}
+                                                {node.inputDataA && node.inputDataB && (
+                                                    <span className="ml-2 text-green-600">✓ Ready</span>
+                                                )}
+                                                {(node.inputDataA || node.inputDataB) && !(node.inputDataA && node.inputDataB) && (
+                                                    <span className="ml-2 text-amber-600">⏳ {node.inputDataA ? 'B' : 'A'}</span>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {/* Connector Points - not for comment nodes */}
                                         {node.type !== 'comment' && (
                                             <>
@@ -2188,12 +2461,31 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     />
                                                 )}
                                                 
-                                                {/* Input connector - all nodes except triggers */}
+                                                {/* Input connector(s) - all nodes except triggers */}
                                                 {node.type !== 'trigger' && (
-                                                    <div
-                                                        onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
-                                                        className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all border-slate-400`}
-                                                    />
+                                                    node.type === 'join' ? (
+                                                        // Join nodes have TWO input connectors: A and B
+                                                        <>
+                                                            {/* Input A - top left */}
+                                                            <div
+                                                                onMouseUp={(e) => handleConnectorMouseUp(e, node.id, 'A')}
+                                                                className={`absolute -left-1.5 top-1/4 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-cyan-500 cursor-crosshair transition-all border-slate-400`}
+                                                                title="Input A"
+                                                            />
+                                                            {/* Input B - bottom left */}
+                                                            <div
+                                                                onMouseUp={(e) => handleConnectorMouseUp(e, node.id, 'B')}
+                                                                className={`absolute -left-1.5 top-3/4 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-cyan-500 cursor-crosshair transition-all border-slate-400`}
+                                                                title="Input B"
+                                                            />
+                                                        </>
+                                                    ) : (
+                                                        // Regular nodes have ONE input connector
+                                                        <div
+                                                            onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                            className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all border-slate-400`}
+                                                        />
+                                                    )
                                                 )}
                                             </>
                                         )}
@@ -2832,6 +3124,176 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 </div>
                             </div>
                         )}
+
+                        {/* Join Configuration Modal */}
+                        {configuringJoinNodeId && (() => {
+                            // Find input nodes to get available fields
+                            const joinNode = nodes.find(n => n.id === configuringJoinNodeId);
+                            
+                            // Try to get data from inputDataA/B first, then from parent nodes
+                            let inputAData = joinNode?.inputDataA;
+                            let inputBData = joinNode?.inputDataB;
+                            
+                            // If inputDataA/B not available, look at parent nodes' outputData
+                            if (!inputAData || !inputBData) {
+                                const incomingConns = connections.filter(c => c.toNodeId === configuringJoinNodeId);
+                                for (const conn of incomingConns) {
+                                    const parentNode = nodes.find(n => n.id === conn.fromNodeId);
+                                    if (parentNode?.outputData) {
+                                        if (conn.inputPort === 'A' && !inputAData) {
+                                            inputAData = parentNode.outputData;
+                                        } else if (conn.inputPort === 'B' && !inputBData) {
+                                            inputBData = parentNode.outputData;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Extract common fields from both inputs
+                            const fieldsA = inputAData && Array.isArray(inputAData) && inputAData.length > 0 
+                                ? Object.keys(inputAData[0]) 
+                                : [];
+                            const fieldsB = inputBData && Array.isArray(inputBData) && inputBData.length > 0 
+                                ? Object.keys(inputBData[0]) 
+                                : [];
+                            const commonFields = fieldsA.filter(f => fieldsB.includes(f));
+                            const allFields = [...new Set([...fieldsA, ...fieldsB])];
+                            
+                            return (
+                                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringJoinNodeId(null)}>
+                                    <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
+                                        <h3 className="text-lg font-bold text-slate-800 mb-4">
+                                            <GitMerge className="inline-block mr-2" size={20} />
+                                            Configure Join
+                                        </h3>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                    Join Strategy
+                                                </label>
+                                                <select
+                                                    value={joinStrategy}
+                                                    onChange={(e) => setJoinStrategy(e.target.value as 'concat' | 'mergeByKey')}
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                                >
+                                                    <option value="concat">Concatenate (combine all records)</option>
+                                                    <option value="mergeByKey">Merge by common key</option>
+                                                </select>
+                                                <p className="text-xs text-slate-500 mt-1">
+                                                    {joinStrategy === 'concat' 
+                                                        ? 'All records from A and B will be combined into one list'
+                                                        : 'Records with matching key values will be merged together'}
+                                                </p>
+                                            </div>
+                                            
+                                            {joinStrategy === 'mergeByKey' && (
+                                                <>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                        Join Type
+                                                    </label>
+                                                    <div className="space-y-2">
+                                                        <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${joinType === 'inner' ? 'border-cyan-500 bg-cyan-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                                            <input
+                                                                type="radio"
+                                                                name="joinType"
+                                                                value="inner"
+                                                                checked={joinType === 'inner'}
+                                                                onChange={() => setJoinType('inner')}
+                                                                className="mt-0.5 mr-3"
+                                                            />
+                                                            <div>
+                                                                <span className="font-medium text-sm">Inner Join</span>
+                                                                <p className="text-xs text-slate-500 mt-0.5">
+                                                                    Only records that match in both inputs
+                                                                </p>
+                                                            </div>
+                                                        </label>
+                                                        <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${joinType === 'outer' ? 'border-cyan-500 bg-cyan-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                                            <input
+                                                                type="radio"
+                                                                name="joinType"
+                                                                value="outer"
+                                                                checked={joinType === 'outer'}
+                                                                onChange={() => setJoinType('outer')}
+                                                                className="mt-0.5 mr-3"
+                                                            />
+                                                            <div>
+                                                                <span className="font-medium text-sm">Outer Join</span>
+                                                                <p className="text-xs text-slate-500 mt-0.5">
+                                                                    All records from both inputs (empty where no match)
+                                                                </p>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                        Common Key Field
+                                                    </label>
+                                                    {allFields.length > 0 ? (
+                                                        <>
+                                                            <select
+                                                                value={joinKey}
+                                                                onChange={(e) => setJoinKey(e.target.value)}
+                                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                                            >
+                                                                <option value="">Select a field...</option>
+                                                                {commonFields.length > 0 && (
+                                                                    <optgroup label="Common fields (recommended)">
+                                                                        {commonFields.map(field => (
+                                                                            <option key={field} value={field}>{field}</option>
+                                                                        ))}
+                                                                    </optgroup>
+                                                                )}
+                                                                <optgroup label="All fields">
+                                                                    {allFields.map(field => (
+                                                                        <option key={field} value={field}>{field}</option>
+                                                                    ))}
+                                                                </optgroup>
+                                                            </select>
+                                                            {commonFields.length > 0 && (
+                                                                <p className="text-xs text-green-600 mt-1">
+                                                                    ✓ {commonFields.length} common field(s) found
+                                                                </p>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <input
+                                                                type="text"
+                                                                value={joinKey}
+                                                                onChange={(e) => setJoinKey(e.target.value)}
+                                                                placeholder="e.g., id, name"
+                                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                                            />
+                                                            <p className="text-xs text-amber-600 mt-1">
+                                                                ⚠️ Run the input nodes first to see available fields
+                                                            </p>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                </>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-2 justify-end mt-6">
+                                            <button
+                                                onClick={() => setConfiguringJoinNodeId(null)}
+                                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveJoinConfig}
+                                                className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm font-medium"
+                                            >
+                                                Save
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         {/* Save Records Configuration Modal */}
                         {configuringSaveNodeId && (
