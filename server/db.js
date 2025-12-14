@@ -96,6 +96,31 @@ async function initDb() {
       updatedAt TEXT,
       FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS dashboards (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT,
+      name TEXT NOT NULL,
+      description TEXT,
+      isPublic INTEGER DEFAULT 0,
+      shareToken TEXT UNIQUE,
+      createdBy TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(createdBy) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS widgets (
+      id TEXT PRIMARY KEY,
+      dashboardId TEXT,
+      title TEXT NOT NULL,
+      description TEXT,
+      config TEXT NOT NULL,
+      position INTEGER DEFAULT 0,
+      createdAt TEXT,
+      FOREIGN KEY(dashboardId) REFERENCES dashboards(id) ON DELETE CASCADE
+    );
   `);
 
   return db;

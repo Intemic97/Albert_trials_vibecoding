@@ -6,6 +6,7 @@ import { Dashboard } from './components/Dashboard';
 import { Workflows } from './components/Workflows';
 import { LoginPage } from './components/LoginPage';
 import { Settings } from './components/Settings';
+import { SharedDashboard } from './components/SharedDashboard';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Entity, Property, PropertyType } from './types';
 import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X, Code, Paperclip, Download, Loader2 } from 'lucide-react';
@@ -13,6 +14,14 @@ import { ProfileMenu } from './components/ProfileMenu';
 import { API_BASE } from './config';
 
 export default function App() {
+    // Check for shared dashboard route
+    const path = window.location.pathname;
+    const sharedMatch = path.match(/^\/shared\/([a-f0-9]+)$/);
+    
+    if (sharedMatch) {
+        return <SharedDashboard shareToken={sharedMatch[1]} />;
+    }
+    
     return (
         <AuthProvider>
             <AuthenticatedApp />

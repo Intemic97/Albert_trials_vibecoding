@@ -1125,6 +1125,205 @@ app.post('/api/generate-widget', authenticateToken, async (req, res) => {
     }
 });
 
+// Dashboard Management Endpoints
+app.get('/api/dashboards', authenticateToken, async (req, res) => {
+    try {
+        const dashboards = await db.all(
+            'SELECT id, name, description, isPublic, shareToken, createdAt, updatedAt FROM dashboards WHERE organizationId = ? ORDER BY updatedAt DESC',
+            [req.user.orgId]
+        );
+        res.json(dashboards);
+    } catch (error) {
+        console.error('Error fetching dashboards:', error);
+        res.status(500).json({ error: 'Failed to fetch dashboards' });
+    }
+});
+
+app.post('/api/dashboards', authenticateToken, async (req, res) => {
+    try {
+        const { id, name, description } = req.body;
+        const now = new Date().toISOString();
+        
+        await db.run(
+            'INSERT INTO dashboards (id, organizationId, name, description, createdBy, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [id, req.user.orgId, name, description || '', req.user.id, now, now]
+        );
+        
+        res.json({ id, name, description, createdAt: now, updatedAt: now });
+    } catch (error) {
+        console.error('Error creating dashboard:', error);
+        res.status(500).json({ error: 'Failed to create dashboard' });
+    }
+});
+
+app.put('/api/dashboards/:id', authenticateToken, async (req, res) => {
+    try {
+        const { name, description } = req.body;
+        const now = new Date().toISOString();
+        
+        await db.run(
+            'UPDATE dashboards SET name = ?, description = ?, updatedAt = ? WHERE id = ? AND organizationId = ?',
+            [name, description || '', now, req.params.id, req.user.orgId]
+        );
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating dashboard:', error);
+        res.status(500).json({ error: 'Failed to update dashboard' });
+    }
+});
+
+app.delete('/api/dashboards/:id', authenticateToken, async (req, res) => {
+    try {
+        await db.run('DELETE FROM dashboards WHERE id = ? AND organizationId = ?', [req.params.id, req.user.orgId]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting dashboard:', error);
+        res.status(500).json({ error: 'Failed to delete dashboard' });
+    }
+});
+
+// Share dashboard - generate share token
+app.post('/api/dashboards/:id/share', authenticateToken, async (req, res) => {
+    try {
+        const shareToken = require('crypto').randomBytes(16).toString('hex');
+        const now = new Date().toISOString();
+        
+        await db.run(
+            'UPDATE dashboards SET isPublic = 1, shareToken = ?, updatedAt = ? WHERE id = ? AND organizationId = ?',
+            [shareToken, now, req.params.id, req.user.orgId]
+        );
+        
+        res.json({ shareToken, shareUrl: `/shared/${shareToken}` });
+    } catch (error) {
+        console.error('Error sharing dashboard:', error);
+        res.status(500).json({ error: 'Failed to share dashboard' });
+    }
+});
+
+// Unshare dashboard
+app.post('/api/dashboards/:id/unshare', authenticateToken, async (req, res) => {
+    try {
+        const now = new Date().toISOString();
+        
+        await db.run(
+            'UPDATE dashboards SET isPublic = 0, shareToken = NULL, updatedAt = ? WHERE id = ? AND organizationId = ?',
+            [now, req.params.id, req.user.orgId]
+        );
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error unsharing dashboard:', error);
+        res.status(500).json({ error: 'Failed to unshare dashboard' });
+    }
+});
+
+// Get widgets for a dashboard
+app.get('/api/dashboards/:id/widgets', authenticateToken, async (req, res) => {
+    try {
+        // Verify dashboard belongs to user's org
+        const dashboard = await db.get('SELECT id FROM dashboards WHERE id = ? AND organizationId = ?', [req.params.id, req.user.orgId]);
+        if (!dashboard) {
+            return res.status(404).json({ error: 'Dashboard not found' });
+        }
+        
+        const widgets = await db.all(
+            'SELECT id, title, description, config, position, createdAt FROM widgets WHERE dashboardId = ? ORDER BY position ASC',
+            [req.params.id]
+        );
+        
+        // Parse config JSON
+        const parsedWidgets = widgets.map(w => ({
+            ...w,
+            config: JSON.parse(w.config || '{}')
+        }));
+        
+        res.json(parsedWidgets);
+    } catch (error) {
+        console.error('Error fetching widgets:', error);
+        res.status(500).json({ error: 'Failed to fetch widgets' });
+    }
+});
+
+// Add widget to dashboard
+app.post('/api/dashboards/:id/widgets', authenticateToken, async (req, res) => {
+    try {
+        const { id: widgetId, title, description, config } = req.body;
+        const now = new Date().toISOString();
+        
+        // Get max position
+        const maxPos = await db.get('SELECT MAX(position) as maxPos FROM widgets WHERE dashboardId = ?', [req.params.id]);
+        const position = (maxPos?.maxPos || 0) + 1;
+        
+        await db.run(
+            'INSERT INTO widgets (id, dashboardId, title, description, config, position, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [widgetId, req.params.id, title, description || '', JSON.stringify(config), position, now]
+        );
+        
+        // Update dashboard updatedAt
+        await db.run('UPDATE dashboards SET updatedAt = ? WHERE id = ?', [now, req.params.id]);
+        
+        res.json({ id: widgetId, title, description, config, position, createdAt: now });
+    } catch (error) {
+        console.error('Error adding widget:', error);
+        res.status(500).json({ error: 'Failed to add widget' });
+    }
+});
+
+// Delete widget
+app.delete('/api/widgets/:id', authenticateToken, async (req, res) => {
+    try {
+        // Verify widget belongs to user's org via dashboard
+        const widget = await db.get(`
+            SELECT w.id FROM widgets w 
+            JOIN dashboards d ON w.dashboardId = d.id 
+            WHERE w.id = ? AND d.organizationId = ?
+        `, [req.params.id, req.user.orgId]);
+        
+        if (!widget) {
+            return res.status(404).json({ error: 'Widget not found' });
+        }
+        
+        await db.run('DELETE FROM widgets WHERE id = ?', [req.params.id]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting widget:', error);
+        res.status(500).json({ error: 'Failed to delete widget' });
+    }
+});
+
+// Public shared dashboard endpoint (no auth required)
+app.get('/api/shared/:token', async (req, res) => {
+    try {
+        const dashboard = await db.get(
+            'SELECT id, name, description, createdAt FROM dashboards WHERE shareToken = ? AND isPublic = 1',
+            [req.params.token]
+        );
+        
+        if (!dashboard) {
+            return res.status(404).json({ error: 'Dashboard not found or not shared' });
+        }
+        
+        const widgets = await db.all(
+            'SELECT id, title, description, config, position FROM widgets WHERE dashboardId = ? ORDER BY position ASC',
+            [dashboard.id]
+        );
+        
+        const parsedWidgets = widgets.map(w => ({
+            ...w,
+            config: JSON.parse(w.config || '{}')
+        }));
+        
+        res.json({
+            dashboard,
+            widgets: parsedWidgets
+        });
+    } catch (error) {
+        console.error('Error fetching shared dashboard:', error);
+        res.status(500).json({ error: 'Failed to fetch shared dashboard' });
+    }
+});
+
 // Workflow Management Endpoints
 app.get('/api/workflows', authenticateToken, async (req, res) => {
     try {
