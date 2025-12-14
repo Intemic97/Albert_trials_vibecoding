@@ -370,6 +370,69 @@ app.get('/api/entities/:id/records', authenticateToken, async (req, res) => {
     }
 });
 
+// POST /api/entities/:id/records - Create record with property names (for workflows)
+app.post('/api/entities/:id/records', authenticateToken, async (req, res) => {
+    const { id: entityId } = req.params;
+    const recordData = req.body; // Data with property names as keys
+
+    try {
+        // Verify entity belongs to user's organization
+        const entity = await db.get('SELECT id FROM entities WHERE id = ? AND organizationId = ?', [entityId, req.user.orgId]);
+        if (!entity) {
+            return res.status(403).json({ error: 'Access denied to this entity' });
+        }
+
+        // Get entity properties to map names to IDs
+        const properties = await db.all('SELECT id, name, type FROM properties WHERE entityId = ?', [entityId]);
+        
+        // Create name -> property mapping (case-insensitive)
+        const propertyMap = {};
+        properties.forEach(prop => {
+            propertyMap[prop.name.toLowerCase()] = prop;
+        });
+
+        // Create the record
+        const recordId = Math.random().toString(36).substr(2, 9);
+        const createdAt = new Date().toISOString();
+
+        await db.run(
+            'INSERT INTO records (id, entityId, createdAt) VALUES (?, ?, ?)',
+            [recordId, entityId, createdAt]
+        );
+
+        // Map property names to IDs and save values
+        let savedFields = 0;
+        let skippedFields = [];
+        
+        for (const [key, val] of Object.entries(recordData)) {
+            // Skip internal fields
+            if (key === 'id' || key === 'createdAt' || key === 'entityId') continue;
+            
+            const prop = propertyMap[key.toLowerCase()];
+            if (prop) {
+                const valueId = Math.random().toString(36).substr(2, 9);
+                await db.run(
+                    'INSERT INTO record_values (id, recordId, propertyId, value) VALUES (?, ?, ?, ?)',
+                    [valueId, recordId, prop.id, String(val)]
+                );
+                savedFields++;
+            } else {
+                skippedFields.push(key);
+            }
+        }
+
+        res.status(201).json({ 
+            message: 'Record created', 
+            id: recordId,
+            savedFields,
+            skippedFields: skippedFields.length > 0 ? skippedFields : undefined
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to create record' });
+    }
+});
+
 // POST /api/records
 // POST /api/records
 app.post('/api/records', authenticateToken, async (req, res) => {
