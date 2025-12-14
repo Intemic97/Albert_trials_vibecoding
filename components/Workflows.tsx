@@ -1518,9 +1518,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             let finalOutputType = dragConnectionStart.outputType;
 
             // If connecting from a condition node and no type was set, ask the user
+            // (This is a fallback - users should use the colored TRUE/FALSE connectors)
             const fromNode = nodes.find(n => n.id === dragConnectionStart.nodeId);
             if (fromNode?.type === 'condition' && !finalOutputType) {
-                const choice = window.confirm('Click OK for TRUE path, Cancel for FALSE path');
+                const choice = window.confirm('Use the green (✓) or red (✗) connectors on the If/Else node.\n\nAs fallback: OK = TRUE path, Cancel = FALSE path');
                 finalOutputType = choice ? 'true' : 'false';
             }
 
@@ -1913,7 +1914,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                         // Calculate line positions (from right of fromNode to left of toNode)
                                         const x1 = fromNode.x + 96; // Half width of node (192px / 2)
-                                        const y1 = fromNode.y;
+                                        
+                                        // For condition nodes, adjust Y position based on output type
+                                        // Node height is approximately 80px, so offsets are:
+                                        // - TRUE (top-1/4): -20px from center
+                                        // - FALSE (top-3/4): +20px from center
+                                        let y1 = fromNode.y;
+                                        if (fromNode.type === 'condition') {
+                                            if (conn.outputType === 'true') {
+                                                y1 = fromNode.y - 20; // TRUE connector position
+                                            } else if (conn.outputType === 'false') {
+                                                y1 = fromNode.y + 20; // FALSE connector position
+                                            }
+                                        }
+                                        
                                         const x2 = toNode.x - 96;
                                         const y2 = toNode.y;
 
@@ -1927,6 +1941,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         const strokeColor = conn.outputType === 'true' ? '#10b981'
                                             : conn.outputType === 'false' ? '#ef4444'
                                                 : '#0d9488';
+                                        
+                                        // Use different arrowhead colors
+                                        const arrowId = conn.outputType === 'true' ? 'arrow-green'
+                                            : conn.outputType === 'false' ? 'arrow-red'
+                                                : 'workflow-arrowhead';
 
                                         return (
                                             <path
@@ -1935,11 +1954,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 stroke={strokeColor}
                                                 strokeWidth="2"
                                                 fill="none"
-                                                markerEnd="url(#workflow-arrowhead)"
+                                                markerEnd={`url(#${arrowId})`}
                                             />
                                         );
                                     })}
-                                    {/* Arrow marker definition */}
+                                    {/* Arrow marker definitions */}
                                     <defs>
                                         <marker
                                             id="workflow-arrowhead"
@@ -1950,6 +1969,26 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             orient="auto"
                                         >
                                             <polygon points="0 0, 6 3, 0 6" fill="#0d9488" />
+                                        </marker>
+                                        <marker
+                                            id="arrow-green"
+                                            markerWidth="6"
+                                            markerHeight="6"
+                                            refX="5"
+                                            refY="3"
+                                            orient="auto"
+                                        >
+                                            <polygon points="0 0, 6 3, 0 6" fill="#10b981" />
+                                        </marker>
+                                        <marker
+                                            id="arrow-red"
+                                            markerWidth="6"
+                                            markerHeight="6"
+                                            refX="5"
+                                            refY="3"
+                                            orient="auto"
+                                        >
+                                            <polygon points="0 0, 6 3, 0 6" fill="#ef4444" />
                                         </marker>
                                     </defs>
                                 </svg>
@@ -2118,12 +2157,38 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         {/* Connector Points - not for comment nodes */}
                                         {node.type !== 'comment' && (
                                             <>
-                                                <div
-                                                    onMouseDown={(e) => handleConnectorMouseDown(e, node.id)}
-                                                    onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
-                                                    className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id ? 'border-teal-500 scale-150' : 'border-slate-400'
-                                                        }`}
-                                                />
+                                                {/* Output connectors */}
+                                                {node.type === 'condition' ? (
+                                                    // Condition nodes have TWO output connectors: TRUE and FALSE
+                                                    <>
+                                                        {/* TRUE output - top right (green) */}
+                                                        <div
+                                                            onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'true')}
+                                                            onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                            className={`absolute -right-1.5 top-1/4 -translate-y-1/2 w-3 h-3 bg-green-100 border-2 rounded-full hover:border-green-500 hover:bg-green-200 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'true' ? 'border-green-500 scale-150 bg-green-300' : 'border-green-400'}`}
+                                                            title="TRUE path"
+                                                        />
+                                                        <span className="absolute -right-6 top-1/4 -translate-y-1/2 text-[9px] font-bold text-green-600">✓</span>
+                                                        
+                                                        {/* FALSE output - bottom right (red) */}
+                                                        <div
+                                                            onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'false')}
+                                                            onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                            className={`absolute -right-1.5 top-3/4 -translate-y-1/2 w-3 h-3 bg-red-100 border-2 rounded-full hover:border-red-500 hover:bg-red-200 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'false' ? 'border-red-500 scale-150 bg-red-300' : 'border-red-400'}`}
+                                                            title="FALSE path"
+                                                        />
+                                                        <span className="absolute -right-6 top-3/4 -translate-y-1/2 text-[9px] font-bold text-red-600">✗</span>
+                                                    </>
+                                                ) : (
+                                                    // Regular nodes have ONE output connector
+                                                    <div
+                                                        onMouseDown={(e) => handleConnectorMouseDown(e, node.id)}
+                                                        onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                        className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id ? 'border-teal-500 scale-150' : 'border-slate-400'}`}
+                                                    />
+                                                )}
+                                                
+                                                {/* Input connector - all nodes except triggers */}
                                                 {node.type !== 'trigger' && (
                                                     <div
                                                         onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
@@ -2136,7 +2201,26 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 ))}
 
                                 {/* Temporary Connection Line */}
-                                {dragConnectionStart && dragConnectionCurrent && (
+                                {dragConnectionStart && dragConnectionCurrent && (() => {
+                                    const startNode = nodes.find(n => n.id === dragConnectionStart.nodeId)!;
+                                    const startX = startNode.x + 96;
+                                    
+                                    // Adjust Y position for condition node outputs
+                                    let startY = startNode.y;
+                                    if (startNode.type === 'condition') {
+                                        if (dragConnectionStart.outputType === 'true') {
+                                            startY = startNode.y - 20;
+                                        } else if (dragConnectionStart.outputType === 'false') {
+                                            startY = startNode.y + 20;
+                                        }
+                                    }
+                                    
+                                    // Color based on output type
+                                    const strokeColor = dragConnectionStart.outputType === 'true' ? '#10b981'
+                                        : dragConnectionStart.outputType === 'false' ? '#ef4444'
+                                            : '#0d9488';
+                                    
+                                    return (
                                     <svg
                                         className="absolute pointer-events-none"
                                         style={{
@@ -2157,19 +2241,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 refY="3.5"
                                                 orient="auto"
                                             >
-                                                <polygon points="0 0, 10 3.5, 0 7" fill="#0d9488" />
+                                                <polygon points="0 0, 10 3.5, 0 7" fill={strokeColor} />
                                             </marker>
                                         </defs>
                                         <path
-                                            d={`M ${nodes.find(n => n.id === dragConnectionStart.nodeId)!.x + 96} ${nodes.find(n => n.id === dragConnectionStart.nodeId)!.y} C ${nodes.find(n => n.id === dragConnectionStart.nodeId)!.x + 96 + 50} ${nodes.find(n => n.id === dragConnectionStart.nodeId)!.y}, ${dragConnectionCurrent.x - 50} ${dragConnectionCurrent.y}, ${dragConnectionCurrent.x} ${dragConnectionCurrent.y}`}
-                                            stroke="#0d9488"
+                                            d={`M ${startX} ${startY} C ${startX + 50} ${startY}, ${dragConnectionCurrent.x - 50} ${dragConnectionCurrent.y}, ${dragConnectionCurrent.x} ${dragConnectionCurrent.y}`}
+                                            stroke={strokeColor}
                                             strokeWidth="2"
                                             fill="none"
                                             strokeDasharray="5,5"
                                             markerEnd="url(#temp-arrowhead)"
                                         />
                                     </svg>
-                                )}
+                                    );
+                                })()}
 
                                 {nodes.length === 0 && (
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
