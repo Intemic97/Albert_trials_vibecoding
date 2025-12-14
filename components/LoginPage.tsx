@@ -52,8 +52,12 @@ export function LoginPage() {
             <div className="w-full max-w-md">
                 <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl">
                     <div className="text-center mb-8">
-                        <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mx-auto mb-4 border border-blue-500/20">
-                            <Building2 className="w-6 h-6 text-blue-400" />
+                        <div className="flex items-center justify-center mx-auto mb-4">
+                            <img
+                                src="/logo.png"
+                                alt="Intemic"
+                                className="h-10 w-auto object-contain"
+                            />
                         </div>
                         <h1 className="text-2xl font-bold text-white mb-2">
                             {isLogin ? 'Welcome back' : 'Create an organization'}
