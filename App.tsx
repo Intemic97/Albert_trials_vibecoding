@@ -1187,9 +1187,9 @@ function AuthenticatedApp() {
                                                         Add Record
                                                     </button>
                                                     {activeEntity.properties.length === 0 && (
-                                                        <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/addrecord:opacity-100 transition-opacity pointer-events-none z-50">
+                                                        <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/addrecord:opacity-100 transition-opacity pointer-events-none z-50">
                                                             Add properties to your entity to start adding records
-                                                            <div className="absolute top-full right-4 border-4 border-transparent border-t-slate-900"></div>
+                                                            <div className="absolute bottom-full right-4 border-4 border-transparent border-b-slate-900"></div>
                                                         </div>
                                                     )}
                                                 </div>

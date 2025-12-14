@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Entity } from '../types';
-import { Database, Sparkles, X, Info, Plus, Share2, LayoutDashboard, ChevronDown, Copy, Check, Trash2, Edit3, Link, ExternalLink } from 'lucide-react';
+import { Database, Sparkles, X, Info, Plus, Share2, LayoutDashboard, ChevronDown, Copy, Check, Trash2, Link, ExternalLink } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { ProfileMenu } from './ProfileMenu';
@@ -133,13 +133,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     const [showDashboardDropdown, setShowDashboardDropdown] = useState(false);
     
     // Modal states
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [showEditModal, setShowEditModal] = useState(false);
     const [showShareModal, setShowShareModal] = useState(false);
-    const [newDashboardName, setNewDashboardName] = useState('');
-    const [newDashboardDescription, setNewDashboardDescription] = useState('');
-    const [editDashboardName, setEditDashboardName] = useState('');
-    const [editDashboardDescription, setEditDashboardDescription] = useState('');
+    
+    // Inline editing states
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [isEditingDescription, setIsEditingDescription] = useState(false);
+    const [editingTitle, setEditingTitle] = useState('');
+    const [editingDescription, setEditingDescription] = useState('');
     
     // Widget state
     const [generatedWidgets, setGeneratedWidgets] = useState<WidgetConfig[]>([]);
@@ -202,17 +202,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     };
 
     const handleCreateDashboard = async () => {
-        if (!newDashboardName.trim()) return;
-        
         try {
             const id = generateUUID();
+            const defaultName = `Dashboard ${dashboards.length + 1}`;
             const res = await fetch(`${API_BASE}/dashboards`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     id,
-                    name: newDashboardName.trim(),
-                    description: newDashboardDescription.trim()
+                    name: defaultName,
+                    description: ''
                 }),
                 credentials: 'include'
             });
@@ -221,9 +220,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 const newDashboard = await res.json();
                 setDashboards(prev => [newDashboard, ...prev]);
                 setSelectedDashboardId(newDashboard.id);
-                setShowCreateModal(false);
-                setNewDashboardName('');
-                setNewDashboardDescription('');
+                // Start editing the title immediately
+                setEditingTitle(defaultName);
+                setIsEditingTitle(true);
             }
         } catch (error) {
             console.error('Error creating dashboard:', error);
@@ -231,16 +230,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         }
     };
 
-    const handleEditDashboard = async () => {
-        if (!selectedDashboardId || !editDashboardName.trim()) return;
+    const handleSaveTitle = async () => {
+        if (!selectedDashboardId || !editingTitle.trim()) {
+            setIsEditingTitle(false);
+            return;
+        }
         
         try {
             const res = await fetch(`${API_BASE}/dashboards/${selectedDashboardId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    name: editDashboardName.trim(),
-                    description: editDashboardDescription.trim()
+                    name: editingTitle.trim(),
+                    description: selectedDashboard?.description || ''
                 }),
                 credentials: 'include'
             });
@@ -248,15 +250,44 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             if (res.ok) {
                 setDashboards(prev => prev.map(d => 
                     d.id === selectedDashboardId 
-                        ? { ...d, name: editDashboardName.trim(), description: editDashboardDescription.trim() }
+                        ? { ...d, name: editingTitle.trim() }
                         : d
                 ));
-                setShowEditModal(false);
             }
         } catch (error) {
             console.error('Error updating dashboard:', error);
-            alert('Failed to update dashboard.');
         }
+        setIsEditingTitle(false);
+    };
+
+    const handleSaveDescription = async () => {
+        if (!selectedDashboardId) {
+            setIsEditingDescription(false);
+            return;
+        }
+        
+        try {
+            const res = await fetch(`${API_BASE}/dashboards/${selectedDashboardId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: selectedDashboard?.name || '',
+                    description: editingDescription.trim()
+                }),
+                credentials: 'include'
+            });
+
+            if (res.ok) {
+                setDashboards(prev => prev.map(d => 
+                    d.id === selectedDashboardId 
+                        ? { ...d, description: editingDescription.trim() }
+                        : d
+                ));
+            }
+        } catch (error) {
+            console.error('Error updating dashboard:', error);
+        }
+        setIsEditingDescription(false);
     };
 
     const handleDeleteDashboard = async () => {
@@ -411,14 +442,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         }
     };
 
-    const openEditModal = () => {
-        if (selectedDashboard) {
-            setEditDashboardName(selectedDashboard.name);
-            setEditDashboardDescription(selectedDashboard.description || '');
-            setShowEditModal(true);
-        }
-    };
-
     const openShareModalIfShared = () => {
         if (selectedDashboard?.shareToken) {
             const fullUrl = `${window.location.origin}/shared/${selectedDashboard.shareToken}`;
@@ -473,7 +496,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                 <div className="border-t border-slate-100 mt-1 pt-1">
                                     <button
                                         onClick={() => {
-                                            setShowCreateModal(true);
+                                            handleCreateDashboard();
                                             setShowDashboardDropdown(false);
                                         }}
                                         className="w-full text-left px-4 py-2 hover:bg-slate-50 text-teal-600 flex items-center gap-2"
@@ -489,13 +512,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     {/* Dashboard Actions */}
                     {selectedDashboard && (
                         <div className="flex items-center gap-1">
-                            <button
-                                onClick={openEditModal}
-                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                title="Edit Dashboard"
-                            >
-                                <Edit3 size={18} />
-                            </button>
                             <button
                                 onClick={openShareModalIfShared}
                                 className={`p-2 rounded-lg transition-colors ${
@@ -555,28 +571,89 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     {/* Dashboard Content */}
                     {selectedDashboard && (
                         <>
-                            {/* Dashboard Description */}
-                            {selectedDashboard.description && (
-                                <p className="text-sm text-slate-500">{selectedDashboard.description}</p>
+                            {/* Editable Title */}
+                            <div className="mb-2">
+                                {isEditingTitle ? (
+                                    <input
+                                        type="text"
+                                        value={editingTitle}
+                                        onChange={e => setEditingTitle(e.target.value)}
+                                        onBlur={handleSaveTitle}
+                                        onKeyDown={e => e.key === 'Enter' && handleSaveTitle()}
+                                        className="text-2xl font-bold text-slate-800 bg-transparent border-b-2 border-teal-500 focus:outline-none w-full"
+                                        autoFocus
+                                    />
+                                ) : (
+                                    <h2 
+                                        onClick={() => {
+                                            setEditingTitle(selectedDashboard.name);
+                                            setIsEditingTitle(true);
+                                        }}
+                                        className="text-2xl font-bold text-slate-800 cursor-pointer hover:text-teal-600 transition-colors"
+                                        title="Click to edit"
+                                    >
+                                        {selectedDashboard.name}
+                                    </h2>
+                                )}
+                            </div>
+
+                            {/* Editable Description */}
+                            <div className="mb-6">
+                                {isEditingDescription ? (
+                                    <input
+                                        type="text"
+                                        value={editingDescription}
+                                        onChange={e => setEditingDescription(e.target.value)}
+                                        onBlur={handleSaveDescription}
+                                        onKeyDown={e => e.key === 'Enter' && handleSaveDescription()}
+                                        placeholder="Add a description..."
+                                        className="text-sm text-slate-500 bg-transparent border-b border-slate-300 focus:border-teal-500 focus:outline-none w-full"
+                                        autoFocus
+                                    />
+                                ) : (
+                                    <p 
+                                        onClick={() => {
+                                            setEditingDescription(selectedDashboard.description || '');
+                                            setIsEditingDescription(true);
+                                        }}
+                                        className="text-sm text-slate-500 cursor-pointer hover:text-slate-700 transition-colors"
+                                        title="Click to edit"
+                                    >
+                                        {selectedDashboard.description || 'Click to add description...'}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Saved Widgets Section */}
+                            {savedWidgets.length > 0 && (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        {savedWidgets.map((widget) => (
+                                            <WidgetCard
+                                                key={widget.id}
+                                                widget={widget}
+                                                onRemove={() => removeWidget(widget.id)}
+                                                isSaved={true}
+                                                onNavigate={onNavigate}
+                                                entities={entities}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
                             )}
 
                             {/* AI Widget Generator */}
-                            <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-xl shadow-lg p-6 text-white">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <Sparkles className="text-teal-100" size={24} />
-                                    <h2 className="text-lg font-bold">AI Widget Generator</h2>
+                            <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-xl shadow-lg p-4">
+                                <div className="bg-white rounded-lg p-3">
+                                    <PromptInput
+                                        entities={entities}
+                                        onGenerate={handleGenerateWidget}
+                                        isGenerating={isGenerating}
+                                        placeholder="Describe a chart... e.g. 'Bar chart of @Customers by total orders'"
+                                        buttonLabel="Generate"
+                                        className="text-slate-800"
+                                    />
                                 </div>
-                                <p className="text-teal-50 text-sm mb-6">
-                                    Ask a question about your data to generate a custom chart. Try "Show me a bar chart of @Entities by property count". <strong>Press Enter to generate.</strong>
-                                </p>
-                                <PromptInput
-                                    entities={entities}
-                                    onGenerate={handleGenerateWidget}
-                                    isGenerating={isGenerating}
-                                    placeholder="Describe the chart you want to create..."
-                                    buttonLabel="Generate Widget"
-                                    className="bg-white rounded-lg shadow-inner text-slate-800"
-                                />
                             </div>
 
                             {/* Generated Widgets Section */}
@@ -602,35 +679,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                 </div>
                             )}
 
-                            {/* Saved Widgets Section */}
-                            {savedWidgets.length > 0 && (
-                                <div className="space-y-6">
-                                    <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                                        <Database size={18} className="text-teal-500" />
-                                        Saved Widgets
-                                    </h3>
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        {savedWidgets.map((widget) => (
-                                            <WidgetCard
-                                                key={widget.id}
-                                                widget={widget}
-                                                onRemove={() => removeWidget(widget.id)}
-                                                isSaved={true}
-                                                onNavigate={onNavigate}
-                                                entities={entities}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
                             {/* Empty State when no widgets */}
                             {savedWidgets.length === 0 && generatedWidgets.length === 0 && (
                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
                                     <Database className="mx-auto text-slate-300 mb-4" size={48} />
                                     <h3 className="text-lg font-semibold text-slate-600 mb-2">No widgets yet</h3>
                                     <p className="text-sm text-slate-500 max-w-md mx-auto">
-                                        Use the AI Widget Generator above to create custom charts and visualizations from your data.
+                                        Use the prompt below to create custom charts and visualizations from your data.
                                     </p>
                                 </div>
                             )}
@@ -640,103 +695,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 </div>
             </div>
 
-            {/* Create Dashboard Modal */}
-            {showCreateModal && (
-                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setShowCreateModal(false)}>
-                    <div className="bg-white rounded-xl shadow-xl p-6 w-96" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <Plus size={20} className="text-teal-600" />
-                            New Dashboard
-                        </h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
-                                <input
-                                    type="text"
-                                    value={newDashboardName}
-                                    onChange={e => setNewDashboardName(e.target.value)}
-                                    placeholder="My Dashboard"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                    autoFocus
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Description (optional)</label>
-                                <textarea
-                                    value={newDashboardDescription}
-                                    onChange={e => setNewDashboardDescription(e.target.value)}
-                                    placeholder="What is this dashboard for?"
-                                    rows={2}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex gap-2 justify-end mt-6">
-                            <button
-                                onClick={() => setShowCreateModal(false)}
-                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleCreateDashboard}
-                                disabled={!newDashboardName.trim()}
-                                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Create
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Edit Dashboard Modal */}
-            {showEditModal && (
-                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setShowEditModal(false)}>
-                    <div className="bg-white rounded-xl shadow-xl p-6 w-96" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <Edit3 size={20} className="text-teal-600" />
-                            Edit Dashboard
-                        </h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
-                                <input
-                                    type="text"
-                                    value={editDashboardName}
-                                    onChange={e => setEditDashboardName(e.target.value)}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                    autoFocus
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-                                <textarea
-                                    value={editDashboardDescription}
-                                    onChange={e => setEditDashboardDescription(e.target.value)}
-                                    rows={2}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex gap-2 justify-end mt-6">
-                            <button
-                                onClick={() => setShowEditModal(false)}
-                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleEditDashboard}
-                                disabled={!editDashboardName.trim()}
-                                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Save
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Share Dashboard Modal */}
             {showShareModal && (

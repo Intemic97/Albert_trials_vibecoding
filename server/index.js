@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
+const XLSX = require('xlsx');
 const { initDb } = require('./db');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const cookieParser = require('cookie-parser');
@@ -142,6 +143,109 @@ app.get('/api/files/:filename/download', async (req, res) => {
     
     res.download(filePath, originalName || filename);
 });
+
+// Parse Excel/CSV file endpoint
+app.post('/api/parse-spreadsheet', authenticateToken, upload.single('file'), (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const filePath = path.join(uploadsDir, req.file.filename);
+        const ext = path.extname(req.file.originalname).toLowerCase();
+
+        let data = [];
+        let headers = [];
+
+        if (ext === '.csv') {
+            // Parse CSV
+            const fileContent = fs.readFileSync(filePath, 'utf-8');
+            const lines = fileContent.split('\n').filter(line => line.trim());
+            
+            if (lines.length > 0) {
+                // First line is headers
+                headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+                
+                // Parse data rows
+                for (let i = 1; i < lines.length; i++) {
+                    const values = parseCSVLine(lines[i]);
+                    if (values.length > 0) {
+                        const row = {};
+                        headers.forEach((header, idx) => {
+                            row[header] = values[idx] || '';
+                        });
+                        data.push(row);
+                    }
+                }
+            }
+        } else if (ext === '.xlsx' || ext === '.xls') {
+            // Parse Excel
+            const workbook = XLSX.readFile(filePath);
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            
+            // Convert to JSON with header row
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            
+            if (jsonData.length > 0) {
+                headers = jsonData[0].map(h => String(h || '').trim());
+                
+                for (let i = 1; i < jsonData.length; i++) {
+                    const rowData = jsonData[i];
+                    if (rowData && rowData.some(cell => cell !== null && cell !== undefined && cell !== '')) {
+                        const row = {};
+                        headers.forEach((header, idx) => {
+                            const value = rowData[idx];
+                            row[header] = value !== null && value !== undefined ? String(value) : '';
+                        });
+                        data.push(row);
+                    }
+                }
+            }
+        } else {
+            // Clean up uploaded file
+            fs.unlinkSync(filePath);
+            return res.status(400).json({ error: 'Unsupported file format. Please upload .csv, .xlsx, or .xls files.' });
+        }
+
+        // Clean up uploaded file after parsing
+        fs.unlinkSync(filePath);
+
+        res.json({
+            success: true,
+            headers,
+            data,
+            rowCount: data.length
+        });
+
+    } catch (error) {
+        console.error('Error parsing spreadsheet:', error);
+        res.status(500).json({ error: 'Failed to parse spreadsheet: ' + error.message });
+    }
+});
+
+// Helper function to parse CSV lines (handles quoted values with commas)
+function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+            result.push(current.trim().replace(/^"|"$/g, ''));
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    
+    result.push(current.trim().replace(/^"|"$/g, ''));
+    return result;
+}
 
 // Helper function to extract text from files
 async function extractFileContent(filename) {
@@ -1122,6 +1226,121 @@ app.post('/api/generate-widget', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Error generating widget:', error);
         res.status(500).json({ error: 'Failed to generate widget' });
+    }
+});
+
+// AI Workflow Generation Endpoint
+app.post('/api/generate-workflow', authenticateToken, async (req, res) => {
+    console.log('Received workflow generation request');
+    try {
+        const { prompt, entities } = req.body;
+        console.log('Workflow Prompt:', prompt);
+
+        if (!process.env.OPENAI_API_KEY) {
+            return res.status(500).json({ error: 'OpenAI API Key not configured' });
+        }
+
+        // Build entity context for the AI
+        const entityContext = entities.map(e => ({
+            id: e.id,
+            name: e.name,
+            properties: e.properties.map(p => ({ name: p.name, type: p.type }))
+        }));
+
+        const systemPrompt = `You are an AI assistant that generates workflow configurations. You must output ONLY valid JSON, no explanations.
+
+Available node types and their configurations:
+
+1. **trigger** - Start the workflow
+   - label: "Manual Trigger" or "Schedule"
+
+2. **fetchData** - Get records from a database entity
+   - config: { selectedEntityId: "entity-uuid", selectedEntityName: "EntityName" }
+
+3. **condition** - If/Else branching (has two outputs: true and false)
+   - config: { conditionField: "fieldName", conditionOperator: "equals|notEquals|contains|greaterThan|lessThan", conditionValue: "value" }
+
+4. **join** - Combine data from two sources (has two inputs: A and B)
+   - config: { joinStrategy: "concat|mergeByKey", joinKey: "fieldName" }
+
+5. **addField** - Add a new field to each record
+   - config: { fieldName: "newField", fieldValue: "value or expression" }
+
+6. **llm** - Generate text using AI
+   - config: { prompt: "AI prompt text" }
+
+7. **python** - Run Python code
+   - config: { code: "python code here" }
+
+8. **http** - Make HTTP request
+   - config: { url: "https://...", method: "GET|POST" }
+
+9. **manualInput** - Define a variable
+   - config: { variableName: "name", variableValue: "value" }
+
+10. **saveRecords** - Save data to database
+    - config: { targetEntityId: "entity-uuid", targetEntityName: "EntityName", fieldMappings: {} }
+
+11. **output** - Display results
+    - label: "Output" or custom label
+
+12. **humanApproval** - Wait for user approval
+    - label: "Human Approval"
+
+13. **esios** - Fetch energy prices from Red Eléctrica
+    - config: { indicator: "indicator-id" }
+
+14. **climatiq** - Search CO2 emission factors
+    - config: { searchQuery: "activity description" }
+
+15. **excelInput** - Load data from Excel or CSV file
+    - config: { fileName: "file.xlsx" } (file must be uploaded via node configuration)
+
+User's available entities:
+${JSON.stringify(entityContext, null, 2)}
+
+RULES:
+1. Always start with a "trigger" node at x=100
+2. Space nodes horizontally by 200px (x: 100, 300, 500, 700...)
+3. Keep y position around 200-300 for main flow
+4. For condition nodes, branch true path at y=200, false path at y=350
+5. Generate unique IDs using format: "node_1", "node_2", etc.
+6. Connection IDs use format: "conn_1", "conn_2", etc.
+7. For condition connections, specify outputType: "true" or "false"
+8. For join connections, specify inputPort: "A" or "B"
+9. Match entity names/IDs from the provided entities list when using fetchData or saveRecords
+
+Output format:
+{
+  "nodes": [
+    { "id": "node_1", "type": "trigger", "label": "Manual Trigger", "x": 100, "y": 200 },
+    { "id": "node_2", "type": "fetchData", "label": "Fetch Customers", "x": 300, "y": 200, "config": { "selectedEntityId": "uuid", "selectedEntityName": "Customers" } }
+  ],
+  "connections": [
+    { "id": "conn_1", "fromNodeId": "node_1", "toNodeId": "node_2" }
+  ]
+}`;
+
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `Create a workflow for: ${prompt}` }
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.7
+        });
+
+        const workflowData = JSON.parse(completion.choices[0].message.content);
+        console.log('Generated workflow:', JSON.stringify(workflowData, null, 2));
+        res.json(workflowData);
+
+    } catch (error) {
+        console.error('Error generating workflow:', error);
+        res.status(500).json({ error: 'Failed to generate workflow' });
     }
 });
 

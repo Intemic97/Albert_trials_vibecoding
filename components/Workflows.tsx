@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, Upload } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu } from './ProfileMenu';
 import { API_BASE } from '../config';
@@ -19,7 +19,7 @@ const generateUUID = (): string => {
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput';
     label: string;
     x: number;
     y: number;
@@ -61,6 +61,13 @@ interface WorkflowNode {
         joinStrategy?: 'concat' | 'mergeByKey';
         joinType?: 'inner' | 'outer';  // inner = only matching, outer = all records
         joinKey?: string;
+        // For excel input nodes:
+        fileName?: string;
+        headers?: string[];
+        parsedData?: any[];
+        rowCount?: number;
+        // Processing mode (for condition, llm, etc.)
+        processingMode?: 'batch' | 'perRow';  // batch = all rows together, perRow = filter/process each row
     };
     executionResult?: string;
     data?: any;
@@ -80,7 +87,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -91,6 +98,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'trigger', label: 'Manual Trigger', icon: Play, description: 'Manually start the workflow', category: 'Triggers' },
     { type: 'trigger', label: 'Schedule', icon: Workflow, description: 'Run on a specific schedule', category: 'Triggers' },
     { type: 'fetchData', label: 'Fetch Data', icon: Database, description: 'Get records from an entity', category: 'Data' },
+    { type: 'excelInput', label: 'Excel/CSV Input', icon: FileSpreadsheet, description: 'Load data from Excel or CSV', category: 'Data' },
     { type: 'saveRecords', label: 'Save to Database', icon: Database, description: 'Create or update records', category: 'Data' },
     { type: 'equipment', label: 'Equipment', icon: Wrench, description: 'Use specific equipment data', category: 'Data' },
     { type: 'http', label: 'HTTP Request', icon: Globe, description: 'Fetch data from an external API', category: 'Data' },
@@ -131,6 +139,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [conditionField, setConditionField] = useState<string>('');
     const [conditionOperator, setConditionOperator] = useState<string>('isText');
     const [conditionValue, setConditionValue] = useState<string>('');
+    const [conditionProcessingMode, setConditionProcessingMode] = useState<'batch' | 'perRow'>('batch');
     const [connectingFromType, setConnectingFromType] = useState<'true' | 'false' | null>(null);
     const [configuringAddFieldNodeId, setConfiguringAddFieldNodeId] = useState<string | null>(null);
     const [addFieldName, setAddFieldName] = useState<string>('');
@@ -154,6 +163,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [llmPrompt, setLlmPrompt] = useState<string>('');
     const [llmContextEntities, setLlmContextEntities] = useState<string[]>([]);
     const [llmIncludeInput, setLlmIncludeInput] = useState<boolean>(true);
+    const [llmProcessingMode, setLlmProcessingMode] = useState<'batch' | 'perRow'>('batch');
 
     // Python Node State
     const [configuringPythonNodeId, setConfiguringPythonNodeId] = useState<string | null>(null);
@@ -166,6 +176,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [joinStrategy, setJoinStrategy] = useState<'concat' | 'mergeByKey'>('concat');
     const [joinType, setJoinType] = useState<'inner' | 'outer'>('inner');
     const [joinKey, setJoinKey] = useState<string>('');
+
+    // Excel Input Node State
+    const [configuringExcelNodeId, setConfiguringExcelNodeId] = useState<string | null>(null);
+    const [excelFile, setExcelFile] = useState<File | null>(null);
+    const [excelPreviewData, setExcelPreviewData] = useState<{ headers: string[], data: any[], rowCount: number } | null>(null);
+    const [isParsingExcel, setIsParsingExcel] = useState(false);
 
     // Manual Input Node State
     const [configuringManualInputNodeId, setConfiguringManualInputNodeId] = useState<string | null>(null);
@@ -220,6 +236,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // Human Approval Waiting State
     const [waitingApprovalNodeId, setWaitingApprovalNodeId] = useState<string | null>(null);
     const [pendingApprovalData, setPendingApprovalData] = useState<{ inputData: any, resolve: () => void } | null>(null);
+
+    // AI Workflow Assistant State
+    const [showAiAssistant, setShowAiAssistant] = useState<boolean>(false);
+    const [aiPrompt, setAiPrompt] = useState<string>('');
+    const [isGeneratingWorkflow, setIsGeneratingWorkflow] = useState<boolean>(false);
+    const [aiGeneratedWorkflow, setAiGeneratedWorkflow] = useState<{ nodes: any[], connections: any[] } | null>(null);
+    const [showAiConfirmDialog, setShowAiConfirmDialog] = useState<boolean>(false);
 
     const showToast = (message: string, type: 'success' | 'error' = 'success') => {
         setToast({ message, type });
@@ -412,6 +435,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             setConditionField(node.config?.conditionField || '');
             setConditionOperator(node.config?.conditionOperator || 'isText');
             setConditionValue(node.config?.conditionValue || '');
+            setConditionProcessingMode(node.config?.processingMode || 'batch');
         }
     };
 
@@ -426,7 +450,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         ...n.config,
                         conditionField,
                         conditionOperator,
-                        conditionValue
+                        conditionValue,
+                        processingMode: conditionProcessingMode
                     }
                 }
                 : n
@@ -435,6 +460,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setConditionField('');
         setConditionOperator('isText');
         setConditionValue('');
+        setConditionProcessingMode('batch');
     };
 
     const openAddFieldConfig = (nodeId: string) => {
@@ -496,6 +522,85 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setJoinStrategy('concat');
         setJoinType('inner');
         setJoinKey('');
+    };
+
+    const openExcelConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'excelInput') {
+            setConfiguringExcelNodeId(nodeId);
+            // If the node already has parsed data, show preview
+            if (node.config?.parsedData) {
+                setExcelPreviewData({
+                    headers: node.config.headers || [],
+                    data: node.config.parsedData.slice(0, 5),
+                    rowCount: node.config.parsedData.length
+                });
+            } else {
+                setExcelPreviewData(null);
+            }
+            setExcelFile(null);
+        }
+    };
+
+    const handleExcelFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setExcelFile(file);
+        setIsParsingExcel(true);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const res = await fetch(`${API_BASE}/parse-spreadsheet`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+
+            if (!res.ok) {
+                throw new Error('Failed to parse file');
+            }
+
+            const result = await res.json();
+            setExcelPreviewData({
+                headers: result.headers,
+                data: result.data.slice(0, 5), // Show first 5 rows as preview
+                rowCount: result.rowCount
+            });
+
+            // Save parsed data to node config
+            if (configuringExcelNodeId) {
+                setNodes(prev => prev.map(n =>
+                    n.id === configuringExcelNodeId
+                        ? {
+                            ...n,
+                            label: file.name,
+                            config: {
+                                ...n.config,
+                                fileName: file.name,
+                                headers: result.headers,
+                                parsedData: result.data,
+                                rowCount: result.rowCount
+                            }
+                        }
+                        : n
+                ));
+            }
+        } catch (error) {
+            console.error('Error parsing file:', error);
+            showToast('Failed to parse file. Make sure it\'s a valid Excel or CSV file.', 'error');
+            setExcelPreviewData(null);
+        } finally {
+            setIsParsingExcel(false);
+        }
+    };
+
+    const closeExcelConfig = () => {
+        setConfiguringExcelNodeId(null);
+        setExcelFile(null);
+        setExcelPreviewData(null);
     };
 
     const openSaveRecordsConfig = (nodeId: string) => {
@@ -604,6 +709,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             setLlmPrompt(node.config?.llmPrompt || '');
             setLlmContextEntities(node.config?.llmContextEntities || []);
             setLlmIncludeInput(node.config?.llmIncludeInput !== undefined ? node.config.llmIncludeInput : true);
+            setLlmProcessingMode(node.config?.processingMode || 'batch');
         }
     };
 
@@ -618,7 +724,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         ...n.config,
                         llmPrompt,
                         llmContextEntities,
-                        llmIncludeInput
+                        llmIncludeInput,
+                        processingMode: llmProcessingMode
                     }
                 }
                 : n
@@ -627,6 +734,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setLlmPrompt('');
         setLlmContextEntities([]);
         setLlmIncludeInput(true);
+        setLlmProcessingMode('batch');
     };
 
     const openPythonConfig = (nodeId: string) => {
@@ -1080,23 +1188,39 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     // Evaluate condition
                     if (node.config?.conditionField && node.config?.conditionOperator) {
                         const dataToEval = inputData;
+                        const processingMode = node.config.processingMode || 'batch';
 
                         if (dataToEval && Array.isArray(dataToEval) && dataToEval.length > 0) {
-                            const record = dataToEval[0];
-                            const fieldValue = record[node.config.conditionField];
-                            let condResult = false;
+                            const evaluateRecord = (record: any): boolean => {
+                                const fieldValue = record[node.config!.conditionField!];
+                                switch (node.config!.conditionOperator) {
+                                    case 'isText': return typeof fieldValue === 'string';
+                                    case 'isNumber': return !isNaN(Number(fieldValue));
+                                    case 'equals': return String(fieldValue) === node.config!.conditionValue;
+                                    case 'notEquals': return String(fieldValue) !== node.config!.conditionValue;
+                                    case 'contains': return String(fieldValue).includes(node.config!.conditionValue || '');
+                                    case 'greaterThan': return Number(fieldValue) > Number(node.config!.conditionValue);
+                                    case 'lessThan': return Number(fieldValue) < Number(node.config!.conditionValue);
+                                    default: return false;
+                                }
+                            };
 
-                            switch (node.config.conditionOperator) {
-                                case 'isText': condResult = typeof fieldValue === 'string'; break;
-                                case 'isNumber': condResult = !isNaN(Number(fieldValue)); break;
-                                case 'equals': condResult = String(fieldValue) === node.config.conditionValue; break;
-                                case 'greaterThan': condResult = Number(fieldValue) > Number(node.config.conditionValue); break;
-                                case 'lessThan': condResult = Number(fieldValue) < Number(node.config.conditionValue); break;
+                            if (processingMode === 'perRow') {
+                                // Per-row mode: filter data into TRUE and FALSE outputs
+                                const trueRecords = dataToEval.filter(record => evaluateRecord(record));
+                                const falseRecords = dataToEval.filter(record => !evaluateRecord(record));
+                                
+                                // Store both filtered arrays for routing
+                                nodeData = { trueRecords, falseRecords };
+                                conditionResult = trueRecords.length > 0; // For visual indication
+                                result = `Filtered: ${trueRecords.length} TRUE, ${falseRecords.length} FALSE`;
+                            } else {
+                                // Batch mode: evaluate first record, route ALL data
+                                const condResult = evaluateRecord(dataToEval[0]);
+                                nodeData = dataToEval;
+                                conditionResult = condResult;
+                                result = `${node.config.conditionField} ${node.config.conditionOperator} → ${condResult ? '✓ All to TRUE' : '✗ All to FALSE'}`;
                             }
-
-                            nodeData = dataToEval;
-                            conditionResult = condResult;
-                            result = `${node.config.conditionField} ${node.config.conditionOperator} → ${condResult ? '✓' : '✗'}`;
                         } else {
                             result = 'No data to evaluate';
                         }
@@ -1190,25 +1314,70 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     break;
                 case 'llm':
                     if (node.config?.llmPrompt) {
+                        const llmProcessingMode = node.config.processingMode || 'batch';
+                        
                         try {
-                            const response = await fetch(`${API_BASE}/generate`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    prompt: node.config.llmPrompt,
-                                    mentionedEntityIds: node.config.llmContextEntities || [],
-                                    additionalContext: node.config.llmIncludeInput ? inputData : undefined
-                                }),
-                                credentials: 'include'
-                            });
+                            if (llmProcessingMode === 'perRow' && inputData && Array.isArray(inputData) && inputData.length > 0) {
+                                // Per-row mode: process each record individually
+                                const results: any[] = [];
+                                
+                                for (let i = 0; i < inputData.length; i++) {
+                                    const record = inputData[i];
+                                    // Replace placeholders in prompt with record values
+                                    let personalizedPrompt = node.config.llmPrompt;
+                                    Object.keys(record).forEach(key => {
+                                        personalizedPrompt = personalizedPrompt.replace(new RegExp(`\\{${key}\\}`, 'g'), String(record[key]));
+                                    });
+                                    
+                                    const response = await fetch(`${API_BASE}/generate`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            prompt: personalizedPrompt,
+                                            mentionedEntityIds: node.config.llmContextEntities || [],
+                                            additionalContext: node.config.llmIncludeInput ? [record] : undefined
+                                        }),
+                                        credentials: 'include'
+                                    });
 
-                            if (response.ok) {
-                                const data = await response.json();
-                                nodeData = [{ result: data.response }]; // Store as a record-like object
-                                result = 'Generated text successfully';
+                                    if (response.ok) {
+                                        const data = await response.json();
+                                        results.push({
+                                            ...record,
+                                            ai_result: data.response
+                                        });
+                                    } else {
+                                        results.push({
+                                            ...record,
+                                            ai_result: 'Error generating',
+                                            ai_error: true
+                                        });
+                                    }
+                                }
+                                
+                                nodeData = results;
+                                result = `Generated for ${results.length} records`;
                             } else {
-                                const errorData = await response.json();
-                                throw new Error(errorData.error || 'Failed to generate text');
+                                // Batch mode: single call with all data
+                                const response = await fetch(`${API_BASE}/generate`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        prompt: node.config.llmPrompt,
+                                        mentionedEntityIds: node.config.llmContextEntities || [],
+                                        additionalContext: node.config.llmIncludeInput ? inputData : undefined
+                                    }),
+                                    credentials: 'include'
+                                });
+
+                                if (response.ok) {
+                                    const data = await response.json();
+                                    nodeData = [{ result: data.response }];
+                                    result = 'Generated text successfully';
+                                } else {
+                                    const errorData = await response.json();
+                                    throw new Error(errorData.error || 'Failed to generate text');
+                                }
                             }
                         } catch (error) {
                             console.error('LLM generation error:', error);
@@ -1326,6 +1495,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     } else {
                         result = 'Not configured - please select an emission factor';
                         nodeData = [{ error: 'No emission factor selected' }];
+                    }
+                    break;
+                case 'excelInput':
+                    // Excel/CSV Input node - output the parsed data
+                    if (node.config?.parsedData && Array.isArray(node.config.parsedData)) {
+                        nodeData = node.config.parsedData;
+                        result = `Loaded ${nodeData.length} rows from ${node.config.fileName || 'file'}`;
+                    } else {
+                        result = 'No file loaded - click to upload Excel/CSV file';
+                        nodeData = [];
                     }
                     break;
                 case 'join':
@@ -1474,25 +1653,40 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             // Find and execute connected nodes
             const nextConnections = connections.filter(conn => conn.fromNodeId === nodeId);
 
-            // For condition nodes, filter by outputType based on result
-            const toExecute = node.type === 'condition' && conditionResult !== undefined
-                ? nextConnections.filter(c => {
-                    if (conditionResult) {
-                        return !c.outputType || c.outputType === 'true';
+            // For condition nodes in perRow mode, send filtered data to each output
+            if (node.type === 'condition' && node.config?.processingMode === 'perRow' && nodeData?.trueRecords !== undefined) {
+                // Per-row mode: send trueRecords to TRUE connections, falseRecords to FALSE connections
+                for (const conn of nextConnections) {
+                    const targetNode = nodes.find(n => n.id === conn.toNodeId);
+                    const dataToSend = conn.outputType === 'false' ? nodeData.falseRecords : nodeData.trueRecords;
+                    
+                    if (targetNode?.type === 'join') {
+                        await executeJoinInput(conn.toNodeId, dataToSend, conn.inputPort || 'A');
                     } else {
-                        return c.outputType === 'false';
+                        await executeNode(conn.toNodeId, dataToSend);
                     }
-                })
-                : nextConnections;
+                }
+            } else {
+                // Batch mode or non-condition nodes
+                const toExecute = node.type === 'condition' && conditionResult !== undefined
+                    ? nextConnections.filter(c => {
+                        if (conditionResult) {
+                            return !c.outputType || c.outputType === 'true';
+                        } else {
+                            return c.outputType === 'false';
+                        }
+                    })
+                    : nextConnections;
 
-            for (const conn of toExecute) {
-                const targetNode = nodes.find(n => n.id === conn.toNodeId);
-                
-                // For join nodes, we need to handle inputs differently
-                if (targetNode?.type === 'join') {
-                    await executeJoinInput(conn.toNodeId, nodeData, conn.inputPort || 'A');
-                } else {
-                    await executeNode(conn.toNodeId, nodeData);
+                for (const conn of toExecute) {
+                    const targetNode = nodes.find(n => n.id === conn.toNodeId);
+
+                    // For join nodes, we need to handle inputs differently
+                    if (targetNode?.type === 'join') {
+                        await executeJoinInput(conn.toNodeId, nodeData, conn.inputPort || 'A');
+                    } else {
+                        await executeNode(conn.toNodeId, nodeData);
+                    }
                 }
             }
         }
@@ -1634,6 +1828,119 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         await executeNode(nodeId, inputData, false);
     };
 
+    // AI Workflow Assistant Functions
+    const handleGenerateWorkflow = async () => {
+        if (!aiPrompt.trim() || isGeneratingWorkflow) return;
+        
+        setIsGeneratingWorkflow(true);
+        try {
+            const res = await fetch(`${API_BASE}/generate-workflow`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: aiPrompt,
+                    entities: entities.map(e => ({
+                        id: e.id,
+                        name: e.name,
+                        properties: e.properties?.map((p: any) => ({ name: p.name, type: p.type })) || []
+                    }))
+                }),
+                credentials: 'include'
+            });
+
+            if (!res.ok) {
+                throw new Error('Failed to generate workflow');
+            }
+
+            const data = await res.json();
+            
+            if (data.nodes && data.connections) {
+                setAiGeneratedWorkflow(data);
+                setShowAiAssistant(false);
+                setShowAiConfirmDialog(true);
+            } else {
+                throw new Error('Invalid response format');
+            }
+        } catch (error) {
+            console.error('Error generating workflow:', error);
+            showToast('Failed to generate workflow. Please try again.', 'error');
+        } finally {
+            setIsGeneratingWorkflow(false);
+        }
+    };
+
+    const applyAiWorkflow = (mode: 'replace' | 'add') => {
+        if (!aiGeneratedWorkflow) return;
+
+        const { nodes: newNodes, connections: newConnections } = aiGeneratedWorkflow;
+
+        if (mode === 'replace') {
+            // Replace: clear canvas and add new nodes
+            const processedNodes: WorkflowNode[] = newNodes.map((n: any) => ({
+                id: generateUUID(),
+                type: n.type,
+                label: n.label,
+                x: n.x,
+                y: n.y,
+                config: n.config || {},
+                status: 'idle' as const
+            }));
+
+            // Map old IDs to new IDs for connections
+            const idMap: { [oldId: string]: string } = {};
+            newNodes.forEach((n: any, i: number) => {
+                idMap[n.id] = processedNodes[i].id;
+            });
+
+            const processedConnections: Connection[] = newConnections.map((c: any) => ({
+                id: generateUUID(),
+                fromNodeId: idMap[c.fromNodeId],
+                toNodeId: idMap[c.toNodeId],
+                outputType: c.outputType,
+                inputPort: c.inputPort
+            })).filter((c: Connection) => c.fromNodeId && c.toNodeId);
+
+            setNodes(processedNodes);
+            setConnections(processedConnections);
+        } else {
+            // Add: offset nodes and append to canvas
+            const maxX = nodes.length > 0 ? Math.max(...nodes.map(n => n.x)) + 300 : 0;
+            const offsetX = maxX;
+
+            const processedNodes: WorkflowNode[] = newNodes.map((n: any) => ({
+                id: generateUUID(),
+                type: n.type,
+                label: n.label,
+                x: n.x + offsetX,
+                y: n.y,
+                config: n.config || {},
+                status: 'idle' as const
+            }));
+
+            // Map old IDs to new IDs for connections
+            const idMap: { [oldId: string]: string } = {};
+            newNodes.forEach((n: any, i: number) => {
+                idMap[n.id] = processedNodes[i].id;
+            });
+
+            const processedConnections: Connection[] = newConnections.map((c: any) => ({
+                id: generateUUID(),
+                fromNodeId: idMap[c.fromNodeId],
+                toNodeId: idMap[c.toNodeId],
+                outputType: c.outputType,
+                inputPort: c.inputPort
+            })).filter((c: Connection) => c.fromNodeId && c.toNodeId);
+
+            setNodes(prev => [...prev, ...processedNodes]);
+            setConnections(prev => [...prev, ...processedConnections]);
+        }
+
+        // Cleanup
+        setShowAiConfirmDialog(false);
+        setAiGeneratedWorkflow(null);
+        setAiPrompt('');
+        showToast(`Workflow ${mode === 'replace' ? 'created' : 'added'} successfully!`, 'success');
+    };
 
     const handleDragStart = (e: React.DragEvent, item: DraggableItem) => {
         setDraggingItem(item);
@@ -1802,6 +2109,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'saveRecords': return 'bg-emerald-100 border-emerald-300 text-emerald-800';
             case 'llm': return 'bg-violet-100 border-violet-300 text-violet-800';
             case 'join': return 'bg-cyan-100 border-cyan-300 text-cyan-800';
+            case 'excelInput': return 'bg-emerald-100 border-emerald-300 text-emerald-800';
             case 'comment': return 'bg-amber-50 border-amber-200 text-amber-900';
             default: return 'bg-slate-100 border-slate-300';
         }
@@ -2047,9 +2355,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     className="text-2xl font-bold text-slate-800 bg-transparent border-b-2 border-transparent hover:border-slate-300 focus:border-teal-500 focus:outline-none transition-colors"
                                     placeholder="Workflow Name"
                                 />
-                                <p className="text-sm text-slate-500 mt-1">
-                                    {nodes.length} nodes • {connections.length} connections {currentWorkflowId && '• Saved'}
-                                </p>
                             </div>
                             <div className="flex gap-1.5">
                                 <button
@@ -2107,6 +2412,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             className="w-full h-full relative"
                             style={{ cursor: isPanning ? 'grabbing' : 'default' }}
                         >
+                            {/* AI Assistant Floating Button */}
+                            <button
+                                onClick={() => setShowAiAssistant(true)}
+                                className="absolute bottom-4 left-4 z-20 w-12 h-12 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center"
+                                title="AI Workflow Assistant"
+                            >
+                                <Sparkles size={22} />
+                            </button>
+
                             {/* Zoom Controls */}
                             <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2">
                                 <button
@@ -2285,6 +2599,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openHumanApprovalConfig(node.id);
                                             } else if (node.type === 'join') {
                                                 openJoinConfig(node.id);
+                                            } else if (node.type === 'excelInput') {
+                                                openExcelConfig(node.id);
                                             }
                                         }}
                                         onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
@@ -2415,7 +2731,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                         {node.type === 'join' && (
                                             <div className="mt-2 text-xs font-medium text-cyan-700">
-                                                {node.config?.joinStrategy === 'mergeByKey' 
+                                                {node.config?.joinStrategy === 'mergeByKey'
                                                     ? `${node.config?.joinType === 'outer' ? 'Outer' : 'Inner'} Join: ${node.config?.joinKey || 'key not set'}`
                                                     : 'Strategy: Concatenate'}
                                                 {node.inputDataA && node.inputDataB && (
@@ -2423,6 +2739,57 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 )}
                                                 {(node.inputDataA || node.inputDataB) && !(node.inputDataA && node.inputDataB) && (
                                                     <span className="ml-2 text-amber-600">⏳ {node.inputDataA ? 'B' : 'A'}</span>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {node.type === 'excelInput' && (
+                                            <div className="mt-2 text-xs font-medium text-emerald-700">
+                                                {node.config?.fileName ? (
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="truncate max-w-[160px]" title={node.config.fileName}>
+                                                            📄 {node.config.fileName}
+                                                        </span>
+                                                        <span className="text-slate-500">
+                                                            {node.config.rowCount} rows • {node.config.headers?.length || 0} cols
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-400 italic">Click to upload file</span>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {node.type === 'condition' && (
+                                            <div className="mt-2 text-xs font-medium text-amber-700">
+                                                {node.config?.conditionField ? (
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span>
+                                                            {node.config.conditionField} {node.config.conditionOperator} {node.config.conditionValue || ''}
+                                                        </span>
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${node.config.processingMode === 'perRow' ? 'bg-amber-200 text-amber-800' : 'bg-slate-200 text-slate-600'}`}>
+                                                            {node.config.processingMode === 'perRow' ? '⚡ Per Row (filter)' : '📦 Batch'}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-400 italic">Not configured</span>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {node.type === 'llm' && (
+                                            <div className="mt-2 text-xs font-medium text-violet-700">
+                                                {node.config?.llmPrompt ? (
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="truncate max-w-[160px]" title={node.config.llmPrompt}>
+                                                            {node.config.llmPrompt.slice(0, 30)}{node.config.llmPrompt.length > 30 ? '...' : ''}
+                                                        </span>
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${node.config.processingMode === 'perRow' ? 'bg-violet-200 text-violet-800' : 'bg-slate-200 text-slate-600'}`}>
+                                                            {node.config.processingMode === 'perRow' ? '⚡ Per Row' : '📦 Batch'}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-400 italic">Not configured</span>
                                                 )}
                                             </div>
                                         )}
@@ -3033,14 +3400,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     onChange={(e) => setConditionOperator(e.target.value)}
                                                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                                                 >
-                                                    <option value="isText">Is Text</option>
-                                                    <option value="isNumber">Is Number</option>
                                                     <option value="equals">Equals</option>
+                                                    <option value="notEquals">Not Equals</option>
+                                                    <option value="contains">Contains</option>
                                                     <option value="greaterThan">Greater Than</option>
                                                     <option value="lessThan">Less Than</option>
+                                                    <option value="isText">Is Text</option>
+                                                    <option value="isNumber">Is Number</option>
                                                 </select>
                                             </div>
-                                            {['equals', 'greaterThan', 'lessThan'].includes(conditionOperator) && (
+                                            {['equals', 'notEquals', 'contains', 'greaterThan', 'lessThan'].includes(conditionOperator) && (
                                                 <div>
                                                     <label className="block text-sm font-medium text-slate-700 mb-2">
                                                         Value
@@ -3054,6 +3423,47 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     />
                                                 </div>
                                             )}
+
+                                            {/* Processing Mode */}
+                                            <div className="pt-2 border-t border-slate-200">
+                                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                    Processing Mode
+                                                </label>
+                                                <div className="space-y-2">
+                                                    <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${conditionProcessingMode === 'batch' ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                                        <input
+                                                            type="radio"
+                                                            name="processingMode"
+                                                            value="batch"
+                                                            checked={conditionProcessingMode === 'batch'}
+                                                            onChange={() => setConditionProcessingMode('batch')}
+                                                            className="mt-0.5 mr-3"
+                                                        />
+                                                        <div>
+                                                            <span className="font-medium text-sm">Batch (all rows)</span>
+                                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                                Evaluate first row → route ALL data to TRUE or FALSE
+                                                            </p>
+                                                        </div>
+                                                    </label>
+                                                    <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${conditionProcessingMode === 'perRow' ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                                        <input
+                                                            type="radio"
+                                                            name="processingMode"
+                                                            value="perRow"
+                                                            checked={conditionProcessingMode === 'perRow'}
+                                                            onChange={() => setConditionProcessingMode('perRow')}
+                                                            className="mt-0.5 mr-3"
+                                                        />
+                                                        <div>
+                                                            <span className="font-medium text-sm">Per Row (filter)</span>
+                                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                                Evaluate each row → matching to TRUE, non-matching to FALSE
+                                                            </p>
+                                                        </div>
+                                                    </label>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div className="flex gap-2 justify-end mt-6">
                                             <button
@@ -3295,6 +3705,127 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             );
                         })()}
 
+                        {/* Excel Input Configuration Modal */}
+                        {configuringExcelNodeId && (
+                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={closeExcelConfig}>
+                                <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                        <FileSpreadsheet className="text-emerald-600" size={20} />
+                                        Excel/CSV Input
+                                    </h3>
+                                    
+                                    {/* File Upload Area */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Upload File
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                type="file"
+                                                accept=".csv,.xlsx,.xls"
+                                                onChange={handleExcelFileChange}
+                                                className="hidden"
+                                                id="excel-file-input"
+                                                disabled={isParsingExcel}
+                                            />
+                                            <label
+                                                htmlFor="excel-file-input"
+                                                className={`flex items-center justify-center gap-2 w-full px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
+                                                    isParsingExcel 
+                                                        ? 'bg-slate-50 border-slate-300 cursor-wait'
+                                                        : 'border-emerald-300 hover:border-emerald-500 hover:bg-emerald-50'
+                                                }`}
+                                            >
+                                                {isParsingExcel ? (
+                                                    <>
+                                                        <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                                                        <span className="text-slate-600">Parsing file...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Upload className="text-emerald-500" size={24} />
+                                                        <div className="text-center">
+                                                            <span className="text-slate-600 font-medium">Click to upload</span>
+                                                            <p className="text-xs text-slate-400 mt-1">CSV, XLS, XLSX supported</p>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {/* Preview Section */}
+                                    {excelPreviewData && (
+                                        <div className="mb-4">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="block text-sm font-medium text-slate-700">
+                                                    Preview
+                                                </label>
+                                                <span className="text-xs text-slate-500">
+                                                    {excelPreviewData.rowCount} total rows • {excelPreviewData.headers.length} columns
+                                                </span>
+                                            </div>
+                                            <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                                <div className="overflow-x-auto max-h-48">
+                                                    <table className="w-full text-xs">
+                                                        <thead className="bg-slate-100 sticky top-0">
+                                                            <tr>
+                                                                {excelPreviewData.headers.map((header, i) => (
+                                                                    <th key={i} className="px-3 py-2 text-left font-semibold text-slate-700 whitespace-nowrap">
+                                                                        {header}
+                                                                    </th>
+                                                                ))}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {excelPreviewData.data.map((row, i) => (
+                                                                <tr key={i} className="hover:bg-slate-50">
+                                                                    {excelPreviewData.headers.map((header, j) => (
+                                                                        <td key={j} className="px-3 py-2 text-slate-600 whitespace-nowrap max-w-[150px] truncate">
+                                                                            {row[header] || '-'}
+                                                                        </td>
+                                                                    ))}
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                {excelPreviewData.rowCount > 5 && (
+                                                    <div className="px-3 py-2 bg-slate-50 text-xs text-slate-500 text-center border-t border-slate-200">
+                                                        Showing first 5 of {excelPreviewData.rowCount} rows
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Current File Info */}
+                                    {nodes.find(n => n.id === configuringExcelNodeId)?.config?.fileName && !excelFile && (
+                                        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <FileSpreadsheet className="text-emerald-600" size={16} />
+                                                <span className="font-medium text-emerald-800">
+                                                    {nodes.find(n => n.id === configuringExcelNodeId)?.config?.fileName}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-emerald-600 mt-1">
+                                                {nodes.find(n => n.id === configuringExcelNodeId)?.config?.rowCount} rows loaded
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <div className="flex gap-2 justify-end mt-6">
+                                        <button
+                                            onClick={closeExcelConfig}
+                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Save Records Configuration Modal */}
                         {configuringSaveNodeId && (
                             <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringSaveNodeId(null)}>
@@ -3463,6 +3994,48 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <label htmlFor="includeInput" className="text-sm text-slate-700 cursor-pointer">
                                             Include Input Data (from previous node)
                                         </label>
+                                    </div>
+
+                                    {/* Processing Mode */}
+                                    <div className="pt-3 border-t border-slate-200">
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Processing Mode
+                                        </label>
+                                        <div className="space-y-2">
+                                            <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${llmProcessingMode === 'batch' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                                <input
+                                                    type="radio"
+                                                    name="llmProcessingMode"
+                                                    value="batch"
+                                                    checked={llmProcessingMode === 'batch'}
+                                                    onChange={() => setLlmProcessingMode('batch')}
+                                                    className="mt-0.5 mr-3"
+                                                />
+                                                <div>
+                                                    <span className="font-medium text-sm">Batch (all rows)</span>
+                                                    <p className="text-xs text-slate-500 mt-0.5">
+                                                        Send all data in one AI call → single result
+                                                    </p>
+                                                </div>
+                                            </label>
+                                            <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${llmProcessingMode === 'perRow' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                                <input
+                                                    type="radio"
+                                                    name="llmProcessingMode"
+                                                    value="perRow"
+                                                    checked={llmProcessingMode === 'perRow'}
+                                                    onChange={() => setLlmProcessingMode('perRow')}
+                                                    className="mt-0.5 mr-3"
+                                                />
+                                                <div>
+                                                    <span className="font-medium text-sm">Per Row</span>
+                                                    <p className="text-xs text-slate-500 mt-0.5">
+                                                        Call AI for each row → adds <code className="bg-slate-100 px-1 rounded">ai_result</code> field.
+                                                        Use <code className="bg-slate-100 px-1 rounded">{'{field}'}</code> in prompt for row values.
+                                                    </p>
+                                                </div>
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -3822,6 +4395,140 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     >
                         <X size={14} />
                     </button>
+                </div>
+            )}
+
+            {/* AI Workflow Assistant Modal */}
+            {showAiAssistant && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !isGeneratingWorkflow && setShowAiAssistant(false)}>
+                    <div className="bg-white rounded-xl shadow-2xl w-[500px] flex flex-col" onClick={e => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-6 py-4 text-white rounded-t-xl shrink-0">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <Sparkles size={24} />
+                                    <div>
+                                        <h3 className="font-bold text-lg">AI Workflow Assistant</h3>
+                                        <p className="text-violet-100 text-sm">Describe your workflow in natural language</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowAiAssistant(false)}
+                                    disabled={isGeneratingWorkflow}
+                                    className="p-1 hover:bg-white/20 rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6">
+                            <textarea
+                                value={aiPrompt}
+                                onChange={e => setAiPrompt(e.target.value)}
+                                placeholder="Example: Fetch all customers, filter those with orders greater than 100, and display the results..."
+                                className="w-full h-28 p-3 border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-slate-800 text-sm"
+                                disabled={isGeneratingWorkflow}
+                            />
+
+                            {/* Available Entities */}
+                            {entities.length > 0 && (
+                                <div className="mt-3 p-2 bg-slate-50 rounded-lg">
+                                    <p className="text-xs font-medium text-slate-600 mb-1">Your entities:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                        {entities.map(e => (
+                                            <span key={e.id} className="px-2 py-0.5 bg-violet-100 text-violet-700 rounded text-xs">
+                                                {e.name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 rounded-b-xl shrink-0">
+                            <button
+                                onClick={() => setShowAiAssistant(false)}
+                                disabled={isGeneratingWorkflow}
+                                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleGenerateWorkflow}
+                                disabled={!aiPrompt.trim() || isGeneratingWorkflow}
+                                className="px-5 py-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-lg hover:from-violet-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            >
+                                {isGeneratingWorkflow ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        Generating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles size={16} />
+                                        Generate
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* AI Confirm Dialog */}
+            {showAiConfirmDialog && aiGeneratedWorkflow && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl shadow-2xl w-[400px] overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 bg-violet-100 rounded-lg flex items-center justify-center">
+                                    <Sparkles size={20} className="text-violet-600" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-lg text-slate-800">Workflow Generated!</h3>
+                                    <p className="text-sm text-slate-500">
+                                        {aiGeneratedWorkflow.nodes.length} nodes, {aiGeneratedWorkflow.connections.length} connections
+                                    </p>
+                                </div>
+                            </div>
+
+                            <p className="text-slate-600 mb-4">
+                                How would you like to add this workflow to the canvas?
+                            </p>
+
+                            <div className="space-y-2">
+                                <button
+                                    onClick={() => applyAiWorkflow('replace')}
+                                    className="w-full p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-left"
+                                >
+                                    <span className="font-medium text-slate-800">Replace canvas</span>
+                                    <p className="text-xs text-slate-500 mt-0.5">Clear existing nodes and start fresh</p>
+                                </button>
+                                <button
+                                    onClick={() => applyAiWorkflow('add')}
+                                    className="w-full p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-left"
+                                >
+                                    <span className="font-medium text-slate-800">Add to canvas</span>
+                                    <p className="text-xs text-slate-500 mt-0.5">Append nodes to existing workflow</p>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
+                            <button
+                                onClick={() => {
+                                    setShowAiConfirmDialog(false);
+                                    setAiGeneratedWorkflow(null);
+                                }}
+                                className="w-full px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
