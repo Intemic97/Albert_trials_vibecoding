@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Plus, X, Search, Building } from 'lucide-react';
-import { ProfileMenu } from './ProfileMenu';
+import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import { API_BASE } from '../config';
 
 interface SettingsProps {
@@ -12,6 +12,8 @@ interface OrgUser {
     name: string;
     email: string;
     role: string;
+    profilePhoto?: string;
+    companyRole?: string;
 }
 
 export const Settings: React.FC<SettingsProps> = ({ onViewChange }) => {
@@ -149,10 +151,13 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange }) => {
                                             <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-9 h-9 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-sm">
-                                                            {user.name.charAt(0)}
+                                                        <UserAvatar name={user.name} profilePhoto={user.profilePhoto} size="sm" />
+                                                        <div>
+                                                            <span className="font-medium text-slate-700">{user.name}</span>
+                                                            {user.companyRole && (
+                                                                <p className="text-xs text-slate-400">{user.companyRole}</p>
+                                                            )}
                                                         </div>
-                                                        <span className="font-medium text-slate-700">{user.name}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">

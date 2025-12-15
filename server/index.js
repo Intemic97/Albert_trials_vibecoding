@@ -8,7 +8,7 @@ const XLSX = require('xlsx');
 const { initDb } = require('./db');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const cookieParser = require('cookie-parser');
-const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser } = require('./auth');
+const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile } = require('./auth');
 
 const app = express();
 const PORT = 3001;
@@ -56,7 +56,7 @@ const upload = multer({
 });
 
 app.use(cors({
-    origin: 'http://localhost:5173', // Vite default port
+    origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'], // Vite ports
     credentials: true
 }));
 app.use(express.json());
@@ -87,6 +87,7 @@ app.get('/api/auth/organizations', authenticateToken, getOrganizations);
 app.post('/api/auth/switch-org', authenticateToken, switchOrganization);
 app.get('/api/organization/users', authenticateToken, getOrganizationUsers);
 app.post('/api/organization/invite', authenticateToken, inviteUser);
+app.put('/api/profile', authenticateToken, updateProfile);
 
 // File Upload Endpoint
 app.post('/api/upload', authenticateToken, upload.single('file'), (req, res) => {

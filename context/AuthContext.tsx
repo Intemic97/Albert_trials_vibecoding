@@ -6,6 +6,8 @@ interface User {
     name: string;
     email: string;
     orgId: string;
+    profilePhoto?: string;
+    companyRole?: string;
 }
 
 interface Organization {
@@ -22,6 +24,7 @@ interface AuthContextType {
     login: (user: User) => void;
     logout: () => void;
     switchOrganization: (orgId: string) => Promise<void>;
+    updateProfile: (updates: { name?: string; companyRole?: string; profilePhoto?: string }) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -114,8 +117,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const updateProfile = async (updates: { name?: string; companyRole?: string; profilePhoto?: string }): Promise<boolean> => {
+        try {
+            const res = await fetch(`${API_BASE}/profile`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates),
+                credentials: 'include'
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setUser(data.user);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Update profile error:', error);
+            return false;
+        }
+    };
+
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, organizations, login, logout, switchOrganization }}>
+        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, organizations, login, logout, switchOrganization, updateProfile }}>
             {children}
         </AuthContext.Provider>
     );

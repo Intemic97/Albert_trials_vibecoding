@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, Upload } from 'lucide-react';
 import { PromptInput } from './PromptInput';
-import { ProfileMenu } from './ProfileMenu';
+import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import { API_BASE } from '../config';
 
 // Generate UUID that works in non-HTTPS contexts
@@ -56,6 +56,7 @@ interface WorkflowNode {
         // For human approval nodes:
         assignedUserId?: string;
         assignedUserName?: string;
+        assignedUserPhoto?: string;
         approvalStatus?: 'pending' | 'approved' | 'rejected';
         // For join nodes:
         joinStrategy?: 'concat' | 'mergeByKey';
@@ -983,7 +984,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         }
     };
 
-    const saveHumanApprovalConfig = (userId: string, userName: string) => {
+    const saveHumanApprovalConfig = (userId: string, userName: string, userProfilePhoto?: string) => {
         if (!configuringHumanApprovalNodeId) return;
 
         setNodes(prev => prev.map(n =>
@@ -995,6 +996,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         ...n.config,
                         assignedUserId: userId,
                         assignedUserName: userName,
+                        assignedUserPhoto: userProfilePhoto,
                         approvalStatus: 'pending'
                     }
                 }
@@ -2673,6 +2675,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             /* Regular Node Layout */
                                             <>
                                                 <div className="flex items-center">
+                                                    {/* Show assigned user photo for humanApproval nodes */}
+                                                    {node.type === 'humanApproval' && node.config?.assignedUserId && (
+                                                        <div className="mr-2 flex-shrink-0">
+                                                            <UserAvatar 
+                                                                name={node.config.assignedUserName} 
+                                                                profilePhoto={node.config.assignedUserPhoto} 
+                                                                size="sm" 
+                                                            />
+                                                        </div>
+                                                    )}
                                                     <div className="flex-1 font-medium text-sm truncate" title={node.label}>{node.label}</div>
                                                     {node.status === 'completed' && <Check size={16} className="text-green-600 flex-shrink-0 ml-1" />}
                                                     {node.status === 'error' && <XCircle size={16} className="text-red-600 flex-shrink-0 ml-1" />}
@@ -3198,16 +3210,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     return (
                                                         <button
                                                             key={user.id}
-                                                            onClick={() => saveHumanApprovalConfig(user.id, user.name || user.email)}
+                                                            onClick={() => saveHumanApprovalConfig(user.id, user.name || user.email, user.profilePhoto)}
                                                             className={`w-full p-3 rounded-lg border-2 text-left transition-all flex items-center gap-3 ${
                                                                 isSelected
                                                                     ? 'border-orange-500 bg-orange-50'
                                                                     : 'border-slate-200 hover:border-orange-300 hover:bg-orange-50/50'
                                                             }`}
                                                         >
-                                                            <div className="w-9 h-9 bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                                                                {(user.name || user.email || '?').charAt(0).toUpperCase()}
-                                                            </div>
+                                                            <UserAvatar name={user.name || user.email} profilePhoto={user.profilePhoto} size="sm" />
                                                             <div className="flex-1 min-w-0">
                                                                 <div className="font-medium text-slate-800 truncate">
                                                                     {user.name || 'Unnamed User'}

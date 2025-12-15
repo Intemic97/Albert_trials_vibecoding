@@ -33,6 +33,8 @@ async function initDb() {
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       name TEXT,
+      profilePhoto TEXT,
+      companyRole TEXT,
       createdAt TEXT
     );
 
@@ -122,6 +124,18 @@ async function initDb() {
       FOREIGN KEY(dashboardId) REFERENCES dashboards(id) ON DELETE CASCADE
     );
   `);
+
+  // Migration: Add profilePhoto and companyRole columns to users table if they don't exist
+  try {
+    await db.exec(`ALTER TABLE users ADD COLUMN profilePhoto TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE users ADD COLUMN companyRole TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
 
   return db;
 }

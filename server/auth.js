@@ -139,7 +139,7 @@ async function getMe(req, res) {
     // req.user is populated by authenticateToken
     const db = await openDb();
     try {
-        const user = await db.get('SELECT id, name, email FROM users WHERE id = ?', [req.user.sub]);
+        const user = await db.get('SELECT id, name, email, profilePhoto, companyRole FROM users WHERE id = ?', [req.user.sub]);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
         res.json({ user: { ...user, orgId: req.user.orgId } });
@@ -210,7 +210,7 @@ async function getOrganizationUsers(req, res) {
     const db = await openDb();
     try {
         const users = await db.all(`
-            SELECT u.id, u.name, u.email, uo.role, uo.organizationId
+            SELECT u.id, u.name, u.email, u.profilePhoto, u.companyRole, uo.role, uo.organizationId
             FROM users u
             JOIN user_organizations uo ON u.id = uo.userId
             WHERE uo.organizationId = ?
@@ -267,4 +267,45 @@ async function inviteUser(req, res) {
     }
 }
 
-module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser };
+async function updateProfile(req, res) {
+    const { name, companyRole, profilePhoto } = req.body;
+    const userId = req.user.sub;
+
+    const db = await openDb();
+
+    try {
+        // Build dynamic update query
+        const updates = [];
+        const params = [];
+
+        if (name !== undefined) {
+            updates.push('name = ?');
+            params.push(name);
+        }
+        if (companyRole !== undefined) {
+            updates.push('companyRole = ?');
+            params.push(companyRole);
+        }
+        if (profilePhoto !== undefined) {
+            updates.push('profilePhoto = ?');
+            params.push(profilePhoto);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        params.push(userId);
+        await db.run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
+
+        // Return updated user
+        const user = await db.get('SELECT id, name, email, profilePhoto, companyRole FROM users WHERE id = ?', [userId]);
+        res.json({ user: { ...user, orgId: req.user.orgId } });
+
+    } catch (error) {
+        console.error('UpdateProfile error:', error);
+        res.status(500).json({ error: 'Failed to update profile' });
+    }
+}
+
+module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile };
