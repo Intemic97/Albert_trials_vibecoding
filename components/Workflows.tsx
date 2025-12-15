@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, Upload } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, Upload, Columns, GripVertical } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import { API_BASE } from '../config';
@@ -19,7 +19,7 @@ const generateUUID = (): string => {
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'splitColumns';
     label: string;
     x: number;
     y: number;
@@ -69,6 +69,9 @@ interface WorkflowNode {
         rowCount?: number;
         // Processing mode (for condition, llm, etc.)
         processingMode?: 'batch' | 'perRow';  // batch = all rows together, perRow = filter/process each row
+        // For split columns nodes:
+        columnsOutputA?: string[];  // Columns to send to output A
+        columnsOutputB?: string[];  // Columns to send to output B
     };
     executionResult?: string;
     data?: any;
@@ -83,12 +86,12 @@ interface Connection {
     id: string;
     fromNodeId: string;
     toNodeId: string;
-    outputType?: 'true' | 'false';  // For condition nodes
+    outputType?: 'true' | 'false' | 'A' | 'B';  // For condition nodes (true/false) and splitColumns nodes (A/B)
     inputPort?: 'A' | 'B';  // For join nodes
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'splitColumns';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -108,6 +111,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'manualInput', label: 'Manual Data Input', icon: Edit, description: 'Define a variable with a value', category: 'Data' },
     { type: 'condition', label: 'If / Else', icon: AlertCircle, description: 'Branch based on conditions', category: 'Logic' },
     { type: 'join', label: 'Join', icon: GitMerge, description: 'Combine data from two sources', category: 'Logic' },
+    { type: 'splitColumns', label: 'Split by Columns', icon: Columns, description: 'Split dataset by columns into two outputs', category: 'Logic' },
     { type: 'llm', label: 'AI Generation', icon: Sparkles, description: 'Generate text using AI', category: 'Logic' },
     { type: 'python', label: 'Python Code', icon: Code, description: 'Run Python script', category: 'Logic' },
     { type: 'addField', label: 'Add Field', icon: CheckCircle, description: 'Add a new field to data', category: 'Logic' },
@@ -141,7 +145,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [conditionOperator, setConditionOperator] = useState<string>('isText');
     const [conditionValue, setConditionValue] = useState<string>('');
     const [conditionProcessingMode, setConditionProcessingMode] = useState<'batch' | 'perRow'>('batch');
-    const [connectingFromType, setConnectingFromType] = useState<'true' | 'false' | null>(null);
+    const [connectingFromType, setConnectingFromType] = useState<'true' | 'false' | 'A' | 'B' | null>(null);
     const [configuringAddFieldNodeId, setConfiguringAddFieldNodeId] = useState<string | null>(null);
     const [addFieldName, setAddFieldName] = useState<string>('');
     const [addFieldValue, setAddFieldValue] = useState<string>('');
@@ -178,6 +182,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [joinType, setJoinType] = useState<'inner' | 'outer'>('inner');
     const [joinKey, setJoinKey] = useState<string>('');
 
+    // Split Columns Node State
+    const [configuringSplitColumnsNodeId, setConfiguringSplitColumnsNodeId] = useState<string | null>(null);
+    const [splitColumnsAvailable, setSplitColumnsAvailable] = useState<string[]>([]);
+    const [splitColumnsOutputA, setSplitColumnsOutputA] = useState<string[]>([]);
+    const [splitColumnsOutputB, setSplitColumnsOutputB] = useState<string[]>([]);
+    const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
+
     // Excel Input Node State
     const [configuringExcelNodeId, setConfiguringExcelNodeId] = useState<string | null>(null);
     const [excelFile, setExcelFile] = useState<File | null>(null);
@@ -212,6 +223,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(false);
 
     const [dataViewTab, setDataViewTab] = useState<'input' | 'output'>('output');
+    const [splitViewTab, setSplitViewTab] = useState<'input' | 'outputA' | 'outputB'>('outputA');
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
     const [canvasZoom, setCanvasZoom] = useState(1);
     const [isPanning, setIsPanning] = useState(false);
@@ -523,6 +535,79 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setJoinStrategy('concat');
         setJoinType('inner');
         setJoinKey('');
+    };
+
+    const openSplitColumnsConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'splitColumns') {
+            setConfiguringSplitColumnsNodeId(nodeId);
+            
+            // Get available columns from parent node's output data
+            const parentConnection = connections.find(c => c.toNodeId === nodeId);
+            const parentNode = parentConnection ? nodes.find(n => n.id === parentConnection.fromNodeId) : null;
+            
+            // Handle splitColumns parent node
+            let parentOutputData: any[] = [];
+            if (parentNode?.type === 'splitColumns' && parentNode.outputData) {
+                parentOutputData = parentConnection?.outputType === 'B' 
+                    ? parentNode.outputData.outputB || []
+                    : parentNode.outputData.outputA || [];
+            } else {
+                parentOutputData = parentNode?.outputData || parentNode?.data || [];
+            }
+            
+            const allColumns: string[] = [];
+            if (Array.isArray(parentOutputData) && parentOutputData.length > 0) {
+                const firstRecord = parentOutputData[0];
+                if (firstRecord && typeof firstRecord === 'object') {
+                    Object.keys(firstRecord).forEach(key => {
+                        if (!allColumns.includes(key)) {
+                            allColumns.push(key);
+                        }
+                    });
+                }
+            }
+            
+            // Initialize from existing config or default all to Output A
+            const existingOutputA = node.config?.columnsOutputA || [];
+            const existingOutputB = node.config?.columnsOutputB || [];
+            
+            if (existingOutputA.length > 0 || existingOutputB.length > 0) {
+                // Use existing configuration, but only include columns that still exist
+                setSplitColumnsOutputA(existingOutputA.filter((c: string) => allColumns.includes(c)));
+                setSplitColumnsOutputB(existingOutputB.filter((c: string) => allColumns.includes(c)));
+                // Any new columns go to available
+                const usedColumns = [...existingOutputA, ...existingOutputB];
+                setSplitColumnsAvailable(allColumns.filter(c => !usedColumns.includes(c)));
+            } else {
+                // Default: all columns go to Output A
+                setSplitColumnsOutputA(allColumns);
+                setSplitColumnsOutputB([]);
+                setSplitColumnsAvailable([]);
+            }
+        }
+    };
+
+    const saveSplitColumnsConfig = () => {
+        if (!configuringSplitColumnsNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringSplitColumnsNodeId
+                ? {
+                    ...n,
+                    config: {
+                        ...n.config,
+                        columnsOutputA: splitColumnsOutputA,
+                        columnsOutputB: splitColumnsOutputB
+                    }
+                }
+                : n
+        ));
+        setConfiguringSplitColumnsNodeId(null);
+        setSplitColumnsAvailable([]);
+        setSplitColumnsOutputA([]);
+        setSplitColumnsOutputB([]);
+        setDraggedColumn(null);
     };
 
     const openExcelConfig = (nodeId: string) => {
@@ -1606,6 +1691,46 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         result = 'Waiting for both inputs...';
                     }
                     break;
+                case 'splitColumns':
+                    // Split columns node - split dataset into two outputs by column selection
+                    if (inputData && Array.isArray(inputData) && inputData.length > 0) {
+                        const columnsA = node.config?.columnsOutputA || [];
+                        const columnsB = node.config?.columnsOutputB || [];
+                        
+                        if (columnsA.length === 0 && columnsB.length === 0) {
+                            // Not configured - send all data to output A
+                            const allKeys = Object.keys(inputData[0] || {});
+                            nodeData = {
+                                outputA: inputData,
+                                outputB: inputData.map(() => ({}))
+                            };
+                            result = `Not configured - all ${allKeys.length} columns to Output A`;
+                        } else {
+                            // Split by configured columns
+                            const outputA = inputData.map((record: any) => {
+                                const filtered: any = {};
+                                columnsA.forEach((col: string) => {
+                                    if (col in record) filtered[col] = record[col];
+                                });
+                                return filtered;
+                            });
+                            
+                            const outputB = inputData.map((record: any) => {
+                                const filtered: any = {};
+                                columnsB.forEach((col: string) => {
+                                    if (col in record) filtered[col] = record[col];
+                                });
+                                return filtered;
+                            });
+                            
+                            nodeData = { outputA, outputB };
+                            result = `Split: ${columnsA.length} cols → A, ${columnsB.length} cols → B (${inputData.length} rows)`;
+                        }
+                    } else {
+                        result = 'No input data to split';
+                        nodeData = { outputA: [], outputB: [] };
+                    }
+                    break;
                 case 'output':
                     // Output node just displays the input data
                     if (inputData && Array.isArray(inputData) && inputData.length > 0) {
@@ -1661,6 +1786,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 for (const conn of nextConnections) {
                     const targetNode = nodes.find(n => n.id === conn.toNodeId);
                     const dataToSend = conn.outputType === 'false' ? nodeData.falseRecords : nodeData.trueRecords;
+                    
+                    if (targetNode?.type === 'join') {
+                        await executeJoinInput(conn.toNodeId, dataToSend, conn.inputPort || 'A');
+                    } else {
+                        await executeNode(conn.toNodeId, dataToSend);
+                    }
+                }
+            } else if (node.type === 'splitColumns' && nodeData?.outputA !== undefined) {
+                // Split columns node: send outputA to 'A' connections, outputB to 'B' connections
+                for (const conn of nextConnections) {
+                    const targetNode = nodes.find(n => n.id === conn.toNodeId);
+                    const dataToSend = conn.outputType === 'B' ? nodeData.outputB : nodeData.outputA;
                     
                     if (targetNode?.type === 'join') {
                         await executeJoinInput(conn.toNodeId, dataToSend, conn.inputPort || 'A');
@@ -1790,10 +1927,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 for (const conn of incomingConnections) {
                     const parentNode = nodes.find(n => n.id === conn.fromNodeId);
                     if (parentNode?.outputData) {
+                        // Handle splitColumns parent node
+                        let parentData;
+                        if (parentNode.type === 'splitColumns') {
+                            parentData = conn.outputType === 'B' 
+                                ? parentNode.outputData.outputB 
+                                : parentNode.outputData.outputA;
+                        } else {
+                            parentData = parentNode.outputData;
+                        }
+                        
                         if (conn.inputPort === 'A') {
-                            dataA = parentNode.outputData;
+                            dataA = parentData;
                         } else if (conn.inputPort === 'B') {
-                            dataB = parentNode.outputData;
+                            dataB = parentData;
                         }
                     }
                 }
@@ -1821,7 +1968,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             for (const conn of incomingConnections) {
                 const parentNode = nodes.find(n => n.id === conn.fromNodeId);
                 if (parentNode && parentNode.outputData) {
-                    inputData = parentNode.outputData;
+                    // Handle splitColumns parent node
+                    if (parentNode.type === 'splitColumns') {
+                        inputData = conn.outputType === 'B' 
+                            ? parentNode.outputData.outputB 
+                            : parentNode.outputData.outputA;
+                    } else {
+                        inputData = parentNode.outputData;
+                    }
                     break;
                 }
             }
@@ -2045,10 +2199,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setConnections(prev => prev.filter(c => c.fromNodeId !== id && c.toNodeId !== id));
     };
 
-    const [dragConnectionStart, setDragConnectionStart] = useState<{ nodeId: string, outputType?: 'true' | 'false', x: number, y: number } | null>(null);
+    const [dragConnectionStart, setDragConnectionStart] = useState<{ nodeId: string, outputType?: 'true' | 'false' | 'A' | 'B', x: number, y: number } | null>(null);
     const [dragConnectionCurrent, setDragConnectionCurrent] = useState<{ x: number, y: number } | null>(null);
 
-    const handleConnectorMouseDown = (e: React.MouseEvent, nodeId: string, outputType?: 'true' | 'false') => {
+    const handleConnectorMouseDown = (e: React.MouseEvent, nodeId: string, outputType?: 'true' | 'false' | 'A' | 'B') => {
         e.stopPropagation();
         e.preventDefault();
 
@@ -2117,6 +2271,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'saveRecords': return 'bg-emerald-100 border-emerald-300 text-emerald-800';
             case 'llm': return 'bg-violet-100 border-violet-300 text-violet-800';
             case 'join': return 'bg-cyan-100 border-cyan-300 text-cyan-800';
+            case 'splitColumns': return 'bg-sky-100 border-sky-300 text-sky-800';
             case 'excelInput': return 'bg-emerald-100 border-emerald-300 text-emerald-800';
             case 'comment': return 'bg-amber-50 border-amber-200 text-amber-900';
             default: return 'bg-slate-100 border-slate-300';
@@ -2485,7 +2640,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         // Calculate line positions (from right of fromNode to left of toNode)
                                         const x1 = fromNode.x + 96; // Half width of node (192px / 2)
                                         
-                                        // For condition nodes, adjust Y position based on output type
+                                        // For condition and splitColumns nodes, adjust Y position based on output type
                                         // Connectors use top-[28px] and top-[calc(100%-28px)]
                                         // Since nodes use translate(-50%, -50%), we need to offset from center
                                         let y1 = fromNode.y;
@@ -2495,6 +2650,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 y1 = fromNode.y - 28; // TRUE connector position
                                             } else if (conn.outputType === 'false') {
                                                 y1 = fromNode.y + 28; // FALSE connector position
+                                            }
+                                        } else if (fromNode.type === 'splitColumns') {
+                                            // Use fixed offset of 28px from center to match connector positions
+                                            if (conn.outputType === 'A') {
+                                                y1 = fromNode.y - 28; // Output A position
+                                            } else if (conn.outputType === 'B') {
+                                                y1 = fromNode.y + 28; // Output B position
                                             }
                                         }
                                         
@@ -2517,14 +2679,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         const c2x = x2 - Math.abs(x2 - x1) / 2;
                                         const c2y = y2;
 
-                                        // Color based on outputType: green for true, red for false, teal for default
+                                        // Color based on outputType: green for true, red for false, blue for A, purple for B, teal for default
                                         const strokeColor = conn.outputType === 'true' ? '#10b981'
                                             : conn.outputType === 'false' ? '#ef4444'
+                                            : conn.outputType === 'A' ? '#3b82f6'
+                                            : conn.outputType === 'B' ? '#a855f7'
                                                 : '#0d9488';
                                         
                                         // Use different arrowhead colors
                                         const arrowId = conn.outputType === 'true' ? 'arrow-green'
                                             : conn.outputType === 'false' ? 'arrow-red'
+                                            : conn.outputType === 'A' ? 'arrow-blue'
+                                            : conn.outputType === 'B' ? 'arrow-purple'
                                                 : 'workflow-arrowhead';
 
                                         return (
@@ -2570,6 +2736,26 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         >
                                             <polygon points="0 0, 6 3, 0 6" fill="#ef4444" />
                                         </marker>
+                                        <marker
+                                            id="arrow-blue"
+                                            markerWidth="6"
+                                            markerHeight="6"
+                                            refX="5"
+                                            refY="3"
+                                            orient="auto"
+                                        >
+                                            <polygon points="0 0, 6 3, 0 6" fill="#3b82f6" />
+                                        </marker>
+                                        <marker
+                                            id="arrow-purple"
+                                            markerWidth="6"
+                                            markerHeight="6"
+                                            refX="5"
+                                            refY="3"
+                                            orient="auto"
+                                        >
+                                            <polygon points="0 0, 6 3, 0 6" fill="#a855f7" />
+                                        </marker>
                                     </defs>
                                 </svg>
 
@@ -2611,6 +2797,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openHumanApprovalConfig(node.id);
                                             } else if (node.type === 'join') {
                                                 openJoinConfig(node.id);
+                                            } else if (node.type === 'splitColumns') {
+                                                openSplitColumnsConfig(node.id);
                                             } else if (node.type === 'excelInput') {
                                                 openExcelConfig(node.id);
                                             }
@@ -2624,7 +2812,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             width: '192px', // Enforce fixed width (w-48)
                                             cursor: (node.data || ['fetchData', 'condition', 'addField', 'saveRecords', 'equipment', 'llm'].includes(node.type)) ? 'grab' : 'default',
                                             // Fixed height for nodes with dual connectors to ensure consistent positioning
-                                            ...(node.type === 'condition' || node.type === 'join' ? { minHeight: '112px' } : {})
+                                            ...(node.type === 'condition' || node.type === 'join' || node.type === 'splitColumns' ? { minHeight: '112px' } : {})
                                         }}
                                         className={`flex flex-col p-3 rounded-lg border-2 shadow-md w-48 group relative ${getNodeColor(node.type, node.status)}`}
                                     >
@@ -2640,7 +2828,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             >
                                                 <Play size={12} fill="currentColor" />
                                             </button>
-                                            {node.data && Array.isArray(node.data) && node.data.length > 0 && (
+                                            {((node.data && Array.isArray(node.data) && node.data.length > 0) || 
+                                              (node.type === 'splitColumns' && node.data && (node.data.outputA?.length > 0 || node.data.outputB?.length > 0))) && (
                                                 <button
                                                     onClick={() => setViewingDataNodeId(node.id)}
                                                     className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-slate-800 transition-all"
@@ -2801,6 +2990,25 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </div>
                                         )}
 
+                                        {node.type === 'splitColumns' && (
+                                            <div className="mt-2 text-xs font-medium text-sky-700">
+                                                {(node.config?.columnsOutputA?.length || 0) > 0 || (node.config?.columnsOutputB?.length || 0) > 0 ? (
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="text-blue-600 font-bold">A:</span>
+                                                            <span>{node.config?.columnsOutputA?.length || 0} cols</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="text-purple-600 font-bold">B:</span>
+                                                            <span>{node.config?.columnsOutputB?.length || 0} cols</span>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-400 italic">Click to configure</span>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {node.type === 'llm' && (
                                             <div className="mt-2 text-xs font-medium text-violet-700">
                                                 {node.config?.llmPrompt ? (
@@ -2844,6 +3052,29 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             title="FALSE path"
                                                         />
                                                         <span className="absolute -right-6 text-[9px] font-bold text-red-600" style={{ bottom: '28px', transform: 'translateY(50%)' }}>✗</span>
+                                                    </>
+                                                ) : node.type === 'splitColumns' ? (
+                                                    // Split Columns nodes have TWO output connectors: A and B
+                                                    <>
+                                                        {/* Output A - top right (blue) - fixed position */}
+                                                        <div
+                                                            onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'A')}
+                                                            onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                            className={`connector-point absolute -right-1.5 w-3 h-3 bg-blue-100 border-2 rounded-full hover:border-blue-500 hover:bg-blue-200 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'A' ? 'border-blue-500 scale-150 bg-blue-300' : 'border-blue-400'}`}
+                                                            style={{ top: '28px', transform: 'translateY(-50%)' }}
+                                                            title="Output A"
+                                                        />
+                                                        <span className="absolute -right-6 text-[9px] font-bold text-blue-600" style={{ top: '28px', transform: 'translateY(-50%)' }}>A</span>
+
+                                                        {/* Output B - bottom right (purple) - fixed position */}
+                                                        <div
+                                                            onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'B')}
+                                                            onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                            className={`connector-point absolute -right-1.5 w-3 h-3 bg-purple-100 border-2 rounded-full hover:border-purple-500 hover:bg-purple-200 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'B' ? 'border-purple-500 scale-150 bg-purple-300' : 'border-purple-400'}`}
+                                                            style={{ bottom: '28px', transform: 'translateY(50%)' }}
+                                                            title="Output B"
+                                                        />
+                                                        <span className="absolute -right-6 text-[9px] font-bold text-purple-600" style={{ bottom: '28px', transform: 'translateY(50%)' }}>B</span>
                                                     </>
                                                 ) : (
                                                     // Regular nodes have ONE output connector
@@ -2892,7 +3123,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     const startNode = nodes.find(n => n.id === dragConnectionStart.nodeId)!;
                                     const startX = startNode.x + 96;
                                     
-                                    // Adjust Y position for condition node outputs
+                                    // Adjust Y position for condition and splitColumns node outputs
                                     let startY = startNode.y;
                                     if (startNode.type === 'condition') {
                                         if (dragConnectionStart.outputType === 'true') {
@@ -2900,11 +3131,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         } else if (dragConnectionStart.outputType === 'false') {
                                             startY = startNode.y + 20;
                                         }
+                                    } else if (startNode.type === 'splitColumns') {
+                                        if (dragConnectionStart.outputType === 'A') {
+                                            startY = startNode.y - 20;
+                                        } else if (dragConnectionStart.outputType === 'B') {
+                                            startY = startNode.y + 20;
+                                        }
                                     }
                                     
                                     // Color based on output type
                                     const strokeColor = dragConnectionStart.outputType === 'true' ? '#10b981'
                                         : dragConnectionStart.outputType === 'false' ? '#ef4444'
+                                        : dragConnectionStart.outputType === 'A' ? '#3b82f6'
+                                        : dragConnectionStart.outputType === 'B' ? '#a855f7'
                                             : '#0d9488';
                                     
                                     return (
@@ -3273,10 +3512,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             const node = nodes.find(n => n.id === viewingDataNodeId);
                             if (!node) return null;
 
+                            // Special handling for splitColumns node
+                            const isSplitColumnsNode = node.type === 'splitColumns';
                             const hasInput = node.inputData && Array.isArray(node.inputData) && node.inputData.length > 0;
-                            const hasOutput = node.outputData && Array.isArray(node.outputData) && node.outputData.length > 0;
+                            const hasOutput = !isSplitColumnsNode && node.outputData && Array.isArray(node.outputData) && node.outputData.length > 0;
+                            const hasOutputA = isSplitColumnsNode && node.outputData?.outputA?.length > 0;
+                            const hasOutputB = isSplitColumnsNode && node.outputData?.outputB?.length > 0;
 
-                            if (!hasInput && !hasOutput) return null;
+                            if (!hasInput && !hasOutput && !hasOutputA && !hasOutputB) return null;
 
                             return (
                                 <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setViewingDataNodeId(null)}>
@@ -3293,35 +3536,88 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </button>
                                         </div>
 
-                                        {/* Tabs */}
-                                        <div className="flex gap-2 mb-4 border-b">
-                                            {hasInput && (
-                                                <button
-                                                    onClick={() => setDataViewTab('input')}
-                                                    className={`px-4 py-2 font-medium transition-all ${dataViewTab === 'input'
-                                                        ? 'text-emerald-600 border-b-2 border-emerald-600'
-                                                        : 'text-slate-600 hover:text-slate-800'
-                                                        }`}
-                                                >
-                                                    Input ({node.inputData.length})
-                                                </button>
-                                            )}
-                                            {hasOutput && (
-                                                <button
-                                                    onClick={() => setDataViewTab('output')}
-                                                    className={`px-4 py-2 font-medium transition-all ${dataViewTab === 'output'
-                                                        ? 'text-emerald-600 border-b-2 border-emerald-600'
-                                                        : 'text-slate-600 hover:text-slate-800'
-                                                        }`}
-                                                >
-                                                    Output ({node.outputData.length})
-                                                </button>
-                                            )}
-                                        </div>
+                                        {/* Tabs - different for splitColumns */}
+                                        {isSplitColumnsNode ? (
+                                            <div className="flex gap-2 mb-4 border-b">
+                                                {hasInput && (
+                                                    <button
+                                                        onClick={() => setSplitViewTab('input')}
+                                                        className={`px-4 py-2 font-medium transition-all ${splitViewTab === 'input'
+                                                            ? 'text-emerald-600 border-b-2 border-emerald-600'
+                                                            : 'text-slate-600 hover:text-slate-800'
+                                                            }`}
+                                                    >
+                                                        Input ({node.inputData.length})
+                                                    </button>
+                                                )}
+                                                {hasOutputA && (
+                                                    <button
+                                                        onClick={() => setSplitViewTab('outputA')}
+                                                        className={`px-4 py-2 font-medium transition-all ${splitViewTab === 'outputA'
+                                                            ? 'text-blue-600 border-b-2 border-blue-600'
+                                                            : 'text-slate-600 hover:text-slate-800'
+                                                            }`}
+                                                    >
+                                                        <span className="flex items-center gap-1">
+                                                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                                            Output A ({node.outputData.outputA.length})
+                                                        </span>
+                                                    </button>
+                                                )}
+                                                {hasOutputB && (
+                                                    <button
+                                                        onClick={() => setSplitViewTab('outputB')}
+                                                        className={`px-4 py-2 font-medium transition-all ${splitViewTab === 'outputB'
+                                                            ? 'text-purple-600 border-b-2 border-purple-600'
+                                                            : 'text-slate-600 hover:text-slate-800'
+                                                            }`}
+                                                    >
+                                                        <span className="flex items-center gap-1">
+                                                            <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                                                            Output B ({node.outputData.outputB.length})
+                                                        </span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="flex gap-2 mb-4 border-b">
+                                                {hasInput && (
+                                                    <button
+                                                        onClick={() => setDataViewTab('input')}
+                                                        className={`px-4 py-2 font-medium transition-all ${dataViewTab === 'input'
+                                                            ? 'text-emerald-600 border-b-2 border-emerald-600'
+                                                            : 'text-slate-600 hover:text-slate-800'
+                                                            }`}
+                                                    >
+                                                        Input ({node.inputData.length})
+                                                    </button>
+                                                )}
+                                                {hasOutput && (
+                                                    <button
+                                                        onClick={() => setDataViewTab('output')}
+                                                        className={`px-4 py-2 font-medium transition-all ${dataViewTab === 'output'
+                                                            ? 'text-emerald-600 border-b-2 border-emerald-600'
+                                                            : 'text-slate-600 hover:text-slate-800'
+                                                            }`}
+                                                    >
+                                                        Output ({node.outputData.length})
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
 
                                         <div className="overflow-auto flex-1">
                                             {(() => {
-                                                const displayData = dataViewTab === 'input' ? node.inputData : node.outputData;
+                                                let displayData: any[];
+                                                if (isSplitColumnsNode) {
+                                                    displayData = splitViewTab === 'input' 
+                                                        ? node.inputData 
+                                                        : splitViewTab === 'outputA' 
+                                                            ? node.outputData?.outputA 
+                                                            : node.outputData?.outputB;
+                                                } else {
+                                                    displayData = dataViewTab === 'input' ? node.inputData : node.outputData;
+                                                }
                                                 return displayData && displayData.length > 0 ? (
                                                     <table className="w-full text-sm">
                                                         <thead className="bg-slate-100 sticky top-0">
@@ -3360,7 +3656,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             // Find the parent node to get available fields
                             const parentConnection = connections.find(c => c.toNodeId === configuringConditionNodeId);
                             const parentNode = parentConnection ? nodes.find(n => n.id === parentConnection.fromNodeId) : null;
-                            const parentOutputData = parentNode?.outputData || parentNode?.data || [];
+                            
+                            // Handle splitColumns parent node - get the correct output based on connection type
+                            let parentOutputData: any[] = [];
+                            if (parentNode?.type === 'splitColumns' && parentNode.outputData) {
+                                // Get the correct output based on the connection's outputType
+                                if (parentConnection?.outputType === 'B') {
+                                    parentOutputData = parentNode.outputData.outputB || [];
+                                } else {
+                                    parentOutputData = parentNode.outputData.outputA || [];
+                                }
+                            } else {
+                                parentOutputData = parentNode?.outputData || parentNode?.data || [];
+                            }
                             
                             // Extract field names from the parent's output data
                             const availableFields: string[] = [];
@@ -3576,10 +3884,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 for (const conn of incomingConns) {
                                     const parentNode = nodes.find(n => n.id === conn.fromNodeId);
                                     if (parentNode?.outputData) {
+                                        // Handle splitColumns parent node
+                                        let parentData;
+                                        if (parentNode.type === 'splitColumns') {
+                                            parentData = conn.outputType === 'B' 
+                                                ? parentNode.outputData.outputB 
+                                                : parentNode.outputData.outputA;
+                                        } else {
+                                            parentData = parentNode.outputData;
+                                        }
+                                        
                                         if (conn.inputPort === 'A' && !inputAData) {
-                                            inputAData = parentNode.outputData;
+                                            inputAData = parentData;
                                         } else if (conn.inputPort === 'B' && !inputBData) {
-                                            inputBData = parentNode.outputData;
+                                            inputBData = parentData;
                                         }
                                     }
                                 }
@@ -3724,6 +4042,227 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm font-medium"
                                             >
                                                 Save
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Split Columns Configuration Modal */}
+                        {configuringSplitColumnsNodeId && (() => {
+                            const allColumns = [...splitColumnsAvailable, ...splitColumnsOutputA, ...splitColumnsOutputB];
+                            
+                            const handleDragStart = (column: string) => {
+                                setDraggedColumn(column);
+                            };
+                            
+                            const handleDragEnd = () => {
+                                setDraggedColumn(null);
+                            };
+                            
+                            const handleDropOnOutputA = (e: React.DragEvent) => {
+                                e.preventDefault();
+                                if (!draggedColumn) return;
+                                
+                                // Remove from other lists
+                                setSplitColumnsAvailable(prev => prev.filter(c => c !== draggedColumn));
+                                setSplitColumnsOutputB(prev => prev.filter(c => c !== draggedColumn));
+                                
+                                // Add to Output A if not already there
+                                if (!splitColumnsOutputA.includes(draggedColumn)) {
+                                    setSplitColumnsOutputA(prev => [...prev, draggedColumn]);
+                                }
+                                setDraggedColumn(null);
+                            };
+                            
+                            const handleDropOnOutputB = (e: React.DragEvent) => {
+                                e.preventDefault();
+                                if (!draggedColumn) return;
+                                
+                                // Remove from other lists
+                                setSplitColumnsAvailable(prev => prev.filter(c => c !== draggedColumn));
+                                setSplitColumnsOutputA(prev => prev.filter(c => c !== draggedColumn));
+                                
+                                // Add to Output B if not already there
+                                if (!splitColumnsOutputB.includes(draggedColumn)) {
+                                    setSplitColumnsOutputB(prev => [...prev, draggedColumn]);
+                                }
+                                setDraggedColumn(null);
+                            };
+                            
+                            const handleDragOver = (e: React.DragEvent) => {
+                                e.preventDefault();
+                            };
+                            
+                            const moveColumnToA = (column: string) => {
+                                setSplitColumnsOutputB(prev => prev.filter(c => c !== column));
+                                if (!splitColumnsOutputA.includes(column)) {
+                                    setSplitColumnsOutputA(prev => [...prev, column]);
+                                }
+                            };
+                            
+                            const moveColumnToB = (column: string) => {
+                                setSplitColumnsOutputA(prev => prev.filter(c => c !== column));
+                                if (!splitColumnsOutputB.includes(column)) {
+                                    setSplitColumnsOutputB(prev => [...prev, column]);
+                                }
+                            };
+                            
+                            const moveAllToA = () => {
+                                setSplitColumnsOutputA([...splitColumnsOutputA, ...splitColumnsOutputB]);
+                                setSplitColumnsOutputB([]);
+                            };
+                            
+                            const moveAllToB = () => {
+                                setSplitColumnsOutputB([...splitColumnsOutputB, ...splitColumnsOutputA]);
+                                setSplitColumnsOutputA([]);
+                            };
+                            
+                            return (
+                                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringSplitColumnsNodeId(null)}>
+                                    <div className="bg-white rounded-lg shadow-xl p-6 w-[600px] max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="w-10 h-10 bg-sky-100 rounded-lg flex items-center justify-center">
+                                                <Columns size={20} className="text-sky-600" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-lg font-bold text-slate-800">Split by Columns</h3>
+                                                <p className="text-sm text-slate-500">Drag columns between outputs A and B</p>
+                                            </div>
+                                        </div>
+                                        
+                                        {allColumns.length === 0 ? (
+                                            <div className="text-center py-8 text-slate-500">
+                                                <Columns size={32} className="mx-auto mb-2 opacity-50" />
+                                                <p className="font-medium">No columns available</p>
+                                                <p className="text-sm">Run the previous node first to detect columns</p>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="flex gap-4 flex-1 overflow-hidden">
+                                                    {/* Output A Column */}
+                                                    <div 
+                                                        className="flex-1 flex flex-col"
+                                                        onDragOver={handleDragOver}
+                                                        onDrop={handleDropOnOutputA}
+                                                    >
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                                                                <span className="font-semibold text-blue-700">Output A</span>
+                                                                <span className="text-xs text-slate-500">({splitColumnsOutputA.length} cols)</span>
+                                                            </div>
+                                                            <button
+                                                                onClick={moveAllToA}
+                                                                className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                                                            >
+                                                                Move all here
+                                                            </button>
+                                                        </div>
+                                                        <div className={`flex-1 border-2 rounded-lg p-2 min-h-[200px] max-h-[300px] overflow-y-auto transition-colors ${draggedColumn && !splitColumnsOutputA.includes(draggedColumn) ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-slate-50'}`}>
+                                                            {splitColumnsOutputA.length === 0 ? (
+                                                                <div className="text-center py-8 text-slate-400 text-sm">
+                                                                    Drop columns here
+                                                                </div>
+                                                            ) : (
+                                                                <div className="space-y-1">
+                                                                    {splitColumnsOutputA.map(column => (
+                                                                        <div
+                                                                            key={column}
+                                                                            draggable
+                                                                            onDragStart={() => handleDragStart(column)}
+                                                                            onDragEnd={handleDragEnd}
+                                                                            className="flex items-center justify-between px-3 py-2 bg-white rounded border border-slate-200 shadow-sm cursor-grab hover:shadow-md transition-shadow group"
+                                                                        >
+                                                                            <div className="flex items-center gap-2">
+                                                                                <GripVertical size={14} className="text-slate-400" />
+                                                                                <span className="text-sm font-medium text-slate-700">{column}</span>
+                                                                            </div>
+                                                                            <button
+                                                                                onClick={() => moveColumnToB(column)}
+                                                                                className="opacity-0 group-hover:opacity-100 text-xs text-purple-600 hover:text-purple-800 transition-opacity"
+                                                                            >
+                                                                                → B
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Output B Column */}
+                                                    <div 
+                                                        className="flex-1 flex flex-col"
+                                                        onDragOver={handleDragOver}
+                                                        onDrop={handleDropOnOutputB}
+                                                    >
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                                                                <span className="font-semibold text-purple-700">Output B</span>
+                                                                <span className="text-xs text-slate-500">({splitColumnsOutputB.length} cols)</span>
+                                                            </div>
+                                                            <button
+                                                                onClick={moveAllToB}
+                                                                className="text-xs text-purple-600 hover:text-purple-800 hover:underline"
+                                                            >
+                                                                Move all here
+                                                            </button>
+                                                        </div>
+                                                        <div className={`flex-1 border-2 rounded-lg p-2 min-h-[200px] max-h-[300px] overflow-y-auto transition-colors ${draggedColumn && !splitColumnsOutputB.includes(draggedColumn) ? 'border-purple-400 bg-purple-50' : 'border-slate-200 bg-slate-50'}`}>
+                                                            {splitColumnsOutputB.length === 0 ? (
+                                                                <div className="text-center py-8 text-slate-400 text-sm">
+                                                                    Drop columns here
+                                                                </div>
+                                                            ) : (
+                                                                <div className="space-y-1">
+                                                                    {splitColumnsOutputB.map(column => (
+                                                                        <div
+                                                                            key={column}
+                                                                            draggable
+                                                                            onDragStart={() => handleDragStart(column)}
+                                                                            onDragEnd={handleDragEnd}
+                                                                            className="flex items-center justify-between px-3 py-2 bg-white rounded border border-slate-200 shadow-sm cursor-grab hover:shadow-md transition-shadow group"
+                                                                        >
+                                                                            <div className="flex items-center gap-2">
+                                                                                <GripVertical size={14} className="text-slate-400" />
+                                                                                <span className="text-sm font-medium text-slate-700">{column}</span>
+                                                                            </div>
+                                                                            <button
+                                                                                onClick={() => moveColumnToA(column)}
+                                                                                className="opacity-0 group-hover:opacity-100 text-xs text-blue-600 hover:text-blue-800 transition-opacity"
+                                                                            >
+                                                                                ← A
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="mt-4 p-3 bg-slate-50 rounded-lg text-xs text-slate-600">
+                                                    <strong>Tip:</strong> Drag columns between outputs, or use the arrow buttons. Each row will be split into two datasets with the selected columns.
+                                                </div>
+                                            </>
+                                        )}
+                                        
+                                        <div className="flex gap-2 justify-end mt-4 pt-4 border-t">
+                                            <button
+                                                onClick={() => setConfiguringSplitColumnsNodeId(null)}
+                                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveSplitColumnsConfig}
+                                                disabled={splitColumnsOutputA.length === 0 && splitColumnsOutputB.length === 0}
+                                                className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                                            >
+                                                Save Configuration
                                             </button>
                                         </div>
                                     </div>
@@ -4001,6 +4540,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     const parentConnection = connections.find(c => c.toNodeId === configuringLLMNodeId);
                                                     if (parentConnection) {
                                                         const parentNode = nodes.find(n => n.id === parentConnection.fromNodeId);
+                                                        // Handle splitColumns parent node
+                                                        if (parentNode?.type === 'splitColumns' && parentNode.outputData) {
+                                                            return parentConnection.outputType === 'B' 
+                                                                ? parentNode.outputData.outputB || []
+                                                                : parentNode.outputData.outputA || [];
+                                                        }
                                                         return parentNode?.outputData || parentNode?.data || [];
                                                     }
                                                     return [];
