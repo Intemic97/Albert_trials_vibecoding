@@ -4,7 +4,6 @@ import {
   Database,
   Workflow,
   Settings,
-  Users,
   FileText,
   Cpu,
   Layers,
@@ -63,7 +62,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
           <SectionLabel label="Company" />
           <NavItem icon={LayoutDashboard} label="Overview" />
           <NavItem icon={LayoutDashboard} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
-          <NavItem icon={Users} label="Copilots" />
 
           <SectionLabel label="Modeling" />
           <NavItem icon={Workflow} label="Workflows" view="workflows" active={activeView === 'workflows'} />

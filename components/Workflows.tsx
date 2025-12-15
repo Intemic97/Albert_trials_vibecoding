@@ -2415,7 +2415,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             {/* AI Assistant Floating Button */}
                             <button
                                 onClick={() => setShowAiAssistant(true)}
-                                className="absolute bottom-4 left-4 z-20 w-12 h-12 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center"
+                                className="absolute bottom-4 left-4 z-20 w-12 h-12 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center"
                                 title="AI Workflow Assistant"
                             >
                                 <Sparkles size={22} />
@@ -4403,13 +4403,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !isGeneratingWorkflow && setShowAiAssistant(false)}>
                     <div className="bg-white rounded-xl shadow-2xl w-[500px] flex flex-col" onClick={e => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-6 py-4 text-white rounded-t-xl shrink-0">
+                        <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-4 text-white rounded-t-xl shrink-0">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <Sparkles size={24} />
                                     <div>
                                         <h3 className="font-bold text-lg">AI Workflow Assistant</h3>
-                                        <p className="text-violet-100 text-sm">Describe your workflow in natural language</p>
+                                        <p className="text-slate-300 text-sm">Describe your workflow in natural language</p>
                                     </div>
                                 </div>
                                 <button
@@ -4428,7 +4428,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 value={aiPrompt}
                                 onChange={e => setAiPrompt(e.target.value)}
                                 placeholder="Example: Fetch all customers, filter those with orders greater than 100, and display the results..."
-                                className="w-full h-28 p-3 border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-slate-800 text-sm"
+                                className="w-full h-28 p-3 border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent text-slate-800 text-sm"
                                 disabled={isGeneratingWorkflow}
                             />
 
@@ -4438,7 +4438,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <p className="text-xs font-medium text-slate-600 mb-1">Your entities:</p>
                                     <div className="flex flex-wrap gap-1">
                                         {entities.map(e => (
-                                            <span key={e.id} className="px-2 py-0.5 bg-violet-100 text-violet-700 rounded text-xs">
+                                            <span key={e.id} className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs border border-slate-200">
                                                 {e.name}
                                             </span>
                                         ))}
@@ -4459,7 +4459,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <button
                                 onClick={handleGenerateWorkflow}
                                 disabled={!aiPrompt.trim() || isGeneratingWorkflow}
-                                className="px-5 py-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-lg hover:from-violet-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                className="px-5 py-2 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-lg hover:from-slate-800 hover:to-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             >
                                 {isGeneratingWorkflow ? (
                                     <>
@@ -4484,8 +4484,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     <div className="bg-white rounded-xl shadow-2xl w-[400px] overflow-hidden" onClick={e => e.stopPropagation()}>
                         <div className="p-6">
                             <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 bg-violet-100 rounded-lg flex items-center justify-center">
-                                    <Sparkles size={20} className="text-violet-600" />
+                                <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                                    <Sparkles size={20} className="text-slate-700" />
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-lg text-slate-800">Workflow Generated!</h3>
