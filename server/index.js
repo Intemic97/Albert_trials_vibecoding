@@ -1301,10 +1301,10 @@ User's available entities:
 ${JSON.stringify(entityContext, null, 2)}
 
 RULES:
-1. Always start with a "trigger" node at x=100
-2. Space nodes horizontally by 200px (x: 100, 300, 500, 700...)
-3. Keep y position around 200-300 for main flow
-4. For condition nodes, branch true path at y=200, false path at y=350
+1. Always start with a "trigger" node at x=150
+2. Space nodes horizontally by 280px (x: 150, 430, 710, 990...)
+3. Keep y position around 250 for main flow
+4. For condition nodes, branch true path at y=200, false path at y=400
 5. Generate unique IDs using format: "node_1", "node_2", etc.
 6. Connection IDs use format: "conn_1", "conn_2", etc.
 7. For condition connections, specify outputType: "true" or "false"
@@ -1314,8 +1314,8 @@ RULES:
 Output format:
 {
   "nodes": [
-    { "id": "node_1", "type": "trigger", "label": "Manual Trigger", "x": 100, "y": 200 },
-    { "id": "node_2", "type": "fetchData", "label": "Fetch Customers", "x": 300, "y": 200, "config": { "selectedEntityId": "uuid", "selectedEntityName": "Customers" } }
+    { "id": "node_1", "type": "trigger", "label": "Manual Trigger", "x": 150, "y": 250 },
+    { "id": "node_2", "type": "fetchData", "label": "Fetch Customers", "x": 430, "y": 250, "config": { "selectedEntityId": "uuid", "selectedEntityName": "Customers" } }
   ],
   "connections": [
     { "id": "conn_1", "fromNodeId": "node_1", "toNodeId": "node_2" }

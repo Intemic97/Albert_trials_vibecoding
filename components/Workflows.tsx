@@ -1963,6 +1963,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     };
 
     const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+    const [nodeDragged, setNodeDragged] = useState<boolean>(false);
 
     const handleCanvasMouseDown = (e: React.MouseEvent) => {
         // Panning logic (Middle mouse or Left mouse on canvas)
@@ -1988,6 +1989,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             const x = (e.clientX - canvasRect.left - canvasOffset.x) / canvasZoom;
             const y = (e.clientY - canvasRect.top - canvasOffset.y) / canvasZoom;
 
+            // Mark that the node was actually dragged (moved)
+            setNodeDragged(true);
+
             setNodes(prev => prev.map(n =>
                 n.id === draggingNodeId
                     ? { ...n, x, y }
@@ -1999,6 +2003,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const handleCanvasMouseUp = () => {
         setIsPanning(false);
         setDraggingNodeId(null);
+        // Reset nodeDragged after a small delay to allow onClick to check it
+        setTimeout(() => setNodeDragged(false), 10);
     };
 
     const handleNodeMouseDown = (e: React.MouseEvent, nodeId: string) => {
@@ -2573,6 +2579,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         onClick={(e) => {
                                             // Don't trigger on connector points or delete button
                                             if ((e.target as HTMLElement).closest('.connector-point, button')) return;
+                                            
+                                            // Don't open modal if node was dragged
+                                            if (nodeDragged) return;
 
                                             // Open config for configurable nodes
                                             if (node.type === 'fetchData') {
