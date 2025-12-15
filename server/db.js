@@ -123,6 +123,23 @@ async function initDb() {
       createdAt TEXT,
       FOREIGN KEY(dashboardId) REFERENCES dashboards(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS pending_approvals (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT,
+      workflowId TEXT,
+      nodeId TEXT,
+      nodeLabel TEXT,
+      assignedUserId TEXT,
+      assignedUserName TEXT,
+      status TEXT DEFAULT 'pending',
+      inputDataPreview TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(workflowId) REFERENCES workflows(id) ON DELETE CASCADE,
+      FOREIGN KEY(assignedUserId) REFERENCES users(id)
+    );
   `);
 
   // Migration: Add profilePhoto and companyRole columns to users table if they don't exist

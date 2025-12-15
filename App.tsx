@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar';
 import { EntityCard } from './components/EntityCard';
 import { Reporting } from './components/Reporting';
 import { Dashboard } from './components/Dashboard';
+import { Overview } from './components/Overview';
 import { Workflows } from './components/Workflows';
 import { LoginPage } from './components/LoginPage';
 import { Settings } from './components/Settings';
@@ -33,7 +34,7 @@ function AuthenticatedApp() {
     const { isAuthenticated, isLoading } = useAuth();
     const [entities, setEntities] = useState<Entity[]>([]);
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
-    const [currentView, setCurrentView] = useState('database');
+    const [currentView, setCurrentView] = useState('overview');
 
     // New Property State
     const [isAddingProp, setIsAddingProp] = useState(false);
@@ -734,7 +735,12 @@ function AuthenticatedApp() {
             <Sidebar activeView={currentView} onNavigate={setCurrentView} />
 
             <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-                {currentView === 'dashboard' ? (
+                {currentView === 'overview' ? (
+                    <Overview
+                        entities={entities}
+                        onViewChange={setCurrentView}
+                    />
+                ) : currentView === 'dashboard' ? (
                     <Dashboard
                         entities={entities}
                         onNavigate={(entityId) => {

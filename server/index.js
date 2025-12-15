@@ -1619,6 +1619,69 @@ app.delete('/api/workflows/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// Pending Approvals Endpoints (Human in the Loop)
+app.get('/api/pending-approvals', authenticateToken, async (req, res) => {
+    try {
+        const approvals = await db.all(`
+            SELECT pa.*, w.name as workflowName 
+            FROM pending_approvals pa
+            LEFT JOIN workflows w ON pa.workflowId = w.id
+            WHERE pa.assignedUserId = ? AND pa.status = 'pending' AND pa.organizationId = ?
+            ORDER BY pa.createdAt DESC
+        `, [req.user.id, req.user.orgId]);
+        res.json(approvals || []);
+    } catch (error) {
+        console.error('Error fetching pending approvals:', error);
+        res.json([]); // Return empty array instead of error
+    }
+});
+
+app.post('/api/pending-approvals', authenticateToken, async (req, res) => {
+    try {
+        const { workflowId, nodeId, nodeLabel, assignedUserId, assignedUserName, inputDataPreview } = req.body;
+        const id = Math.random().toString(36).substr(2, 9);
+        const createdAt = new Date().toISOString();
+        
+        await db.run(`
+            INSERT INTO pending_approvals (id, workflowId, nodeId, nodeLabel, assignedUserId, assignedUserName, status, createdAt, inputDataPreview, organizationId)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+        `, [id, workflowId, nodeId, nodeLabel, assignedUserId, assignedUserName, createdAt, JSON.stringify(inputDataPreview), req.user.orgId]);
+        
+        res.json({ id, status: 'pending', createdAt });
+    } catch (error) {
+        console.error('Error creating pending approval:', error);
+        res.status(500).json({ error: 'Failed to create pending approval' });
+    }
+});
+
+app.post('/api/pending-approvals/:id/approve', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.run(`
+            UPDATE pending_approvals SET status = 'approved', updatedAt = ? 
+            WHERE id = ? AND assignedUserId = ? AND organizationId = ?
+        `, [new Date().toISOString(), id, req.user.id, req.user.orgId]);
+        res.json({ message: 'Approved' });
+    } catch (error) {
+        console.error('Error approving:', error);
+        res.status(500).json({ error: 'Failed to approve' });
+    }
+});
+
+app.post('/api/pending-approvals/:id/reject', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.run(`
+            UPDATE pending_approvals SET status = 'rejected', updatedAt = ? 
+            WHERE id = ? AND assignedUserId = ? AND organizationId = ?
+        `, [new Date().toISOString(), id, req.user.id, req.user.orgId]);
+        res.json({ message: 'Rejected' });
+    } catch (error) {
+        console.error('Error rejecting:', error);
+        res.status(500).json({ error: 'Failed to reject' });
+    }
+});
+
 // HTTP Proxy Endpoint
 app.post('/api/proxy', authenticateToken, async (req, res) => {
     const { url, method = 'GET', headers = {} } = req.body;

@@ -60,7 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <nav className="px-2">
           <SectionLabel label="Company" />
-          <NavItem icon={LayoutDashboard} label="Overview" />
+          <NavItem icon={LayoutDashboard} label="Overview" view="overview" active={activeView === 'overview'} />
           <NavItem icon={LayoutDashboard} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
 
           <SectionLabel label="Modeling" />
