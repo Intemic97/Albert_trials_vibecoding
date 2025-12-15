@@ -2486,15 +2486,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         const x1 = fromNode.x + 96; // Half width of node (192px / 2)
                                         
                                         // For condition nodes, adjust Y position based on output type
-                                        // Node height is approximately 80px, so offsets are:
-                                        // - TRUE (top-1/4): -20px from center
-                                        // - FALSE (top-3/4): +20px from center
+                                        // Connectors use top-[28px] and top-[calc(100%-28px)]
+                                        // Since nodes use translate(-50%, -50%), we need to offset from center
                                         let y1 = fromNode.y;
                                         if (fromNode.type === 'condition') {
+                                            // Use fixed offset of 28px from center to match connector positions
                                             if (conn.outputType === 'true') {
-                                                y1 = fromNode.y - 20; // TRUE connector position
+                                                y1 = fromNode.y - 28; // TRUE connector position
                                             } else if (conn.outputType === 'false') {
-                                                y1 = fromNode.y + 20; // FALSE connector position
+                                                y1 = fromNode.y + 28; // FALSE connector position
                                             }
                                         }
                                         
@@ -2503,10 +2503,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         // For join nodes, adjust Y position based on input port
                                         let y2 = toNode.y;
                                         if (toNode.type === 'join') {
+                                            // Use fixed offset of 28px from center to match connector positions
                                             if (conn.inputPort === 'A') {
-                                                y2 = toNode.y - 20; // Input A position
+                                                y2 = toNode.y - 28; // Input A position
                                             } else if (conn.inputPort === 'B') {
-                                                y2 = toNode.y + 20; // Input B position
+                                                y2 = toNode.y + 28; // Input B position
                                             }
                                         }
 
@@ -2621,7 +2622,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             top: node.y,
                                             transform: 'translate(-50%, -50%)', // Center on drop point
                                             width: '192px', // Enforce fixed width (w-48)
-                                            cursor: (node.data || ['fetchData', 'condition', 'addField', 'saveRecords', 'equipment', 'llm'].includes(node.type)) ? 'grab' : 'default'
+                                            cursor: (node.data || ['fetchData', 'condition', 'addField', 'saveRecords', 'equipment', 'llm'].includes(node.type)) ? 'grab' : 'default',
+                                            // Fixed height for nodes with dual connectors to ensure consistent positioning
+                                            ...(node.type === 'condition' || node.type === 'join' ? { minHeight: '112px' } : {})
                                         }}
                                         className={`flex flex-col p-3 rounded-lg border-2 shadow-md w-48 group relative ${getNodeColor(node.type, node.status)}`}
                                     >
@@ -2822,23 +2825,25 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 {node.type === 'condition' ? (
                                                     // Condition nodes have TWO output connectors: TRUE and FALSE
                                                     <>
-                                                        {/* TRUE output - top right (green) */}
+                                                        {/* TRUE output - top right (green) - fixed position */}
                                                         <div
                                                             onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'true')}
                                                             onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
-                                                            className={`absolute -right-1.5 top-1/4 -translate-y-1/2 w-3 h-3 bg-green-100 border-2 rounded-full hover:border-green-500 hover:bg-green-200 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'true' ? 'border-green-500 scale-150 bg-green-300' : 'border-green-400'}`}
+                                                            className={`connector-point absolute -right-1.5 w-3 h-3 bg-green-100 border-2 rounded-full hover:border-green-500 hover:bg-green-200 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'true' ? 'border-green-500 scale-150 bg-green-300' : 'border-green-400'}`}
+                                                            style={{ top: '28px', transform: 'translateY(-50%)' }}
                                                             title="TRUE path"
                                                         />
-                                                        <span className="absolute -right-6 top-1/4 -translate-y-1/2 text-[9px] font-bold text-green-600">✓</span>
-                                                        
-                                                        {/* FALSE output - bottom right (red) */}
+                                                        <span className="absolute -right-6 text-[9px] font-bold text-green-600" style={{ top: '28px', transform: 'translateY(-50%)' }}>✓</span>
+
+                                                        {/* FALSE output - bottom right (red) - fixed position */}
                                                         <div
                                                             onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'false')}
                                                             onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
-                                                            className={`absolute -right-1.5 top-3/4 -translate-y-1/2 w-3 h-3 bg-red-100 border-2 rounded-full hover:border-red-500 hover:bg-red-200 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'false' ? 'border-red-500 scale-150 bg-red-300' : 'border-red-400'}`}
+                                                            className={`connector-point absolute -right-1.5 w-3 h-3 bg-red-100 border-2 rounded-full hover:border-red-500 hover:bg-red-200 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'false' ? 'border-red-500 scale-150 bg-red-300' : 'border-red-400'}`}
+                                                            style={{ bottom: '28px', transform: 'translateY(50%)' }}
                                                             title="FALSE path"
                                                         />
-                                                        <span className="absolute -right-6 top-3/4 -translate-y-1/2 text-[9px] font-bold text-red-600">✗</span>
+                                                        <span className="absolute -right-6 text-[9px] font-bold text-red-600" style={{ bottom: '28px', transform: 'translateY(50%)' }}>✗</span>
                                                     </>
                                                 ) : (
                                                     // Regular nodes have ONE output connector
@@ -2852,18 +2857,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 {/* Input connector(s) - all nodes except triggers */}
                                                 {node.type !== 'trigger' && (
                                                     node.type === 'join' ? (
-                                                        // Join nodes have TWO input connectors: A and B
+                                                        // Join nodes have TWO input connectors: A and B - fixed positions
                                                         <>
                                                             {/* Input A - top left */}
                                                             <div
                                                                 onMouseUp={(e) => handleConnectorMouseUp(e, node.id, 'A')}
-                                                                className={`absolute -left-1.5 top-1/4 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-cyan-500 cursor-crosshair transition-all border-slate-400`}
+                                                                className={`connector-point absolute -left-1.5 w-3 h-3 bg-white border-2 rounded-full hover:border-cyan-500 cursor-crosshair transition-all border-slate-400`}
+                                                                style={{ top: '28px', transform: 'translateY(-50%)' }}
                                                                 title="Input A"
                                                             />
                                                             {/* Input B - bottom left */}
                                                             <div
                                                                 onMouseUp={(e) => handleConnectorMouseUp(e, node.id, 'B')}
-                                                                className={`absolute -left-1.5 top-3/4 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-cyan-500 cursor-crosshair transition-all border-slate-400`}
+                                                                className={`connector-point absolute -left-1.5 w-3 h-3 bg-white border-2 rounded-full hover:border-cyan-500 cursor-crosshair transition-all border-slate-400`}
+                                                                style={{ bottom: '28px', transform: 'translateY(50%)' }}
                                                                 title="Input B"
                                                             />
                                                         </>
