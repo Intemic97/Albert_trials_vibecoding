@@ -190,12 +190,14 @@ export function useCollaborativeCursors({
             oldWs.close();
         }
         
+        // Always clear remote cursors when workflowId changes
+        setRemoteCursors(new Map());
+        setIsConnected(false);
+        
         // Reset cleaning up flag for new connection
         isCleaningUpRef.current = false;
         
         if (!enabled || !workflowId || !user) {
-            setIsConnected(false);
-            setRemoteCursors(new Map());
             return;
         }
 
