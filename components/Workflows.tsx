@@ -89,6 +89,8 @@ interface WorkflowNode {
         emailSmtpPort?: string;
         emailSmtpUser?: string;
         emailSmtpPass?: string;
+        // Custom node name
+        customName?: string;
     };
     executionResult?: string;
     data?: any;
@@ -3265,7 +3267,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             // Fixed height for nodes with dual connectors to ensure consistent positioning
                                             ...(node.type === 'condition' || node.type === 'join' || node.type === 'splitColumns' ? { minHeight: '112px' } : {})
                                         }}
-                                        className={`flex flex-col p-3 rounded-lg border-2 shadow-md w-48 group relative ${getNodeColor(node.type, node.status)}`}
+                                        className={`flex flex-col p-3 rounded-lg border-2 shadow-md hover:shadow-xl w-48 group relative transition-shadow duration-200 select-none ${getNodeColor(node.type, node.status)}`}
                                     >
                                         {/* Hover Action Buttons - Above Node */}
                                         <div className="absolute -top-7 left-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all bg-white rounded-md shadow-sm border border-slate-200 p-0.5">
@@ -3570,6 +3572,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 )}
                                             </>
                                         )}
+
                                     </div>
                                 ))}
 
