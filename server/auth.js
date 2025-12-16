@@ -56,8 +56,8 @@ async function register(req, res) {
 
         res.cookie('auth_token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            secure: false, // Set to true when using HTTPS
+            sameSite: 'lax',
             maxAge: 24 * 60 * 60 * 1000 // 24 hours
         });
 
@@ -101,8 +101,8 @@ async function login(req, res) {
 
         res.cookie('auth_token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            secure: false, // Set to true when using HTTPS
+            sameSite: 'lax',
             maxAge: 24 * 60 * 60 * 1000 // 24 hours
         });
 
@@ -193,8 +193,8 @@ async function switchOrganization(req, res) {
 
         res.cookie('auth_token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            secure: false, // Set to true when using HTTPS
+            sameSite: 'lax',
             maxAge: 24 * 60 * 60 * 1000 // 24 hours
         });
 

@@ -60,7 +60,7 @@ export function LoginPage() {
                             />
                         </div>
                         <h1 className="text-2xl font-bold text-white mb-2">
-                            {isLogin ? 'Welcome back 🚀' : 'Create an organization'}
+                            {isLogin ? 'Welcome back' : 'Create an organization'}
                         </h1>
                         <p className="text-slate-400">
                             {isLogin
