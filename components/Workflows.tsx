@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, Upload, Columns, GripVertical, Users } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, Upload, Columns, GripVertical, Users, Mail } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import { API_BASE } from '../config';
@@ -21,7 +21,7 @@ const generateUUID = (): string => {
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'splitColumns';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'splitColumns' | 'mysql' | 'sendEmail';
     label: string;
     x: number;
     y: number;
@@ -74,6 +74,21 @@ interface WorkflowNode {
         // For split columns nodes:
         columnsOutputA?: string[];  // Columns to send to output A
         columnsOutputB?: string[];  // Columns to send to output B
+        // For MySQL nodes:
+        mysqlHost?: string;
+        mysqlPort?: string;
+        mysqlDatabase?: string;
+        mysqlUsername?: string;
+        mysqlPassword?: string;
+        mysqlQuery?: string;
+        // For Send Email nodes:
+        emailTo?: string;
+        emailSubject?: string;
+        emailBody?: string;
+        emailSmtpHost?: string;
+        emailSmtpPort?: string;
+        emailSmtpUser?: string;
+        emailSmtpPass?: string;
     };
     executionResult?: string;
     data?: any;
@@ -93,7 +108,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'splitColumns';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'splitColumns' | 'mysql' | 'sendEmail';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -108,6 +123,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'saveRecords', label: 'Save to Database', icon: Database, description: 'Create or update records', category: 'Data' },
     { type: 'equipment', label: 'Equipment', icon: Wrench, description: 'Use specific equipment data', category: 'Data' },
     { type: 'http', label: 'HTTP Request', icon: Globe, description: 'Fetch data from an external API', category: 'Data' },
+    { type: 'mysql', label: 'MySQL', icon: Database, description: 'Query data from MySQL database', category: 'Data' },
     { type: 'esios', label: 'Energy Prices', icon: Zap, description: 'Fetch prices from Red Eléctrica', category: 'Data' },
     { type: 'climatiq', label: 'Emission Factors', icon: Leaf, description: 'Search CO2 emission factors', category: 'Data' },
     { type: 'manualInput', label: 'Manual Data Input', icon: Edit, description: 'Define a variable with a value', category: 'Data' },
@@ -118,7 +134,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'python', label: 'Python Code', icon: Code, description: 'Run Python script', category: 'Logic' },
     { type: 'addField', label: 'Add Field', icon: CheckCircle, description: 'Add a new field to data', category: 'Logic' },
     { type: 'humanApproval', label: 'Human in the Loop', icon: UserCheck, description: 'Wait for user approval to continue', category: 'Logic' },
-    { type: 'action', label: 'Send Email', icon: Zap, description: 'Send an email notification', category: 'Actions' },
+    { type: 'sendEmail', label: 'Send Email', icon: Mail, description: 'Send an email notification', category: 'Actions' },
     { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },
     { type: 'output', label: 'Output', icon: LogOut, description: 'Display workflow output data', category: 'Actions' },
     { type: 'comment', label: 'Comment', icon: MessageSquare, description: 'Add a note or comment', category: 'Other' },
@@ -279,6 +295,26 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // HTTP Node State
     const [configuringHttpNodeId, setConfiguringHttpNodeId] = useState<string | null>(null);
     const [httpUrl, setHttpUrl] = useState<string>('');
+
+    // MySQL Node State
+    const [configuringMySQLNodeId, setConfiguringMySQLNodeId] = useState<string | null>(null);
+    const [mysqlHost, setMysqlHost] = useState<string>('localhost');
+    const [mysqlPort, setMysqlPort] = useState<string>('3306');
+    const [mysqlDatabase, setMysqlDatabase] = useState<string>('');
+    const [mysqlUsername, setMysqlUsername] = useState<string>('');
+    const [mysqlPassword, setMysqlPassword] = useState<string>('');
+    const [mysqlQuery, setMysqlQuery] = useState<string>('SELECT * FROM ');
+
+    // Send Email Node State
+    const [configuringEmailNodeId, setConfiguringEmailNodeId] = useState<string | null>(null);
+    const [emailTo, setEmailTo] = useState<string>('');
+    const [emailSubject, setEmailSubject] = useState<string>('');
+    const [emailBody, setEmailBody] = useState<string>('');
+    const [emailSmtpHost, setEmailSmtpHost] = useState<string>('smtp.gmail.com');
+    const [emailSmtpPort, setEmailSmtpPort] = useState<string>('587');
+    const [emailSmtpUser, setEmailSmtpUser] = useState<string>('');
+    const [emailSmtpPass, setEmailSmtpPass] = useState<string>('');
+    const [showEmailSmtpSettings, setShowEmailSmtpSettings] = useState<boolean>(false);
 
     // ESIOS Node State
     const [configuringEsiosNodeId, setConfiguringEsiosNodeId] = useState<string | null>(null);
@@ -974,6 +1010,81 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setHttpUrl('');
     };
 
+    const openMySQLConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'mysql') {
+            setConfiguringMySQLNodeId(nodeId);
+            setMysqlHost(node.config?.mysqlHost || 'localhost');
+            setMysqlPort(node.config?.mysqlPort || '3306');
+            setMysqlDatabase(node.config?.mysqlDatabase || '');
+            setMysqlUsername(node.config?.mysqlUsername || '');
+            setMysqlPassword(node.config?.mysqlPassword || '');
+            setMysqlQuery(node.config?.mysqlQuery || 'SELECT * FROM ');
+        }
+    };
+
+    const saveMySQLConfig = () => {
+        if (!configuringMySQLNodeId || !mysqlQuery.trim()) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringMySQLNodeId
+                ? {
+                    ...n,
+                    label: mysqlDatabase ? `MySQL: ${mysqlDatabase}` : 'MySQL',
+                    config: {
+                        ...n.config,
+                        mysqlHost: mysqlHost || undefined,
+                        mysqlPort: mysqlPort || undefined,
+                        mysqlDatabase: mysqlDatabase || undefined,
+                        mysqlUsername: mysqlUsername || undefined,
+                        mysqlPassword: mysqlPassword || undefined,
+                        mysqlQuery
+                    }
+                }
+                : n
+        ));
+        setConfiguringMySQLNodeId(null);
+    };
+
+    const openEmailConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'sendEmail') {
+            setConfiguringEmailNodeId(nodeId);
+            setEmailTo(node.config?.emailTo || '');
+            setEmailSubject(node.config?.emailSubject || '');
+            setEmailBody(node.config?.emailBody || '');
+            setEmailSmtpHost(node.config?.emailSmtpHost || 'smtp.gmail.com');
+            setEmailSmtpPort(node.config?.emailSmtpPort || '587');
+            setEmailSmtpUser(node.config?.emailSmtpUser || '');
+            setEmailSmtpPass(node.config?.emailSmtpPass || '');
+            setShowEmailSmtpSettings(false);
+        }
+    };
+
+    const saveEmailConfig = () => {
+        if (!configuringEmailNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringEmailNodeId
+                ? {
+                    ...n,
+                    label: emailTo ? `Email to: ${emailTo.split('@')[0]}...` : 'Send Email',
+                    config: {
+                        ...n.config,
+                        emailTo,
+                        emailSubject,
+                        emailBody,
+                        emailSmtpHost: emailSmtpHost || undefined,
+                        emailSmtpPort: emailSmtpPort || undefined,
+                        emailSmtpUser: emailSmtpUser || undefined,
+                        emailSmtpPass: emailSmtpPass || undefined,
+                    }
+                }
+                : n
+        ));
+        setConfiguringEmailNodeId(null);
+    };
+
     const openEsiosConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
         if (node && node.type === 'esios') {
@@ -1638,6 +1749,92 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         }
                     } else {
                         result = 'URL not configured';
+                    }
+                    break;
+                case 'mysql':
+                    if (node.config?.mysqlQuery) {
+                        try {
+                            const response = await fetch(`${API_BASE}/mysql/query`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    host: node.config.mysqlHost || 'localhost',
+                                    port: node.config.mysqlPort || '3306',
+                                    database: node.config.mysqlDatabase,
+                                    username: node.config.mysqlUsername,
+                                    password: node.config.mysqlPassword,
+                                    query: node.config.mysqlQuery
+                                }),
+                                credentials: 'include'
+                            });
+
+                            if (response.ok) {
+                                const data = await response.json();
+                                nodeData = data.results || [];
+                                result = `Fetched ${nodeData.length} rows from MySQL`;
+                            } else {
+                                const errorData = await response.json();
+                                throw new Error(errorData.error || 'MySQL query failed');
+                            }
+                        } catch (error) {
+                            console.error('MySQL query error:', error);
+                            result = `Error: ${error.message || 'Failed to query MySQL'}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'Query not configured';
+                    }
+                    break;
+                case 'sendEmail':
+                    if (node.config?.emailTo) {
+                        try {
+                            // Replace variables in email fields
+                            const replaceVariables = (text: string, data: any) => {
+                                if (!text || !data) return text;
+                                let result = text;
+                                // If data is an array, use first record
+                                const record = Array.isArray(data) ? data[0] : data;
+                                if (record && typeof record === 'object') {
+                                    Object.keys(record).forEach(key => {
+                                        const regex = new RegExp(`\\{${key}\\}`, 'g');
+                                        result = result.replace(regex, String(record[key] ?? ''));
+                                    });
+                                }
+                                return result;
+                            };
+
+                            const emailData = {
+                                to: replaceVariables(node.config.emailTo, inputData),
+                                subject: replaceVariables(node.config.emailSubject || '', inputData),
+                                body: replaceVariables(node.config.emailBody || '', inputData),
+                                smtpHost: node.config.emailSmtpHost || 'smtp.gmail.com',
+                                smtpPort: node.config.emailSmtpPort || '587',
+                                smtpUser: node.config.emailSmtpUser,
+                                smtpPass: node.config.emailSmtpPass
+                            };
+
+                            const response = await fetch(`${API_BASE}/email/send`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(emailData),
+                                credentials: 'include'
+                            });
+
+                            if (response.ok) {
+                                const data = await response.json();
+                                nodeData = inputData || [{ emailSent: true, to: emailData.to }];
+                                result = `Email sent to ${emailData.to}`;
+                            } else {
+                                const errorData = await response.json();
+                                throw new Error(errorData.error || 'Failed to send email');
+                            }
+                        } catch (error) {
+                            console.error('Email send error:', error);
+                            result = `Error: ${error.message || 'Failed to send email'}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'Recipient not configured';
                     }
                     break;
                 case 'esios':
@@ -2391,6 +2588,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'join': return 'bg-cyan-100 border-cyan-300 text-cyan-800';
             case 'splitColumns': return 'bg-sky-100 border-sky-300 text-sky-800';
             case 'excelInput': return 'bg-emerald-100 border-emerald-300 text-emerald-800';
+            case 'sendEmail': return 'bg-rose-100 border-rose-300 text-rose-800';
             case 'comment': return 'bg-amber-50 border-amber-200 text-amber-900';
             default: return 'bg-slate-100 border-slate-300';
         }
@@ -3019,6 +3217,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openManualInputConfig(node.id);
                                             } else if (node.type === 'http') {
                                                 openHttpConfig(node.id);
+                                            } else if (node.type === 'mysql') {
+                                                openMySQLConfig(node.id);
+                                            } else if (node.type === 'sendEmail') {
+                                                openEmailConfig(node.id);
                                             } else if (node.type === 'esios') {
                                                 openEsiosConfig(node.id);
                                             } else if (node.type === 'climatiq') {
@@ -3500,6 +3702,292 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 </div>
                             </div>
                         )}
+
+                        {/* MySQL Configuration Modal */}
+                        {configuringMySQLNodeId && (
+                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringMySQLNodeId(null)}>
+                                <div className="bg-white rounded-lg shadow-xl p-6 w-[450px]" onClick={(e) => e.stopPropagation()}>
+                                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                        <Database className="text-blue-600" size={20} />
+                                        MySQL
+                                        <span className="text-sm font-normal text-slate-500">MySQL</span>
+                                    </h3>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                Host
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={mysqlHost}
+                                                onChange={(e) => setMysqlHost(e.target.value)}
+                                                placeholder="localhost"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    Port
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={mysqlPort}
+                                                    onChange={(e) => setMysqlPort(e.target.value)}
+                                                    placeholder="3306"
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    Database
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={mysqlDatabase}
+                                                    onChange={(e) => setMysqlDatabase(e.target.value)}
+                                                    placeholder="mydb"
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                Username
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={mysqlUsername}
+                                                onChange={(e) => setMysqlUsername(e.target.value)}
+                                                placeholder="root"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                Password
+                                            </label>
+                                            <input
+                                                type="password"
+                                                value={mysqlPassword}
+                                                onChange={(e) => setMysqlPassword(e.target.value)}
+                                                placeholder="••••••"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                SQL Query
+                                            </label>
+                                            <textarea
+                                                value={mysqlQuery}
+                                                onChange={(e) => setMysqlQuery(e.target.value)}
+                                                placeholder="SELECT * FROM users"
+                                                rows={3}
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 justify-end mt-6">
+                                        <button
+                                            onClick={() => setConfiguringMySQLNodeId(null)}
+                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveMySQLConfig}
+                                            disabled={!mysqlQuery.trim()}
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+                                        >
+                                            Save
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Send Email Configuration Modal */}
+                        {configuringEmailNodeId && (() => {
+                            // Get available fields from parent node
+                            const parentConnection = connections.find(c => c.toNodeId === configuringEmailNodeId);
+                            const parentNode = parentConnection ? nodes.find(n => n.id === parentConnection.fromNodeId) : null;
+                            let availableFields: string[] = [];
+                            
+                            if (parentNode) {
+                                let parentData = parentNode.outputData || parentNode.inputDataA;
+                                if (parentNode.type === 'manualInput' && parentNode.config?.inputVarName) {
+                                    availableFields = [parentNode.config.inputVarName];
+                                } else if (parentData && Array.isArray(parentData) && parentData.length > 0) {
+                                    availableFields = Object.keys(parentData[0]);
+                                }
+                            }
+
+                            return (
+                                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringEmailNodeId(null)}>
+                                    <div className="bg-white rounded-lg shadow-xl p-6 w-[550px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                            <Mail className="text-rose-600" size={20} />
+                                            Send Email
+                                        </h3>
+                                        
+                                        <div className="space-y-4">
+                                            {/* Available variables helper */}
+                                            {availableFields.length > 0 && (
+                                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                                    <p className="text-xs font-medium text-blue-800 mb-2">
+                                                        📝 Available variables from previous node:
+                                                    </p>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {availableFields.map(field => (
+                                                            <code 
+                                                                key={field} 
+                                                                className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded cursor-pointer hover:bg-blue-200"
+                                                                onClick={() => navigator.clipboard.writeText(`{${field}}`)}
+                                                                title="Click to copy"
+                                                            >
+                                                                {`{${field}}`}
+                                                            </code>
+                                                        ))}
+                                                    </div>
+                                                    <p className="text-[10px] text-blue-600 mt-1">
+                                                        Click to copy, then paste in any field below
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    To (recipient email)
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={emailTo}
+                                                    onChange={(e) => setEmailTo(e.target.value)}
+                                                    placeholder="recipient@example.com or {email}"
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                                                />
+                                                <p className="text-xs text-slate-500 mt-1">
+                                                    Use {'{variable}'} to reference input data
+                                                </p>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    Subject
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={emailSubject}
+                                                    onChange={(e) => setEmailSubject(e.target.value)}
+                                                    placeholder="Email subject with {variables}"
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    Body
+                                                </label>
+                                                <textarea
+                                                    value={emailBody}
+                                                    onChange={(e) => setEmailBody(e.target.value)}
+                                                    placeholder="Hello {name},&#10;&#10;Your order {orderId} has been processed.&#10;&#10;Thank you!"
+                                                    rows={6}
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                                                />
+                                            </div>
+
+                                            {/* SMTP Settings (collapsible) */}
+                                            <div className="border border-slate-200 rounded-lg">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowEmailSmtpSettings(!showEmailSmtpSettings)}
+                                                    className="w-full px-4 py-2 flex items-center justify-between text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                                >
+                                                    <span>⚙️ SMTP Settings</span>
+                                                    <span>{showEmailSmtpSettings ? '▲' : '▼'}</span>
+                                                </button>
+                                                
+                                                {showEmailSmtpSettings && (
+                                                    <div className="p-4 border-t border-slate-200 space-y-3">
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <div>
+                                                                <label className="block text-xs font-medium text-slate-600 mb-1">
+                                                                    SMTP Host
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={emailSmtpHost}
+                                                                    onChange={(e) => setEmailSmtpHost(e.target.value)}
+                                                                    placeholder="smtp.gmail.com"
+                                                                    className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-rose-500"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-medium text-slate-600 mb-1">
+                                                                    SMTP Port
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={emailSmtpPort}
+                                                                    onChange={(e) => setEmailSmtpPort(e.target.value)}
+                                                                    placeholder="587"
+                                                                    className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-rose-500"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-slate-600 mb-1">
+                                                                SMTP Username (email)
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={emailSmtpUser}
+                                                                onChange={(e) => setEmailSmtpUser(e.target.value)}
+                                                                placeholder="your-email@gmail.com"
+                                                                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-rose-500"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-slate-600 mb-1">
+                                                                SMTP Password / App Password
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={emailSmtpPass}
+                                                                onChange={(e) => setEmailSmtpPass(e.target.value)}
+                                                                placeholder="••••••••••••"
+                                                                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-rose-500"
+                                                            />
+                                                            <p className="text-[10px] text-slate-500 mt-1">
+                                                                For Gmail, use an App Password (not your regular password)
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-2 justify-end mt-6">
+                                            <button
+                                                onClick={() => setConfiguringEmailNodeId(null)}
+                                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveEmailConfig}
+                                                disabled={!emailTo.trim()}
+                                                className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 disabled:opacity-50 text-sm font-medium"
+                                            >
+                                                Save
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         {/* ESIOS Configuration Modal */}
                         {configuringEsiosNodeId && (

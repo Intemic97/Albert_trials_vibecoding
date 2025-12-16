@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Entity } from '../types';
 import { Sparkles, FileText, FlaskConical, Clipboard, Wrench, AlertTriangle, Download } from 'lucide-react';
@@ -300,6 +300,20 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
     const [templatePrompt, setTemplatePrompt] = useState(''); // Store template prompt to pass to PromptInput
 
     const reportRef = useRef<HTMLDivElement>(null);
+    const resultsContainerRef = useRef<HTMLDivElement>(null);
+
+    // Auto-scroll to results when report is generated
+    useEffect(() => {
+        if (report && resultsContainerRef.current) {
+            // Small delay to ensure the DOM has updated
+            setTimeout(() => {
+                resultsContainerRef.current?.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start' 
+                });
+            }, 100);
+        }
+    }, [report]);
 
     const handleTemplateSelect = (template: ReportTemplate) => {
         setTemplatePrompt(template.prompt);
@@ -492,7 +506,10 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
 
                     {/* Results Area */}
                     {report && (
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div 
+                            ref={resultsContainerRef}
+                            className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 animate-in fade-in slide-in-from-bottom-4 duration-500"
+                        >
                             <div className="flex items-center gap-3 mb-6 pb-6 border-b border-slate-100">
                                 <div className="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center">
                                     <Sparkles className="text-teal-600" size={20} />

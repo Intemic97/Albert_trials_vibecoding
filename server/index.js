@@ -2048,3 +2048,82 @@ app.post('/api/proxy', authenticateToken, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+// MySQL Query Endpoint
+app.post('/api/mysql/query', authenticateToken, async (req, res) => {
+    const { host, port, database, username, password, query } = req.body;
+
+    if (!query) {
+        return res.status(400).json({ error: 'SQL query is required' });
+    }
+
+    // Only allow SELECT queries for security
+    const trimmedQuery = query.trim().toUpperCase();
+    if (!trimmedQuery.startsWith('SELECT')) {
+        return res.status(400).json({ error: 'Only SELECT queries are allowed for security reasons' });
+    }
+
+    try {
+        const mysql = require('mysql2/promise');
+        
+        const connection = await mysql.createConnection({
+            host: host || 'localhost',
+            port: parseInt(port) || 3306,
+            database: database,
+            user: username,
+            password: password,
+            connectTimeout: 10000
+        });
+
+        const [rows] = await connection.execute(query);
+        await connection.end();
+
+        res.json({ results: rows });
+    } catch (error) {
+        console.error('MySQL query error:', error);
+        res.status(500).json({ error: error.message || 'Failed to execute MySQL query' });
+    }
+});
+
+// Send Email Endpoint
+app.post('/api/email/send', authenticateToken, async (req, res) => {
+    const { to, subject, body, smtpHost, smtpPort, smtpUser, smtpPass } = req.body;
+
+    if (!to) {
+        return res.status(400).json({ error: 'Recipient email is required' });
+    }
+
+    if (!smtpUser || !smtpPass) {
+        return res.status(400).json({ error: 'SMTP credentials are required. Configure SMTP settings in the node.' });
+    }
+
+    try {
+        const nodemailer = require('nodemailer');
+
+        // Create transporter with user-provided SMTP settings
+        const transporter = nodemailer.createTransport({
+            host: smtpHost || 'smtp.gmail.com',
+            port: parseInt(smtpPort) || 587,
+            secure: parseInt(smtpPort) === 465, // true for 465, false for other ports
+            auth: {
+                user: smtpUser,
+                pass: smtpPass
+            }
+        });
+
+        // Send email
+        const info = await transporter.sendMail({
+            from: smtpUser,
+            to: to,
+            subject: subject || '(No subject)',
+            text: body || '',
+            html: body ? body.replace(/\n/g, '<br>') : ''
+        });
+
+        console.log('Email sent:', info.messageId);
+        res.json({ success: true, messageId: info.messageId });
+    } catch (error) {
+        console.error('Email send error:', error);
+        res.status(500).json({ error: error.message || 'Failed to send email' });
+    }
+});
