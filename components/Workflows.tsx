@@ -2575,22 +2575,41 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (status === 'error') return 'bg-red-100 border-red-400 text-red-900';
         if (status === 'waiting') return 'bg-orange-100 border-orange-400 text-orange-900 animate-pulse';
 
+        // Idle/not executed nodes are white
+        if (type === 'comment') return 'bg-amber-50 border-amber-200 text-amber-900';
+        return 'bg-white border-slate-300 text-slate-700 hover:border-slate-400 hover:shadow-md transition-all';
+    };
+
+    // Get icon for node type (matches sidebar icons)
+    const getNodeIcon = (type: string): React.ElementType => {
+        const item = DRAGGABLE_ITEMS.find(i => i.type === type);
+        return item?.icon || Workflow;
+    };
+
+    // Get icon background color for node type
+    const getNodeIconBg = (type: string) => {
         switch (type) {
-            case 'trigger': return 'bg-purple-100 border-purple-300 text-purple-800';
-            case 'action': return 'bg-blue-100 border-blue-300 text-blue-800';
-            case 'condition': return 'bg-amber-100 border-amber-300 text-amber-800';
-            case 'fetchData': return 'bg-teal-100 border-teal-300 text-teal-800';
-            case 'equipment': return 'bg-orange-100 border-orange-300 text-orange-800';
-            case 'humanApproval': return 'bg-orange-100 border-orange-300 text-orange-800';
-            case 'addField': return 'bg-indigo-100 border-indigo-300 text-indigo-800';
-            case 'saveRecords': return 'bg-emerald-100 border-emerald-300 text-emerald-800';
-            case 'llm': return 'bg-violet-100 border-violet-300 text-violet-800';
-            case 'join': return 'bg-cyan-100 border-cyan-300 text-cyan-800';
-            case 'splitColumns': return 'bg-sky-100 border-sky-300 text-sky-800';
-            case 'excelInput': return 'bg-emerald-100 border-emerald-300 text-emerald-800';
-            case 'sendEmail': return 'bg-rose-100 border-rose-300 text-rose-800';
-            case 'comment': return 'bg-amber-50 border-amber-200 text-amber-900';
-            default: return 'bg-slate-100 border-slate-300';
+            case 'trigger': return 'bg-purple-100 text-purple-600';
+            case 'action': return 'bg-blue-100 text-blue-600';
+            case 'condition': return 'bg-amber-100 text-amber-600';
+            case 'fetchData': return 'bg-teal-100 text-teal-600';
+            case 'equipment': return 'bg-orange-100 text-orange-600';
+            case 'humanApproval': return 'bg-orange-100 text-orange-600';
+            case 'addField': return 'bg-indigo-100 text-indigo-600';
+            case 'saveRecords': return 'bg-emerald-100 text-emerald-600';
+            case 'llm': return 'bg-violet-100 text-violet-600';
+            case 'python': return 'bg-sky-100 text-sky-600';
+            case 'manualInput': return 'bg-pink-100 text-pink-600';
+            case 'output': return 'bg-indigo-100 text-indigo-600';
+            case 'http': return 'bg-cyan-100 text-cyan-600';
+            case 'mysql': return 'bg-blue-100 text-blue-600';
+            case 'esios': return 'bg-yellow-100 text-yellow-600';
+            case 'climatiq': return 'bg-green-100 text-green-600';
+            case 'join': return 'bg-cyan-100 text-cyan-600';
+            case 'splitColumns': return 'bg-sky-100 text-sky-600';
+            case 'excelInput': return 'bg-emerald-100 text-emerald-600';
+            case 'sendEmail': return 'bg-rose-100 text-rose-600';
+            default: return 'bg-slate-100 text-slate-600';
         }
     };
 
@@ -3307,15 +3326,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         ) : (
                                             /* Regular Node Layout */
                                             <>
-                                                <div className="flex items-center">
-                                                    {/* Show assigned user photo for humanApproval nodes */}
-                                                    {node.type === 'humanApproval' && node.config?.assignedUserId && (
-                                                        <div className="mr-2 flex-shrink-0">
+                                                <div className="flex items-center gap-2">
+                                                    {/* Node Icon */}
+                                                    {node.type === 'humanApproval' && node.config?.assignedUserId ? (
+                                                        <div className="flex-shrink-0">
                                                             <UserAvatar 
                                                                 name={node.config.assignedUserName} 
                                                                 profilePhoto={node.config.assignedUserPhoto} 
                                                                 size="sm" 
                                                             />
+                                                        </div>
+                                                    ) : (
+                                                        <div className={`p-1.5 rounded-lg flex-shrink-0 ${getNodeIconBg(node.type)}`}>
+                                                            {React.createElement(getNodeIcon(node.type), { size: 16 })}
                                                         </div>
                                                     )}
                                                     <div className="flex-1 font-medium text-sm truncate" title={node.label}>{node.label}</div>

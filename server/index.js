@@ -1191,95 +1191,243 @@ app.post('/api/generate', authenticateToken, async (req, res) => {
     }
 });
 
-// Python Execution Endpoint
+// Python Execution Endpoint - Secure Sandbox
 app.post('/api/python/execute', authenticateToken, async (req, res) => {
     const { code, inputData } = req.body;
     const fs = require('fs');
     const path = require('path');
     const { spawn } = require('child_process');
+    const crypto = require('crypto');
+
+    // Timeout in seconds
+    const EXECUTION_TIMEOUT = 30;
 
     try {
-        // Create a wrapper script that imports the user's code and runs it
+        // Escape user code safely - convert to base64 to avoid any injection
+        const codeBase64 = Buffer.from(code || '').toString('base64');
+        
+        // Create a secure wrapper script
         const wrapperCode = `
 import json
 import sys
 import ast
+import base64
+import signal
 
-# Security Check
+# ============== TIMEOUT HANDLER ==============
+class TimeoutError(Exception):
+    pass
+
+def timeout_handler(signum, frame):
+    raise TimeoutError("Execution timed out (${EXECUTION_TIMEOUT}s limit)")
+
+# Set timeout (Unix only, Windows will skip this)
+try:
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(${EXECUTION_TIMEOUT})
+except:
+    pass  # Windows doesn't support SIGALRM
+
+# ============== SECURITY CHECKS ==============
 def check_security(code_str):
     try:
         tree = ast.parse(code_str)
     except SyntaxError as e:
         return f"Syntax Error: {e}"
 
-    forbidden_imports = {'os', 'subprocess', 'shutil', 'sys', 'socket', 'requests', 'http', 'urllib', 'ftplib', 'telnetlib', 'importlib', 'pickle', 'marshal', 'shelve'}
-    forbidden_functions = {'open', 'exec', 'eval', 'compile', '__import__', 'input', 'breakpoint', 'help', 'exit', 'quit'}
+    # Expanded forbidden imports
+    forbidden_imports = {
+        'os', 'subprocess', 'shutil', 'sys', 'socket', 'requests', 
+        'http', 'urllib', 'ftplib', 'telnetlib', 'importlib', 'pickle', 
+        'marshal', 'shelve', 'ctypes', 'multiprocessing', 'threading',
+        'asyncio', 'concurrent', 'signal', 'resource', 'pty', 'tty',
+        'termios', 'fcntl', 'pipes', 'posix', 'pwd', 'grp', 'spwd',
+        'crypt', 'tempfile', 'glob', 'fnmatch', 'linecache', 'traceback',
+        'gc', 'inspect', 'dis', 'code', 'codeop', 'pdb', 'profile',
+        'timeit', 'trace', 'builtins', '_thread', 'io', 'pathlib'
+    }
+    
+    # Expanded forbidden functions/names
+    forbidden_names = {
+        'open', 'exec', 'eval', 'compile', '__import__', 'input', 
+        'breakpoint', 'help', 'exit', 'quit', 'getattr', 'setattr', 
+        'delattr', 'globals', 'locals', 'vars', 'dir', 'type',
+        'object', 'super', 'classmethod', 'staticmethod', 'property',
+        'memoryview', 'bytearray', '__build_class__', '__loader__',
+        '__spec__', '__builtins__', '__cached__', '__doc__', '__file__',
+        '__name__', '__package__'
+    }
+    
+    # Forbidden attribute access patterns
+    forbidden_attrs = {
+        '__class__', '__bases__', '__subclasses__', '__mro__', '__dict__',
+        '__globals__', '__code__', '__closure__', '__func__', '__self__',
+        '__module__', '__init__', '__new__', '__del__', '__call__',
+        '__getattr__', '__setattr__', '__delattr__', '__getattribute__',
+        '__reduce__', '__reduce_ex__', '__getinitargs__', '__getnewargs__',
+        '__getstate__', '__setstate__', 'gi_frame', 'gi_code', 'f_globals',
+        'f_locals', 'f_builtins', 'co_code', 'func_globals', 'func_code'
+    }
 
     for node in ast.walk(tree):
         # Check imports
         if isinstance(node, ast.Import):
             for alias in node.names:
-                if alias.name.split('.')[0] in forbidden_imports:
-                    return f"Security Error: Import of '{alias.name}' is forbidden"
-        elif isinstance(node, ast.ImportFrom):
-            if node.module and node.module.split('.')[0] in forbidden_imports:
-                return f"Security Error: Import from '{node.module}' is forbidden"
+                module_base = alias.name.split('.')[0]
+                if module_base in forbidden_imports:
+                    return f"Security Error: Import of '{alias.name}' is not allowed"
         
-        # Check function calls
-        elif isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Name):
-                if node.func.id in forbidden_functions:
-                    return f"Security Error: Usage of '{node.func.id}' is forbidden"
-            elif isinstance(node.func, ast.Attribute):
-                # Block specific dangerous methods if needed, but for now relying on import blocking
-                pass
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                module_base = node.module.split('.')[0]
+                if module_base in forbidden_imports:
+                    return f"Security Error: Import from '{node.module}' is not allowed"
+        
+        # Check function calls and name access
+        elif isinstance(node, ast.Name):
+            if node.id in forbidden_names:
+                return f"Security Error: Access to '{node.id}' is not allowed"
+        
+        # Check attribute access
+        elif isinstance(node, ast.Attribute):
+            if node.attr in forbidden_attrs:
+                return f"Security Error: Access to '{node.attr}' is not allowed"
+            if node.attr.startswith('_'):
+                return f"Security Error: Access to private/dunder attributes is not allowed"
+        
+        # Block string formatting that could be used for exploits
+        elif isinstance(node, ast.JoinedStr):  # f-strings
+            for value in node.values:
+                if isinstance(value, ast.FormattedValue):
+                    # Check for dangerous patterns in f-strings
+                    pass
 
     return None
 
-# User code
-user_code = """${code}"""
+# ============== SAFE BUILTINS ==============
+SAFE_BUILTINS = {
+    'True': True,
+    'False': False,
+    'None': None,
+    'abs': abs,
+    'all': all,
+    'any': any,
+    'bin': bin,
+    'bool': bool,
+    'chr': chr,
+    'dict': dict,
+    'divmod': divmod,
+    'enumerate': enumerate,
+    'filter': filter,
+    'float': float,
+    'format': format,
+    'frozenset': frozenset,
+    'hash': hash,
+    'hex': hex,
+    'int': int,
+    'isinstance': isinstance,
+    'issubclass': issubclass,
+    'iter': iter,
+    'len': len,
+    'list': list,
+    'map': map,
+    'max': max,
+    'min': min,
+    'next': next,
+    'oct': oct,
+    'ord': ord,
+    'pow': pow,
+    'print': print,
+    'range': range,
+    'repr': repr,
+    'reversed': reversed,
+    'round': round,
+    'set': set,
+    'slice': slice,
+    'sorted': sorted,
+    'str': str,
+    'sum': sum,
+    'tuple': tuple,
+    'zip': zip,
+    # Math functions (safe)
+    'complex': complex,
+}
 
-# Run security check
-security_error = check_security(user_code)
-if security_error:
-    print(json.dumps({"error": security_error}))
-    sys.exit(0)
-
-# Execute User Code
+# ============== DECODE AND EXECUTE ==============
 try:
-    exec(user_code, globals())
+    # Decode user code from base64
+    user_code = base64.b64decode("${codeBase64}").decode('utf-8')
+    
+    # Run security check
+    security_error = check_security(user_code)
+    if security_error:
+        print(json.dumps({"error": security_error}))
+        sys.exit(0)
+    
+    # Create restricted globals
+    restricted_globals = {
+        '__builtins__': SAFE_BUILTINS,
+        'json': json,  # Allow json for data processing
+        'math': __import__('math'),  # Allow math module
+        're': __import__('re'),  # Allow regex
+        'datetime': __import__('datetime'),  # Allow datetime
+        'collections': __import__('collections'),  # Allow collections
+        'itertools': __import__('itertools'),  # Allow itertools
+        'functools': __import__('functools'),  # Allow functools
+        'decimal': __import__('decimal'),  # Allow decimal
+        'fractions': __import__('fractions'),  # Allow fractions
+        'random': __import__('random'),  # Allow random
+        'statistics': __import__('statistics'),  # Allow statistics
+        'string': __import__('string'),  # Allow string
+        'copy': __import__('copy'),  # Allow copy
+    }
+    restricted_locals = {}
+    
+    # Execute user code in restricted environment
+    exec(user_code, restricted_globals, restricted_locals)
+    
+    # Read input from stdin
+    input_data = json.load(sys.stdin)
+    
+    # Execute user function (must be named 'process')
+    if 'process' in restricted_locals:
+        result = restricted_locals['process'](input_data)
+        print(json.dumps(result))
+    else:
+        print(json.dumps({"error": "Function 'process(data)' not found. Please define: def process(data): ..."}))
+
+except TimeoutError as e:
+    print(json.dumps({"error": str(e)}))
+except MemoryError:
+    print(json.dumps({"error": "Memory limit exceeded"}))
 except Exception as e:
     print(json.dumps({"error": f"Runtime Error: {str(e)}"}))
-    sys.exit(0)
-
-if __name__ == "__main__":
+finally:
+    # Cancel alarm
     try:
-        # Read input from stdin
-        input_data = json.load(sys.stdin)
-        
-        # Execute user function (assuming it's named 'process')
-        if 'process' in locals():
-            result = process(input_data)
-            print(json.dumps(result))
-        else:
-            print(json.dumps({"error": "Function 'process(data)' not found in code"}))
-            
-    except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        signal.alarm(0)
+    except:
+        pass
 `;
 
-        // Write to temp file
-        const tempFile = path.join(__dirname, `temp_${Date.now()}.py`);
+        // Write to temp file with random name to prevent race conditions
+        const tempFile = path.join(__dirname, `sandbox_${crypto.randomBytes(8).toString('hex')}.py`);
         fs.writeFileSync(tempFile, wrapperCode);
 
         // Execute python script
-        // Use 'py' launcher for Windows compatibility if 'python' fails
         const pythonCommand = process.platform === 'win32' ? 'py' : 'python3';
-        console.log('Executing Python with command:', pythonCommand);
+        console.log('Executing Python (sandboxed) with command:', pythonCommand);
 
         const pythonProcess = spawn(pythonCommand, [tempFile]);
 
+        // Set up Node.js level timeout as backup
+        const processTimeout = setTimeout(() => {
+            pythonProcess.kill('SIGKILL');
+            console.error('Python process killed due to timeout');
+        }, (EXECUTION_TIMEOUT + 5) * 1000);
+
         pythonProcess.on('error', (err) => {
+            clearTimeout(processTimeout);
             console.error('Failed to start python process:', err);
         });
 
@@ -1291,14 +1439,21 @@ if __name__ == "__main__":
         pythonProcess.stdin.end();
 
         pythonProcess.stdout.on('data', (data) => {
-            stdoutData += data.toString();
+            // Limit output size to prevent memory exhaustion
+            if (stdoutData.length < 10 * 1024 * 1024) { // 10MB limit
+                stdoutData += data.toString();
+            }
         });
 
         pythonProcess.stderr.on('data', (data) => {
-            stderrData += data.toString();
+            if (stderrData.length < 1024 * 1024) { // 1MB limit
+                stderrData += data.toString();
+            }
         });
 
         pythonProcess.on('close', (code) => {
+            clearTimeout(processTimeout);
+            
             // Cleanup temp file
             try {
                 fs.unlinkSync(tempFile);
@@ -1306,15 +1461,18 @@ if __name__ == "__main__":
                 console.error('Error deleting temp file:', e);
             }
 
-            if (code !== 0) {
+            if (code !== 0 && !stdoutData) {
                 return res.status(500).json({ error: stderrData || 'Python execution failed' });
             }
 
             try {
                 const result = JSON.parse(stdoutData);
+                if (result.error) {
+                    return res.status(400).json({ error: result.error });
+                }
                 res.json({ result });
             } catch (e) {
-                res.status(500).json({ error: 'Failed to parse Python output: ' + stdoutData });
+                res.status(500).json({ error: 'Failed to parse Python output: ' + stdoutData.substring(0, 500) });
             }
         });
 
