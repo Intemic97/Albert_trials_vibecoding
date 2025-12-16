@@ -145,6 +145,79 @@ wss.on('connection', (ws) => {
                     break;
                 }
                 
+                case 'node_move': {
+                    // User moved a node
+                    const { nodeId, x, y } = message;
+                    
+                    if (currentWorkflowId && workflowRooms.has(currentWorkflowId)) {
+                        // Broadcast node movement to others
+                        broadcastToRoom(currentWorkflowId, {
+                            type: 'node_update',
+                            nodeId,
+                            x,
+                            y,
+                            movedBy: socketId
+                        }, socketId);
+                    }
+                    break;
+                }
+                
+                case 'node_add': {
+                    // User added a new node
+                    const { node } = message;
+                    
+                    if (currentWorkflowId && workflowRooms.has(currentWorkflowId)) {
+                        broadcastToRoom(currentWorkflowId, {
+                            type: 'node_added',
+                            node,
+                            addedBy: socketId
+                        }, socketId);
+                    }
+                    break;
+                }
+                
+                case 'node_delete': {
+                    // User deleted a node
+                    const { nodeId } = message;
+                    
+                    if (currentWorkflowId && workflowRooms.has(currentWorkflowId)) {
+                        broadcastToRoom(currentWorkflowId, {
+                            type: 'node_deleted',
+                            nodeId,
+                            deletedBy: socketId
+                        }, socketId);
+                    }
+                    break;
+                }
+                
+                case 'connection_add': {
+                    // User added a connection
+                    const { connection } = message;
+                    
+                    if (currentWorkflowId && workflowRooms.has(currentWorkflowId)) {
+                        broadcastToRoom(currentWorkflowId, {
+                            type: 'connection_added',
+                            connection,
+                            addedBy: socketId
+                        }, socketId);
+                    }
+                    break;
+                }
+                
+                case 'connection_delete': {
+                    // User deleted a connection
+                    const { connectionId } = message;
+                    
+                    if (currentWorkflowId && workflowRooms.has(currentWorkflowId)) {
+                        broadcastToRoom(currentWorkflowId, {
+                            type: 'connection_deleted',
+                            connectionId,
+                            deletedBy: socketId
+                        }, socketId);
+                    }
+                    break;
+                }
+                
                 case 'leave': {
                     leaveRoom(socketId, currentWorkflowId);
                     currentWorkflowId = null;

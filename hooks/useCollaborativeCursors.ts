@@ -26,16 +26,40 @@ export interface RemoteUser {
     cursor: CursorPosition | null;
 }
 
+interface NodeUpdate {
+    nodeId: string;
+    x: number;
+    y: number;
+}
+
+interface ConnectionUpdate {
+    id: string;
+    fromNodeId: string;
+    toNodeId: string;
+    outputType?: 'true' | 'false' | 'A' | 'B';
+    inputPort?: 'A' | 'B';
+}
+
 interface UseCollaborativeCursorsProps {
     workflowId: string | null;
     user: User | null;
     enabled?: boolean;
+    onNodeUpdate?: (nodeId: string, x: number, y: number) => void;
+    onNodeAdded?: (node: any) => void;
+    onNodeDeleted?: (nodeId: string) => void;
+    onConnectionAdded?: (connection: ConnectionUpdate) => void;
+    onConnectionDeleted?: (connectionId: string) => void;
 }
 
 interface UseCollaborativeCursorsReturn {
     remoteCursors: Map<string, RemoteUser>;
     remoteUsers: RemoteUser[]; // Deduplicated list of remote users for avatar display
     sendCursorPosition: (x: number, y: number, canvasX: number, canvasY: number) => void;
+    sendNodeMove: (nodeId: string, x: number, y: number) => void;
+    sendNodeAdd: (node: any) => void;
+    sendNodeDelete: (nodeId: string) => void;
+    sendConnectionAdd: (connection: ConnectionUpdate) => void;
+    sendConnectionDelete: (connectionId: string) => void;
     isConnected: boolean;
     myColor: string | null;
     activeUsers: number;
@@ -50,7 +74,12 @@ const getWsUrl = () => {
 export function useCollaborativeCursors({
     workflowId,
     user,
-    enabled = true
+    enabled = true,
+    onNodeUpdate,
+    onNodeAdded,
+    onNodeDeleted,
+    onConnectionAdded,
+    onConnectionDeleted
 }: UseCollaborativeCursorsProps): UseCollaborativeCursorsReturn {
     const [remoteCursors, setRemoteCursors] = useState<Map<string, RemoteUser>>(new Map());
     const [isConnected, setIsConnected] = useState(false);
@@ -59,6 +88,22 @@ export function useCollaborativeCursors({
     const reconnectTimeoutRef = useRef<number | null>(null);
     const lastSentPositionRef = useRef<{ x: number; y: number; time: number } | null>(null);
     const isCleaningUpRef = useRef(false);
+    
+    // Store callbacks in refs to prevent effect re-runs
+    const onNodeUpdateRef = useRef(onNodeUpdate);
+    const onNodeAddedRef = useRef(onNodeAdded);
+    const onNodeDeletedRef = useRef(onNodeDeleted);
+    const onConnectionAddedRef = useRef(onConnectionAdded);
+    const onConnectionDeletedRef = useRef(onConnectionDeleted);
+    
+    // Update refs when callbacks change
+    useEffect(() => {
+        onNodeUpdateRef.current = onNodeUpdate;
+        onNodeAddedRef.current = onNodeAdded;
+        onNodeDeletedRef.current = onNodeDeleted;
+        onConnectionAddedRef.current = onConnectionAdded;
+        onConnectionDeletedRef.current = onConnectionDeleted;
+    }, [onNodeUpdate, onNodeAdded, onNodeDeleted, onConnectionAdded, onConnectionDeleted]);
 
     // Cleanup function
     const cleanup = useCallback(() => {
@@ -192,6 +237,42 @@ export function useCollaborativeCursors({
                                 });
                                 break;
                             }
+
+                            // Node collaboration events
+                            case 'node_update': {
+                                if (onNodeUpdateRef.current) {
+                                    onNodeUpdateRef.current(message.nodeId, message.x, message.y);
+                                }
+                                break;
+                            }
+
+                            case 'node_added': {
+                                if (onNodeAddedRef.current) {
+                                    onNodeAddedRef.current(message.node);
+                                }
+                                break;
+                            }
+
+                            case 'node_deleted': {
+                                if (onNodeDeletedRef.current) {
+                                    onNodeDeletedRef.current(message.nodeId);
+                                }
+                                break;
+                            }
+
+                            case 'connection_added': {
+                                if (onConnectionAddedRef.current) {
+                                    onConnectionAddedRef.current(message.connection);
+                                }
+                                break;
+                            }
+
+                            case 'connection_deleted': {
+                                if (onConnectionDeletedRef.current) {
+                                    onConnectionDeletedRef.current(message.connectionId);
+                                }
+                                break;
+                            }
                         }
                     } catch (err) {
                         console.error('Error parsing WebSocket message:', err);
@@ -266,6 +347,53 @@ export function useCollaborativeCursors({
         }));
     }, []);
 
+    // Send node movement
+    const sendNodeMove = useCallback((nodeId: string, x: number, y: number) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({
+            type: 'node_move',
+            nodeId,
+            x,
+            y
+        }));
+    }, []);
+
+    // Send node add
+    const sendNodeAdd = useCallback((node: any) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({
+            type: 'node_add',
+            node
+        }));
+    }, []);
+
+    // Send node delete
+    const sendNodeDelete = useCallback((nodeId: string) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({
+            type: 'node_delete',
+            nodeId
+        }));
+    }, []);
+
+    // Send connection add
+    const sendConnectionAdd = useCallback((connection: ConnectionUpdate) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({
+            type: 'connection_add',
+            connection
+        }));
+    }, []);
+
+    // Send connection delete
+    const sendConnectionDelete = useCallback((connectionId: string) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({
+            type: 'connection_delete',
+            connectionId
+        }));
+    }, []);
+
     // Deduplicate remote users by their actual user ID (not socket ID)
     // This handles the case where the same user has multiple tabs open
     const remoteUsers = Array.from(remoteCursors.values()).reduce((acc: RemoteUser[], remote) => {
@@ -281,6 +409,11 @@ export function useCollaborativeCursors({
         remoteCursors,
         remoteUsers,
         sendCursorPosition,
+        sendNodeMove,
+        sendNodeAdd,
+        sendNodeDelete,
+        sendConnectionAdd,
+        sendConnectionDelete,
         isConnected,
         myColor,
         activeUsers: remoteUsers.length + (isConnected ? 1 : 0)
