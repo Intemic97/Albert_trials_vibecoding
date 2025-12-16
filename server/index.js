@@ -2,16 +2,210 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const XLSX = require('xlsx');
+const { WebSocketServer } = require('ws');
 const { initDb } = require('./db');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const cookieParser = require('cookie-parser');
 const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile } = require('./auth');
 
 const app = express();
+const server = http.createServer(app);
 const PORT = 3001;
+
+// ==================== WEBSOCKET SETUP ====================
+const wss = new WebSocketServer({ server, path: '/ws' });
+
+// Track users per workflow: { workflowId: Map<socketId, { ws, user, cursor }> }
+const workflowRooms = new Map();
+
+// Generate unique socket ID
+let socketIdCounter = 0;
+const generateSocketId = () => `socket_${++socketIdCounter}_${Date.now()}`;
+
+// Cursor colors for different users
+const CURSOR_COLORS = [
+    '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', 
+    '#3b82f6', '#8b5cf6', '#ec4899', '#f43f5e', '#06b6d4'
+];
+
+// Heartbeat to detect disconnected clients
+const HEARTBEAT_INTERVAL = 10000; // 10 seconds
+
+setInterval(() => {
+    wss.clients.forEach((ws) => {
+        if (ws.isAlive === false) {
+            console.log('[WS] Terminating inactive connection');
+            return ws.terminate();
+        }
+        ws.isAlive = false;
+        ws.ping();
+    });
+}, HEARTBEAT_INTERVAL);
+
+wss.on('connection', (ws) => {
+    const socketId = generateSocketId();
+    let currentWorkflowId = null;
+    let userData = null;
+    
+    // Setup heartbeat
+    ws.isAlive = true;
+    ws.on('pong', () => {
+        ws.isAlive = true;
+    });
+    
+    ws.on('message', (data) => {
+        try {
+            const message = JSON.parse(data.toString());
+            
+            switch (message.type) {
+                case 'join': {
+                    // User joins a workflow canvas
+                    const { workflowId, user } = message;
+                    
+                    // If already in a room, leave it first
+                    if (currentWorkflowId) {
+                        leaveRoom(socketId, currentWorkflowId);
+                    }
+                    
+                    currentWorkflowId = workflowId;
+                    userData = user;
+                    
+                    if (!workflowRooms.has(workflowId)) {
+                        workflowRooms.set(workflowId, new Map());
+                    }
+                    
+                    const room = workflowRooms.get(workflowId);
+                    const colorIndex = room.size % CURSOR_COLORS.length;
+                    
+                    room.set(socketId, {
+                        ws,
+                        user: {
+                            id: user.id,
+                            name: user.name || user.email?.split('@')[0] || 'Anonymous',
+                            color: CURSOR_COLORS[colorIndex],
+                            profilePhoto: user.profilePhoto
+                        },
+                        cursor: null
+                    });
+                    
+                    console.log(`[WS] User ${user.name || user.id} joined workflow ${workflowId} (${room.size} users)`);
+                    
+                    // Send existing users to the new user
+                    const existingUsers = [];
+                    room.forEach((data, id) => {
+                        if (id !== socketId) {
+                            existingUsers.push({
+                                id,
+                                user: data.user,
+                                cursor: data.cursor
+                            });
+                        }
+                    });
+                    
+                    ws.send(JSON.stringify({
+                        type: 'room_state',
+                        users: existingUsers,
+                        yourId: socketId,
+                        yourColor: CURSOR_COLORS[colorIndex]
+                    }));
+                    
+                    // Notify others about new user
+                    broadcastToRoom(workflowId, {
+                        type: 'user_joined',
+                        id: socketId,
+                        user: room.get(socketId).user
+                    }, socketId);
+                    
+                    break;
+                }
+                
+                case 'cursor_move': {
+                    // User moved their cursor
+                    const { x, y, canvasX, canvasY } = message;
+                    
+                    if (currentWorkflowId && workflowRooms.has(currentWorkflowId)) {
+                        const room = workflowRooms.get(currentWorkflowId);
+                        const userEntry = room.get(socketId);
+                        
+                        if (userEntry) {
+                            userEntry.cursor = { x, y, canvasX, canvasY };
+                            
+                            // Broadcast cursor position to others
+                            broadcastToRoom(currentWorkflowId, {
+                                type: 'cursor_update',
+                                id: socketId,
+                                cursor: { x, y, canvasX, canvasY }
+                            }, socketId);
+                        }
+                    }
+                    break;
+                }
+                
+                case 'leave': {
+                    leaveRoom(socketId, currentWorkflowId);
+                    currentWorkflowId = null;
+                    userData = null;
+                    break;
+                }
+            }
+        } catch (err) {
+            console.error('WebSocket message error:', err);
+        }
+    });
+    
+    ws.on('close', () => {
+        console.log(`[WS] Connection closed for socket ${socketId}`);
+        leaveRoom(socketId, currentWorkflowId);
+    });
+    
+    ws.on('error', (err) => {
+        console.error(`[WS] Error for socket ${socketId}:`, err);
+        leaveRoom(socketId, currentWorkflowId);
+    });
+});
+
+function broadcastToRoom(workflowId, message, excludeSocketId = null) {
+    if (!workflowRooms.has(workflowId)) return;
+    
+    const room = workflowRooms.get(workflowId);
+    const messageStr = JSON.stringify(message);
+    
+    room.forEach((data, id) => {
+        if (id !== excludeSocketId && data.ws.readyState === 1) {
+            data.ws.send(messageStr);
+        }
+    });
+}
+
+function leaveRoom(socketId, workflowId) {
+    if (!workflowId || !workflowRooms.has(workflowId)) return;
+    
+    const room = workflowRooms.get(workflowId);
+    if (room.has(socketId)) {
+        const userData = room.get(socketId);
+        console.log(`[WS] User ${userData?.user?.name || socketId} left workflow ${workflowId} (${room.size - 1} users remaining)`);
+        
+        room.delete(socketId);
+        
+        // Notify others
+        broadcastToRoom(workflowId, {
+            type: 'user_left',
+            id: socketId
+        });
+        
+        // Clean up empty rooms
+        if (room.size === 0) {
+            workflowRooms.delete(workflowId);
+            console.log(`[WS] Room ${workflowId} closed (no users)`);
+        }
+    }
+}
+
+// ==================== END WEBSOCKET SETUP ====================
 
 // Configure multer for file uploads
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -69,8 +263,9 @@ initDb().then(database => {
     db = database;
     console.log('Database initialized');
 
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
         console.log(`Server running on http://localhost:${PORT}`);
+        console.log(`WebSocket server running on ws://localhost:${PORT}/ws`);
     });
 }).catch(err => {
     console.error('Failed to initialize database:', err);

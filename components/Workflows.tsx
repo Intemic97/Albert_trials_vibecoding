@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, Upload, Columns, GripVertical } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, Upload, Columns, GripVertical, Users } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import { API_BASE } from '../config';
+import { useAuth } from '../context/AuthContext';
+import { useCollaborativeCursors } from '../hooks/useCollaborativeCursors';
 
 // Generate UUID that works in non-HTTPS contexts
 const generateUUID = (): string => {
@@ -128,12 +130,27 @@ interface WorkflowsProps {
 }
 
 export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) => {
+    const { user } = useAuth();
     const [nodes, setNodes] = useState<WorkflowNode[]>([]);
     const [connections, setConnections] = useState<Connection[]>([]);
     const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
     const [draggingItem, setDraggingItem] = useState<DraggableItem | null>(null);
     const [workflowName, setWorkflowName] = useState<string>('Untitled Workflow');
     const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null);
+    
+    // Collaborative cursors
+    const { 
+        remoteCursors, 
+        remoteUsers,
+        sendCursorPosition, 
+        isConnected: wsConnected, 
+        myColor,
+        activeUsers 
+    } = useCollaborativeCursors({
+        workflowId: currentWorkflowId,
+        user,
+        enabled: !!currentWorkflowId
+    });
     const [savedWorkflows, setSavedWorkflows] = useState<any[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [isRunning, setIsRunning] = useState(false);
@@ -2509,6 +2526,45 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                     {/* Canvas */}
                     <div className="flex-1 relative overflow-hidden bg-slate-50 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px]">
+                        {/* Remote Cursors */}
+                        {Array.from(remoteCursors.values()).map((remote) => {
+                            if (!remote.cursor || remote.cursor.x < 0) return null;
+                            return (
+                                <div
+                                    key={remote.id}
+                                    className="absolute pointer-events-none z-[100] transition-all duration-75"
+                                    style={{
+                                        left: remote.cursor.x,
+                                        top: remote.cursor.y,
+                                        transform: 'translate(-2px, -2px)'
+                                    }}
+                                >
+                                    {/* Cursor arrow */}
+                                    <svg
+                                        width="24"
+                                        height="24"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}
+                                    >
+                                        <path
+                                            d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.48 0 .72-.58.38-.92L6.35 2.88a.5.5 0 0 0-.85.33Z"
+                                            fill={remote.user.color}
+                                            stroke="white"
+                                            strokeWidth="1.5"
+                                        />
+                                    </svg>
+                                    {/* User name label */}
+                                    <div
+                                        className="absolute left-5 top-4 px-2 py-0.5 rounded text-xs font-medium text-white whitespace-nowrap"
+                                        style={{ backgroundColor: remote.user.color }}
+                                    >
+                                        {remote.user.name}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        
                         <div className="absolute top-4 left-4 right-8 z-10 flex items-center gap-4">
                             <div className="flex-1">
                                 <input
@@ -2519,6 +2575,53 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     placeholder="Workflow Name"
                                 />
                             </div>
+                            {/* Active Users - Google Drive Style */}
+                            {wsConnected && remoteUsers.length > 0 && (
+                                <div className="flex items-center">
+                                    {/* Remote users avatars */}
+                                    <div className="flex -space-x-2">
+                                        {remoteUsers.slice(0, 5).map((remoteUser) => (
+                                            <div
+                                                key={remoteUser.id}
+                                                className="relative group"
+                                            >
+                                                {remoteUser.user.profilePhoto ? (
+                                                    <img
+                                                        src={remoteUser.user.profilePhoto}
+                                                        alt={remoteUser.user.name}
+                                                        className="w-8 h-8 rounded-full border-2 border-white shadow-sm object-cover"
+                                                        style={{ borderColor: remoteUser.user.color }}
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        className="w-8 h-8 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-white text-xs font-semibold"
+                                                        style={{ backgroundColor: remoteUser.user.color }}
+                                                    >
+                                                        {remoteUser.user.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                )}
+                                                {/* Tooltip */}
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                                                    {remoteUser.user.name}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {remoteUsers.length > 5 && (
+                                            <div className="w-8 h-8 rounded-full border-2 border-white bg-slate-200 shadow-sm flex items-center justify-center text-slate-600 text-xs font-semibold">
+                                                +{remoteUsers.length - 5}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {/* Your indicator */}
+                                    <div className="ml-2 flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 rounded-full shadow-sm">
+                                        <div 
+                                            className="w-2 h-2 rounded-full animate-pulse"
+                                            style={{ backgroundColor: myColor || '#22c55e' }}
+                                        />
+                                        <span className="text-xs text-slate-500">You</span>
+                                    </div>
+                                </div>
+                            )}
                             <div className="flex gap-1.5">
                                 <button
                                     onClick={backToList}
@@ -2569,9 +2672,22 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             onDrop={handleDrop}
                             onWheel={handleWheel}
                             onMouseDown={handleCanvasMouseDown}
-                            onMouseMove={handleCanvasMouseMove}
+                            onMouseMove={(e) => {
+                                handleCanvasMouseMove(e);
+                                // Send cursor position for collaboration
+                                if (canvasRef.current && currentWorkflowId) {
+                                    const rect = canvasRef.current.getBoundingClientRect();
+                                    const x = e.clientX - rect.left;
+                                    const y = e.clientY - rect.top;
+                                    sendCursorPosition(x, y, e.clientX, e.clientY);
+                                }
+                            }}
                             onMouseUp={handleCanvasMouseUp}
-                            onMouseLeave={handleCanvasMouseUp}
+                            onMouseLeave={() => {
+                                handleCanvasMouseUp();
+                                // Hide cursor when leaving canvas
+                                sendCursorPosition(-100, -100, -100, -100);
+                            }}
                             className="w-full h-full relative"
                             style={{ cursor: isPanning ? 'grabbing' : 'default' }}
                         >
