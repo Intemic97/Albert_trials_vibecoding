@@ -559,7 +559,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                 Dashboards let you organize and share your visualizations with your team.
                             </p>
                             <button
-                                onClick={() => setShowCreateModal(true)}
+                                onClick={handleCreateDashboard}
                                 className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
                             >
                                 <Plus size={18} />
