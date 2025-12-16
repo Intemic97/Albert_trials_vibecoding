@@ -482,9 +482,18 @@ export function useCollaborativeCursors({
         }));
     }, []);
 
-    // Deduplicate remote users by their actual user ID (not socket ID)
-    // This handles the case where the same user has multiple tabs open
-    const remoteUsers = Array.from(remoteCursors.values()).reduce((acc: RemoteUser[], remote) => {
+    // Filter out own user's cursors and deduplicate remote users by their actual user ID
+    // This handles: 1) Not showing your own cursor, 2) Showing one avatar per user even with multiple tabs
+    const filteredRemoteCursors = new Map<string, RemoteUser>();
+    remoteCursors.forEach((remote, key) => {
+        // Skip cursors from the current user (same user.id)
+        if (user && remote.user.id === user.id) {
+            return;
+        }
+        filteredRemoteCursors.set(key, remote);
+    });
+
+    const remoteUsers = Array.from(filteredRemoteCursors.values()).reduce((acc: RemoteUser[], remote) => {
         // Check if we already have a user with the same user.id
         const existingIndex = acc.findIndex(u => u.user.id === remote.user.id);
         if (existingIndex === -1) {
@@ -494,7 +503,7 @@ export function useCollaborativeCursors({
     }, []);
 
     return {
-        remoteCursors,
+        remoteCursors: filteredRemoteCursors,
         remoteUsers,
         sendCursorPosition,
         sendNodeMove,

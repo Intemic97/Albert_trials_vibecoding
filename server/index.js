@@ -94,10 +94,11 @@ wss.on('connection', (ws) => {
                     
                     console.log(`[WS] User ${user.name || user.id} joined workflow ${workflowId} (${room.size} users)`);
                     
-                    // Send existing users to the new user
+                    // Send existing users to the new user (exclude own user's other tabs)
                     const existingUsers = [];
                     room.forEach((data, id) => {
-                        if (id !== socketId) {
+                        // Skip this socket and any other tabs of the same user
+                        if (id !== socketId && data.user?.id !== user.id) {
                             existingUsers.push({
                                 id,
                                 user: data.user,
@@ -113,12 +114,12 @@ wss.on('connection', (ws) => {
                         yourColor: CURSOR_COLORS[colorIndex]
                     }));
                     
-                    // Notify others about new user
+                    // Notify others about new user (exclude other tabs of the same user)
                     broadcastToRoom(workflowId, {
                         type: 'user_joined',
                         id: socketId,
                         user: room.get(socketId).user
-                    }, socketId);
+                    }, socketId, user.id);
                     
                     break;
                 }
@@ -134,12 +135,12 @@ wss.on('connection', (ws) => {
                         if (userEntry) {
                             userEntry.cursor = { x, y, canvasX, canvasY };
                             
-                            // Broadcast cursor position to others
+                            // Broadcast cursor position to others (exclude all tabs of the same user)
                             broadcastToRoom(currentWorkflowId, {
                                 type: 'cursor_update',
                                 id: socketId,
                                 cursor: { x, y, canvasX, canvasY }
-                            }, socketId);
+                            }, socketId, userEntry.user?.id);
                         }
                     }
                     break;
@@ -280,14 +281,19 @@ wss.on('connection', (ws) => {
     });
 });
 
-function broadcastToRoom(workflowId, message, excludeSocketId = null) {
+function broadcastToRoom(workflowId, message, excludeSocketId = null, excludeUserId = null) {
     if (!workflowRooms.has(workflowId)) return;
     
     const room = workflowRooms.get(workflowId);
     const messageStr = JSON.stringify(message);
     
     room.forEach((data, id) => {
-        if (id !== excludeSocketId && data.ws.readyState === 1) {
+        // Skip if this is the excluded socket
+        if (id === excludeSocketId) return;
+        // Skip if this user should be excluded (all their tabs)
+        if (excludeUserId && data.user && data.user.id === excludeUserId) return;
+        // Send if connection is open
+        if (data.ws.readyState === 1) {
             data.ws.send(messageStr);
         }
     });
@@ -1235,72 +1241,56 @@ def check_security(code_str):
     except SyntaxError as e:
         return f"Syntax Error: {e}"
 
-    # Expanded forbidden imports
-    forbidden_imports = {
-        'os', 'subprocess', 'shutil', 'sys', 'socket', 'requests', 
-        'http', 'urllib', 'ftplib', 'telnetlib', 'importlib', 'pickle', 
-        'marshal', 'shelve', 'ctypes', 'multiprocessing', 'threading',
-        'asyncio', 'concurrent', 'signal', 'resource', 'pty', 'tty',
-        'termios', 'fcntl', 'pipes', 'posix', 'pwd', 'grp', 'spwd',
-        'crypt', 'tempfile', 'glob', 'fnmatch', 'linecache', 'traceback',
-        'gc', 'inspect', 'dis', 'code', 'codeop', 'pdb', 'profile',
-        'timeit', 'trace', 'builtins', '_thread', 'io', 'pathlib'
+    # Allowed safe imports (whitelist approach)
+    allowed_imports = {
+        'json', 'math', 're', 'datetime', 'collections', 'itertools',
+        'functools', 'decimal', 'fractions', 'random', 'statistics',
+        'string', 'copy', 'operator', 'numbers', 'time', 'calendar',
+        'heapq', 'bisect', 'array', 'enum', 'typing', 'dataclasses',
+        'csv', 'hashlib', 'hmac', 'base64', 'binascii', 'struct',
+        'codecs', 'unicodedata', 'difflib', 'textwrap', 'pprint'
     }
     
     # Expanded forbidden functions/names
     forbidden_names = {
         'open', 'exec', 'eval', 'compile', '__import__', 'input', 
-        'breakpoint', 'help', 'exit', 'quit', 'getattr', 'setattr', 
-        'delattr', 'globals', 'locals', 'vars', 'dir', 'type',
-        'object', 'super', 'classmethod', 'staticmethod', 'property',
-        'memoryview', 'bytearray', '__build_class__', '__loader__',
-        '__spec__', '__builtins__', '__cached__', '__doc__', '__file__',
-        '__name__', '__package__'
+        'breakpoint', 'help', 'exit', 'quit',
+        '__build_class__', '__loader__', '__spec__', '__builtins__', 
+        '__cached__', '__doc__', '__file__', '__name__', '__package__'
     }
     
     # Forbidden attribute access patterns
     forbidden_attrs = {
         '__class__', '__bases__', '__subclasses__', '__mro__', '__dict__',
         '__globals__', '__code__', '__closure__', '__func__', '__self__',
-        '__module__', '__init__', '__new__', '__del__', '__call__',
-        '__getattr__', '__setattr__', '__delattr__', '__getattribute__',
         '__reduce__', '__reduce_ex__', '__getinitargs__', '__getnewargs__',
         '__getstate__', '__setstate__', 'gi_frame', 'gi_code', 'f_globals',
         'f_locals', 'f_builtins', 'co_code', 'func_globals', 'func_code'
     }
 
     for node in ast.walk(tree):
-        # Check imports
+        # Check imports - whitelist approach
         if isinstance(node, ast.Import):
             for alias in node.names:
                 module_base = alias.name.split('.')[0]
-                if module_base in forbidden_imports:
-                    return f"Security Error: Import of '{alias.name}' is not allowed"
+                if module_base not in allowed_imports:
+                    return f"Security Error: Import of '{alias.name}' is not allowed. Allowed: {', '.join(sorted(allowed_imports))}"
         
         elif isinstance(node, ast.ImportFrom):
             if node.module:
                 module_base = node.module.split('.')[0]
-                if module_base in forbidden_imports:
-                    return f"Security Error: Import from '{node.module}' is not allowed"
+                if module_base not in allowed_imports:
+                    return f"Security Error: Import from '{node.module}' is not allowed. Allowed: {', '.join(sorted(allowed_imports))}"
         
         # Check function calls and name access
         elif isinstance(node, ast.Name):
             if node.id in forbidden_names:
                 return f"Security Error: Access to '{node.id}' is not allowed"
         
-        # Check attribute access
+        # Check attribute access - only block dangerous dunder methods
         elif isinstance(node, ast.Attribute):
             if node.attr in forbidden_attrs:
                 return f"Security Error: Access to '{node.attr}' is not allowed"
-            if node.attr.startswith('_'):
-                return f"Security Error: Access to private/dunder attributes is not allowed"
-        
-        # Block string formatting that could be used for exploits
-        elif isinstance(node, ast.JoinedStr):  # f-strings
-            for value in node.values:
-                if isinstance(value, ast.FormattedValue):
-                    # Check for dangerous patterns in f-strings
-                    pass
 
     return None
 

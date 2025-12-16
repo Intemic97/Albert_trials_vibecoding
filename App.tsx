@@ -31,7 +31,7 @@ export default function App() {
 }
 
 function AuthenticatedApp() {
-    const { isAuthenticated, isLoading } = useAuth();
+    const { isAuthenticated, isLoading, user } = useAuth();
     const [entities, setEntities] = useState<Entity[]>([]);
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
     const [currentView, setCurrentView] = useState('overview');
@@ -260,7 +260,7 @@ function AuthenticatedApp() {
             id: Math.random().toString(36).substr(2, 9),
             name: newEntityName,
             description: newEntityDescription,
-            author: 'User', // Hardcoded for now
+            author: user?.name || user?.email?.split('@')[0] || 'User',
             lastEdited: 'Just now',
             properties: []
         };
