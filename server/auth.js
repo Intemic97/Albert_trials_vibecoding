@@ -106,7 +106,7 @@ async function login(req, res) {
             maxAge: 24 * 60 * 60 * 1000 // 24 hours
         });
 
-        res.json({ message: 'Logged in', user: { id: user.id, name: user.name, email: user.email, orgId: userOrg.organizationId } });
+        res.json({ message: 'Logged in', user: { id: user.id, name: user.name, email: user.email, orgId: userOrg.organizationId, profilePhoto: user.profilePhoto, companyRole: user.companyRole } });
 
     } catch (error) {
         console.error('Login error:', error);
