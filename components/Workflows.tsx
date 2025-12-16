@@ -1089,10 +1089,51 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
         setIsGeneratingCode(true);
         try {
+            // Get input data schema from parent node
+            let inputDataSchema: { columns: string[], sampleData?: any[] } | null = null;
+            
+            if (configuringPythonNodeId) {
+                const parentConnection = connections.find(c => c.toNodeId === configuringPythonNodeId);
+                if (parentConnection) {
+                    const parentNode = nodes.find(n => n.id === parentConnection.fromNodeId);
+                    if (parentNode) {
+                        // Try to get data from different sources
+                        let parentData = parentNode.outputData || parentNode.inputDataA || null;
+                        
+                        // Handle splitColumns parent node
+                        if (parentNode.type === 'splitColumns' && parentNode.outputData) {
+                            parentData = parentConnection.outputType === 'B' 
+                                ? parentNode.outputData.outputB 
+                                : parentNode.outputData.outputA;
+                        }
+                        
+                        // Handle manualInput node
+                        if (parentNode.type === 'manualInput' && parentNode.config) {
+                            const varName = parentNode.config.inputVarName || 'value';
+                            const varValue = parentNode.config.inputVarValue;
+                            parentData = [{ [varName]: varValue }];
+                        }
+                        
+                        if (parentData && Array.isArray(parentData) && parentData.length > 0) {
+                            const columns = Object.keys(parentData[0]);
+                            inputDataSchema = {
+                                columns,
+                                sampleData: parentData.slice(0, 3) // Send first 3 records as sample
+                            };
+                            console.log('Python AI - Input data schema:', inputDataSchema);
+                        }
+                    }
+                }
+            }
+
+            console.log('Python AI - Sending to API:', { prompt: pythonAiPrompt, inputDataSchema });
             const response = await fetch(`${API_BASE}/python/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: pythonAiPrompt }),
+                body: JSON.stringify({ 
+                    prompt: pythonAiPrompt,
+                    inputDataSchema 
+                }),
                 credentials: 'include'
             });
 

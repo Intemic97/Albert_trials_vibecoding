@@ -1320,7 +1320,7 @@ if __name__ == "__main__":
 
 // Python Code Generation Endpoint
 app.post('/api/python/generate', authenticateToken, async (req, res) => {
-    const { prompt } = req.body;
+    const { prompt, inputDataSchema } = req.body;
 
     if (!process.env.OPENAI_API_KEY) {
         return res.status(500).json({ error: 'OpenAI API Key not configured' });
@@ -1330,27 +1330,50 @@ app.post('/api/python/generate', authenticateToken, async (req, res) => {
         const OpenAI = require('openai');
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+        // Build context about input data if available
+        let inputDataContext = '';
+        if (inputDataSchema && inputDataSchema.columns && inputDataSchema.columns.length > 0) {
+            console.log('Python Generate - Input Schema:', JSON.stringify(inputDataSchema));
+            inputDataContext = `
+
+CRITICAL - INPUT DATA STRUCTURE:
+The input data contains records with these EXACT column names: ${inputDataSchema.columns.map(c => `"${c}"`).join(', ')}
+You MUST use these EXACT column names in your code. Do NOT translate, rename, or modify them in any way.
+For example, if the column is "temperatura_celsius", use exactly "temperatura_celsius", NOT "temperature_celsius".`;
+            
+            if (inputDataSchema.sampleData && inputDataSchema.sampleData.length > 0) {
+                inputDataContext += `
+Sample input data: ${JSON.stringify(inputDataSchema.sampleData)}`;
+            }
+        } else {
+            console.log('Python Generate - No input schema provided');
+        }
+
         const completion = await openai.chat.completions.create({
             messages: [
                 {
                     role: "system",
-                    content: `You are a Python expert. Write a Python function named \`process(data)\` that takes a list of records (dictionaries) as input and returns a modified list. 
-                    
-                    Rules:
-                    1. The function MUST be named \`process\`.
-                    2. It MUST accept one argument \`data\`.
-                    3. It MUST return a list of dictionaries.
-                    4. Do NOT include any markdown formatting (like \`\`\`python).
-                    5. Do NOT include explanations. Just the code.
-                    6. Import any standard libraries you need inside the function or at the top.
-                    
-                    Example Output:
-                    import json
-                    def process(data):
-                        # Your logic here
-                        return data`
+                    content: `You are a Python code generator. Your ONLY job is to output Python code. NEVER output explanations, comments outside code, or any text that is not valid Python code.
+
+STRICT RULES:
+1. Output ONLY valid Python code - nothing else.
+2. Start with any necessary imports (like: import json, import math, etc.)
+3. Define a function named exactly: def process(data):
+4. The function receives 'data' which is a list of dictionaries (records).
+5. The function MUST return the modified list.
+6. Do NOT include markdown formatting (no \`\`\`python or \`\`\`).
+7. Do NOT include any explanations or text outside the code.${inputDataContext}
+
+EXAMPLE OUTPUT FORMAT:
+import json
+
+def process(data):
+    for record in data:
+        # your logic here
+        pass
+    return data`
                 },
-                { role: "user", content: prompt }
+                { role: "user", content: `Generate Python code to: ${prompt}` }
             ],
             model: "gpt-4o",
         });
