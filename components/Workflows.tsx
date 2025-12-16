@@ -148,6 +148,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         sendNodeDelete,
         sendConnectionAdd,
         sendConnectionDelete,
+        sendNodePropsUpdate,
+        sendWorkflowRunStart,
+        sendWorkflowRunComplete,
         isConnected: wsConnected, 
         myColor,
         activeUsers 
@@ -186,6 +189,25 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         onConnectionDeleted: (connectionId) => {
             // Delete connection from remote user
             setConnections(prev => prev.filter(c => c.id !== connectionId));
+        },
+        onNodePropsUpdated: (nodeId, updates) => {
+            // Update node properties from remote user
+            setNodes(prev => prev.map(n => 
+                n.id === nodeId ? { 
+                    ...n, 
+                    ...updates,
+                    // Ensure status type is correct
+                    status: updates.status as WorkflowNode['status'] ?? n.status
+                } : n
+            ));
+        },
+        onWorkflowRunning: (userName) => {
+            // Show notification that another user started running
+            console.log(`${userName} started running the workflow`);
+        },
+        onWorkflowCompleted: (userName) => {
+            // Show notification that another user finished running
+            console.log(`${userName} finished running the workflow`);
         }
     });
     const [savedWorkflows, setSavedWorkflows] = useState<any[]>([]);
@@ -1152,12 +1174,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             pendingApprovalData.resolve();
             showToast(`Step approved! Workflow continuing...`, 'success');
         } else {
-            // Set node to error state
-            setNodes(prev => prev.map(n =>
-                n.id === waitingApprovalNodeId 
-                    ? { ...n, status: 'error' as const, executionResult: 'Rejected by user' } 
-                    : n
-            ));
+            // Set node to error state and broadcast
+            updateNodeAndBroadcast(waitingApprovalNodeId, { 
+                status: 'error' as const, 
+                executionResult: 'Rejected by user' 
+            });
             // Stop the workflow execution
             setIsRunning(false);
             setIsRunningWorkflow(false);
@@ -1216,16 +1237,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     };
 
 
+    // Helper to update node and broadcast to other users
+    const updateNodeAndBroadcast = (nodeId: string, updates: Partial<WorkflowNode>) => {
+        setNodes(prev => prev.map(n =>
+            n.id === nodeId ? { ...n, ...updates } : n
+        ));
+        // Broadcast to other users
+        sendNodePropsUpdate(nodeId, updates);
+    };
+
     const executeNode = async (nodeId: string, inputData: any = null, recursive: boolean = true) => {
         // Use a ref or get the latest node from the state setter to ensure we have the latest config?
         // For now, using 'nodes' from closure is fine for config, but we must be careful about 'status' checks if we needed them.
         const node = nodes.find(n => n.id === nodeId);
         if (!node) return;
 
-        // Set to running
-        setNodes(prev => prev.map(n =>
-            n.id === nodeId ? { ...n, status: 'running' as const, inputData } : n
-        ));
+        // Set to running and broadcast
+        updateNodeAndBroadcast(nodeId, { status: 'running' as const, inputData });
 
         //Simulate work
         await new Promise(resolve => setTimeout(resolve, 1500));
@@ -1238,9 +1266,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (node.type === 'fetchData') {
             if (!node.config?.entityId) {
                 result = 'Error: No entity configured';
-                setNodes(prev => prev.map(n =>
-                    n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
-                ));
+                updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result });
                 return;
             }
 
@@ -1272,17 +1298,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 result = `Fetched ${records.length} records from ${node.config.entityName}`;
             } catch (error) {
                 result = 'Error fetching data';
-                setNodes(prev => prev.map(n =>
-                    n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
-                ));
+                updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result });
                 return;
             }
         } else if (node.type === 'equipment') {
             if (!node.config?.recordId) {
                 result = 'Error: No equipment selected';
-                setNodes(prev => prev.map(n =>
-                    n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
-                ));
+                updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result });
                 return;
             }
 
@@ -1305,16 +1327,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     result = `Fetched equipment: ${node.config.recordName}`;
                 } else {
                     result = 'Equipment record not found';
-                    setNodes(prev => prev.map(n =>
-                        n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
-                    ));
+                    updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result });
                     return;
                 }
             } catch (error) {
                 result = 'Error fetching equipment';
-                setNodes(prev => prev.map(n =>
-                    n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
-                ));
+                updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result });
                 return;
             }
         } else {
@@ -1801,16 +1819,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     // Human approval node - wait for user acceptance
                     if (!node.config?.assignedUserId) {
                         result = 'Error: No user assigned';
-                        setNodes(prev => prev.map(n =>
-                            n.id === nodeId ? { ...n, status: 'error' as const, executionResult: result } : n
-                        ));
+                        updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result });
                         return;
                     }
 
-                    // Set to waiting status
-                    setNodes(prev => prev.map(n =>
-                        n.id === nodeId ? { ...n, status: 'waiting' as const, inputData } : n
-                    ));
+                    // Set to waiting status and broadcast
+                    updateNodeAndBroadcast(nodeId, { status: 'waiting' as const, inputData });
                     setWaitingApprovalNodeId(nodeId);
 
                     // Wait for user approval
@@ -1826,9 +1840,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         }
 
         // Set to completed
-        setNodes(prev => prev.map(n =>
-            n.id === nodeId ? { ...n, status: 'completed' as const, executionResult: result, data: nodeData, outputData: nodeData, conditionResult: conditionResult !== undefined ? conditionResult : n.conditionResult } : n
-        ));
+        // Set to completed and broadcast
+        updateNodeAndBroadcast(nodeId, { 
+            status: 'completed' as const, 
+            executionResult: result, 
+            data: nodeData, 
+            outputData: nodeData,
+            conditionResult: conditionResult !== undefined ? conditionResult : undefined
+        });
 
         if (recursive) {
             // Find and execute connected nodes
@@ -1890,19 +1909,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         const node = nodes.find(n => n.id === nodeId);
         if (!node || node.type !== 'join') return;
 
-        // Store the input data for the appropriate port
-        setNodes(prev => prev.map(n => {
-            if (n.id === nodeId) {
-                const updated = { ...n };
-                if (inputPort === 'A') {
-                    updated.inputDataA = inputData;
-                } else {
-                    updated.inputDataB = inputData;
-                }
-                return updated;
-            }
-            return n;
-        }));
+        // Store the input data for the appropriate port and broadcast
+        const updates = inputPort === 'A' 
+            ? { inputDataA: inputData } 
+            : { inputDataB: inputData };
+        updateNodeAndBroadcast(nodeId, updates);
 
         // Wait for state to update
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -2691,11 +2702,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             onMouseMove={(e) => {
                                 handleCanvasMouseMove(e);
                                 // Send cursor position for collaboration
+                                // Convert to canvas coordinates (accounting for pan and zoom)
                                 if (canvasRef.current && currentWorkflowId) {
                                     const rect = canvasRef.current.getBoundingClientRect();
-                                    const x = e.clientX - rect.left;
-                                    const y = e.clientY - rect.top;
-                                    sendCursorPosition(x, y, e.clientX, e.clientY);
+                                    const screenX = e.clientX - rect.left;
+                                    const screenY = e.clientY - rect.top;
+                                    // Convert to canvas space (same coordinate system as nodes)
+                                    const canvasX = (screenX - canvasOffset.x) / canvasZoom;
+                                    const canvasY = (screenY - canvasOffset.y) / canvasZoom;
+                                    sendCursorPosition(canvasX, canvasY, screenX, screenY);
                                 }
                             }}
                             onMouseUp={handleCanvasMouseUp}
@@ -2710,13 +2725,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             {/* Remote Cursors */}
                             {Array.from(remoteCursors.values()).map((remote) => {
                                 if (!remote.cursor || remote.cursor.x < 0) return null;
+                                // Transform canvas coordinates to screen coordinates using local pan/zoom
+                                const screenX = remote.cursor.x * canvasZoom + canvasOffset.x;
+                                const screenY = remote.cursor.y * canvasZoom + canvasOffset.y;
                                 return (
                                     <div
                                         key={remote.id}
                                         className="absolute pointer-events-none z-[100] transition-all duration-75"
                                         style={{
-                                            left: remote.cursor.x,
-                                            top: remote.cursor.y,
+                                            left: screenX,
+                                            top: screenY,
                                             transform: 'translate(-2px, -2px)'
                                         }}
                                     >

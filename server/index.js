@@ -218,6 +218,45 @@ wss.on('connection', (ws) => {
                     break;
                 }
                 
+                case 'node_update_props': {
+                    // User updated node properties (status, config, data, etc.)
+                    const { nodeId, updates } = message;
+                    
+                    if (currentWorkflowId && workflowRooms.has(currentWorkflowId)) {
+                        broadcastToRoom(currentWorkflowId, {
+                            type: 'node_props_updated',
+                            nodeId,
+                            updates,
+                            updatedBy: socketId
+                        }, socketId);
+                    }
+                    break;
+                }
+                
+                case 'workflow_run_start': {
+                    // User started running the workflow
+                    if (currentWorkflowId && workflowRooms.has(currentWorkflowId)) {
+                        broadcastToRoom(currentWorkflowId, {
+                            type: 'workflow_running',
+                            startedBy: socketId,
+                            userName: userData?.name || 'Unknown'
+                        }, socketId);
+                    }
+                    break;
+                }
+                
+                case 'workflow_run_complete': {
+                    // User finished running the workflow
+                    if (currentWorkflowId && workflowRooms.has(currentWorkflowId)) {
+                        broadcastToRoom(currentWorkflowId, {
+                            type: 'workflow_completed',
+                            completedBy: socketId,
+                            userName: userData?.name || 'Unknown'
+                        }, socketId);
+                    }
+                    break;
+                }
+                
                 case 'leave': {
                     leaveRoom(socketId, currentWorkflowId);
                     currentWorkflowId = null;

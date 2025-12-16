@@ -40,6 +40,15 @@ interface ConnectionUpdate {
     inputPort?: 'A' | 'B';
 }
 
+interface NodePropsUpdate {
+    status?: string;
+    config?: any;
+    inputData?: any;
+    outputData?: any;
+    label?: string;
+    data?: any;
+}
+
 interface UseCollaborativeCursorsProps {
     workflowId: string | null;
     user: User | null;
@@ -49,6 +58,9 @@ interface UseCollaborativeCursorsProps {
     onNodeDeleted?: (nodeId: string) => void;
     onConnectionAdded?: (connection: ConnectionUpdate) => void;
     onConnectionDeleted?: (connectionId: string) => void;
+    onNodePropsUpdated?: (nodeId: string, updates: NodePropsUpdate) => void;
+    onWorkflowRunning?: (userName: string) => void;
+    onWorkflowCompleted?: (userName: string) => void;
 }
 
 interface UseCollaborativeCursorsReturn {
@@ -60,6 +72,9 @@ interface UseCollaborativeCursorsReturn {
     sendNodeDelete: (nodeId: string) => void;
     sendConnectionAdd: (connection: ConnectionUpdate) => void;
     sendConnectionDelete: (connectionId: string) => void;
+    sendNodePropsUpdate: (nodeId: string, updates: NodePropsUpdate) => void;
+    sendWorkflowRunStart: () => void;
+    sendWorkflowRunComplete: () => void;
     isConnected: boolean;
     myColor: string | null;
     activeUsers: number;
@@ -79,7 +94,10 @@ export function useCollaborativeCursors({
     onNodeAdded,
     onNodeDeleted,
     onConnectionAdded,
-    onConnectionDeleted
+    onConnectionDeleted,
+    onNodePropsUpdated,
+    onWorkflowRunning,
+    onWorkflowCompleted
 }: UseCollaborativeCursorsProps): UseCollaborativeCursorsReturn {
     const [remoteCursors, setRemoteCursors] = useState<Map<string, RemoteUser>>(new Map());
     const [isConnected, setIsConnected] = useState(false);
@@ -95,6 +113,9 @@ export function useCollaborativeCursors({
     const onNodeDeletedRef = useRef(onNodeDeleted);
     const onConnectionAddedRef = useRef(onConnectionAdded);
     const onConnectionDeletedRef = useRef(onConnectionDeleted);
+    const onNodePropsUpdatedRef = useRef(onNodePropsUpdated);
+    const onWorkflowRunningRef = useRef(onWorkflowRunning);
+    const onWorkflowCompletedRef = useRef(onWorkflowCompleted);
     
     // Update refs when callbacks change
     useEffect(() => {
@@ -103,32 +124,48 @@ export function useCollaborativeCursors({
         onNodeDeletedRef.current = onNodeDeleted;
         onConnectionAddedRef.current = onConnectionAdded;
         onConnectionDeletedRef.current = onConnectionDeleted;
-    }, [onNodeUpdate, onNodeAdded, onNodeDeleted, onConnectionAdded, onConnectionDeleted]);
+        onNodePropsUpdatedRef.current = onNodePropsUpdated;
+        onWorkflowRunningRef.current = onWorkflowRunning;
+        onWorkflowCompletedRef.current = onWorkflowCompleted;
+    }, [onNodeUpdate, onNodeAdded, onNodeDeleted, onConnectionAdded, onConnectionDeleted, onNodePropsUpdated, onWorkflowRunning, onWorkflowCompleted]);
 
-    // Cleanup function
+    // Cleanup function - keeps isCleaningUpRef true to prevent reconnection
     const cleanup = useCallback(() => {
-        if (isCleaningUpRef.current) return;
-        isCleaningUpRef.current = true;
+        console.log('[Collab] Cleanup called, current state:', { isCleaningUp: isCleaningUpRef.current, hasWs: !!wsRef.current });
         
+        // Clear any pending reconnection first
         if (reconnectTimeoutRef.current) {
             clearTimeout(reconnectTimeoutRef.current);
             reconnectTimeoutRef.current = null;
         }
+        
+        // Mark as cleaning up to prevent reconnection
+        isCleaningUpRef.current = true;
+        
         if (wsRef.current) {
+            const ws = wsRef.current;
+            wsRef.current = null; // Clear ref first to prevent race conditions
+            
             // Send leave message before closing
-            if (wsRef.current.readyState === WebSocket.OPEN) {
+            if (ws.readyState === WebSocket.OPEN) {
                 try {
-                    wsRef.current.send(JSON.stringify({ type: 'leave' }));
+                    ws.send(JSON.stringify({ type: 'leave' }));
+                    console.log('[Collab] Sent leave message');
                 } catch (e) {
-                    // Ignore send errors during cleanup
+                    console.log('[Collab] Failed to send leave message:', e);
                 }
             }
-            wsRef.current.close();
-            wsRef.current = null;
+            
+            // Close with a delay to allow leave message to be sent
+            setTimeout(() => {
+                ws.close();
+                console.log('[Collab] WebSocket closed');
+            }, 50);
         }
+        
         setIsConnected(false);
         setRemoteCursors(new Map());
-        isCleaningUpRef.current = false;
+        // Note: isCleaningUpRef stays true - it will be reset when a new connection starts
     }, []);
 
     // Connect to WebSocket
@@ -141,18 +178,20 @@ export function useCollaborativeCursors({
         
         // Clean up any existing connection first
         if (wsRef.current) {
-            console.log('[Collab] Cleaning up existing connection');
-            // Mark as cleaning up to prevent reconnection
-            isCleaningUpRef.current = true;
-            if (wsRef.current.readyState === WebSocket.OPEN) {
+            console.log('[Collab] Cleaning up existing connection before new one');
+            const oldWs = wsRef.current;
+            wsRef.current = null;
+            
+            if (oldWs.readyState === WebSocket.OPEN) {
                 try {
-                    wsRef.current.send(JSON.stringify({ type: 'leave' }));
+                    oldWs.send(JSON.stringify({ type: 'leave' }));
                 } catch (e) { /* ignore */ }
             }
-            wsRef.current.close();
-            wsRef.current = null;
-            isCleaningUpRef.current = false;
+            oldWs.close();
         }
+        
+        // Reset cleaning up flag for new connection
+        isCleaningUpRef.current = false;
         
         if (!enabled || !workflowId || !user) {
             setIsConnected(false);
@@ -270,6 +309,27 @@ export function useCollaborativeCursors({
                             case 'connection_deleted': {
                                 if (onConnectionDeletedRef.current) {
                                     onConnectionDeletedRef.current(message.connectionId);
+                                }
+                                break;
+                            }
+
+                            case 'node_props_updated': {
+                                if (onNodePropsUpdatedRef.current) {
+                                    onNodePropsUpdatedRef.current(message.nodeId, message.updates);
+                                }
+                                break;
+                            }
+
+                            case 'workflow_running': {
+                                if (onWorkflowRunningRef.current) {
+                                    onWorkflowRunningRef.current(message.userName);
+                                }
+                                break;
+                            }
+
+                            case 'workflow_completed': {
+                                if (onWorkflowCompletedRef.current) {
+                                    onWorkflowCompletedRef.current(message.userName);
                                 }
                                 break;
                             }
@@ -394,6 +454,32 @@ export function useCollaborativeCursors({
         }));
     }, []);
 
+    // Send node properties update (status, config, data, etc.)
+    const sendNodePropsUpdate = useCallback((nodeId: string, updates: NodePropsUpdate) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({
+            type: 'node_update_props',
+            nodeId,
+            updates
+        }));
+    }, []);
+
+    // Send workflow run start notification
+    const sendWorkflowRunStart = useCallback(() => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({
+            type: 'workflow_run_start'
+        }));
+    }, []);
+
+    // Send workflow run complete notification
+    const sendWorkflowRunComplete = useCallback(() => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({
+            type: 'workflow_run_complete'
+        }));
+    }, []);
+
     // Deduplicate remote users by their actual user ID (not socket ID)
     // This handles the case where the same user has multiple tabs open
     const remoteUsers = Array.from(remoteCursors.values()).reduce((acc: RemoteUser[], remote) => {
@@ -414,6 +500,9 @@ export function useCollaborativeCursors({
         sendNodeDelete,
         sendConnectionAdd,
         sendConnectionDelete,
+        sendNodePropsUpdate,
+        sendWorkflowRunStart,
+        sendWorkflowRunComplete,
         isConnected,
         myColor,
         activeUsers: remoteUsers.length + (isConnected ? 1 : 0)
