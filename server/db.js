@@ -178,6 +178,13 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  // Migration: Add isAdmin column to users table for platform-wide admin access
+  try {
+    await db.exec(`ALTER TABLE users ADD COLUMN isAdmin INTEGER DEFAULT 0`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   return db;
 }
 

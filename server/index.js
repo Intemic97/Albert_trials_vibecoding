@@ -10,7 +10,7 @@ const { WebSocketServer } = require('ws');
 const { initDb } = require('./db');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const cookieParser = require('cookie-parser');
-const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile } = require('./auth');
+const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin } = require('./auth');
 
 const app = express();
 const server = http.createServer(app);
@@ -407,6 +407,105 @@ app.post('/api/auth/switch-org', authenticateToken, switchOrganization);
 app.get('/api/organization/users', authenticateToken, getOrganizationUsers);
 app.post('/api/organization/invite', authenticateToken, inviteUser);
 app.put('/api/profile', authenticateToken, updateProfile);
+
+// Admin Routes - Platform-wide admin panel
+app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        // Get total counts
+        const userCount = await db.get('SELECT COUNT(*) as count FROM users');
+        const orgCount = await db.get('SELECT COUNT(*) as count FROM organizations');
+        const workflowCount = await db.get('SELECT COUNT(*) as count FROM workflows');
+        const dashboardCount = await db.get('SELECT COUNT(*) as count FROM dashboards');
+        const entityCount = await db.get('SELECT COUNT(*) as count FROM entities');
+
+        res.json({
+            users: userCount.count,
+            organizations: orgCount.count,
+            workflows: workflowCount.count,
+            dashboards: dashboardCount.count,
+            entities: entityCount.count
+        });
+    } catch (error) {
+        console.error('Admin stats error:', error);
+        res.status(500).json({ error: 'Failed to fetch admin stats' });
+    }
+});
+
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        // Get all users with their organization info and resource counts
+        const users = await db.all(`
+            SELECT 
+                u.id,
+                u.name,
+                u.email,
+                u.profilePhoto,
+                u.companyRole,
+                u.isAdmin,
+                u.createdAt,
+                GROUP_CONCAT(DISTINCT o.name) as organizations,
+                COUNT(DISTINCT uo.organizationId) as orgCount
+            FROM users u
+            LEFT JOIN user_organizations uo ON u.id = uo.userId
+            LEFT JOIN organizations o ON uo.organizationId = o.id
+            GROUP BY u.id
+            ORDER BY u.createdAt DESC
+        `);
+
+        // For each user, get their workflow and dashboard counts across all their orgs
+        const usersWithCounts = await Promise.all(users.map(async (user) => {
+            // Get all org IDs for this user
+            const userOrgs = await db.all(
+                'SELECT organizationId FROM user_organizations WHERE userId = ?',
+                [user.id]
+            );
+            const orgIds = userOrgs.map(o => o.organizationId);
+
+            let workflowCount = 0;
+            let dashboardCount = 0;
+
+            if (orgIds.length > 0) {
+                const placeholders = orgIds.map(() => '?').join(',');
+                const wfCount = await db.get(
+                    `SELECT COUNT(*) as count FROM workflows WHERE organizationId IN (${placeholders})`,
+                    orgIds
+                );
+                const dbCount = await db.get(
+                    `SELECT COUNT(*) as count FROM dashboards WHERE organizationId IN (${placeholders})`,
+                    orgIds
+                );
+                workflowCount = wfCount.count;
+                dashboardCount = dbCount.count;
+            }
+
+            return {
+                ...user,
+                isAdmin: !!user.isAdmin,
+                workflowCount,
+                dashboardCount
+            };
+        }));
+
+        res.json(usersWithCounts);
+    } catch (error) {
+        console.error('Admin users error:', error);
+        res.status(500).json({ error: 'Failed to fetch users' });
+    }
+});
+
+app.put('/api/admin/users/:id/admin', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { isAdmin } = req.body;
+
+        await db.run('UPDATE users SET isAdmin = ? WHERE id = ?', [isAdmin ? 1 : 0, id]);
+
+        res.json({ message: 'User admin status updated' });
+    } catch (error) {
+        console.error('Update admin status error:', error);
+        res.status(500).json({ error: 'Failed to update admin status' });
+    }
+});
 
 // File Upload Endpoint
 app.post('/api/upload', authenticateToken, upload.single('file'), (req, res) => {

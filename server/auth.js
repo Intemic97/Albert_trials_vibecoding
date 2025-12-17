@@ -97,7 +97,7 @@ async function login(req, res) {
             return res.status(403).json({ error: 'User does not belong to an organization' });
         }
 
-        const token = jwt.sign({ sub: user.id, email: user.email, orgId: userOrg.organizationId }, JWT_SECRET, { expiresIn: '24h' });
+        const token = jwt.sign({ sub: user.id, email: user.email, orgId: userOrg.organizationId, isAdmin: !!user.isAdmin }, JWT_SECRET, { expiresIn: '24h' });
 
         res.cookie('auth_token', token, {
             httpOnly: true,
@@ -106,7 +106,7 @@ async function login(req, res) {
             maxAge: 24 * 60 * 60 * 1000 // 24 hours
         });
 
-        res.json({ message: 'Logged in', user: { id: user.id, name: user.name, email: user.email, orgId: userOrg.organizationId, profilePhoto: user.profilePhoto, companyRole: user.companyRole } });
+        res.json({ message: 'Logged in', user: { id: user.id, name: user.name, email: user.email, orgId: userOrg.organizationId, profilePhoto: user.profilePhoto, companyRole: user.companyRole, isAdmin: !!user.isAdmin } });
 
     } catch (error) {
         console.error('Login error:', error);
@@ -139,10 +139,11 @@ async function getMe(req, res) {
     // req.user is populated by authenticateToken
     const db = await openDb();
     try {
-        const user = await db.get('SELECT id, name, email, profilePhoto, companyRole FROM users WHERE id = ?', [req.user.sub]);
+        const user = await db.get('SELECT id, name, email, profilePhoto, companyRole, isAdmin FROM users WHERE id = ?', [req.user.sub]);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        res.json({ user: { ...user, orgId: req.user.orgId } });
+        console.log('[getMe] DB user.isAdmin:', user.isAdmin, '-> converted:', !!user.isAdmin);
+        res.json({ user: { ...user, orgId: req.user.orgId, isAdmin: !!user.isAdmin } });
     } catch (error) {
         console.error('GetMe error:', error);
         res.status(500).json({ error: 'Failed to fetch user' });
@@ -308,4 +309,12 @@ async function updateProfile(req, res) {
     }
 }
 
-module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile };
+// Middleware to verify user is a platform admin
+function requireAdmin(req, res, next) {
+    if (!req.user || !req.user.isAdmin) {
+        return res.status(403).json({ error: 'Admin access required' });
+    }
+    next();
+}
+
+module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin };
