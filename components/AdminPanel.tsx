@@ -107,9 +107,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
             {/* Header */}
-            <header className="bg-white border-b border-slate-200 px-6 py-4">
+            <header className="bg-white border-b border-slate-200 px-6 py-4 flex-shrink-0">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <button
@@ -141,7 +141,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-6 py-8">
+            <main className="flex-1 overflow-y-auto">
+                <div className="max-w-7xl mx-auto px-6 py-8">
                 {/* Stats Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
@@ -293,6 +294,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                             No users found
                         </div>
                     )}
+                </div>
                 </div>
             </main>
         </div>
