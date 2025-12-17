@@ -106,7 +106,7 @@ async function login(req, res) {
             maxAge: 24 * 60 * 60 * 1000 // 24 hours
         });
 
-        res.json({ message: 'Logged in', user: { id: user.id, name: user.name, email: user.email, orgId: userOrg.organizationId, profilePhoto: user.profilePhoto, companyRole: user.companyRole, isAdmin: !!user.isAdmin } });
+        res.json({ message: 'Logged in', user: { id: user.id, name: user.name, email: user.email, orgId: userOrg.organizationId, profilePhoto: user.profilePhoto, companyRole: user.companyRole, isAdmin: !!user.isAdmin, onboardingCompleted: !!user.onboardingCompleted } });
 
     } catch (error) {
         console.error('Login error:', error);
@@ -139,11 +139,10 @@ async function getMe(req, res) {
     // req.user is populated by authenticateToken
     const db = await openDb();
     try {
-        const user = await db.get('SELECT id, name, email, profilePhoto, companyRole, isAdmin FROM users WHERE id = ?', [req.user.sub]);
+        const user = await db.get('SELECT id, name, email, profilePhoto, companyRole, isAdmin, onboardingCompleted FROM users WHERE id = ?', [req.user.sub]);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        console.log('[getMe] DB user.isAdmin:', user.isAdmin, '-> converted:', !!user.isAdmin);
-        res.json({ user: { ...user, orgId: req.user.orgId, isAdmin: !!user.isAdmin } });
+        res.json({ user: { ...user, orgId: req.user.orgId, isAdmin: !!user.isAdmin, onboardingCompleted: !!user.onboardingCompleted } });
     } catch (error) {
         console.error('GetMe error:', error);
         res.status(500).json({ error: 'Failed to fetch user' });
@@ -317,4 +316,29 @@ function requireAdmin(req, res, next) {
     next();
 }
 
-module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin };
+async function completeOnboarding(req, res) {
+    const { role, industry, useCase, source } = req.body;
+    const userId = req.user.sub;
+
+    const db = await openDb();
+
+    try {
+        await db.run(
+            `UPDATE users SET 
+                onboardingRole = ?, 
+                onboardingIndustry = ?, 
+                onboardingUseCase = ?, 
+                onboardingSource = ?,
+                onboardingCompleted = 1
+            WHERE id = ?`,
+            [role, industry, useCase, source, userId]
+        );
+
+        res.json({ success: true, message: 'Onboarding completed' });
+    } catch (error) {
+        console.error('CompleteOnboarding error:', error);
+        res.status(500).json({ error: 'Failed to save onboarding data' });
+    }
+}
+
+module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding };

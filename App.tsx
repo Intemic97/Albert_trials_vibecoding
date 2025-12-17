@@ -9,6 +9,7 @@ import { LoginPage } from './components/LoginPage';
 import { Settings } from './components/Settings';
 import { SharedDashboard } from './components/SharedDashboard';
 import { AdminPanel } from './components/AdminPanel';
+import { OnboardingModal } from './components/OnboardingModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Entity, Property, PropertyType } from './types';
 import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X, Code, Paperclip, Download, Loader2 } from 'lucide-react';
@@ -36,6 +37,16 @@ function AuthenticatedApp() {
     const [entities, setEntities] = useState<Entity[]>([]);
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
     const [currentView, setCurrentView] = useState('overview');
+    const previousUserIdRef = React.useRef<string | undefined>(undefined);
+
+    // Reset view to overview when user changes (login/logout) - but not on first load
+    useEffect(() => {
+        // Only reset if the user ID actually changed (not on initial load)
+        if (previousUserIdRef.current !== undefined && previousUserIdRef.current !== user?.id) {
+            setCurrentView('overview');
+        }
+        previousUserIdRef.current = user?.id;
+    }, [user?.id]);
 
     // New Property State
     const [isAddingProp, setIsAddingProp] = useState(false);
@@ -731,8 +742,16 @@ function AuthenticatedApp() {
         return <LoginPage />;
     }
 
+    // Show onboarding modal for new users who haven't completed it
+    const showOnboarding = user && !user.onboardingCompleted;
+
     return (
         <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+            {showOnboarding && (
+                <OnboardingModal onComplete={() => {
+                    // The AuthContext will update the user state
+                }} />
+            )}
             <Sidebar activeView={currentView} onNavigate={setCurrentView} />
 
             <main className="flex-1 flex flex-col h-screen overflow-hidden relative">

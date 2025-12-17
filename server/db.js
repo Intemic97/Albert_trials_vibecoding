@@ -185,6 +185,33 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  // Migration: Add onboarding columns to users table
+  try {
+    await db.exec(`ALTER TABLE users ADD COLUMN onboardingRole TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE users ADD COLUMN onboardingIndustry TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE users ADD COLUMN onboardingUseCase TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE users ADD COLUMN onboardingSource TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE users ADD COLUMN onboardingCompleted INTEGER DEFAULT 0`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   return db;
 }
 

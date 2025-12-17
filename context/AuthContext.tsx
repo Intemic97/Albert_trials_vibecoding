@@ -9,6 +9,7 @@ interface User {
     profilePhoto?: string;
     companyRole?: string;
     isAdmin?: boolean;
+    onboardingCompleted?: boolean;
 }
 
 interface Organization {
@@ -26,6 +27,7 @@ interface AuthContextType {
     logout: () => void;
     switchOrganization: (orgId: string) => Promise<void>;
     updateProfile: (updates: { name?: string; companyRole?: string; profilePhoto?: string }) => Promise<boolean>;
+    completeOnboarding: (data: { role: string; industry: string; useCase: string; source: string }) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -140,8 +142,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const completeOnboarding = async (data: { role: string; industry: string; useCase: string; source: string }): Promise<boolean> => {
+        try {
+            const res = await fetch(`${API_BASE}/auth/onboarding`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+                credentials: 'include'
+            });
+
+            if (res.ok) {
+                setUser(prev => prev ? { ...prev, onboardingCompleted: true } : null);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Complete onboarding error:', error);
+            return false;
+        }
+    };
+
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, organizations, login, logout, switchOrganization, updateProfile }}>
+        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, organizations, login, logout, switchOrganization, updateProfile, completeOnboarding }}>
             {children}
         </AuthContext.Provider>
     );

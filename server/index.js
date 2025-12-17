@@ -10,7 +10,7 @@ const { WebSocketServer } = require('ws');
 const { initDb } = require('./db');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const cookieParser = require('cookie-parser');
-const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin } = require('./auth');
+const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding } = require('./auth');
 
 const app = express();
 const server = http.createServer(app);
@@ -407,6 +407,7 @@ app.post('/api/auth/switch-org', authenticateToken, switchOrganization);
 app.get('/api/organization/users', authenticateToken, getOrganizationUsers);
 app.post('/api/organization/invite', authenticateToken, inviteUser);
 app.put('/api/profile', authenticateToken, updateProfile);
+app.post('/api/auth/onboarding', authenticateToken, completeOnboarding);
 
 // Admin Routes - Platform-wide admin panel
 app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
@@ -443,6 +444,11 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =>
                 u.companyRole,
                 u.isAdmin,
                 u.createdAt,
+                u.onboardingRole,
+                u.onboardingIndustry,
+                u.onboardingUseCase,
+                u.onboardingSource,
+                u.onboardingCompleted,
                 GROUP_CONCAT(DISTINCT o.name) as organizations,
                 COUNT(DISTINCT uo.organizationId) as orgCount
             FROM users u
@@ -481,6 +487,7 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =>
             return {
                 ...user,
                 isAdmin: !!user.isAdmin,
+                onboardingCompleted: !!user.onboardingCompleted,
                 workflowCount,
                 dashboardCount
             };

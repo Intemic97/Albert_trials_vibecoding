@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building2, GitBranch, LayoutDashboard, Database, Shield, ShieldCheck, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Users, Building2, GitBranch, LayoutDashboard, Database, Shield, ShieldCheck, ArrowLeft, RefreshCw, ChevronDown, ChevronUp, Briefcase, Target, Megaphone, CheckCircle2, Clock } from 'lucide-react';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { ProfileMenu } from './ProfileMenu';
@@ -24,6 +24,11 @@ interface AdminUser {
     orgCount: number;
     workflowCount: number;
     dashboardCount: number;
+    onboardingRole?: string;
+    onboardingIndustry?: string;
+    onboardingUseCase?: string;
+    onboardingSource?: string;
+    onboardingCompleted: boolean;
 }
 
 interface AdminPanelProps {
@@ -36,6 +41,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
@@ -224,67 +230,145 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                             </thead>
                             <tbody className="divide-y divide-slate-200">
                                 {users.map((u) => (
-                                    <tr key={u.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                {u.profilePhoto ? (
-                                                    <img 
-                                                        src={u.profilePhoto.startsWith('http') ? u.profilePhoto : `${API_BASE}/files/${u.profilePhoto}`}
-                                                        alt={u.name}
-                                                        className="w-10 h-10 rounded-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white font-semibold">
-                                                        {u.name?.charAt(0).toUpperCase() || u.email.charAt(0).toUpperCase()}
-                                                    </div>
-                                                )}
-                                                <div>
-                                                    <p className="font-medium text-slate-800">{u.name || 'No name'}</p>
-                                                    <p className="text-sm text-slate-500">{u.email}</p>
-                                                    {u.companyRole && (
-                                                        <p className="text-xs text-slate-400">{u.companyRole}</p>
+                                    <React.Fragment key={u.id}>
+                                        <tr 
+                                            className="hover:bg-slate-50 transition-colors cursor-pointer"
+                                            onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)}
+                                        >
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <button className="p-1 hover:bg-slate-200 rounded transition-colors">
+                                                        {expandedUserId === u.id ? (
+                                                            <ChevronUp size={16} className="text-slate-400" />
+                                                        ) : (
+                                                            <ChevronDown size={16} className="text-slate-400" />
+                                                        )}
+                                                    </button>
+                                                    {u.profilePhoto ? (
+                                                        <img 
+                                                            src={u.profilePhoto.startsWith('http') ? u.profilePhoto : `${API_BASE}/files/${u.profilePhoto}`}
+                                                            alt={u.name}
+                                                            className="w-10 h-10 rounded-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white font-semibold">
+                                                            {u.name?.charAt(0).toUpperCase() || u.email.charAt(0).toUpperCase()}
+                                                        </div>
                                                     )}
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-medium text-slate-800">{u.name || 'No name'}</p>
+                                                            {u.onboardingCompleted ? (
+                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-green-100 text-green-600 rounded text-xs" title="Onboarding completed">
+                                                                    <CheckCircle2 size={12} />
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-600 rounded text-xs" title="Onboarding pending">
+                                                                    <Clock size={12} />
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-sm text-slate-500">{u.email}</p>
+                                                        {u.companyRole && (
+                                                            <p className="text-xs text-slate-400">{u.companyRole}</p>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-wrap gap-1">
-                                                {u.organizations?.split(',').map((org, i) => (
-                                                    <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs">
-                                                        {org.trim()}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-50 text-teal-700 rounded-full text-sm font-medium">
-                                                <GitBranch size={14} />
-                                                {u.workflowCount}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-50 text-orange-700 rounded-full text-sm font-medium">
-                                                <LayoutDashboard size={14} />
-                                                {u.dashboardCount}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-slate-600">
-                                            {formatDate(u.createdAt)}
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <button
-                                                onClick={() => toggleAdminStatus(u.id, u.isAdmin)}
-                                                className={`p-2 rounded-lg transition-colors ${
-                                                    u.isAdmin 
-                                                        ? 'bg-red-100 text-red-600 hover:bg-red-200' 
-                                                        : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600'
-                                                }`}
-                                                title={u.isAdmin ? 'Remove admin' : 'Make admin'}
-                                            >
-                                                {u.isAdmin ? <ShieldCheck size={18} /> : <Shield size={18} />}
-                                            </button>
-                                        </td>
-                                    </tr>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex flex-wrap gap-1">
+                                                    {u.organizations?.split(',').map((org, i) => (
+                                                        <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs">
+                                                            {org.trim()}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-50 text-teal-700 rounded-full text-sm font-medium">
+                                                    <GitBranch size={14} />
+                                                    {u.workflowCount}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-50 text-orange-700 rounded-full text-sm font-medium">
+                                                    <LayoutDashboard size={14} />
+                                                    {u.dashboardCount}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-slate-600">
+                                                {formatDate(u.createdAt)}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toggleAdminStatus(u.id, u.isAdmin);
+                                                    }}
+                                                    className={`p-2 rounded-lg transition-colors ${
+                                                        u.isAdmin 
+                                                            ? 'bg-red-100 text-red-600 hover:bg-red-200' 
+                                                            : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600'
+                                                    }`}
+                                                    title={u.isAdmin ? 'Remove admin' : 'Make admin'}
+                                                >
+                                                    {u.isAdmin ? <ShieldCheck size={18} /> : <Shield size={18} />}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {/* Expanded onboarding details */}
+                                        {expandedUserId === u.id && (
+                                            <tr className="bg-slate-50">
+                                                <td colSpan={6} className="px-6 py-4">
+                                                    <div className="ml-10">
+                                                        <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                                            <Users size={16} />
+                                                            Onboarding Information
+                                                        </h4>
+                                                        {u.onboardingCompleted ? (
+                                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                                <div className="bg-white rounded-lg p-3 border border-slate-200">
+                                                                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
+                                                                        <Briefcase size={12} />
+                                                                        Role
+                                                                    </div>
+                                                                    <p className="text-sm font-medium text-slate-800">{u.onboardingRole || '-'}</p>
+                                                                </div>
+                                                                <div className="bg-white rounded-lg p-3 border border-slate-200">
+                                                                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
+                                                                        <Building2 size={12} />
+                                                                        Industry
+                                                                    </div>
+                                                                    <p className="text-sm font-medium text-slate-800">{u.onboardingIndustry || '-'}</p>
+                                                                </div>
+                                                                <div className="bg-white rounded-lg p-3 border border-slate-200">
+                                                                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
+                                                                        <Target size={12} />
+                                                                        Use Case
+                                                                    </div>
+                                                                    <p className="text-sm font-medium text-slate-800">{u.onboardingUseCase || '-'}</p>
+                                                                </div>
+                                                                <div className="bg-white rounded-lg p-3 border border-slate-200">
+                                                                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
+                                                                        <Megaphone size={12} />
+                                                                        Source
+                                                                    </div>
+                                                                    <p className="text-sm font-medium text-slate-800">{u.onboardingSource || '-'}</p>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-700 text-sm">
+                                                                <p className="flex items-center gap-2">
+                                                                    <Clock size={16} />
+                                                                    This user hasn't completed the onboarding survey yet.
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
                                 ))}
                             </tbody>
                         </table>
