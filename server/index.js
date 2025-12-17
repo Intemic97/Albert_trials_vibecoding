@@ -2031,7 +2031,7 @@ app.get('/api/shared/:token', async (req, res) => {
 // Workflow Management Endpoints
 app.get('/api/workflows', authenticateToken, async (req, res) => {
     try {
-        const workflows = await db.all('SELECT id, name, createdAt, updatedAt, createdBy, createdByName FROM workflows WHERE organizationId = ? ORDER BY updatedAt DESC', [req.user.orgId]);
+        const workflows = await db.all('SELECT id, name, createdAt, updatedAt, createdBy, createdByName, lastEditedBy, lastEditedByName FROM workflows WHERE organizationId = ? ORDER BY updatedAt DESC', [req.user.orgId]);
         res.json(workflows);
     } catch (error) {
         console.error('Error fetching workflows:', error);
@@ -2077,12 +2077,12 @@ app.post('/api/workflows', authenticateToken, async (req, res) => {
 app.put('/api/workflows/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, data } = req.body;
+        const { name, data, lastEditedByName } = req.body;
         const now = new Date().toISOString();
 
         await db.run(
-            'UPDATE workflows SET name = ?, data = ?, updatedAt = ? WHERE id = ? AND organizationId = ?',
-            [name, JSON.stringify(data), now, id, req.user.orgId]
+            'UPDATE workflows SET name = ?, data = ?, updatedAt = ?, lastEditedBy = ?, lastEditedByName = ? WHERE id = ? AND organizationId = ?',
+            [name, JSON.stringify(data), now, req.user.sub, lastEditedByName || 'Unknown', id, req.user.orgId]
         );
 
         res.json({ message: 'Workflow updated' });

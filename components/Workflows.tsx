@@ -459,7 +459,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 const res = await fetch(`${API_BASE}/workflows/${currentWorkflowId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: workflowName, data }),
+                    body: JSON.stringify({ 
+                        name: workflowName, 
+                        data,
+                        lastEditedByName: user?.name || user?.email?.split('@')[0] || 'Unknown'
+                    }),
                     credentials: 'include'
                 });
                 if (!res.ok) throw new Error('Failed to update workflow');
@@ -2728,13 +2732,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             Creator: <span className="text-slate-600 font-medium">{workflow.createdByName || 'Unknown'}</span>
                                         </p>
                                         <p className="text-xs text-slate-400">
-                                            Nodes: <span className="text-slate-600 font-medium">{workflow.data?.nodes?.length || 0}</span>
-                                        </p>
-                                        <p className="text-xs text-slate-400">
-                                            Connections: <span className="text-slate-600 font-medium">{workflow.data?.connections?.length || 0}</span>
+                                            Created: <span className="text-slate-600">{workflow.createdAt ? new Date(workflow.createdAt).toLocaleDateString() : 'Unknown'}</span>
                                         </p>
                                         <p className="text-xs text-slate-400">
                                             Last edited: <span className="text-slate-600">{workflow.updatedAt ? new Date(workflow.updatedAt).toLocaleDateString() : 'Never'}</span>
+                                            {workflow.lastEditedByName && (
+                                                <span className="text-slate-500"> by <span className="text-slate-600 font-medium">{workflow.lastEditedByName}</span></span>
+                                            )}
                                         </p>
                                     </div>
                                 </div>
@@ -3883,17 +3887,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                         {/* Send Email Configuration Modal */}
                         {configuringEmailNodeId && (() => {
-                            // Get available fields from parent node
+                            // Get input data from parent node for @ mentions
                             const parentConnection = connections.find(c => c.toNodeId === configuringEmailNodeId);
                             const parentNode = parentConnection ? nodes.find(n => n.id === parentConnection.fromNodeId) : null;
-                            let availableFields: string[] = [];
+                            let inputDataForEmail: any[] = [];
                             
                             if (parentNode) {
-                                let parentData = parentNode.outputData || parentNode.inputDataA;
-                                if (parentNode.type === 'manualInput' && parentNode.config?.inputVarName) {
-                                    availableFields = [parentNode.config.inputVarName];
-                                } else if (parentData && Array.isArray(parentData) && parentData.length > 0) {
-                                    availableFields = Object.keys(parentData[0]);
+                                if (parentNode.type === 'splitColumns' && parentNode.outputData) {
+                                    inputDataForEmail = parentConnection.outputType === 'B' 
+                                        ? parentNode.outputData.outputB || []
+                                        : parentNode.outputData.outputA || [];
+                                } else {
+                                    inputDataForEmail = parentNode.outputData || parentNode.config?.parsedData || [];
                                 }
                             }
 
@@ -3906,70 +3911,61 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </h3>
                                         
                                         <div className="space-y-4">
-                                            {/* Available variables helper */}
-                                            {availableFields.length > 0 && (
-                                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                                    <p className="text-xs font-medium text-blue-800 mb-2">
-                                                        📝 Available variables from previous node:
-                                                    </p>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {availableFields.map(field => (
-                                                            <code 
-                                                                key={field} 
-                                                                className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded cursor-pointer hover:bg-blue-200"
-                                                                onClick={() => navigator.clipboard.writeText(`{${field}}`)}
-                                                                title="Click to copy"
-                                                            >
-                                                                {`{${field}}`}
-                                                            </code>
-                                                        ))}
-                                                    </div>
-                                                    <p className="text-[10px] text-blue-600 mt-1">
-                                                        Click to copy, then paste in any field below
-                                                    </p>
-                                                </div>
-                                            )}
-
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-700 mb-1">
                                                     To (recipient email)
                                                 </label>
-                                                <input
-                                                    type="text"
-                                                    value={emailTo}
-                                                    onChange={(e) => setEmailTo(e.target.value)}
-                                                    placeholder="recipient@example.com or {email}"
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                                                />
-                                                <p className="text-xs text-slate-500 mt-1">
-                                                    Use {'{variable}'} to reference input data
-                                                </p>
+                                                <div className="h-16">
+                                                    <PromptInput
+                                                        entities={entities}
+                                                        onGenerate={() => {}}
+                                                        isGenerating={false}
+                                                        initialValue={emailTo}
+                                                        placeholder="recipient@example.com — Use @ to mention Input Data or entities"
+                                                        hideButton={true}
+                                                        onChange={(val) => setEmailTo(val)}
+                                                        className="h-full [&_textarea]:!h-10 [&_textarea]:!min-h-0 [&_textarea]:!p-2 [&_textarea]:!text-sm"
+                                                        inputData={inputDataForEmail}
+                                                    />
+                                                </div>
                                             </div>
 
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-700 mb-1">
                                                     Subject
                                                 </label>
-                                                <input
-                                                    type="text"
-                                                    value={emailSubject}
-                                                    onChange={(e) => setEmailSubject(e.target.value)}
-                                                    placeholder="Email subject with {variables}"
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                                                />
+                                                <div className="h-16">
+                                                    <PromptInput
+                                                        entities={entities}
+                                                        onGenerate={() => {}}
+                                                        isGenerating={false}
+                                                        initialValue={emailSubject}
+                                                        placeholder="Email subject — Use @ to mention data"
+                                                        hideButton={true}
+                                                        onChange={(val) => setEmailSubject(val)}
+                                                        className="h-full [&_textarea]:!h-10 [&_textarea]:!min-h-0 [&_textarea]:!p-2 [&_textarea]:!text-sm"
+                                                        inputData={inputDataForEmail}
+                                                    />
+                                                </div>
                                             </div>
 
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-700 mb-1">
                                                     Body
                                                 </label>
-                                                <textarea
-                                                    value={emailBody}
-                                                    onChange={(e) => setEmailBody(e.target.value)}
-                                                    placeholder="Hello {name},&#10;&#10;Your order {orderId} has been processed.&#10;&#10;Thank you!"
-                                                    rows={6}
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                                                />
+                                                <div className="h-48">
+                                                    <PromptInput
+                                                        entities={entities}
+                                                        onGenerate={() => {}}
+                                                        isGenerating={false}
+                                                        initialValue={emailBody}
+                                                        placeholder="Write your email body here...&#10;&#10;Use @ to mention Input Data or entities."
+                                                        hideButton={true}
+                                                        onChange={(val) => setEmailBody(val)}
+                                                        className="h-full"
+                                                        inputData={inputDataForEmail}
+                                                    />
+                                                </div>
                                             </div>
 
                                             {/* SMTP Settings (collapsible) */}

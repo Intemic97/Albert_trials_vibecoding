@@ -166,6 +166,18 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  // Migration: Add lastEditedBy and lastEditedByName columns to workflows table
+  try {
+    await db.exec(`ALTER TABLE workflows ADD COLUMN lastEditedBy TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE workflows ADD COLUMN lastEditedByName TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   return db;
 }
 
