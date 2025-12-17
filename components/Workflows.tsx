@@ -5046,10 +5046,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         {configuringExcelNodeId && (
                             <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={closeExcelConfig}>
                                 <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                        <FileSpreadsheet className="text-emerald-600" size={20} />
-                                        Excel/CSV Input
-                                    </h3>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                            <FileSpreadsheet className="text-emerald-600" size={20} />
+                                            Excel/CSV Input
+                                        </h3>
+                                        <button
+                                            onClick={closeExcelConfig}
+                                            disabled={!excelFile && !nodes.find(n => n.id === configuringExcelNodeId)?.config?.fileName}
+                                            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                                !excelFile && !nodes.find(n => n.id === configuringExcelNodeId)?.config?.fileName
+                                                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                            }`}
+                                        >
+                                            Done
+                                        </button>
+                                    </div>
                                     
                                     {/* File Upload Area */}
                                     <div className="mb-4">
@@ -5151,14 +5164,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </div>
                                     )}
 
-                                    <div className="flex gap-2 justify-end mt-6">
-                                        <button
-                                            onClick={closeExcelConfig}
-                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                                        >
-                                            Close
-                                        </button>
-                                    </div>
                                 </div>
                             </div>
                         )}
