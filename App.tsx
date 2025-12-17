@@ -8,6 +8,7 @@ import { Workflows } from './components/Workflows';
 import { LoginPage } from './components/LoginPage';
 import { Settings } from './components/Settings';
 import { SharedDashboard } from './components/SharedDashboard';
+import { AdminPanel } from './components/AdminPanel';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Entity, Property, PropertyType } from './types';
 import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X, Code, Paperclip, Download, Loader2 } from 'lucide-react';
@@ -756,6 +757,8 @@ function AuthenticatedApp() {
                     <Reporting entities={entities} companyInfo={companyInfo} onViewChange={setCurrentView} />
                 ) : currentView === 'settings' ? (
                     <Settings onViewChange={setCurrentView} />
+                ) : currentView === 'admin' ? (
+                    <AdminPanel onNavigate={setCurrentView} />
                 ) : (
                     <>
                         {/* Top Header */}

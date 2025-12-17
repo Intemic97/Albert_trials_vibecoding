@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Entity } from '../types';
 import { Database, Sparkles, X, Info, Plus, Share2, LayoutDashboard, ChevronDown, Copy, Check, Trash2, Link, ExternalLink } from 'lucide-react';
 import { PromptInput } from './PromptInput';
@@ -145,6 +145,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     const [generatedWidgets, setGeneratedWidgets] = useState<WidgetConfig[]>([]);
     const [savedWidgets, setSavedWidgets] = useState<SavedWidget[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
+    const generatedWidgetsRef = useRef<HTMLDivElement>(null);
     
     // Share state
     const [shareUrl, setShareUrl] = useState('');
@@ -165,6 +166,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             setSavedWidgets([]);
         }
     }, [selectedDashboardId]);
+
+    // Auto-scroll to generated widgets when a new one is created
+    useEffect(() => {
+        if (generatedWidgets.length > 0 && generatedWidgetsRef.current) {
+            setTimeout(() => {
+                generatedWidgetsRef.current?.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start' 
+                });
+            }, 100);
+        }
+    }, [generatedWidgets.length]);
 
     const fetchDashboards = async () => {
         try {
@@ -658,7 +671,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
 
                             {/* Generated Widgets Section */}
                             {generatedWidgets.length > 0 && (
-                                <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                                <div ref={generatedWidgetsRef} className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
                                     <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
                                         <Sparkles size={18} className="text-teal-500" />
                                         New Widgets

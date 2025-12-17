@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { User, LogOut, ChevronRight, Building, Settings, Camera, X, Loader2 } from 'lucide-react';
+import { User, LogOut, ChevronRight, Building, Settings, Camera, X, Loader2, Shield } from 'lucide-react';
 import { API_BASE } from '../config';
 
 interface ProfileMenuProps {
@@ -44,6 +44,7 @@ export const UserAvatar: React.FC<{
 
 export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate }) => {
     const { user, logout, organizations, switchOrganization, updateProfile } = useAuth();
+    console.log('[ProfileMenu] user.isAdmin:', user?.isAdmin);
     const [isOpen, setIsOpen] = useState(false);
     const [view, setView] = useState<'main' | 'organizations'>('main');
     const [showProfileModal, setShowProfileModal] = useState(false);
@@ -194,6 +195,22 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate }) => {
                                     </div>
                                     <span className="font-medium">Settings</span>
                                 </button>
+                                
+                                {/* Admin Panel - Only visible for admins */}
+                                {user?.isAdmin && (
+                                    <button
+                                        onClick={() => {
+                                            setIsOpen(false);
+                                            onNavigate?.('admin');
+                                        }}
+                                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg group transition-colors"
+                                    >
+                                        <div className="p-1.5 bg-red-50 rounded text-red-500 group-hover:text-red-600 group-hover:bg-red-100 transition-colors">
+                                            <Shield size={16} />
+                                        </div>
+                                        <span className="font-medium">Admin Panel</span>
+                                    </button>
+                                )}
                             </div>
 
                             <div className="border-t border-slate-100 my-1 mx-2"></div>
