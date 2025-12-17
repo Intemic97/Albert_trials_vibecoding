@@ -2421,8 +2421,28 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault();
+        
+        if (!canvasRef.current) return;
+        
+        const rect = canvasRef.current.getBoundingClientRect();
+        // Mouse position relative to the canvas element
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        // Calculate the point in canvas coordinates that's under the mouse
+        const worldX = (mouseX - canvasOffset.x) / canvasZoom;
+        const worldY = (mouseY - canvasOffset.y) / canvasZoom;
+        
+        // Calculate new zoom level
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        setCanvasZoom(prev => Math.min(Math.max(prev * delta, 0.25), 3));
+        const newZoom = Math.min(Math.max(canvasZoom * delta, 0.25), 3);
+        
+        // Calculate new offset to keep the same point under the mouse
+        const newOffsetX = mouseX - worldX * newZoom;
+        const newOffsetY = mouseY - worldY * newZoom;
+        
+        setCanvasZoom(newZoom);
+        setCanvasOffset({ x: newOffsetX, y: newOffsetY });
     };
 
     const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
