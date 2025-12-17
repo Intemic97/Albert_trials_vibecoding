@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, Upload, Columns, GripVertical, Users, Mail } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
@@ -343,6 +343,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [isPanning, setIsPanning] = useState(false);
     const [panStart, setPanStart] = useState({ x: 0, y: 0 });
     const canvasRef = useRef<HTMLDivElement>(null);
+    const [highlightedUserId, setHighlightedUserId] = useState<string | null>(null);
 
     // Workflow Runner State
     const [showRunnerModal, setShowRunnerModal] = useState<boolean>(false);
@@ -2512,6 +2513,39 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setCanvasZoom(1);
     };
 
+    // Navigate to a remote user's cursor position
+    const goToUserCursor = useCallback((userId: string) => {
+        if (!canvasRef.current) return;
+        
+        // Find all cursor instances for this user (might have multiple tabs)
+        const userCursors: { cursor: { x: number; y: number } }[] = [];
+        remoteCursors.forEach((remote) => {
+            if (remote.user.id === userId && remote.cursor && remote.cursor.x >= 0) {
+                userCursors.push({ cursor: remote.cursor });
+            }
+        });
+        
+        if (userCursors.length === 0) return;
+        
+        // Get the first available cursor position
+        const cursorPos = userCursors[0].cursor;
+        
+        // Get canvas dimensions
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        const centerX = canvasRect.width / 2;
+        const centerY = canvasRect.height / 2;
+        
+        // Calculate new offset to center the user's cursor on screen
+        const newOffsetX = centerX - cursorPos.x * canvasZoom;
+        const newOffsetY = centerY - cursorPos.y * canvasZoom;
+        
+        setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+        
+        // Highlight the user's cursor temporarily
+        setHighlightedUserId(userId);
+        setTimeout(() => setHighlightedUserId(null), 2000);
+    }, [remoteCursors, canvasZoom]);
+
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         if (!draggingItem || !canvasRef.current) return;
@@ -2895,38 +2929,58 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <div className="flex items-center">
                                     {/* Remote users avatars */}
                                     <div className="flex -space-x-2">
-                                        {remoteUsers.slice(0, 5).map((remoteUser) => (
-                                            <div
-                                                key={remoteUser.id}
-                                                className="relative group"
-                                            >
-                                                {remoteUser.user.profilePhoto ? (
-                                                    <img
-                                                        src={remoteUser.user.profilePhoto.startsWith('http') 
-                                                            ? remoteUser.user.profilePhoto 
-                                                            : `${API_BASE}/files/${remoteUser.user.profilePhoto}`}
-                                                        alt={remoteUser.user.name}
-                                                        className="w-8 h-8 rounded-full border-2 border-white shadow-sm object-cover"
-                                                        style={{ borderColor: remoteUser.user.color }}
-                                                        onError={(e) => {
-                                                            // Fallback to initials if image fails to load
-                                                            e.currentTarget.style.display = 'none';
-                                                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                                                        }}
-                                                    />
-                                                ) : null}
-                                                <div
-                                                    className={`w-8 h-8 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-white text-xs font-semibold ${remoteUser.user.profilePhoto ? 'hidden' : ''}`}
-                                                    style={{ backgroundColor: remoteUser.user.color }}
+                                        {remoteUsers.slice(0, 5).map((remoteUser) => {
+                                            // Check if this user has a visible cursor
+                                            const hasCursor = Array.from(remoteCursors.values()).some(
+                                                r => r.user.id === remoteUser.user.id && r.cursor && r.cursor.x >= 0
+                                            );
+                                            return (
+                                                <button
+                                                    key={remoteUser.id}
+                                                    className={`relative group focus:outline-none ${hasCursor ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-default opacity-70'}`}
+                                                    onClick={() => hasCursor && goToUserCursor(remoteUser.user.id)}
+                                                    title={hasCursor ? `Click to go to ${remoteUser.user.name}'s cursor` : `${remoteUser.user.name} (cursor not visible)`}
                                                 >
-                                                    {remoteUser.user.name.charAt(0).toUpperCase()}
-                                                </div>
-                                                {/* Tooltip */}
-                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-                                                    {remoteUser.user.name}
-                                                </div>
-                                            </div>
-                                        ))}
+                                                    {remoteUser.user.profilePhoto ? (
+                                                        <img
+                                                            src={remoteUser.user.profilePhoto.startsWith('http') 
+                                                                ? remoteUser.user.profilePhoto 
+                                                                : `${API_BASE}/files/${remoteUser.user.profilePhoto}`}
+                                                            alt={remoteUser.user.name}
+                                                            className="w-8 h-8 rounded-full border-2 border-white shadow-sm object-cover"
+                                                            style={{ borderColor: remoteUser.user.color }}
+                                                            onError={(e) => {
+                                                                // Fallback to initials if image fails to load
+                                                                e.currentTarget.style.display = 'none';
+                                                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                                            }}
+                                                        />
+                                                    ) : null}
+                                                    <div
+                                                        className={`w-8 h-8 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-white text-xs font-semibold ${remoteUser.user.profilePhoto ? 'hidden' : ''}`}
+                                                        style={{ backgroundColor: remoteUser.user.color }}
+                                                    >
+                                                        {remoteUser.user.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                    {/* Cursor visibility indicator */}
+                                                    {hasCursor && (
+                                                        <div 
+                                                            className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white flex items-center justify-center"
+                                                            style={{ backgroundColor: remoteUser.user.color }}
+                                                        >
+                                                            <svg width="8" height="8" viewBox="0 0 24 24" fill="white">
+                                                                <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.48 0 .72-.58.38-.92L6.35 2.88a.5.5 0 0 0-.85.33Z" />
+                                                            </svg>
+                                                        </div>
+                                                    )}
+                                                    {/* Tooltip */}
+                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                                                        {remoteUser.user.name}
+                                                        {hasCursor && <span className="block text-[10px] text-slate-300">Click to follow</span>}
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
                                         {remoteUsers.length > 5 && (
                                             <div className="w-8 h-8 rounded-full border-2 border-white bg-slate-200 shadow-sm flex items-center justify-center text-slate-600 text-xs font-semibold">
                                                 +{remoteUsers.length - 5}
@@ -3031,6 +3085,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 // Transform canvas coordinates to screen coordinates using local pan/zoom
                                 const screenX = remote.cursor.x * canvasZoom + canvasOffset.x;
                                 const screenY = remote.cursor.y * canvasZoom + canvasOffset.y;
+                                const isHighlighted = highlightedUserId === remote.user.id;
                                 return (
                                     <div
                                         key={remote.id}
@@ -3041,13 +3096,37 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             transform: 'translate(-2px, -2px)'
                                         }}
                                     >
+                                        {/* Highlight pulse ring when user is being followed */}
+                                        {isHighlighted && (
+                                            <>
+                                                <div 
+                                                    className="absolute -inset-8 rounded-full animate-ping"
+                                                    style={{ 
+                                                        backgroundColor: remote.user.color,
+                                                        opacity: 0.3,
+                                                        animationDuration: '1s'
+                                                    }}
+                                                />
+                                                <div 
+                                                    className="absolute -inset-4 rounded-full animate-pulse"
+                                                    style={{ 
+                                                        backgroundColor: remote.user.color,
+                                                        opacity: 0.4
+                                                    }}
+                                                />
+                                            </>
+                                        )}
                                         {/* Cursor arrow */}
                                         <svg
                                             width="24"
                                             height="24"
                                             viewBox="0 0 24 24"
                                             fill="none"
-                                            style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}
+                                            style={{ 
+                                                filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))',
+                                                transform: isHighlighted ? 'scale(1.3)' : 'scale(1)',
+                                                transition: 'transform 0.2s ease-out'
+                                            }}
                                         >
                                             <path
                                                 d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.48 0 .72-.58.38-.92L6.35 2.88a.5.5 0 0 0-.85.33Z"
@@ -3058,7 +3137,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </svg>
                                         {/* User name label */}
                                         <div
-                                            className="absolute left-5 top-4 px-2 py-0.5 rounded text-xs font-medium text-white whitespace-nowrap"
+                                            className={`absolute left-5 top-4 px-2 py-0.5 rounded text-xs font-medium text-white whitespace-nowrap transition-all ${isHighlighted ? 'scale-110 shadow-lg' : ''}`}
                                             style={{ backgroundColor: remote.user.color }}
                                         >
                                             {remote.user.name}
