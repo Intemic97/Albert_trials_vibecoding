@@ -468,7 +468,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 const res = await fetch(`${API_BASE}/workflows`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: workflowName, data }),
+                    body: JSON.stringify({ 
+                        name: workflowName, 
+                        data,
+                        createdByName: user?.name || user?.email?.split('@')[0] || 'Unknown'
+                    }),
                     credentials: 'include'
                 });
                 if (!res.ok) throw new Error('Failed to create workflow');
@@ -2467,6 +2471,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setDraggingNodeId(null);
         // Reset nodeDragged after a small delay to allow onClick to check it
         setTimeout(() => setNodeDragged(false), 10);
+        // Clear connection drag if dropped on canvas (not on a valid connector)
+        setDragConnectionStart(null);
+        setDragConnectionCurrent(null);
     };
 
     const handleNodeMouseDown = (e: React.MouseEvent, nodeId: string) => {
@@ -2696,7 +2703,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2 mt-4">
+                                    <div className="space-y-1.5 mt-4">
+                                        <p className="text-xs text-slate-400">
+                                            Creator: <span className="text-slate-600 font-medium">{workflow.createdByName || 'Unknown'}</span>
+                                        </p>
                                         <p className="text-xs text-slate-400">
                                             Nodes: <span className="text-slate-600 font-medium">{workflow.data?.nodes?.length || 0}</span>
                                         </p>
@@ -2704,7 +2714,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             Connections: <span className="text-slate-600 font-medium">{workflow.data?.connections?.length || 0}</span>
                                         </p>
                                         <p className="text-xs text-slate-400">
-                                            Last edited: <span className="text-slate-600">{new Date(workflow.updated_at).toLocaleDateString()}</span>
+                                            Last edited: <span className="text-slate-600">{workflow.updatedAt ? new Date(workflow.updatedAt).toLocaleDateString() : 'Never'}</span>
                                         </p>
                                     </div>
                                 </div>
@@ -2770,12 +2780,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </div>
 
                                     {/* Categories */}
-                                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                                    <div className="flex flex-wrap gap-2 pb-2">
                                         {['All', 'Triggers', 'Data', 'Logic', 'Actions', 'Other'].map(cat => (
                                             <button
                                                 key={cat}
                                                 onClick={() => setSelectedCategory(cat)}
-                                                className={`px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${selectedCategory === cat
+                                                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${selectedCategory === cat
                                                     ? 'bg-teal-100 text-teal-700 border border-teal-200'
                                                     : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
                                                     }`}
@@ -2961,6 +2971,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             onMouseDown={handleCanvasMouseDown}
                             onMouseMove={(e) => {
                                 handleCanvasMouseMove(e);
+                                
+                                // Update drag connection line while dragging
+                                if (dragConnectionStart && canvasRef.current) {
+                                    const rect = canvasRef.current.getBoundingClientRect();
+                                    const x = (e.clientX - rect.left - canvasOffset.x) / canvasZoom;
+                                    const y = (e.clientY - rect.top - canvasOffset.y) / canvasZoom;
+                                    setDragConnectionCurrent({ x, y });
+                                }
+                                
                                 // Send cursor position for collaboration
                                 // Convert to canvas coordinates (accounting for pan and zoom)
                                 if (canvasRef.current && currentWorkflowId) {
@@ -3270,7 +3289,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         className={`flex flex-col p-3 rounded-lg border-2 shadow-md hover:shadow-xl w-48 group relative transition-shadow duration-200 select-none ${getNodeColor(node.type, node.status)}`}
                                     >
                                         {/* Hover Action Buttons - Above Node */}
-                                        <div className="absolute -top-7 left-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all bg-white rounded-md shadow-sm border border-slate-200 p-0.5">
+                                        <div 
+                                            className="absolute -top-7 left-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all bg-white rounded-md shadow-sm border border-slate-200 p-0.5"
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                        >
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -3284,7 +3306,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             {((node.data && Array.isArray(node.data) && node.data.length > 0) || 
                                               (node.type === 'splitColumns' && node.data && (node.data.outputA?.length > 0 || node.data.outputB?.length > 0))) && (
                                                 <button
-                                                    onClick={() => setViewingDataNodeId(node.id)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setViewingDataNodeId(node.id);
+                                                    }}
                                                     className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-slate-800 transition-all"
                                                     title="View Data"
                                                 >
@@ -3292,7 +3317,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 </button>
                                             )}
                                             <button
-                                                onClick={() => removeNode(node.id)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removeNode(node.id);
+                                                }}
                                                 className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-red-500 transition-all"
                                                 title="Delete Node"
                                             >

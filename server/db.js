@@ -154,6 +154,18 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  // Migration: Add createdBy and createdByName columns to workflows table
+  try {
+    await db.exec(`ALTER TABLE workflows ADD COLUMN createdBy TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE workflows ADD COLUMN createdByName TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   return db;
 }
 

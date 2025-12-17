@@ -2031,7 +2031,7 @@ app.get('/api/shared/:token', async (req, res) => {
 // Workflow Management Endpoints
 app.get('/api/workflows', authenticateToken, async (req, res) => {
     try {
-        const workflows = await db.all('SELECT id, name, createdAt, updatedAt FROM workflows WHERE organizationId = ? ORDER BY updatedAt DESC', [req.user.orgId]);
+        const workflows = await db.all('SELECT id, name, createdAt, updatedAt, createdBy, createdByName FROM workflows WHERE organizationId = ? ORDER BY updatedAt DESC', [req.user.orgId]);
         res.json(workflows);
     } catch (error) {
         console.error('Error fetching workflows:', error);
@@ -2057,17 +2057,17 @@ app.get('/api/workflows/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/workflows', authenticateToken, async (req, res) => {
     try {
-        const { name, data } = req.body;
+        const { name, data, createdByName } = req.body;
         const id = Math.random().toString(36).substr(2, 9);
         const now = new Date().toISOString();
 
         // Store data as JSON string
         await db.run(
-            'INSERT INTO workflows (id, organizationId, name, data, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
-            [id, req.user.orgId, name, JSON.stringify(data), now, now]
+            'INSERT INTO workflows (id, organizationId, name, data, createdAt, updatedAt, createdBy, createdByName) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, req.user.orgId, name, JSON.stringify(data), now, now, req.user.sub, createdByName || 'Unknown']
         );
 
-        res.json({ id, name, createdAt: now, updatedAt: now });
+        res.json({ id, name, createdAt: now, updatedAt: now, createdBy: req.user.sub, createdByName: createdByName || 'Unknown' });
     } catch (error) {
         console.error('Error saving workflow:', error);
         res.status(500).json({ error: 'Failed to save workflow' });
