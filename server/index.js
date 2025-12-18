@@ -64,62 +64,105 @@ wss.on('connection', (ws) => {
             switch (message.type) {
                 case 'join': {
                     // User joins a workflow canvas
-                    const { workflowId, user } = message;
+                    const { workflowId, orgId, user } = message;
                     
-                    // If already in a room, leave it first
-                    if (currentWorkflowId) {
-                        leaveRoom(socketId, currentWorkflowId);
-                    }
-                    
-                    currentWorkflowId = workflowId;
-                    userData = user;
-                    
-                    if (!workflowRooms.has(workflowId)) {
-                        workflowRooms.set(workflowId, new Map());
-                    }
-                    
-                    const room = workflowRooms.get(workflowId);
-                    const colorIndex = room.size % CURSOR_COLORS.length;
-                    
-                    room.set(socketId, {
-                        ws,
-                        user: {
-                            id: user.id,
-                            name: user.name || user.email?.split('@')[0] || 'Anonymous',
-                            color: CURSOR_COLORS[colorIndex],
-                            profilePhoto: user.profilePhoto
-                        },
-                        cursor: null
-                    });
-                    
-                    console.log(`[WS] User ${user.name || user.id} joined workflow ${workflowId} (${room.size} users)`);
-                    
-                    // Send existing users to the new user (exclude own user's other tabs)
-                    const existingUsers = [];
-                    room.forEach((data, id) => {
-                        // Skip this socket and any other tabs of the same user
-                        if (id !== socketId && data.user?.id !== user.id) {
-                            existingUsers.push({
-                                id,
-                                user: data.user,
-                                cursor: data.cursor
+                    // SECURITY: Validate that the workflow belongs to the user's organization
+                    // This prevents users from different organizations seeing each other's cursors
+                    (async () => {
+                        try {
+                            // 1. Verify the workflow exists and belongs to the claimed organization
+                            const workflow = await db.get(
+                                'SELECT id, organizationId FROM workflows WHERE id = ?',
+                                [workflowId]
+                            );
+                            
+                            if (!workflow) {
+                                console.log(`[WS] SECURITY: Workflow ${workflowId} not found`);
+                                ws.send(JSON.stringify({ type: 'error', message: 'Workflow not found' }));
+                                return;
+                            }
+                            
+                            // 2. Verify the workflow belongs to the organization the user claims
+                            if (workflow.organizationId !== orgId) {
+                                console.log(`[WS] SECURITY: Workflow ${workflowId} belongs to org ${workflow.organizationId}, not ${orgId}`);
+                                ws.send(JSON.stringify({ type: 'error', message: 'Access denied: workflow does not belong to your organization' }));
+                                return;
+                            }
+                            
+                            // 3. Verify the user belongs to that organization
+                            const userOrg = await db.get(
+                                'SELECT userId FROM user_organizations WHERE userId = ? AND organizationId = ?',
+                                [user.id, orgId]
+                            );
+                            
+                            if (!userOrg) {
+                                console.log(`[WS] SECURITY: User ${user.id} does not belong to org ${orgId}`);
+                                ws.send(JSON.stringify({ type: 'error', message: 'Access denied: you do not belong to this organization' }));
+                                return;
+                            }
+                            
+                            console.log(`[WS] SECURITY: User ${user.id} validated for workflow ${workflowId} in org ${orgId}`);
+                            
+                            // If already in a room, leave it first
+                            if (currentWorkflowId) {
+                                leaveRoom(socketId, currentWorkflowId);
+                            }
+                            
+                            currentWorkflowId = workflowId;
+                            userData = user;
+                            
+                            if (!workflowRooms.has(workflowId)) {
+                                workflowRooms.set(workflowId, new Map());
+                            }
+                            
+                            const room = workflowRooms.get(workflowId);
+                            const colorIndex = room.size % CURSOR_COLORS.length;
+                            
+                            room.set(socketId, {
+                                ws,
+                                user: {
+                                    id: user.id,
+                                    name: user.name || user.email?.split('@')[0] || 'Anonymous',
+                                    color: CURSOR_COLORS[colorIndex],
+                                    profilePhoto: user.profilePhoto
+                                },
+                                cursor: null
                             });
+                            
+                            console.log(`[WS] User ${user.name || user.id} joined workflow ${workflowId} (${room.size} users)`);
+                            
+                            // Send existing users to the new user (exclude own user's other tabs)
+                            const existingUsers = [];
+                            room.forEach((data, id) => {
+                                // Skip this socket and any other tabs of the same user
+                                if (id !== socketId && data.user?.id !== user.id) {
+                                    existingUsers.push({
+                                        id,
+                                        user: data.user,
+                                        cursor: data.cursor
+                                    });
+                                }
+                            });
+                            
+                            ws.send(JSON.stringify({
+                                type: 'room_state',
+                                users: existingUsers,
+                                yourId: socketId,
+                                yourColor: CURSOR_COLORS[colorIndex]
+                            }));
+                            
+                            // Notify others about new user (exclude other tabs of the same user)
+                            broadcastToRoom(workflowId, {
+                                type: 'user_joined',
+                                id: socketId,
+                                user: room.get(socketId).user
+                            }, socketId, user.id);
+                            
+                        } catch (err) {
+                            console.error('[WS] Error validating join:', err);
+                            ws.send(JSON.stringify({ type: 'error', message: 'Server error during validation' }));
                         }
-                    });
-                    
-                    ws.send(JSON.stringify({
-                        type: 'room_state',
-                        users: existingUsers,
-                        yourId: socketId,
-                        yourColor: CURSOR_COLORS[colorIndex]
-                    }));
-                    
-                    // Notify others about new user (exclude other tabs of the same user)
-                    broadcastToRoom(workflowId, {
-                        type: 'user_joined',
-                        id: socketId,
-                        user: room.get(socketId).user
-                    }, socketId, user.id);
+                    })();
                     
                     break;
                 }

@@ -5,6 +5,7 @@ interface User {
     name: string;
     email?: string;
     profilePhoto?: string;
+    orgId?: string;
 }
 
 interface CursorPosition {
@@ -211,10 +212,11 @@ export function useCollaborativeCursors({
                 ws.onopen = () => {
                     console.log('[Collab] WebSocket connected, joining workflow:', workflowId);
                     setIsConnected(true);
-                    // Join the workflow room
+                    // Join the workflow room - include orgId for security validation
                     ws.send(JSON.stringify({
                         type: 'join',
                         workflowId,
+                        orgId: user.orgId, // Send organization ID for server-side validation
                         user: {
                             id: user.id,
                             name: user.name || user.email?.split('@')[0] || 'Anonymous',
