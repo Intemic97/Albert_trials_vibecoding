@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building2, GitBranch, LayoutDashboard, Database, Shield, ShieldCheck, ArrowLeft, RefreshCw, ChevronDown, ChevronUp, Briefcase, Target, Megaphone, CheckCircle2, Clock } from 'lucide-react';
+import { Users, Building2, GitBranch, LayoutDashboard, Database, Shield, ShieldCheck, ArrowLeft, RefreshCw, ChevronDown, ChevronUp, Briefcase, Target, Megaphone, CheckCircle2, Clock, MessageSquare, Trash2 } from 'lucide-react';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { ProfileMenu } from './ProfileMenu';
@@ -31,6 +31,21 @@ interface AdminUser {
     onboardingCompleted: boolean;
 }
 
+interface NodeFeedback {
+    id: string;
+    nodeType: string;
+    nodeLabel: string;
+    feedbackText: string;
+    userId: string;
+    userName: string;
+    userEmail: string;
+    organizationId: string;
+    organizationName: string;
+    workflowId?: string;
+    workflowName?: string;
+    createdAt: string;
+}
+
 interface AdminPanelProps {
     onNavigate?: (view: string) => void;
 }
@@ -39,9 +54,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
     const { user } = useAuth();
     const [stats, setStats] = useState<AdminStats | null>(null);
     const [users, setUsers] = useState<AdminUser[]>([]);
+    const [nodeFeedback, setNodeFeedback] = useState<NodeFeedback[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'users' | 'feedback'>('users');
 
     useEffect(() => {
         fetchData();
@@ -50,9 +67,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
     const fetchData = async () => {
         setIsRefreshing(true);
         try {
-            const [statsRes, usersRes] = await Promise.all([
+            const [statsRes, usersRes, feedbackRes] = await Promise.all([
                 fetch(`${API_BASE}/admin/stats`, { credentials: 'include' }),
-                fetch(`${API_BASE}/admin/users`, { credentials: 'include' })
+                fetch(`${API_BASE}/admin/users`, { credentials: 'include' }),
+                fetch(`${API_BASE}/admin/node-feedback`, { credentials: 'include' })
             ]);
 
             if (statsRes.ok && usersRes.ok) {
@@ -61,11 +79,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                 setStats(statsData);
                 setUsers(usersData);
             }
+
+            if (feedbackRes.ok) {
+                const feedbackData = await feedbackRes.json();
+                setNodeFeedback(feedbackData);
+            }
         } catch (error) {
             console.error('Error fetching admin data:', error);
         } finally {
             setIsLoading(false);
             setIsRefreshing(false);
+        }
+    };
+
+    const deleteFeedback = async (feedbackId: string) => {
+        if (!confirm('Are you sure you want to delete this feedback?')) return;
+        
+        try {
+            const res = await fetch(`${API_BASE}/admin/node-feedback/${feedbackId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+
+            if (res.ok) {
+                setNodeFeedback(prev => prev.filter(f => f.id !== feedbackId));
+            }
+        } catch (error) {
+            console.error('Error deleting feedback:', error);
         }
     };
 
@@ -208,7 +248,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                     </div>
                 </div>
 
+                {/* Tab Navigation */}
+                <div className="flex gap-2 mb-6">
+                    <button
+                        onClick={() => setActiveTab('users')}
+                        className={`px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors ${
+                            activeTab === 'users'
+                                ? 'bg-teal-600 text-white'
+                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                        }`}
+                    >
+                        <Users size={18} />
+                        Users ({users.length})
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('feedback')}
+                        className={`px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors ${
+                            activeTab === 'feedback'
+                                ? 'bg-teal-600 text-white'
+                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                        }`}
+                    >
+                        <MessageSquare size={18} />
+                        Node Feedback ({nodeFeedback.length})
+                    </button>
+                </div>
+
                 {/* Users Table */}
+                {activeTab === 'users' && (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="px-6 py-4 border-b border-slate-200">
                         <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
@@ -379,6 +446,79 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                         </div>
                     )}
                 </div>
+                )}
+
+                {/* Node Feedback Table */}
+                {activeTab === 'feedback' && (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-slate-200">
+                        <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                            <MessageSquare size={20} className="text-teal-600" />
+                            Node Feedback
+                        </h2>
+                        <p className="text-sm text-slate-500 mt-1">User suggestions for workflow node improvements</p>
+                    </div>
+                    {nodeFeedback.length > 0 ? (
+                        <div className="divide-y divide-slate-100">
+                            {nodeFeedback.map((feedback) => (
+                                <div key={feedback.id} className="p-4 hover:bg-slate-50 transition-colors">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-xs font-medium">
+                                                    {feedback.nodeLabel || feedback.nodeType}
+                                                </span>
+                                                {feedback.workflowName && (
+                                                    <span className="text-xs text-slate-400">
+                                                        in workflow: {feedback.workflowName}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-slate-800 whitespace-pre-wrap mb-2">
+                                                {feedback.feedbackText}
+                                            </p>
+                                            <div className="flex items-center gap-4 text-xs text-slate-500">
+                                                <span className="flex items-center gap-1">
+                                                    <Users size={12} />
+                                                    {feedback.userName || feedback.userEmail || 'Unknown user'}
+                                                </span>
+                                                {feedback.organizationName && (
+                                                    <span className="flex items-center gap-1">
+                                                        <Building2 size={12} />
+                                                        {feedback.organizationName}
+                                                    </span>
+                                                )}
+                                                <span>
+                                                    {new Date(feedback.createdAt).toLocaleDateString('es-ES', {
+                                                        year: 'numeric',
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => deleteFeedback(feedback.id)}
+                                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                            title="Delete feedback"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="px-6 py-12 text-center text-slate-500">
+                            <MessageSquare size={32} className="mx-auto mb-3 opacity-30" />
+                            <p>No feedback received yet</p>
+                            <p className="text-xs mt-1">User feedback will appear here when submitted</p>
+                        </div>
+                    )}
+                </div>
+                )}
                 </div>
             </main>
         </div>

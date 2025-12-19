@@ -2430,3 +2430,54 @@ app.post('/api/email/send', authenticateToken, async (req, res) => {
         res.status(500).json({ error: error.message || 'Failed to send email' });
     }
 });
+
+// Node Feedback Endpoints
+app.post('/api/node-feedback', authenticateToken, async (req, res) => {
+    try {
+        const { nodeType, nodeLabel, feedbackText, workflowId, workflowName } = req.body;
+
+        if (!nodeType || !feedbackText) {
+            return res.status(400).json({ error: 'Node type and feedback text are required' });
+        }
+
+        const id = Math.random().toString(36).substr(2, 9);
+        const createdAt = new Date().toISOString();
+
+        await db.run(`
+            INSERT INTO node_feedback (id, nodeType, nodeLabel, feedbackText, userId, userName, userEmail, organizationId, workflowId, workflowName, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [id, nodeType, nodeLabel || '', feedbackText, req.user.id, req.user.name || '', req.user.email || '', req.user.orgId, workflowId || null, workflowName || null, createdAt]);
+
+        res.json({ success: true, id, message: 'Feedback submitted successfully' });
+    } catch (error) {
+        console.error('Error saving node feedback:', error);
+        res.status(500).json({ error: 'Failed to save feedback' });
+    }
+});
+
+// Admin endpoint to get all node feedback
+app.get('/api/admin/node-feedback', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const feedback = await db.all(`
+            SELECT nf.*, o.name as organizationName
+            FROM node_feedback nf
+            LEFT JOIN organizations o ON nf.organizationId = o.id
+            ORDER BY nf.createdAt DESC
+        `);
+        res.json(feedback);
+    } catch (error) {
+        console.error('Error fetching node feedback:', error);
+        res.status(500).json({ error: 'Failed to fetch feedback' });
+    }
+});
+
+// Admin endpoint to delete node feedback
+app.delete('/api/admin/node-feedback/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        await db.run('DELETE FROM node_feedback WHERE id = ?', [req.params.id]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting node feedback:', error);
+        res.status(500).json({ error: 'Failed to delete feedback' });
+    }
+});

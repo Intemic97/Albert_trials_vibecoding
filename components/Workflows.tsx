@@ -367,6 +367,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
     // AI Workflow Assistant State
     const [showAiAssistant, setShowAiAssistant] = useState<boolean>(false);
+
+    // Node Feedback Popup State
+    const [feedbackPopupNodeId, setFeedbackPopupNodeId] = useState<string | null>(null);
+    const [feedbackPopupNodeType, setFeedbackPopupNodeType] = useState<string>('');
+    const [feedbackPopupNodeLabel, setFeedbackPopupNodeLabel] = useState<string>('');
+    const [feedbackText, setFeedbackText] = useState<string>('');
+    const [isSubmittingFeedback, setIsSubmittingFeedback] = useState<boolean>(false);
     const [aiPrompt, setAiPrompt] = useState<string>('');
     const [isGeneratingWorkflow, setIsGeneratingWorkflow] = useState<boolean>(false);
     const [aiGeneratedWorkflow, setAiGeneratedWorkflow] = useState<{ nodes: any[], connections: any[] } | null>(null);
@@ -562,6 +569,53 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         ));
         setConfiguringNodeId(null);
         setSelectedEntityId('');
+    };
+
+    // Node Feedback Functions
+    const openFeedbackPopup = (nodeType: string, nodeLabel: string) => {
+        setFeedbackPopupNodeType(nodeType);
+        setFeedbackPopupNodeLabel(nodeLabel);
+        setFeedbackText('');
+        setFeedbackPopupNodeId(nodeType); // Using nodeType as a simple identifier
+    };
+
+    const closeFeedbackPopup = () => {
+        setFeedbackPopupNodeId(null);
+        setFeedbackPopupNodeType('');
+        setFeedbackPopupNodeLabel('');
+        setFeedbackText('');
+    };
+
+    const submitFeedback = async () => {
+        if (!feedbackText.trim()) return;
+        
+        setIsSubmittingFeedback(true);
+        try {
+            const response = await fetch(`${API_BASE}/node-feedback`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    nodeType: feedbackPopupNodeType,
+                    nodeLabel: feedbackPopupNodeLabel,
+                    feedbackText: feedbackText.trim(),
+                    workflowId: currentWorkflowId,
+                    workflowName: workflowName
+                })
+            });
+
+            if (response.ok) {
+                setToast({ message: 'Thank you for your feedback!', type: 'success' });
+                closeFeedbackPopup();
+            } else {
+                setToast({ message: 'Failed to submit feedback', type: 'error' });
+            }
+        } catch (error) {
+            console.error('Error submitting feedback:', error);
+            setToast({ message: 'Failed to submit feedback', type: 'error' });
+        } finally {
+            setIsSubmittingFeedback(false);
+        }
     };
 
     const openConditionConfig = (nodeId: string) => {
@@ -3802,6 +3856,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             ))}
                                         </select>
                                     </div>
+                                    {/* Feedback Link */}
+                                    <div className="mb-4 pt-2 border-t border-slate-100">
+                                        <button
+                                            onClick={() => openFeedbackPopup('fetchData', 'Fetch Data')}
+                                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                        >
+                                            <MessageSquare size={14} />
+                                            What would you like this node to do?
+                                        </button>
+                                    </div>
                                     <div className="flex gap-2 justify-end">
                                         <button
                                             onClick={() => setConfiguringNodeId(null)}
@@ -3840,6 +3904,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <p className="text-xs text-slate-500 mt-1">
                                             Enter the full URL to fetch data from (GET request).
                                         </p>
+                                    </div>
+                                    {/* Feedback Link */}
+                                    <div className="mb-4 pt-2 border-t border-slate-100">
+                                        <button
+                                            onClick={() => openFeedbackPopup('http', 'HTTP Request')}
+                                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                        >
+                                            <MessageSquare size={14} />
+                                            What would you like this node to do?
+                                        </button>
                                     </div>
                                     <div className="flex gap-2 justify-end">
                                         <button
@@ -3944,6 +4018,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
                                             />
                                         </div>
+                                    </div>
+                                    {/* Feedback Link */}
+                                    <div className="mt-4 pt-2 border-t border-slate-100">
+                                        <button
+                                            onClick={() => openFeedbackPopup('mysql', 'MySQL')}
+                                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                        >
+                                            <MessageSquare size={14} />
+                                            What would you like this node to do?
+                                        </button>
                                     </div>
                                     <div className="flex gap-2 justify-end mt-6">
                                         <button
@@ -4118,6 +4202,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </div>
                                         </div>
 
+                                        {/* Feedback Link */}
+                                        <div className="mt-4 pt-2 border-t border-slate-100">
+                                            <button
+                                                onClick={() => openFeedbackPopup('sendEmail', 'Send Email')}
+                                                className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                            >
+                                                <MessageSquare size={14} />
+                                                What would you like this node to do?
+                                            </button>
+                                        </div>
+
                                         <div className="flex gap-2 justify-end mt-6">
                                             <button
                                                 onClick={() => setConfiguringEmailNodeId(null)}
@@ -4172,6 +4267,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
                                         <p className="text-xs text-slate-600 font-medium">Using Token:</p>
                                         <code className="text-[10px] text-slate-500 break-all">d668...da64</code>
+                                    </div>
+                                    {/* Feedback Link */}
+                                    <div className="mb-4 pt-2 border-t border-slate-100">
+                                        <button
+                                            onClick={() => openFeedbackPopup('esios', 'ESIOS Energy Prices')}
+                                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                        >
+                                            <MessageSquare size={14} />
+                                            What would you like this node to do?
+                                        </button>
                                     </div>
                                     <div className="flex gap-2 justify-end">
                                         <button
@@ -4277,6 +4382,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             Introduce your activity and click search
                                         </div>
                                     )}
+
+                                    {/* Feedback Link */}
+                                    <div className="mb-4">
+                                        <button
+                                            onClick={() => openFeedbackPopup('climatiq', 'Climatiq Emissions')}
+                                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                        >
+                                            <MessageSquare size={14} />
+                                            What would you like this node to do?
+                                        </button>
+                                    </div>
 
                                     <div className="flex gap-2 justify-end pt-4 border-t">
                                         <button
@@ -4665,6 +4781,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     </label>
                                                 </div>
                                             </div>
+                                        </div>
+                                        {/* Feedback Link */}
+                                        <div className="mt-4 pt-2 border-t border-slate-100">
+                                            <button
+                                                onClick={() => openFeedbackPopup('condition', 'Condition')}
+                                                className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                            >
+                                                <MessageSquare size={14} />
+                                                What would you like this node to do?
+                                            </button>
                                         </div>
                                         <div className="flex gap-2 justify-end mt-6">
                                             <button
@@ -5482,6 +5608,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </div>
                                 </div>
 
+                                {/* Feedback Link */}
+                                <div className="mt-4 pt-2 border-t border-slate-100">
+                                    <button
+                                        onClick={() => openFeedbackPopup('llm', 'LLM / AI Generate')}
+                                        className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                    >
+                                        <MessageSquare size={14} />
+                                        What would you like this node to do?
+                                    </button>
+                                </div>
+
                                 <div className="flex justify-end gap-2 mt-6">
                                     <button
                                         onClick={() => setConfiguringLLMNodeId(null)}
@@ -5566,6 +5703,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             Function must be named <code>process(data)</code> and return a list.
                                         </p>
                                     </div>
+                                </div>
+
+                                {/* Feedback Link */}
+                                <div className="mt-4 pt-2 border-t border-slate-100">
+                                    <button
+                                        onClick={() => openFeedbackPopup('python', 'Python Code')}
+                                        className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                    >
+                                        <MessageSquare size={14} />
+                                        What would you like this node to do?
+                                    </button>
                                 </div>
 
                                 <div className="flex justify-end gap-2 mt-6">
@@ -5969,6 +6117,63 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 className="w-full px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                             >
                                 Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Node Feedback Popup */}
+            {feedbackPopupNodeId && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]" onClick={closeFeedbackPopup}>
+                    <div className="bg-white rounded-xl shadow-2xl p-6 w-[450px] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
+                                <MessageSquare size={20} className="text-teal-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">Share Your Feedback</h3>
+                                <p className="text-sm text-slate-500">Node: {feedbackPopupNodeLabel}</p>
+                            </div>
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                What would you like this node to do?
+                            </label>
+                            <textarea
+                                value={feedbackText}
+                                onChange={(e) => setFeedbackText(e.target.value)}
+                                placeholder="Describe the functionality you'd like to see, any improvements, or share your ideas..."
+                                rows={4}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                                autoFocus
+                            />
+                            <p className="text-xs text-slate-500 mt-1">
+                                Your feedback helps us improve the platform. Thank you!
+                            </p>
+                        </div>
+
+                        <div className="flex gap-2 justify-end">
+                            <button
+                                onClick={closeFeedbackPopup}
+                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={submitFeedback}
+                                disabled={!feedbackText.trim() || isSubmittingFeedback}
+                                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium flex items-center gap-2"
+                            >
+                                {isSubmittingFeedback ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        Sending...
+                                    </>
+                                ) : (
+                                    'Submit Feedback'
+                                )}
                             </button>
                         </div>
                     </div>
