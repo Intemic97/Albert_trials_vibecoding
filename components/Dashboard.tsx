@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Entity } from '../types';
 import { Database, Sparkles, X, Info, Plus, Share2, LayoutDashboard, ChevronDown, Copy, Check, Trash2, Link, ExternalLink } from 'lucide-react';
 import { PromptInput } from './PromptInput';
@@ -127,10 +128,26 @@ const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSav
 };
 
 export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onViewChange }) => {
+    const { dashboardId: urlDashboardId } = useParams();
+    const navigate = useNavigate();
+    
     // Dashboard state
     const [dashboards, setDashboards] = useState<DashboardData[]>([]);
     const [selectedDashboardId, setSelectedDashboardId] = useState<string | null>(null);
     const [showDashboardDropdown, setShowDashboardDropdown] = useState(false);
+    
+    // Sync URL param with state - load dashboard from URL when it changes
+    useEffect(() => {
+        if (urlDashboardId) {
+            setSelectedDashboardId(urlDashboardId);
+        }
+    }, [urlDashboardId]);
+    
+    // Update URL when dashboard changes
+    const selectDashboard = (id: string) => {
+        setSelectedDashboardId(id);
+        navigate(`/dashboard/${id}`, { replace: true });
+    };
     
     // Modal states
     const [showShareModal, setShowShareModal] = useState(false);
@@ -185,9 +202,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             const data = await res.json();
             if (Array.isArray(data)) {
                 setDashboards(data);
-                // Auto-select first dashboard if available
-                if (data.length > 0 && !selectedDashboardId) {
-                    setSelectedDashboardId(data[0].id);
+                // If there's a URL param, use it; otherwise auto-select first dashboard
+                if (data.length > 0) {
+                    if (urlDashboardId && data.find(d => d.id === urlDashboardId)) {
+                        // URL has valid dashboard ID - just set it (don't navigate again)
+                        setSelectedDashboardId(urlDashboardId);
+                    } else if (!selectedDashboardId) {
+                        // No URL param and nothing selected - select first and update URL
+                        selectDashboard(data[0].id);
+                    }
                 }
             }
         } catch (error) {
@@ -232,7 +255,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             if (res.ok) {
                 const newDashboard = await res.json();
                 setDashboards(prev => [newDashboard, ...prev]);
-                setSelectedDashboardId(newDashboard.id);
+                selectDashboard(newDashboard.id);
                 // Start editing the title immediately
                 setEditingTitle(defaultName);
                 setIsEditingTitle(true);
@@ -316,7 +339,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             if (res.ok) {
                 const remaining = dashboards.filter(d => d.id !== selectedDashboardId);
                 setDashboards(remaining);
-                setSelectedDashboardId(remaining.length > 0 ? remaining[0].id : null);
+                if (remaining.length > 0) {
+                    selectDashboard(remaining[0].id);
+                } else {
+                    setSelectedDashboardId(null);
+                    navigate('/dashboard', { replace: true });
+                }
             }
         } catch (error) {
             console.error('Error deleting dashboard:', error);
@@ -507,7 +535,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                     <button
                                         key={dashboard.id}
                                         onClick={() => {
-                                            setSelectedDashboardId(dashboard.id);
+                                            selectDashboard(dashboard.id);
                                             setShowDashboardDropdown(false);
                                         }}
                                         className={`w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center justify-between ${

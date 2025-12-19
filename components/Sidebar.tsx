@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Database,
@@ -15,19 +16,46 @@ interface SidebarProps {
   onNavigate: (view: string) => void;
 }
 
+// Map view names to routes
+const viewToRoute: Record<string, string> = {
+  'overview': '/overview',
+  'dashboard': '/dashboard',
+  'workflows': '/workflows',
+  'database': '/database',
+  'reports': '/reports',
+  'settings': '/settings',
+  'admin': '/admin',
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
-  const NavItem = ({ icon: Icon, label, view, active = false }: { icon: any, label: string, view?: string, active?: boolean }) => (
-    <div
-      onClick={() => view && onNavigate(view)}
-      className={`flex items-center px-4 py-2 my-1 text-sm font-medium rounded-md cursor-pointer transition-colors ${active
-        ? 'bg-[#E3EFF1] text-[#1F5F68]'
-        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
-        }`}
-    >
-      <Icon size={18} className={`mr-3 ${active ? 'text-[#1F5F68]' : 'text-slate-400'}`} />
-      {label}
-    </div>
-  );
+  const NavItem = ({ icon: Icon, label, view, active = false }: { icon: any, label: string, view?: string, active?: boolean }) => {
+    const route = view ? viewToRoute[view] || `/${view}` : '#';
+    
+    if (!view) {
+      // Non-navigable item (like Documentation)
+      return (
+        <div
+          className={`flex items-center px-4 py-2 my-1 text-sm font-medium rounded-md cursor-pointer transition-colors text-slate-500 hover:bg-slate-100 hover:text-slate-900`}
+        >
+          <Icon size={18} className="mr-3 text-slate-400" />
+          {label}
+        </div>
+      );
+    }
+
+    return (
+      <Link
+        to={route}
+        className={`flex items-center px-4 py-2 my-1 text-sm font-medium rounded-md cursor-pointer transition-colors ${active
+          ? 'bg-[#E3EFF1] text-[#1F5F68]'
+          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+          }`}
+      >
+        <Icon size={18} className={`mr-3 ${active ? 'text-[#1F5F68]' : 'text-slate-400'}`} />
+        {label}
+      </Link>
+    );
+  };
 
   const SectionLabel = ({ label }: { label: string }) => (
     <div className="px-4 mt-6 mb-2 text-xs font-semibold text-[#103D45] uppercase tracking-wider">

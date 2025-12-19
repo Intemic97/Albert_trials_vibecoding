@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, Upload, Columns, GripVertical, Users, Mail } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
@@ -148,13 +149,19 @@ interface WorkflowsProps {
 }
 
 export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) => {
+    const { workflowId: urlWorkflowId } = useParams();
+    const navigate = useNavigate();
+    const location = useLocation();
     const { user } = useAuth();
     const [nodes, setNodes] = useState<WorkflowNode[]>([]);
     const [connections, setConnections] = useState<Connection[]>([]);
     const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
     const [draggingItem, setDraggingItem] = useState<DraggableItem | null>(null);
     const [workflowName, setWorkflowName] = useState<string>('Untitled Workflow');
-    const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null);
+    const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(urlWorkflowId || null);
+    
+    // Track the last loaded workflow ID to avoid re-loading
+    const lastLoadedWorkflowIdRef = useRef<string | null>(null);
     
     // Collaborative cursors and real-time sync
     const { 
@@ -407,11 +414,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         showToast(message, 'success');
     };
 
-    // Load workflows on mount
-    useEffect(() => {
-        fetchWorkflows();
-    }, []);
-
     const fetchWorkflows = async () => {
         try {
             const res = await fetch(`${API_BASE}/workflows`, { credentials: 'include' });
@@ -424,10 +426,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             if (Array.isArray(data)) {
                 setSavedWorkflows(data);
-                // Auto-load the most recent workflow
-                if (data.length > 0 && !currentWorkflowId) {
-                    loadWorkflow(data[0].id);
-                }
+                // URL syncing is now handled by the useEffect above
             } else {
                 console.error('Workflows API returned non-array:', data);
                 setSavedWorkflows([]);
@@ -438,7 +437,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         }
     };
 
-    const loadWorkflow = async (id: string) => {
+    const loadWorkflow = async (id: string, updateUrl = true) => {
         try {
             const res = await fetch(`${API_BASE}/workflows/${id}`, { credentials: 'include' });
             if (!res.ok) throw new Error('Failed to load workflow');
@@ -447,6 +446,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             setCurrentWorkflowId(workflow.id);
             setNodes(workflow.data.nodes || []);
             setConnections(workflow.data.connections || []);
+            lastLoadedWorkflowIdRef.current = workflow.id;
+            // Update URL to reflect the loaded workflow
+            if (updateUrl) {
+                navigate(`/workflow/${workflow.id}`, { replace: true });
+            }
         } catch (error) {
             console.error('Error loading workflow:', error);
         }
@@ -490,6 +494,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 if (!res.ok) throw new Error('Failed to create workflow');
                 const newWorkflow = await res.json();
                 setCurrentWorkflowId(newWorkflow.id);
+                // Update URL with new workflow ID
+                navigate(`/workflow/${newWorkflow.id}`, { replace: true });
             }
 
             await fetchWorkflows();
@@ -517,6 +523,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 setWorkflowName('Untitled Workflow');
                 setNodes([]);
                 setConnections([]);
+                navigate('/workflows', { replace: true });
             }
             setToast({ message: 'Workflow deleted successfully', type: 'success' });
             setTimeout(() => setToast(null), 3000);
@@ -533,17 +540,41 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setNodes([]);
         setConnections([]);
         setConnectingFrom(null);
+        navigate('/workflows', { replace: true });
     };
 
     // View Navigation Functions
     const openWorkflow = (id: string) => {
-        loadWorkflow(id);
+        loadWorkflow(id); // This will update the URL
         setCurrentView('canvas');
     };
 
     const backToList = () => {
-        setCurrentView('list');
+        navigate('/workflows');
+        // The useEffect will handle setting currentView to 'list'
     };
+
+    // Load workflows on mount
+    useEffect(() => {
+        fetchWorkflows();
+    }, []);
+    
+    // Sync URL with component state
+    useEffect(() => {
+        const isListView = location.pathname === '/workflows';
+        const isWorkflowView = location.pathname.startsWith('/workflow/');
+        
+        if (isListView) {
+            // On /workflows, show list view
+            setCurrentView('list');
+        } else if (isWorkflowView && urlWorkflowId) {
+            // On /workflow/:id, load the workflow if not already loaded
+            if (urlWorkflowId !== lastLoadedWorkflowIdRef.current) {
+                loadWorkflow(urlWorkflowId, false);
+            }
+            setCurrentView('canvas');
+        }
+    }, [location.pathname, urlWorkflowId]);
 
     const createNewWorkflow = () => {
         newWorkflow();

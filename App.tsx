@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { EntityCard } from './components/EntityCard';
 import { Reporting } from './components/Reporting';
@@ -17,36 +18,69 @@ import { ProfileMenu } from './components/ProfileMenu';
 import { API_BASE } from './config';
 
 export default function App() {
-    // Check for shared dashboard route
-    const path = window.location.pathname;
-    const sharedMatch = path.match(/^\/shared\/([a-f0-9]+)$/);
-    
-    if (sharedMatch) {
-        return <SharedDashboard shareToken={sharedMatch[1]} />;
-    }
-    
     return (
-        <AuthProvider>
-            <AuthenticatedApp />
-        </AuthProvider>
+        <BrowserRouter>
+            <Routes>
+                <Route path="/shared/:shareToken" element={<SharedDashboardWrapper />} />
+                <Route path="/*" element={
+                    <AuthProvider>
+                        <AuthenticatedApp />
+                    </AuthProvider>
+                } />
+            </Routes>
+        </BrowserRouter>
     );
+}
+
+function SharedDashboardWrapper() {
+    const { shareToken } = useParams();
+    return <SharedDashboard shareToken={shareToken || ''} />;
 }
 
 function AuthenticatedApp() {
     const { isAuthenticated, isLoading, user } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
     const [entities, setEntities] = useState<Entity[]>([]);
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
-    const [currentView, setCurrentView] = useState('overview');
     const previousUserIdRef = React.useRef<string | undefined>(undefined);
+
+    // Get current view from URL path
+    const getCurrentView = () => {
+        const path = location.pathname;
+        if (path.startsWith('/dashboard')) return 'dashboard';
+        if (path.startsWith('/workflow')) return 'workflows';
+        if (path.startsWith('/database')) return 'database';
+        if (path.startsWith('/reports')) return 'reports';
+        if (path.startsWith('/settings')) return 'settings';
+        if (path.startsWith('/admin')) return 'admin';
+        return 'overview';
+    };
+
+    const currentView = getCurrentView();
+
+    // Navigation helper that maps view names to routes
+    const handleNavigate = (view: string) => {
+        const routes: Record<string, string> = {
+            'overview': '/overview',
+            'dashboard': '/dashboard',
+            'workflows': '/workflows',
+            'database': '/database',
+            'reports': '/reports',
+            'settings': '/settings',
+            'admin': '/admin',
+        };
+        navigate(routes[view] || '/overview');
+    };
 
     // Reset view to overview when user changes (login/logout) - but not on first load
     useEffect(() => {
         // Only reset if the user ID actually changed (not on initial load)
         if (previousUserIdRef.current !== undefined && previousUserIdRef.current !== user?.id) {
-            setCurrentView('overview');
+            navigate('/overview');
         }
         previousUserIdRef.current = user?.id;
-    }, [user?.id]);
+    }, [user?.id, navigate]);
 
     // New Property State
     const [isAddingProp, setIsAddingProp] = useState(false);
@@ -752,33 +786,44 @@ function AuthenticatedApp() {
                     // The AuthContext will update the user state
                 }} />
             )}
-            <Sidebar activeView={currentView} onNavigate={setCurrentView} />
+            <Sidebar activeView={currentView} onNavigate={handleNavigate} />
 
             <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-                {currentView === 'overview' ? (
-                    <Overview
-                        entities={entities}
-                        onViewChange={setCurrentView}
-                    />
-                ) : currentView === 'dashboard' ? (
-                    <Dashboard
-                        entities={entities}
-                        onNavigate={(entityId) => {
-                            setActiveEntityId(entityId);
-                            setCurrentView('database');
-                            setActiveTab('data');
-                        }}
-                        onViewChange={setCurrentView}
-                    />
-                ) : currentView === 'workflows' ? (
-                    <Workflows entities={entities} onViewChange={setCurrentView} />
-                ) : currentView === 'reports' ? (
-                    <Reporting entities={entities} companyInfo={companyInfo} onViewChange={setCurrentView} />
-                ) : currentView === 'settings' ? (
-                    <Settings onViewChange={setCurrentView} />
-                ) : currentView === 'admin' ? (
-                    <AdminPanel onNavigate={setCurrentView} />
-                ) : (
+                <Routes>
+                    <Route path="/" element={<Navigate to="/overview" replace />} />
+                    <Route path="/overview" element={
+                        <Overview
+                            entities={entities}
+                            onViewChange={handleNavigate}
+                        />
+                    } />
+                    <Route path="/dashboard/:dashboardId?" element={
+                        <Dashboard
+                            entities={entities}
+                            onNavigate={(entityId) => {
+                                setActiveEntityId(entityId);
+                                navigate('/database');
+                                setActiveTab('data');
+                            }}
+                            onViewChange={handleNavigate}
+                        />
+                    } />
+                    <Route path="/workflows" element={
+                        <Workflows entities={entities} onViewChange={handleNavigate} />
+                    } />
+                    <Route path="/workflow/:workflowId" element={
+                        <Workflows entities={entities} onViewChange={handleNavigate} />
+                    } />
+                    <Route path="/reports" element={
+                        <Reporting entities={entities} companyInfo={companyInfo} onViewChange={handleNavigate} />
+                    } />
+                    <Route path="/settings" element={
+                        <Settings onViewChange={handleNavigate} />
+                    } />
+                    <Route path="/admin" element={
+                        <AdminPanel onNavigate={handleNavigate} />
+                    } />
+                    <Route path="/database/:entityId?" element={
                     <>
                         {/* Top Header */}
                         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
@@ -806,7 +851,7 @@ function AuthenticatedApp() {
                             )}
 
                             <div className="flex items-center space-x-4">
-                                <ProfileMenu onNavigate={setCurrentView} />
+                                <ProfileMenu onNavigate={handleNavigate} />
                             </div>
                         </header>
 
@@ -1658,7 +1703,8 @@ function AuthenticatedApp() {
                         )}
 
                     </>
-                )}
+                    } />
+                </Routes>
             </main>
         </div>
     );
