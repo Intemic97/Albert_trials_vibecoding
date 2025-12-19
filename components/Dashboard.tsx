@@ -383,6 +383,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
 
     const handleGenerateWidget = async (prompt: string, mentionedEntityIds: string[]) => {
         setIsGenerating(true);
+
+        // Save prompt as feedback for analytics
+        try {
+            await fetch(`${API_BASE}/node-feedback`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nodeType: 'dashboard_prompt',
+                    nodeLabel: 'Dashboard Widget',
+                    feedbackText: prompt
+                }),
+                credentials: 'include'
+            });
+        } catch (e) {
+            // Silent fail - don't block widget generation
+        }
+
         try {
             const res = await fetch(`${API_BASE}/generate-widget`, {
                 method: 'POST',

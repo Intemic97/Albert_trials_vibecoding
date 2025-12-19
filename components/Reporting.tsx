@@ -326,6 +326,22 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
         setIsLoading(true);
         setReport(null);
 
+        // Save prompt as feedback for analytics
+        try {
+            await fetch(`${API_BASE}/node-feedback`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nodeType: 'report_prompt',
+                    nodeLabel: 'Reports',
+                    feedbackText: prompt
+                }),
+                credentials: 'include'
+            });
+        } catch (e) {
+            // Silent fail - don't block report generation
+        }
+
         try {
             const res = await fetch(`${API_BASE}/generate`, {
                 method: 'POST',

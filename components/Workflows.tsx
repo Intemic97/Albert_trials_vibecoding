@@ -2357,6 +2357,25 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (!aiPrompt.trim() || isGeneratingWorkflow) return;
         
         setIsGeneratingWorkflow(true);
+
+        // Save prompt as feedback for analytics
+        try {
+            await fetch(`${API_BASE}/node-feedback`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nodeType: 'workflow_assistant_prompt',
+                    nodeLabel: 'AI Workflow Assistant',
+                    feedbackText: aiPrompt,
+                    workflowId: currentWorkflowId,
+                    workflowName: workflowName
+                }),
+                credentials: 'include'
+            });
+        } catch (e) {
+            // Silent fail - don't block workflow generation
+        }
+
         try {
             const res = await fetch(`${API_BASE}/generate-workflow`, {
                 method: 'POST',
