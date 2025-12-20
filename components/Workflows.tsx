@@ -6639,21 +6639,26 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     backgroundSize: '20px 20px'
                                 }}
                             >
-                                {/* SVG Connections */}
+                                {/* SVG Connections - offset by padding (32px) */}
                                 <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ minWidth: '900px', minHeight: '500px' }}>
                                     {previewingTemplate.connections.map(conn => {
                                         const fromNode = previewingTemplate.nodes.find(n => n.id === conn.fromNodeId);
                                         const toNode = previewingTemplate.nodes.find(n => n.id === conn.toNodeId);
                                         if (!fromNode || !toNode) return null;
                                         
-                                        const startX = fromNode.x + 140;
-                                        const startY = fromNode.y + 35;
-                                        const endX = toNode.x;
-                                        const endY = toNode.y + 35;
+                                        // Add 32px offset for the p-8 padding on the container
+                                        const padding = 32;
+                                        const nodeHeight = 52; // Approximate node height
+                                        const nodeWidth = 140;
+                                        
+                                        const startX = fromNode.x + nodeWidth + padding;
+                                        const startY = fromNode.y + (nodeHeight / 2) + padding;
+                                        const endX = toNode.x + padding;
+                                        const endY = toNode.y + (nodeHeight / 2) + padding;
                                         const midX = (startX + endX) / 2;
                                         
                                         // Color based on connection type
-                                        let strokeColor = '#64748b';
+                                        let strokeColor = '#94a3b8';
                                         if (conn.outputType === 'true') strokeColor = '#22c55e';
                                         if (conn.outputType === 'false') strokeColor = '#ef4444';
                                         
