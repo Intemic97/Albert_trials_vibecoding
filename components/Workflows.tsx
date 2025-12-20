@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, Upload, Columns, GripVertical, Users, Mail } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import { API_BASE } from '../config';
@@ -141,6 +141,133 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },
     { type: 'output', label: 'Output', icon: LogOut, description: 'Display workflow output data', category: 'Actions' },
     { type: 'comment', label: 'Comment', icon: MessageSquare, description: 'Add a note or comment', category: 'Other' },
+];
+
+// Pre-defined workflow templates
+interface WorkflowTemplate {
+    id: string;
+    name: string;
+    description: string;
+    category: 'Data Processing' | 'Automation' | 'Integration' | 'Analysis';
+    nodes: WorkflowNode[];
+    connections: Connection[];
+}
+
+const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
+    {
+        id: 'template-data-filtering',
+        name: 'Data Filtering & Export',
+        description: 'Fetch data from a source, filter it based on conditions, and output the results.',
+        category: 'Data Processing',
+        nodes: [
+            { id: 't1-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
+            { id: 't1-fetch', type: 'fetchData', label: 'Fetch Data', x: 300, y: 200 },
+            { id: 't1-condition', type: 'condition', label: 'Filter Records', x: 500, y: 200, config: { conditionField: 'status', conditionOperator: 'equals', conditionValue: 'active', processingMode: 'perRow' } },
+            { id: 't1-output', type: 'output', label: 'Output Results', x: 700, y: 150 },
+            { id: 't1-comment', type: 'comment', label: 'Comment', x: 500, y: 350, config: { commentText: 'This workflow filters records and outputs only those matching the condition.' } },
+        ],
+        connections: [
+            { id: 'c1-1', fromNodeId: 't1-trigger', toNodeId: 't1-fetch' },
+            { id: 'c1-2', fromNodeId: 't1-fetch', toNodeId: 't1-condition' },
+            { id: 'c1-3', fromNodeId: 't1-condition', toNodeId: 't1-output', outputType: 'true' },
+        ]
+    },
+    {
+        id: 'template-ai-enrichment',
+        name: 'AI Data Enrichment',
+        description: 'Process data through AI to add insights, then save the enriched results.',
+        category: 'Analysis',
+        nodes: [
+            { id: 't2-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
+            { id: 't2-fetch', type: 'fetchData', label: 'Fetch Data', x: 300, y: 200 },
+            { id: 't2-llm', type: 'llm', label: 'AI Analysis', x: 500, y: 200, config: { llmPrompt: 'Analyze this data and provide insights:', llmIncludeInput: true } },
+            { id: 't2-add-field', type: 'addField', label: 'Add Insights Field', x: 700, y: 200 },
+            { id: 't2-save', type: 'saveRecords', label: 'Save Results', x: 900, y: 200 },
+        ],
+        connections: [
+            { id: 'c2-1', fromNodeId: 't2-trigger', toNodeId: 't2-fetch' },
+            { id: 'c2-2', fromNodeId: 't2-fetch', toNodeId: 't2-llm' },
+            { id: 'c2-3', fromNodeId: 't2-llm', toNodeId: 't2-add-field' },
+            { id: 'c2-4', fromNodeId: 't2-add-field', toNodeId: 't2-save' },
+        ]
+    },
+    {
+        id: 'template-approval-flow',
+        name: 'Human Approval Workflow',
+        description: 'Route data through human review before processing continues.',
+        category: 'Automation',
+        nodes: [
+            { id: 't3-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
+            { id: 't3-input', type: 'manualInput', label: 'Request Details', x: 300, y: 200, config: { inputVarName: 'request', inputVarValue: '' } },
+            { id: 't3-approval', type: 'humanApproval', label: 'Manager Approval', x: 500, y: 200 },
+            { id: 't3-approved', type: 'output', label: 'Approved Output', x: 700, y: 100 },
+            { id: 't3-rejected', type: 'output', label: 'Rejected Output', x: 700, y: 300 },
+        ],
+        connections: [
+            { id: 'c3-1', fromNodeId: 't3-trigger', toNodeId: 't3-input' },
+            { id: 'c3-2', fromNodeId: 't3-input', toNodeId: 't3-approval' },
+            { id: 'c3-3', fromNodeId: 't3-approval', toNodeId: 't3-approved', outputType: 'true' },
+            { id: 'c3-4', fromNodeId: 't3-approval', toNodeId: 't3-rejected', outputType: 'false' },
+        ]
+    },
+    {
+        id: 'template-data-merge',
+        name: 'Data Join & Merge',
+        description: 'Combine data from two different sources into a unified dataset.',
+        category: 'Data Processing',
+        nodes: [
+            { id: 't4-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 250 },
+            { id: 't4-fetch1', type: 'fetchData', label: 'Source A', x: 300, y: 150 },
+            { id: 't4-fetch2', type: 'fetchData', label: 'Source B', x: 300, y: 350 },
+            { id: 't4-join', type: 'join', label: 'Merge Data', x: 550, y: 250, config: { joinStrategy: 'concat' } },
+            { id: 't4-output', type: 'output', label: 'Combined Output', x: 750, y: 250 },
+        ],
+        connections: [
+            { id: 'c4-1', fromNodeId: 't4-trigger', toNodeId: 't4-fetch1' },
+            { id: 'c4-2', fromNodeId: 't4-trigger', toNodeId: 't4-fetch2' },
+            { id: 'c4-3', fromNodeId: 't4-fetch1', toNodeId: 't4-join', inputPort: 'A' },
+            { id: 'c4-4', fromNodeId: 't4-fetch2', toNodeId: 't4-join', inputPort: 'B' },
+            { id: 'c4-5', fromNodeId: 't4-join', toNodeId: 't4-output' },
+        ]
+    },
+    {
+        id: 'template-api-integration',
+        name: 'External API Integration',
+        description: 'Fetch data from an external API, process it, and save to database.',
+        category: 'Integration',
+        nodes: [
+            { id: 't5-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
+            { id: 't5-http', type: 'http', label: 'API Request', x: 300, y: 200, config: { httpUrl: 'https://api.example.com/data' } },
+            { id: 't5-python', type: 'python', label: 'Transform Data', x: 500, y: 200, config: { pythonCode: '# Transform the API response\nresult = input_data' } },
+            { id: 't5-save', type: 'saveRecords', label: 'Save to DB', x: 700, y: 200 },
+            { id: 't5-output', type: 'output', label: 'Show Results', x: 900, y: 200 },
+        ],
+        connections: [
+            { id: 'c5-1', fromNodeId: 't5-trigger', toNodeId: 't5-http' },
+            { id: 'c5-2', fromNodeId: 't5-http', toNodeId: 't5-python' },
+            { id: 'c5-3', fromNodeId: 't5-python', toNodeId: 't5-save' },
+            { id: 'c5-4', fromNodeId: 't5-save', toNodeId: 't5-output' },
+        ]
+    },
+    {
+        id: 'template-email-notification',
+        name: 'Email Notification Flow',
+        description: 'Monitor data conditions and send email notifications when criteria are met.',
+        category: 'Automation',
+        nodes: [
+            { id: 't6-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
+            { id: 't6-fetch', type: 'fetchData', label: 'Fetch Records', x: 300, y: 200 },
+            { id: 't6-condition', type: 'condition', label: 'Check Condition', x: 500, y: 200, config: { processingMode: 'batch' } },
+            { id: 't6-email', type: 'sendEmail', label: 'Send Alert', x: 700, y: 100 },
+            { id: 't6-output', type: 'output', label: 'Log Status', x: 700, y: 300 },
+        ],
+        connections: [
+            { id: 'c6-1', fromNodeId: 't6-trigger', toNodeId: 't6-fetch' },
+            { id: 'c6-2', fromNodeId: 't6-fetch', toNodeId: 't6-condition' },
+            { id: 'c6-3', fromNodeId: 't6-condition', toNodeId: 't6-email', outputType: 'true' },
+            { id: 'c6-4', fromNodeId: 't6-condition', toNodeId: 't6-output', outputType: 'false' },
+        ]
+    },
 ];
 
 interface WorkflowsProps {
@@ -386,6 +513,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [aiGeneratedWorkflow, setAiGeneratedWorkflow] = useState<{ nodes: any[], connections: any[] } | null>(null);
     const [showAiConfirmDialog, setShowAiConfirmDialog] = useState<boolean>(false);
 
+    // Templates Modal State
+    const [showTemplatesModal, setShowTemplatesModal] = useState<boolean>(false);
+    const [selectedTemplateCategory, setSelectedTemplateCategory] = useState<string>('All');
+    const [isCopyingTemplate, setIsCopyingTemplate] = useState<boolean>(false);
+
     const showToast = (message: string, type: 'success' | 'error' = 'success') => {
         setToast({ message, type });
         setTimeout(() => setToast(null), 3000);
@@ -413,6 +545,78 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         navigator.clipboard.writeText(text);
         showToast(message, 'success');
     };
+
+    // Copy a template to user's workflows
+    const copyTemplateToWorkflows = async (template: WorkflowTemplate) => {
+        setIsCopyingTemplate(true);
+        try {
+            // Generate new unique IDs for nodes and connections
+            const idMapping: { [oldId: string]: string } = {};
+            
+            const newNodes = template.nodes.map(node => {
+                const newId = generateUUID();
+                idMapping[node.id] = newId;
+                return {
+                    ...node,
+                    id: newId,
+                    status: undefined, // Reset status
+                    inputData: undefined,
+                    outputData: undefined,
+                };
+            });
+
+            const newConnections = template.connections.map(conn => ({
+                ...conn,
+                id: generateUUID(),
+                fromNodeId: idMapping[conn.fromNodeId],
+                toNodeId: idMapping[conn.toNodeId],
+            }));
+
+            const workflowData = { nodes: newNodes, connections: newConnections };
+            const workflowName = `${template.name} (Copy)`;
+
+            // Create the new workflow via API
+            const res = await fetch(`${API_BASE}/workflows`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: workflowName,
+                    data: workflowData,
+                    createdByName: user?.name || user?.email?.split('@')[0] || 'Unknown'
+                }),
+                credentials: 'include'
+            });
+
+            if (!res.ok) throw new Error('Failed to create workflow from template');
+            
+            const newWorkflow = await res.json();
+            
+            // Refresh the workflows list
+            await fetchWorkflows();
+            
+            // Close templates modal
+            setShowTemplatesModal(false);
+            
+            showToast(`Template "${template.name}" copied to your workflows!`, 'success');
+
+            // Optionally open the new workflow
+            navigate(`/workflow/${newWorkflow.id}`);
+            setCurrentView('canvas');
+        } catch (error) {
+            console.error('Error copying template:', error);
+            showToast('Failed to copy template', 'error');
+        } finally {
+            setIsCopyingTemplate(false);
+        }
+    };
+
+    // Get filtered templates by category
+    const filteredTemplates = WORKFLOW_TEMPLATES.filter(template =>
+        selectedTemplateCategory === 'All' || template.category === selectedTemplateCategory
+    );
+
+    // Get unique template categories
+    const templateCategories = ['All', ...Array.from(new Set(WORKFLOW_TEMPLATES.map(t => t.category)))];
 
     const fetchWorkflows = async () => {
         try {
@@ -2830,13 +3034,22 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     {filteredWorkflows.length} {filteredWorkflows.length === 1 ? 'workflow' : 'workflows'}
                                 </p>
                             </div>
-                            <button
-                                onClick={createNewWorkflow}
-                                className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors shadow-sm font-medium"
-                            >
-                                <Workflow size={18} />
-                                Create Workflow
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => setShowTemplatesModal(true)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors shadow-sm font-medium"
+                                >
+                                    <BookOpen size={18} />
+                                    Open Templates
+                                </button>
+                                <button
+                                    onClick={createNewWorkflow}
+                                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors shadow-sm font-medium"
+                                >
+                                    <Workflow size={18} />
+                                    Create Workflow
+                                </button>
+                            </div>
                         </div>
 
                     {/* Workflows Grid */}
@@ -6225,6 +6438,156 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     'Submit Feedback'
                                 )}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Workflow Templates Modal */}
+            {showTemplatesModal && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !isCopyingTemplate && setShowTemplatesModal(false)}>
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-5 text-white rounded-t-xl shrink-0">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <BookOpen size={28} />
+                                    <div>
+                                        <h3 className="font-bold text-xl">Workflow Templates</h3>
+                                        <p className="text-amber-100 text-sm">Pre-built workflows to get you started quickly</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowTemplatesModal(false)}
+                                    disabled={isCopyingTemplate}
+                                    className="p-2 hover:bg-white/20 rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                    <X size={22} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Category Filter */}
+                        <div className="px-6 py-3 border-b border-slate-200 bg-slate-50 shrink-0">
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-slate-600">Category:</span>
+                                <div className="flex gap-2">
+                                    {templateCategories.map(category => (
+                                        <button
+                                            key={category}
+                                            onClick={() => setSelectedTemplateCategory(category)}
+                                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                                                selectedTemplateCategory === category
+                                                    ? 'bg-amber-600 text-white'
+                                                    : 'bg-white text-slate-600 border border-slate-300 hover:border-amber-400 hover:text-amber-600'
+                                            }`}
+                                        >
+                                            {category}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Templates Grid */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {filteredTemplates.map(template => (
+                                    <div
+                                        key={template.id}
+                                        className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-lg hover:border-amber-300 transition-all group"
+                                    >
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <h4 className="font-semibold text-lg text-slate-800 group-hover:text-amber-600 transition-colors">
+                                                    {template.name}
+                                                </h4>
+                                                <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full mt-1">
+                                                    {template.category}
+                                                </span>
+                                            </div>
+                                            <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center text-amber-600 group-hover:bg-amber-100 transition-colors">
+                                                <Workflow size={20} />
+                                            </div>
+                                        </div>
+                                        
+                                        <p className="text-sm text-slate-600 mb-4 min-h-[40px]">
+                                            {template.description}
+                                        </p>
+
+                                        {/* Mini workflow preview */}
+                                        <div className="bg-slate-50 rounded-lg p-3 mb-4 border border-slate-100">
+                                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                                                <span className="flex items-center gap-1">
+                                                    <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                                                    {template.nodes.length} nodes
+                                                </span>
+                                                <span className="text-slate-300">•</span>
+                                                <span className="flex items-center gap-1">
+                                                    <ArrowRight size={12} />
+                                                    {template.connections.length} connections
+                                                </span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1.5 mt-2">
+                                                {template.nodes.slice(0, 5).map((node, idx) => (
+                                                    <span
+                                                        key={idx}
+                                                        className="px-2 py-0.5 bg-white text-slate-600 text-xs rounded border border-slate-200"
+                                                    >
+                                                        {node.label}
+                                                    </span>
+                                                ))}
+                                                {template.nodes.length > 5 && (
+                                                    <span className="px-2 py-0.5 text-slate-400 text-xs">
+                                                        +{template.nodes.length - 5} more
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={() => copyTemplateToWorkflows(template)}
+                                            disabled={isCopyingTemplate}
+                                            className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg font-medium hover:from-amber-600 hover:to-orange-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow"
+                                        >
+                                            {isCopyingTemplate ? (
+                                                <>
+                                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                    Copying...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Copy size={16} />
+                                                    Use This Template
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {filteredTemplates.length === 0 && (
+                                <div className="text-center py-12 text-slate-500">
+                                    <BookOpen size={48} className="mx-auto mb-3 opacity-30" />
+                                    <p>No templates found in this category.</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-xl shrink-0">
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm text-slate-500">
+                                    {filteredTemplates.length} template{filteredTemplates.length !== 1 ? 's' : ''} available
+                                </p>
+                                <button
+                                    onClick={() => setShowTemplatesModal(false)}
+                                    disabled={isCopyingTemplate}
+                                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 font-medium"
+                                >
+                                    Close
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
