@@ -81,10 +81,21 @@ interface UseCollaborativeCursorsReturn {
     activeUsers: number;
 }
 
-// Build WebSocket URL dynamically to avoid SSR issues
+// Build WebSocket URL dynamically based on current protocol and environment
 const getWsUrl = () => {
     if (typeof window === 'undefined') return '';
-    return `ws://${window.location.hostname}:3001/ws`;
+    
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host; // includes port if present
+    
+    // In development (localhost), connect directly to the backend on port 3001
+    // In production (HTTPS), use the same host (nginx will proxy /ws to the backend)
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return `ws://${window.location.hostname}:3001/ws`;
+    }
+    
+    // Production: use secure WebSocket through the same host (nginx proxy)
+    return `${protocol}//${host}/ws`;
 };
 
 export function useCollaborativeCursors({
