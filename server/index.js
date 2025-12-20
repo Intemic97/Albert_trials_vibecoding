@@ -64,7 +64,18 @@ wss.on('connection', (ws) => {
             switch (message.type) {
                 case 'join': {
                     // User joins a workflow canvas
-                    const { workflowId, orgId, user } = message;
+                    const { workflowId: rawWorkflowId, orgId, user } = message;
+                    
+                    // Normalize workflowId to string to prevent type mismatches
+                    const workflowId = rawWorkflowId ? String(rawWorkflowId) : null;
+                    
+                    console.log(`[WS] Join request - workflowId: "${workflowId}" (type: ${typeof rawWorkflowId}), user: ${user?.id}, org: ${orgId}`);
+                    
+                    if (!workflowId) {
+                        console.log('[WS] REJECTED: Missing workflowId');
+                        ws.send(JSON.stringify({ type: 'error', message: 'Missing workflowId' }));
+                        return;
+                    }
                     
                     // SECURITY: Validate that the workflow belongs to the user's organization
                     // This prevents users from different organizations seeing each other's cursors
@@ -120,6 +131,7 @@ wss.on('connection', (ws) => {
                             
                             room.set(socketId, {
                                 ws,
+                                workflowId, // Store workflowId with user for validation
                                 user: {
                                     id: user.id,
                                     name: user.name || user.email?.split('@')[0] || 'Anonymous',
@@ -129,7 +141,18 @@ wss.on('connection', (ws) => {
                                 cursor: null
                             });
                             
-                            console.log(`[WS] User ${user.name || user.id} joined workflow ${workflowId} (${room.size} users)`);
+                            console.log(`[WS] User ${user.name || user.id} (socket: ${socketId}) joined workflow ${workflowId} (${room.size} users in room)`);
+                            
+                            // Debug: Log all active rooms and users
+                            console.log('[WS] === ACTIVE ROOMS DEBUG ===');
+                            workflowRooms.forEach((roomUsers, roomWorkflowId) => {
+                                const userList = [];
+                                roomUsers.forEach((data, sid) => {
+                                    userList.push(`${data.user?.name || 'Unknown'}(${sid.substring(0, 10)}...)`);
+                                });
+                                console.log(`[WS] Room ${roomWorkflowId}: ${userList.join(', ')}`);
+                            });
+                            console.log('[WS] === END ROOMS DEBUG ===');
                             
                             // Send existing users to the new user (exclude own user's other tabs)
                             const existingUsers = [];
@@ -146,16 +169,27 @@ wss.on('connection', (ws) => {
                             
                             ws.send(JSON.stringify({
                                 type: 'room_state',
+                                workflowId, // Include workflowId for client validation
                                 users: existingUsers,
                                 yourId: socketId,
                                 yourColor: CURSOR_COLORS[colorIndex]
                             }));
                             
                             // Notify others about new user (exclude other tabs of the same user)
+                            const newUserData = room.get(socketId);
+                            console.log(`[WS] Broadcasting user_joined for ${user.name || user.id} to workflow ${workflowId}`);
+                            console.log(`[WS] Room has ${room.size} users, will notify others (excluding socket ${socketId} and userId ${user.id})`);
+                            
+                            // Debug: list who will receive the message
+                            room.forEach((data, id) => {
+                                const willReceive = id !== socketId && (!user.id || data.user?.id !== user.id);
+                                console.log(`[WS]   - ${data.user?.name || id}: willReceive=${willReceive} (socketMatch=${id === socketId}, userIdMatch=${data.user?.id === user.id})`);
+                            });
+                            
                             broadcastToRoom(workflowId, {
                                 type: 'user_joined',
                                 id: socketId,
-                                user: room.get(socketId).user
+                                user: newUserData.user
                             }, socketId, user.id);
                             
                         } catch (err) {
@@ -194,6 +228,9 @@ wss.on('connection', (ws) => {
                     const { nodeId, x, y } = message;
                     
                     if (currentWorkflowId && workflowRooms.has(currentWorkflowId)) {
+                        const room = workflowRooms.get(currentWorkflowId);
+                        console.log(`[WS] node_move from ${userData?.name || socketId}: nodeId=${nodeId}, x=${Math.round(x)}, y=${Math.round(y)}, room size=${room.size}`);
+                        
                         // Broadcast node movement to others
                         broadcastToRoom(currentWorkflowId, {
                             type: 'node_update',
@@ -202,6 +239,8 @@ wss.on('connection', (ws) => {
                             y,
                             movedBy: socketId
                         }, socketId);
+                    } else {
+                        console.log(`[WS] node_move IGNORED: currentWorkflowId=${currentWorkflowId}, hasRoom=${workflowRooms.has(currentWorkflowId)}`);
                     }
                     break;
                 }
@@ -325,25 +364,43 @@ wss.on('connection', (ws) => {
 });
 
 function broadcastToRoom(workflowId, message, excludeSocketId = null, excludeUserId = null) {
-    if (!workflowRooms.has(workflowId)) return;
+    if (!workflowId || !workflowRooms.has(workflowId)) return;
     
     const room = workflowRooms.get(workflowId);
-    const messageStr = JSON.stringify(message);
+    // Include workflowId in all messages so clients can validate they're for the correct workflow
+    const messageWithWorkflow = { ...message, workflowId };
+    const messageStr = JSON.stringify(messageWithWorkflow);
     
+    let sentCount = 0;
     room.forEach((data, id) => {
         // Skip if this is the excluded socket
         if (id === excludeSocketId) return;
         // Skip if this user should be excluded (all their tabs)
         if (excludeUserId && data.user && data.user.id === excludeUserId) return;
+        // Double-check user's stored workflowId matches (extra safety)
+        if (data.workflowId && data.workflowId !== workflowId) {
+            console.warn(`[WS] MISMATCH: User ${data.user?.id} in room ${workflowId} but has stored workflowId ${data.workflowId}`);
+            return;
+        }
         // Send if connection is open
         if (data.ws.readyState === 1) {
             data.ws.send(messageStr);
+            sentCount++;
         }
     });
+    
+    // Log for node updates to help debug
+    if (message.type === 'node_update' || message.type === 'node_added' || message.type === 'node_deleted') {
+        console.log(`[WS] Broadcast ${message.type} to ${sentCount} users (room size: ${room.size}, excluded: ${excludeSocketId})`);
+    }
 }
 
 function leaveRoom(socketId, workflowId) {
-    if (!workflowId || !workflowRooms.has(workflowId)) return;
+    console.log(`[WS] leaveRoom called - socket: ${socketId}, workflow: ${workflowId}`);
+    if (!workflowId || !workflowRooms.has(workflowId)) {
+        console.log(`[WS] leaveRoom skipped - workflowId: ${workflowId}, hasRoom: ${workflowRooms.has(workflowId)}`);
+        return;
+    }
     
     const room = workflowRooms.get(workflowId);
     if (room.has(socketId)) {

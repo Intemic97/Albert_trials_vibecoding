@@ -3394,8 +3394,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 // Hide cursor when leaving canvas
                                 sendCursorPosition(-100, -100, -100, -100);
                             }}
-                            className="w-full h-full relative"
-                            style={{ cursor: isPanning ? 'grabbing' : 'default' }}
+                            className="w-full h-full relative bg-slate-100"
+                            style={{ 
+                                cursor: isPanning ? 'grabbing' : 'default',
+                                backgroundImage: `
+                                    linear-gradient(to right, #e2e8f0 1px, transparent 1px),
+                                    linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)
+                                `,
+                                backgroundSize: '20px 20px'
+                            }}
                         >
                             {/* Remote Cursors */}
                             {Array.from(remoteCursors.values()).map((remote) => {

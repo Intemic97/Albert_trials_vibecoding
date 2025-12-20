@@ -108,6 +108,14 @@ export function useCollaborativeCursors({
     const lastSentPositionRef = useRef<{ x: number; y: number; time: number } | null>(null);
     const isCleaningUpRef = useRef(false);
     
+    // CRITICAL: Store workflowId in a ref to avoid stale closure issues
+    // This ensures we always validate against the CURRENT workflowId, not the one from when the effect was created
+    const currentWorkflowIdRef = useRef<string | null>(workflowId);
+    
+    // Track which workflow the server has confirmed we're in
+    // This prevents processing messages from old workflows during the join transition
+    const confirmedWorkflowIdRef = useRef<string | null>(null);
+    
     // Store callbacks in refs to prevent effect re-runs
     const onNodeUpdateRef = useRef(onNodeUpdate);
     const onNodeAddedRef = useRef(onNodeAdded);
@@ -129,6 +137,7 @@ export function useCollaborativeCursors({
         onWorkflowRunningRef.current = onWorkflowRunning;
         onWorkflowCompletedRef.current = onWorkflowCompleted;
     }, [onNodeUpdate, onNodeAdded, onNodeDeleted, onConnectionAdded, onConnectionDeleted, onNodePropsUpdated, onWorkflowRunning, onWorkflowCompleted]);
+
 
     // Cleanup function - keeps isCleaningUpRef true to prevent reconnection
     const cleanup = useCallback(() => {
@@ -171,6 +180,12 @@ export function useCollaborativeCursors({
 
     // Connect to WebSocket
     useEffect(() => {
+        // CRITICAL: Update refs synchronously at the START of this effect
+        // This ensures the refs are always in sync before any async operations
+        currentWorkflowIdRef.current = workflowId;
+        // Reset confirmed workflow - we haven't joined the new one yet
+        confirmedWorkflowIdRef.current = null;
+        
         // Clear any pending reconnection
         if (reconnectTimeoutRef.current) {
             clearTimeout(reconnectTimeoutRef.current);
@@ -197,6 +212,8 @@ export function useCollaborativeCursors({
         
         // Reset cleaning up flag for new connection
         isCleaningUpRef.current = false;
+        
+        console.log('[Collab] Effect running for workflowId:', workflowId);
         
         if (!enabled || !workflowId || !user) {
             return;
@@ -230,10 +247,37 @@ export function useCollaborativeCursors({
                     try {
                         const message = JSON.parse(event.data);
 
+                        // SECURITY: Validate that messages are for the current workflow
+                        // We use TWO checks:
+                        // 1. currentWorkflowIdRef - what workflow we WANT to be in
+                        // 2. confirmedWorkflowIdRef - what workflow the server CONFIRMED we're in
+                        
+                        const wantedWorkflowId = currentWorkflowIdRef.current;
+                        const confirmedWorkflowId = confirmedWorkflowIdRef.current;
+                        
+                        // For room_state, we accept it if it matches our WANTED workflow
+                        // This is the confirmation message that lets us start accepting other messages
+                        if (message.type === 'room_state') {
+                            if (message.workflowId !== wantedWorkflowId) {
+                                console.warn('[Collab] REJECTING room_state for different workflow:', message.workflowId, 'wanted:', wantedWorkflowId);
+                                return;
+                            }
+                            // Confirm we're now in this workflow
+                            confirmedWorkflowIdRef.current = message.workflowId;
+                            console.log('[Collab] Confirmed workflow:', message.workflowId);
+                        } else {
+                            // For all other messages, only accept if we've confirmed the workflow
+                            // AND the message is for our confirmed workflow
+                            if (!confirmedWorkflowId || message.workflowId !== confirmedWorkflowId) {
+                                console.warn('[Collab] REJECTING message - confirmed:', confirmedWorkflowId, 'message:', message.workflowId, 'type:', message.type);
+                                return;
+                            }
+                        }
+
                         switch (message.type) {
                             case 'room_state': {
-                                // Initial state with existing users
-                                console.log('[Collab] Room state received, existing users:', message.users.length);
+                                // Initial state with existing users - confirmation already handled above
+                                console.log('[Collab] Room state received for workflow:', message.workflowId, 'existing users:', message.users.length);
                                 const newCursors = new Map<string, RemoteUser>();
                                 message.users.forEach((u: RemoteUser) => {
                                     newCursors.set(u.id, u);
@@ -244,7 +288,8 @@ export function useCollaborativeCursors({
                             }
 
                             case 'user_joined': {
-                                console.log('[Collab] User joined:', message.user.name);
+                                console.log('[Collab] User joined workflow', message.workflowId, ':', message.user.name, 'socketId:', message.id);
+                                console.log('[Collab] Current remoteCursors before adding:', Array.from(remoteCursors.keys()));
                                 setRemoteCursors(prev => {
                                     const newMap = new Map(prev);
                                     newMap.set(message.id, {
@@ -252,6 +297,7 @@ export function useCollaborativeCursors({
                                         user: message.user,
                                         cursor: null
                                     });
+                                    console.log('[Collab] Updated remoteCursors, now has:', Array.from(newMap.keys()));
                                     return newMap;
                                 });
                                 break;
@@ -348,12 +394,26 @@ export function useCollaborativeCursors({
                     setIsConnected(false);
                     wsRef.current = null;
                     
-                    // Only attempt to reconnect if we're not intentionally cleaning up
-                    if (!isCleaningUpRef.current && enabled && workflowId) {
+                    // Only attempt to reconnect if:
+                    // 1. We're not intentionally cleaning up
+                    // 2. The workflowId hasn't changed (if it changed, a new useEffect will handle it)
+                    // CRITICAL: Use ref to check if workflowId is still the same
+                    const shouldReconnect = !isCleaningUpRef.current && 
+                                           enabled && 
+                                           currentWorkflowIdRef.current === workflowId;
+                    
+                    if (shouldReconnect) {
                         reconnectTimeoutRef.current = window.setTimeout(() => {
-                            console.log('[Collab] Attempting reconnect...');
-                            connect();
+                            // Double-check the workflowId hasn't changed during the timeout
+                            if (currentWorkflowIdRef.current === workflowId) {
+                                console.log('[Collab] Attempting reconnect to workflow:', workflowId);
+                                connect();
+                            } else {
+                                console.log('[Collab] Skipping reconnect - workflowId changed from', workflowId, 'to', currentWorkflowIdRef.current);
+                            }
                         }, 3000);
+                    } else {
+                        console.log('[Collab] Not reconnecting - cleanup:', isCleaningUpRef.current, 'workflowMatch:', currentWorkflowIdRef.current === workflowId);
                     }
                 };
 
