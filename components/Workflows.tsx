@@ -285,7 +285,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
     const [draggingItem, setDraggingItem] = useState<DraggableItem | null>(null);
     const [workflowName, setWorkflowName] = useState<string>('Untitled Workflow');
-    const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(urlWorkflowId || null);
+    const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(urlWorkflowId === 'new' ? null : urlWorkflowId || null);
     
     // Track the last loaded workflow ID to avoid re-loading
     const lastLoadedWorkflowIdRef = useRef<string | null>(null);
@@ -745,7 +745,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setNodes([]);
         setConnections([]);
         setConnectingFrom(null);
-        navigate('/workflows', { replace: true });
+        navigate('/workflow/new', { replace: true });
     };
 
     // View Navigation Functions
@@ -767,14 +767,24 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // Sync URL with component state
     useEffect(() => {
         const isListView = location.pathname === '/workflows';
-        const isWorkflowView = location.pathname.startsWith('/workflow/');
+        const isNewWorkflow = location.pathname === '/workflow/new';
+        const isWorkflowView = location.pathname.startsWith('/workflow/') && !isNewWorkflow;
         
-        console.log('[Workflows] URL sync - pathname:', location.pathname, 'isListView:', isListView, 'isWorkflowView:', isWorkflowView);
+        console.log('[Workflows] URL sync - pathname:', location.pathname, 'isListView:', isListView, 'isNewWorkflow:', isNewWorkflow, 'isWorkflowView:', isWorkflowView);
         
         if (isListView) {
             // On /workflows, show list view and clear current workflow
             console.log('[Workflows] Switching to list view');
             setCurrentView('list');
+            setCurrentWorkflowId(null);
+            setNodes([]);
+            setConnections([]);
+            setWorkflowName('Untitled Workflow');
+            lastLoadedWorkflowIdRef.current = null;
+        } else if (isNewWorkflow) {
+            // On /workflow/new, show canvas with empty workflow
+            console.log('[Workflows] New workflow - showing canvas');
+            setCurrentView('canvas');
             setCurrentWorkflowId(null);
             setNodes([]);
             setConnections([]);
@@ -791,7 +801,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
     const createNewWorkflow = () => {
         newWorkflow();
-        setCurrentView('canvas');
+        // useEffect will handle setting currentView to 'canvas' based on /workflow/new URL
     };
 
     const openNodeConfig = (nodeId: string) => {

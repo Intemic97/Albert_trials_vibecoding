@@ -33,7 +33,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     {
         id: 'welcome',
         title: 'Welcome to Intemic! 👋',
-        description: 'Let\'s take a quick tour of the platform. We\'ll guide you through each section step by step.',
+        description: 'Intemic helps manufacturing companies to automate their operations and regulatory compliance, reducing time and costs. Let\'s take a quick tour of the platform. We\'ll guide you through each section step by step.',
         position: 'center',
     },
     {
@@ -92,9 +92,10 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     },
     {
         id: 'workflow-editor',
-        title: 'Build Your Workflow! 🎯',
-        description: 'This is the workflow editor. On the left you have the Components panel with all the building blocks. On the right is the Canvas where you build your workflow.\n\nTry it now! Drag a component from the left and drop it on the canvas.',
+        title: 'Build Your Workflows! 🎯',
+        description: 'This is the workflow editor. On the left you have the Components panel with all the building blocks. On the right is the Canvas where you build your workflows, in real-time collaboration if you are with your colleagues.\n\nTry it now! Drag a component from the left and drop it on the canvas.',
         targetSelector: '[data-tutorial="workflow-editor"]',
+        route: '/workflow/new',
         position: 'center',
         waitForElement: true,
         allowInteraction: true,
@@ -241,30 +242,33 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
         }
     }, [step, updateTargetPosition]);
 
-    // Listen for clicks on the target element for 'click' action steps
-    useEffect(() => {
+    // Handle clicks on the highlighted element for 'click' action steps
+    const handleHighlightClick = useCallback(() => {
         if (step.action !== 'click' || !step.targetSelector) return;
-
-        const handleElementClick = () => {
-            // Small delay to let the actual click action happen first
-            setTimeout(() => {
-                setCurrentStep(prev => prev + 1);
-            }, 150);
-        };
-
-        const element = document.querySelector(step.targetSelector);
+        
+        // Trigger the actual element's click handler
+        const element = document.querySelector(step.targetSelector) as HTMLElement;
         if (element) {
-            element.addEventListener('click', handleElementClick);
-            return () => {
-                element.removeEventListener('click', handleElementClick);
-            };
+            element.click();
         }
-    }, [step, currentStep]);
+        
+        // Advance to next step after a small delay
+        setTimeout(() => {
+            setCurrentStep(prev => prev + 1);
+        }, 150);
+    }, [step]);
 
     const handleNext = () => {
         if (isLastStep) {
             onComplete();
         } else {
+            // If this step has action: 'click', trigger the click and advance
+            if (step.action === 'click' && step.targetSelector) {
+                const element = document.querySelector(step.targetSelector) as HTMLElement;
+                if (element) {
+                    element.click();
+                }
+            }
             setCurrentStep(prev => prev + 1);
         }
     };
@@ -400,6 +404,20 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                         width: targetRect.width + 16,
                         height: targetRect.height + 16,
                         boxShadow: '0 0 0 4px rgba(20, 184, 166, 0.2), 0 0 20px rgba(20, 184, 166, 0.3)',
+                    }}
+                />
+            )}
+
+            {/* Clickable area for 'click' action steps */}
+            {targetRect && step.action === 'click' && !step.fullPage && (
+                <div
+                    onClick={handleHighlightClick}
+                    className="absolute cursor-pointer rounded-xl transition-all duration-300 pointer-events-auto"
+                    style={{
+                        left: targetRect.left - 8,
+                        top: targetRect.top - 8,
+                        width: targetRect.width + 16,
+                        height: targetRect.height + 16,
                     }}
                 />
             )}
