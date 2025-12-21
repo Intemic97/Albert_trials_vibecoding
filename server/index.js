@@ -7,7 +7,7 @@ const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const XLSX = require('xlsx');
 const { WebSocketServer } = require('ws');
-const { initDb } = require('./db');
+const { initDb, openDb } = require('./db');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const cookieParser = require('cookie-parser');
 const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding, verifyEmail, resendVerification, validateInvitation, registerWithInvitation } = require('./auth');
@@ -510,6 +510,52 @@ app.get('/api/auth/organizations', authenticateToken, getOrganizations);
 app.post('/api/auth/switch-org', authenticateToken, switchOrganization);
 app.get('/api/organization/users', authenticateToken, getOrganizationUsers);
 app.post('/api/organization/invite', authenticateToken, inviteUser);
+
+// Create new organization
+app.post('/api/organizations', authenticateToken, async (req, res) => {
+    const { name } = req.body;
+    const userId = req.user.sub;
+
+    if (!name || !name.trim()) {
+        return res.status(400).json({ error: 'Organization name is required' });
+    }
+
+    const db = await openDb();
+
+    try {
+        const orgId = Math.random().toString(36).substr(2, 9);
+        const now = new Date().toISOString();
+
+        await db.run('BEGIN TRANSACTION');
+
+        // Create the organization
+        await db.run(
+            'INSERT INTO organizations (id, name, createdAt) VALUES (?, ?, ?)',
+            [orgId, name.trim(), now]
+        );
+
+        // Add the user as admin of the new organization
+        await db.run(
+            'INSERT INTO user_organizations (userId, organizationId, role) VALUES (?, ?, ?)',
+            [userId, orgId, 'admin']
+        );
+
+        await db.run('COMMIT');
+
+        console.log(`[Org] User ${userId} created organization ${name} (${orgId})`);
+
+        res.status(201).json({ 
+            message: 'Organization created successfully',
+            organization: { id: orgId, name: name.trim(), role: 'admin' }
+        });
+
+    } catch (error) {
+        await db.run('ROLLBACK');
+        console.error('Create organization error:', error);
+        res.status(500).json({ error: 'Failed to create organization' });
+    }
+});
+
 app.put('/api/profile', authenticateToken, updateProfile);
 app.post('/api/auth/onboarding', authenticateToken, completeOnboarding);
 

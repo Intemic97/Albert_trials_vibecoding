@@ -28,6 +28,7 @@ interface AuthContextType {
     switchOrganization: (orgId: string) => Promise<void>;
     updateProfile: (updates: { name?: string; companyRole?: string; profilePhoto?: string }) => Promise<boolean>;
     completeOnboarding: (data: { role: string; industry: string; useCase: string; source: string }) => Promise<boolean>;
+    refreshOrganizations: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -163,7 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, organizations, login, logout, switchOrganization, updateProfile, completeOnboarding }}>
+        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, organizations, login, logout, switchOrganization, updateProfile, completeOnboarding, refreshOrganizations: fetchOrganizations }}>
             {children}
         </AuthContext.Provider>
     );

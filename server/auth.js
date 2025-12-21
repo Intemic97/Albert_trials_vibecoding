@@ -441,9 +441,9 @@ async function updateProfile(req, res) {
         params.push(userId);
         await db.run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
 
-        // Return updated user
-        const user = await db.get('SELECT id, name, email, profilePhoto, companyRole FROM users WHERE id = ?', [userId]);
-        res.json({ user: { ...user, orgId: req.user.orgId } });
+        // Return updated user with all necessary fields
+        const user = await db.get('SELECT id, name, email, profilePhoto, companyRole, isAdmin, onboardingCompleted FROM users WHERE id = ?', [userId]);
+        res.json({ user: { ...user, orgId: req.user.orgId, isAdmin: !!user.isAdmin, onboardingCompleted: !!user.onboardingCompleted } });
 
     } catch (error) {
         console.error('UpdateProfile error:', error);

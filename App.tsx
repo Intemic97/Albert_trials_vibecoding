@@ -9,6 +9,7 @@ import { Workflows } from './components/Workflows';
 import { LoginPage } from './components/LoginPage';
 import { VerifyEmail } from './components/VerifyEmail';
 import { AcceptInvite } from './components/AcceptInvite';
+import { TutorialOverlay } from './components/TutorialOverlay';
 import { Settings } from './components/Settings';
 import { SharedDashboard } from './components/SharedDashboard';
 import { AdminPanel } from './components/AdminPanel';
@@ -46,6 +47,9 @@ function AuthenticatedApp() {
     const [entities, setEntities] = useState<Entity[]>([]);
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
     const previousUserIdRef = React.useRef<string | undefined>(undefined);
+    
+    // Tutorial state
+    const [showTutorial, setShowTutorial] = useState(false);
 
     // Get current view from URL path
     const getCurrentView = () => {
@@ -793,7 +797,25 @@ function AuthenticatedApp() {
                 <OnboardingModal onComplete={() => {
                     // Reload data after onboarding completes
                     fetchEntities();
+                    // Show tutorial if user hasn't seen it
+                    const hasSeenTutorial = localStorage.getItem('intemic_tutorial_completed');
+                    if (!hasSeenTutorial) {
+                        setTimeout(() => setShowTutorial(true), 500);
+                    }
                 }} />
+            )}
+            
+            {showTutorial && (
+                <TutorialOverlay 
+                    onComplete={() => {
+                        localStorage.setItem('intemic_tutorial_completed', 'true');
+                        setShowTutorial(false);
+                    }}
+                    onSkip={() => {
+                        localStorage.setItem('intemic_tutorial_completed', 'true');
+                        setShowTutorial(false);
+                    }}
+                />
             )}
             <Sidebar activeView={currentView} onNavigate={handleNavigate} />
 

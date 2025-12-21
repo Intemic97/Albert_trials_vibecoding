@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { User, LogOut, ChevronRight, Building, Settings, Camera, X, Loader2, Shield } from 'lucide-react';
+import { User, LogOut, ChevronRight, Building, Settings, Camera, X, Loader2, Shield, Plus } from 'lucide-react';
 import { API_BASE } from '../config';
 
 interface ProfileMenuProps {
@@ -43,7 +43,7 @@ export const UserAvatar: React.FC<{
 };
 
 export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate }) => {
-    const { user, logout, organizations, switchOrganization, updateProfile } = useAuth();
+    const { user, logout, organizations, switchOrganization, updateProfile, refreshOrganizations } = useAuth();
     console.log('[ProfileMenu] user.isAdmin:', user?.isAdmin);
     const [isOpen, setIsOpen] = useState(false);
     const [view, setView] = useState<'main' | 'organizations'>('main');
@@ -52,6 +52,9 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate }) => {
     const [editRole, setEditRole] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [showCreateOrgModal, setShowCreateOrgModal] = useState(false);
+    const [newOrgName, setNewOrgName] = useState('');
+    const [isCreatingOrg, setIsCreatingOrg] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -108,6 +111,33 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate }) => {
             console.error('Save profile error:', error);
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleCreateOrganization = async () => {
+        if (!newOrgName.trim()) return;
+        
+        setIsCreatingOrg(true);
+        try {
+            const res = await fetch(`${API_BASE}/organizations`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newOrgName }),
+                credentials: 'include'
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                await refreshOrganizations();
+                await switchOrganization(data.organization.id);
+                setShowCreateOrgModal(false);
+                setNewOrgName('');
+                setIsOpen(false);
+            }
+        } catch (error) {
+            console.error('Create organization error:', error);
+        } finally {
+            setIsCreatingOrg(false);
         }
     };
 
@@ -240,7 +270,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate }) => {
                                 <h3 className="font-semibold text-slate-800">Organizations</h3>
                             </div>
 
-                            <div className="p-2 space-y-1 max-h-60 overflow-y-auto">
+                            <div className="p-2 space-y-1 max-h-48 overflow-y-auto">
                                 {organizations.map(org => (
                                     <button
                                         key={org.id}
@@ -267,6 +297,22 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate }) => {
                                         )}
                                     </button>
                                 ))}
+                            </div>
+                            
+                            {/* Create Organization Button */}
+                            <div className="p-2 border-t border-slate-100">
+                                <button
+                                    onClick={() => {
+                                        setIsOpen(false);
+                                        setShowCreateOrgModal(true);
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-teal-600 hover:bg-teal-50 rounded-lg group transition-colors"
+                                >
+                                    <div className="p-1.5 bg-teal-50 rounded text-teal-500 group-hover:bg-teal-100 transition-colors">
+                                        <Plus size={16} />
+                                    </div>
+                                    <span className="font-medium">Create Organization</span>
+                                </button>
                             </div>
                         </>
                     )}
@@ -380,6 +426,73 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate }) => {
                         >
                             {isSaving && <Loader2 size={16} className="animate-spin" />}
                             Save Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Create Organization Modal */}
+        {showCreateOrgModal && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowCreateOrgModal(false)}>
+                <div className="bg-white rounded-xl shadow-2xl w-[400px] max-w-full mx-4" onClick={e => e.stopPropagation()}>
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-teal-50 rounded-lg">
+                                <Building size={20} className="text-teal-600" />
+                            </div>
+                            <h2 className="text-lg font-bold text-slate-800">Create Organization</h2>
+                        </div>
+                        <button 
+                            onClick={() => setShowCreateOrgModal(false)}
+                            className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
+                        >
+                            <X size={20} className="text-slate-400" />
+                        </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-6">
+                        <p className="text-sm text-slate-500 mb-4">
+                            Create a new organization and become its admin. You can invite team members after creation.
+                        </p>
+                        
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                Organization Name
+                            </label>
+                            <input
+                                type="text"
+                                value={newOrgName}
+                                onChange={(e) => setNewOrgName(e.target.value)}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                placeholder="e.g. Acme Inc."
+                                autoFocus
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && newOrgName.trim()) {
+                                        handleCreateOrganization();
+                                    }
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50/50 rounded-b-xl">
+                        <button
+                            onClick={() => setShowCreateOrgModal(false)}
+                            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleCreateOrganization}
+                            disabled={isCreatingOrg || !newOrgName.trim()}
+                            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                        >
+                            {isCreatingOrg && <Loader2 size={16} className="animate-spin" />}
+                            Create Organization
                         </button>
                     </div>
                 </div>
