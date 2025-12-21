@@ -7,6 +7,7 @@ import { Dashboard } from './components/Dashboard';
 import { Overview } from './components/Overview';
 import { Workflows } from './components/Workflows';
 import { LoginPage } from './components/LoginPage';
+import { VerifyEmail } from './components/VerifyEmail';
 import { Settings } from './components/Settings';
 import { SharedDashboard } from './components/SharedDashboard';
 import { AdminPanel } from './components/AdminPanel';
@@ -773,7 +774,12 @@ function AuthenticatedApp() {
     }
 
     if (!isAuthenticated) {
-        return <LoginPage />;
+        return (
+            <Routes>
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="*" element={<LoginPage />} />
+            </Routes>
+        );
     }
 
     // Show onboarding modal for new users who haven't completed it
@@ -783,7 +789,8 @@ function AuthenticatedApp() {
         <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
             {showOnboarding && (
                 <OnboardingModal onComplete={() => {
-                    // The AuthContext will update the user state
+                    // Reload data after onboarding completes
+                    fetchEntities();
                 }} />
             )}
             <Sidebar activeView={currentView} onNavigate={handleNavigate} />

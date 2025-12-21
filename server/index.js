@@ -10,7 +10,7 @@ const { WebSocketServer } = require('ws');
 const { initDb } = require('./db');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const cookieParser = require('cookie-parser');
-const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding } = require('./auth');
+const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding, verifyEmail, resendVerification } = require('./auth');
 
 const app = express();
 const server = http.createServer(app);
@@ -501,6 +501,8 @@ initDb().then(database => {
 app.post('/api/auth/register', register);
 app.post('/api/auth/login', login);
 app.post('/api/auth/logout', logout);
+app.get('/api/auth/verify-email', verifyEmail);
+app.post('/api/auth/resend-verification', resendVerification);
 app.get('/api/auth/me', authenticateToken, getMe);
 app.get('/api/auth/organizations', authenticateToken, getOrganizations);
 app.post('/api/auth/switch-org', authenticateToken, switchOrganization);

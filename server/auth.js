@@ -1,9 +1,17 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { Resend } = require('resend');
 const { openDb } = require('./db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const SALT_ROUNDS = 10;
+
+// Initialize Resend - API key should be in environment variable
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+// App URL for verification links
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 
 async function register(req, res) {
     const { email, password, name, orgName } = req.body;
@@ -16,14 +24,21 @@ async function register(req, res) {
 
     try {
         // Check if user exists
-        const existingUser = await db.get('SELECT id FROM users WHERE email = ?', [email]);
+        const existingUser = await db.get('SELECT id, emailVerified FROM users WHERE email = ?', [email]);
         if (existingUser) {
+            // If user exists but email not verified, allow re-sending verification
+            if (!existingUser.emailVerified) {
+                return res.status(400).json({ error: 'User already exists. Please check your email for verification link.' });
+            }
             return res.status(400).json({ error: 'User already exists' });
         }
 
         const userId = Math.random().toString(36).substr(2, 9);
         const orgId = Math.random().toString(36).substr(2, 9);
         const now = new Date().toISOString();
+        
+        // Generate verification token
+        const verificationToken = crypto.randomBytes(32).toString('hex');
 
         // Hash password
         const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
@@ -31,10 +46,10 @@ async function register(req, res) {
         // Transaction-like operations
         await db.run('BEGIN TRANSACTION');
 
-        // Create User
+        // Create User (emailVerified = 0 by default)
         await db.run(
-            'INSERT INTO users (id, email, password, name, createdAt) VALUES (?, ?, ?, ?, ?)',
-            [userId, email, hashedPassword, name, now]
+            'INSERT INTO users (id, email, password, name, createdAt, emailVerified, verificationToken) VALUES (?, ?, ?, ?, ?, 0, ?)',
+            [userId, email, hashedPassword, name, now, verificationToken]
         );
 
         // Create Organization
@@ -51,17 +66,59 @@ async function register(req, res) {
 
         await db.run('COMMIT');
 
-        // Auto-login (generate token)
-        const token = jwt.sign({ sub: userId, email, orgId }, JWT_SECRET, { expiresIn: '24h' });
+        // Send verification email
+        const verificationUrl = `${APP_URL}/verify-email?token=${verificationToken}`;
+        
+        try {
+            await resend.emails.send({
+                from: 'Intemic <noreply@notifications.intemic.com>',
+                to: email,
+                subject: 'Verify your email - Intemic',
+                html: `
+                    <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+                        <div style="text-align: center; margin-bottom: 40px;">
+                            <h1 style="color: #1F5F68; margin: 0;">Welcome to Intemic!</h1>
+                        </div>
+                        
+                        <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                            Hi ${name},
+                        </p>
+                        
+                        <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                            Thanks for signing up! Please verify your email address by clicking the button below:
+                        </p>
+                        
+                        <div style="text-align: center; margin: 40px 0;">
+                            <a href="${verificationUrl}" 
+                               style="background-color: #1F5F68; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
+                                Verify Email Address
+                            </a>
+                        </div>
+                        
+                        <p style="color: #6B7280; font-size: 14px; line-height: 1.6;">
+                            Or copy and paste this link in your browser:<br>
+                            <a href="${verificationUrl}" style="color: #1F5F68; word-break: break-all;">${verificationUrl}</a>
+                        </p>
+                        
+                        <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 40px 0;">
+                        
+                        <p style="color: #9CA3AF; font-size: 12px; text-align: center;">
+                            If you didn't create an account with Intemic, you can safely ignore this email.
+                        </p>
+                    </div>
+                `
+            });
+            console.log(`[Auth] Verification email sent to ${email}`);
+        } catch (emailError) {
+            console.error('[Auth] Failed to send verification email:', emailError);
+            // Don't fail registration if email fails - user can request resend
+        }
 
-        res.cookie('auth_token', token, {
-            httpOnly: true,
-            secure: false, // Set to true when using HTTPS
-            sameSite: 'lax',
-            maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        // Don't auto-login - user must verify email first
+        res.status(201).json({ 
+            message: 'Registration successful! Please check your email to verify your account.',
+            requiresVerification: true 
         });
-
-        res.status(201).json({ message: 'Registered successfully', user: { id: userId, name, email, orgId } });
 
     } catch (error) {
         await db.run('ROLLBACK');
@@ -88,6 +145,15 @@ async function login(req, res) {
         const match = await bcrypt.compare(password, user.password);
         if (!match) {
             return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        // Check if email is verified
+        if (!user.emailVerified) {
+            return res.status(403).json({ 
+                error: 'Please verify your email before logging in. Check your inbox for the verification link.',
+                requiresVerification: true,
+                email: user.email
+            });
         }
 
         // Get user's organization (assuming single org for now)
@@ -341,4 +407,120 @@ async function completeOnboarding(req, res) {
     }
 }
 
-module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding };
+async function verifyEmail(req, res) {
+    const { token } = req.query;
+
+    if (!token) {
+        return res.status(400).json({ error: 'Verification token is required' });
+    }
+
+    const db = await openDb();
+
+    try {
+        // Find user by verification token
+        const user = await db.get('SELECT id, email, name, emailVerified FROM users WHERE verificationToken = ?', [token]);
+
+        if (!user) {
+            return res.status(400).json({ error: 'Invalid or expired verification token' });
+        }
+
+        if (user.emailVerified) {
+            return res.json({ message: 'Email already verified. You can now log in.' });
+        }
+
+        // Mark email as verified and clear token
+        await db.run(
+            'UPDATE users SET emailVerified = 1, verificationToken = NULL WHERE id = ?',
+            [user.id]
+        );
+
+        console.log(`[Auth] Email verified for user ${user.email}`);
+
+        res.json({ message: 'Email verified successfully! You can now log in.', email: user.email });
+
+    } catch (error) {
+        console.error('VerifyEmail error:', error);
+        res.status(500).json({ error: 'Verification failed' });
+    }
+}
+
+async function resendVerification(req, res) {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const db = await openDb();
+
+    try {
+        const user = await db.get('SELECT id, name, emailVerified, verificationToken FROM users WHERE email = ?', [email]);
+
+        if (!user) {
+            // Don't reveal if user exists or not for security
+            return res.json({ message: 'If an account exists with this email, a verification link will be sent.' });
+        }
+
+        if (user.emailVerified) {
+            return res.status(400).json({ error: 'Email is already verified. You can log in.' });
+        }
+
+        // Generate new token if needed
+        let verificationToken = user.verificationToken;
+        if (!verificationToken) {
+            verificationToken = crypto.randomBytes(32).toString('hex');
+            await db.run('UPDATE users SET verificationToken = ? WHERE id = ?', [verificationToken, user.id]);
+        }
+
+        // Send verification email
+        const verificationUrl = `${APP_URL}/verify-email?token=${verificationToken}`;
+        
+        await resend.emails.send({
+            from: 'Intemic <noreply@notifications.intemic.com>',
+            to: email,
+            subject: 'Verify your email - Intemic',
+            html: `
+                <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+                    <div style="text-align: center; margin-bottom: 40px;">
+                        <h1 style="color: #1F5F68; margin: 0;">Verify Your Email</h1>
+                    </div>
+                    
+                    <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                        Hi ${user.name},
+                    </p>
+                    
+                    <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                        Please verify your email address by clicking the button below:
+                    </p>
+                    
+                    <div style="text-align: center; margin: 40px 0;">
+                        <a href="${verificationUrl}" 
+                           style="background-color: #1F5F68; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
+                            Verify Email Address
+                        </a>
+                    </div>
+                    
+                    <p style="color: #6B7280; font-size: 14px; line-height: 1.6;">
+                        Or copy and paste this link in your browser:<br>
+                        <a href="${verificationUrl}" style="color: #1F5F68; word-break: break-all;">${verificationUrl}</a>
+                    </p>
+                    
+                    <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 40px 0;">
+                    
+                    <p style="color: #9CA3AF; font-size: 12px; text-align: center;">
+                        If you didn't request this, you can safely ignore this email.
+                    </p>
+                </div>
+            `
+        });
+
+        console.log(`[Auth] Verification email resent to ${email}`);
+        res.json({ message: 'Verification email sent. Please check your inbox.' });
+
+    } catch (error) {
+        console.error('ResendVerification error:', error);
+        res.status(500).json({ error: 'Failed to resend verification email' });
+    }
+}
+
+module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding, verifyEmail, resendVerification };

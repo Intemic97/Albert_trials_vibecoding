@@ -228,6 +228,18 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  // Migration: Add email verification columns
+  try {
+    await db.exec(`ALTER TABLE users ADD COLUMN emailVerified INTEGER DEFAULT 0`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE users ADD COLUMN verificationToken TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   return db;
 }
 
