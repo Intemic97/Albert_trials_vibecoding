@@ -810,10 +810,14 @@ function AuthenticatedApp() {
                     onComplete={() => {
                         localStorage.setItem('intemic_tutorial_completed', 'true');
                         setShowTutorial(false);
+                        // Dispatch event so Settings can update its toggle
+                        window.dispatchEvent(new Event('tutorialCompleted'));
                     }}
                     onSkip={() => {
                         localStorage.setItem('intemic_tutorial_completed', 'true');
                         setShowTutorial(false);
+                        // Dispatch event so Settings can update its toggle
+                        window.dispatchEvent(new Event('tutorialCompleted'));
                     }}
                 />
             )}
@@ -887,7 +891,7 @@ function AuthenticatedApp() {
                         </header>
 
                         {/* Content Area */}
-                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar relative">
+                        <div data-tutorial="database-main" className="flex-1 overflow-y-auto p-8 custom-scrollbar relative">
 
                             {/* LIST VIEW */}
                             {!activeEntityId && (

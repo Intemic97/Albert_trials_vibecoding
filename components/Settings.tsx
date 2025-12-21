@@ -27,6 +27,28 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
         return !localStorage.getItem('intemic_tutorial_completed');
     });
 
+    // Sync tutorialEnabled with localStorage (e.g., when tutorial completes while on this page)
+    useEffect(() => {
+        const checkTutorialStatus = () => {
+            const isCompleted = localStorage.getItem('intemic_tutorial_completed') === 'true';
+            setTutorialEnabled(!isCompleted);
+        };
+        
+        // Check on mount
+        checkTutorialStatus();
+        
+        // Listen for tutorial completion event
+        window.addEventListener('tutorialCompleted', checkTutorialStatus);
+        
+        // Also listen for storage changes (from other tabs)
+        window.addEventListener('storage', checkTutorialStatus);
+        
+        return () => {
+            window.removeEventListener('tutorialCompleted', checkTutorialStatus);
+            window.removeEventListener('storage', checkTutorialStatus);
+        };
+    }, []);
+
     useEffect(() => {
         if (activeTab === 'team') {
             fetchUsers();
