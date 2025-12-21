@@ -25,6 +25,8 @@ interface TutorialStep {
     action?: 'click' | 'hover' | 'observe'; // What the user should do
     waitForElement?: boolean; // Wait for the element to appear
     media?: TutorialMedia; // Optional video/gif/image to show
+    allowInteraction?: boolean; // Allow user to interact with highlighted area (no overlay blocking)
+    fullPage?: boolean; // Highlight the entire page content area (no spotlight)
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
@@ -85,34 +87,19 @@ const TUTORIAL_STEPS: TutorialStep[] = [
         description: 'Click here to create a new workflow. This opens the visual editor where you can build your data pipeline.',
         targetSelector: '[data-tutorial="create-workflow"]',
         route: '/workflows',
-        position: 'right',
+        position: 'center',
         action: 'click',
         waitForElement: true,
     },
     {
-        id: 'node-palette',
-        title: 'Components Panel 🧩',
-        description: 'This is your toolbox! It contains all the building blocks for your workflow: triggers, data operations, logic, and actions.',
-        targetSelector: '[data-tutorial="node-palette"]',
-        position: 'right',
+        id: 'workflow-editor',
+        title: 'Build Your Workflow! 🎯',
+        description: 'This is the workflow editor. On the left you have the Components panel with all the building blocks. On the right is the Canvas where you build your workflow.\n\nTry it now! Drag a component from the left and drop it on the canvas.',
+        targetSelector: '[data-tutorial="workflow-editor"]',
+        position: 'center',
         waitForElement: true,
-        // To add a video: media: { type: 'video', src: '/tutorial/components-panel.mp4' }
-    },
-    {
-        id: 'workflow-canvas',
-        title: 'The Canvas ✨',
-        description: 'Drag components from the left panel and drop them here to build your workflow. Connect nodes by dragging from one output to another input.',
-        targetSelector: '[data-tutorial="workflow-canvas"]',
-        position: 'left',
-        waitForElement: true,
-        // To add a gif: media: { type: 'gif', src: '/tutorial/connect-nodes.gif' }
-    },
-    {
-        id: 'try-drag-drop',
-        title: 'Try It Out! 🎯',
-        description: 'Now try dragging a component (like "Trigger" or "API Call") from the left panel onto the canvas. This is how you build workflows!',
-        targetSelector: '[data-tutorial="node-palette"]',
-        position: 'right',
+        allowInteraction: true,
+        fullPage: true,
         // To add a video: media: { type: 'video', src: '/tutorial/drag-drop-demo.mp4' }
     },
     {
@@ -129,7 +116,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
         description: 'Create entities (like tables) and define properties (like columns). This is your flexible data schema that workflows can use.',
         targetSelector: '[data-tutorial="database-content"]',
         route: '/database',
-        position: 'bottom',
+        position: 'center',
         waitForElement: true,
     },
     {
@@ -147,16 +134,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
         description: 'Invite team members, manage roles, and configure your organization settings here.',
         targetSelector: '[data-tutorial="settings-content"]',
         route: '/settings',
-        position: 'bottom',
+        position: 'center',
         waitForElement: true,
-    },
-    {
-        id: 'profile',
-        title: 'Your Profile',
-        description: 'Click your avatar to access your profile, switch organizations, or log out.',
-        targetSelector: '[data-tutorial="profile-menu"]',
-        route: '/settings',
-        position: 'left',
     },
     {
         id: 'complete',
@@ -245,6 +224,26 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
         }
     }, [step, updateTargetPosition]);
 
+    // Listen for clicks on the target element for 'click' action steps
+    useEffect(() => {
+        if (step.action !== 'click' || !step.targetSelector) return;
+
+        const handleElementClick = () => {
+            // Small delay to let the actual click action happen first
+            setTimeout(() => {
+                setCurrentStep(prev => prev + 1);
+            }, 150);
+        };
+
+        const element = document.querySelector(step.targetSelector);
+        if (element) {
+            element.addEventListener('click', handleElementClick);
+            return () => {
+                element.removeEventListener('click', handleElementClick);
+            };
+        }
+    }, [step, currentStep]);
+
     const handleNext = () => {
         if (isLastStep) {
             onComplete();
@@ -263,7 +262,7 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
         onSkip();
     };
 
-    // Calculate tooltip position
+    // Calculate tooltip position - ensure it's always fully visible
     const getTooltipStyle = (): React.CSSProperties => {
         if (!targetRect || step.position === 'center') {
             return {
@@ -274,43 +273,56 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
             };
         }
 
-        const padding = 16;
+        const padding = 20;
         const tooltipWidth = step.media ? 420 : 360;
-        const tooltipHeight = step.media ? 380 : 200; // Larger when media present
+        // More accurate height estimate based on content
+        const baseHeight = 280; // Base height for title, description, buttons
+        const mediaHeight = step.media ? 200 : 0;
+        const hintHeight = targetRect ? 50 : 0;
+        const tooltipHeight = baseHeight + mediaHeight + hintHeight;
+        
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+        const safeBottom = viewportHeight - tooltipHeight - padding;
+        const safeRight = viewportWidth - tooltipWidth - padding;
+
+        // Calculate ideal position based on step.position
+        let top: number;
+        let left: number;
 
         switch (step.position) {
             case 'right':
-                return {
-                    position: 'fixed',
-                    top: Math.max(padding, Math.min(targetRect.top, window.innerHeight - tooltipHeight - padding)),
-                    left: Math.min(targetRect.right + padding, window.innerWidth - tooltipWidth - padding),
-                };
+                top = targetRect.top;
+                left = targetRect.right + padding;
+                break;
             case 'left':
-                return {
-                    position: 'fixed',
-                    top: Math.max(padding, Math.min(targetRect.top, window.innerHeight - tooltipHeight - padding)),
-                    left: Math.max(padding, targetRect.left - tooltipWidth - padding),
-                };
+                top = targetRect.top;
+                left = targetRect.left - tooltipWidth - padding;
+                break;
             case 'bottom':
-                return {
-                    position: 'fixed',
-                    top: Math.min(targetRect.bottom + padding, window.innerHeight - tooltipHeight - padding),
-                    left: Math.max(padding, Math.min(targetRect.left, window.innerWidth - tooltipWidth - padding)),
-                };
+                top = targetRect.bottom + padding;
+                left = targetRect.left;
+                break;
             case 'top':
-                return {
-                    position: 'fixed',
-                    top: Math.max(padding, targetRect.top - tooltipHeight - padding),
-                    left: Math.max(padding, Math.min(targetRect.left, window.innerWidth - tooltipWidth - padding)),
-                };
+                top = targetRect.top - tooltipHeight - padding;
+                left = targetRect.left;
+                break;
             default:
-                return {
-                    position: 'fixed',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                };
+                top = viewportHeight / 2 - tooltipHeight / 2;
+                left = viewportWidth / 2 - tooltipWidth / 2;
         }
+
+        // Clamp to ensure tooltip stays within viewport
+        // Ensure it doesn't go below the viewport (most important!)
+        top = Math.max(padding, Math.min(top, safeBottom));
+        // Ensure it doesn't go off the right edge
+        left = Math.max(padding, Math.min(left, safeRight));
+
+        return {
+            position: 'fixed',
+            top,
+            left,
+        };
     };
 
     // Get spotlight clip path
@@ -345,49 +357,24 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
         `;
     };
 
-    // Handle click on highlighted element
-    const handleHighlightClick = useCallback(() => {
-        if (step.action === 'click') {
-            // Click the actual element
-            const element = document.querySelector(step.targetSelector!) as HTMLElement;
-            if (element) {
-                element.click();
-            }
-            // Advance to next step after a short delay
-            setTimeout(() => {
-                handleNext();
-            }, 100);
-        } else {
-            // For non-click steps, just advance
-            handleNext();
-        }
-    }, [step, handleNext]);
-
     return (
         <div className="fixed inset-0 z-[9999] pointer-events-none">
-            {/* Overlay with spotlight cutout - blocks clicks outside spotlight */}
-            <div 
-                className="absolute inset-0 bg-slate-950/80 transition-all duration-300 pointer-events-auto"
-                style={targetRect ? { clipPath: getSpotlightClipPath() } : {}}
-            />
-
-            {/* Clickable area over highlighted element */}
-            {targetRect && (
-                <div
-                    onClick={handleHighlightClick}
-                    className="absolute cursor-pointer transition-all duration-300 pointer-events-auto"
-                    style={{
-                        left: targetRect.left - 8,
-                        top: targetRect.top - 8,
-                        width: targetRect.width + 16,
-                        height: targetRect.height + 16,
-                        zIndex: 10000,
-                    }}
+            {/* Overlay with spotlight cutout - always allows interaction with highlighted area */}
+            {step.fullPage ? (
+                // Full page mode: light overlay, no spotlight
+                <div 
+                    className="absolute inset-0 bg-slate-950/40 transition-all duration-300 pointer-events-none"
+                />
+            ) : (
+                // Normal mode: spotlight cutout - the cutout area is naturally interactive
+                <div 
+                    className="absolute inset-0 bg-slate-950/70 transition-all duration-300 pointer-events-none"
+                    style={targetRect ? { clipPath: getSpotlightClipPath() } : {}}
                 />
             )}
 
-            {/* Highlight border around target */}
-            {targetRect && (
+            {/* Highlight border around target - only when not full page */}
+            {targetRect && !step.fullPage && (
                 <div
                     className="absolute border-2 border-teal-400 rounded-xl pointer-events-none transition-all duration-300 animate-pulse"
                     style={{
@@ -403,18 +390,21 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
             {/* Tooltip */}
             <div
                 className={`${step.media ? 'w-[420px]' : 'w-[360px]'} bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 pointer-events-auto`}
-                style={getTooltipStyle()}
+                style={{
+                    ...getTooltipStyle(),
+                    maxHeight: 'calc(100vh - 40px)', // Never exceed viewport height
+                }}
             >
                 {/* Progress bar */}
-                <div className="h-1 bg-slate-100">
+                <div className="h-1 bg-slate-100 shrink-0">
                     <div 
                         className="h-full bg-gradient-to-r from-teal-500 to-blue-500 transition-all duration-500"
                         style={{ width: `${progress}%` }}
                     />
                 </div>
 
-                {/* Content */}
-                <div className="p-6">
+                {/* Content - scrollable if too tall */}
+                <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 100px)' }}>
                     {/* Step indicator */}
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2 text-teal-600">
@@ -467,21 +457,17 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                     )}
 
                     {/* Action hint */}
-                    {targetRect && (
+                    {(step.fullPage || step.action === 'click') && (
                         <div className="flex items-center gap-2 text-xs text-teal-600 bg-teal-50 px-3 py-2 rounded-lg mb-4">
-                            {step.id === 'try-drag-drop' || step.id === 'node-palette' || step.id === 'workflow-canvas' ? (
+                            {step.fullPage ? (
                                 <>
                                     <GripVertical size={14} />
-                                    <span>Drag & drop components to build your workflow</span>
+                                    <span>Try it! Drag components onto the canvas, then click Next</span>
                                 </>
                             ) : (
                                 <>
                                     <MousePointer size={14} />
-                                    <span>
-                                        {step.action === 'click' 
-                                            ? 'Click the highlighted element to navigate' 
-                                            : 'Click the highlighted area or Next to continue'}
-                                    </span>
+                                    <span>Click the highlighted element to continue</span>
                                 </>
                             )}
                         </div>

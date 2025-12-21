@@ -3133,7 +3133,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 </>
             ) : (
                 /* Canvas View */
-                <div className="flex flex-1 h-full">
+                <div data-tutorial="workflow-editor" className="flex flex-1 h-full">
                     {/* Sidebar */}
                     <div data-tutorial="node-palette" className={`${isSidebarCollapsed ? 'w-14' : 'w-72'} bg-slate-50 border-r border-slate-200 flex flex-col shadow-sm z-10 h-full transition-all duration-300`}>
 
