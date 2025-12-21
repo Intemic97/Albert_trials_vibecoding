@@ -157,7 +157,7 @@ const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     {
         id: 'template-data-filtering',
         name: 'Advanced control and monitorization of a chemical process',
-        description: 'Fetch data from a source, filter it based on conditions, and output the results.',
+        description: 'Read equipment sensor data, and calculate process and product quality metrics to ensure compliance with specifications and improve efficiency.',
         category: 'Process Optimization',
         nodes: [
             { id: 't1-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
@@ -194,7 +194,7 @@ const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     {
         id: 'template-ai-enrichment-3',
         name: 'Scope 3 emissions automated reporting',
-        description: 'Centralization of climate, laboratory, production and storage data for automated reporting to regulatory authorities, clients and stakeholders.',
+        description: 'Automated collection of supplier and customer data for scope 3 emissions calculation and reporting.',
         category: 'Reporting',
         nodes: [
             { id: 't2-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
@@ -248,6 +248,25 @@ const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             { id: 'c2-4', fromNodeId: 't2-add-field', toNodeId: 't2-save' },
         ]
     },
+    {
+        id: 'template-ai-enrichment-3',
+        name: 'Overall equipment effectiveness (OEE) calculation',
+        description: 'Read production data, equipment availability and maintenance records to calculate the Overall Equipment Effectiveness (OEE) of a manufacturing process and provide it in a dashboard.',
+        category: 'Planning',
+        nodes: [
+            { id: 't2-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
+            { id: 't2-fetch', type: 'fetchData', label: 'Fetch Data', x: 300, y: 200 },
+            { id: 't2-llm', type: 'llm', label: 'AI Analysis', x: 500, y: 200, config: { llmPrompt: 'Analyze this data and provide insights:', llmIncludeInput: true } },
+            { id: 't2-add-field', type: 'addField', label: 'Add Insights Field', x: 700, y: 200 },
+            { id: 't2-save', type: 'saveRecords', label: 'Save Results', x: 900, y: 200 },
+        ],
+        connections: [
+            { id: 'c2-1', fromNodeId: 't2-trigger', toNodeId: 't2-fetch' },
+            { id: 'c2-2', fromNodeId: 't2-fetch', toNodeId: 't2-llm' },
+            { id: 'c2-3', fromNodeId: 't2-llm', toNodeId: 't2-add-field' },
+            { id: 'c2-4', fromNodeId: 't2-add-field', toNodeId: 't2-save' },
+        ]
+    },
     
     {
         id: 'template-approval-flow',
@@ -270,8 +289,8 @@ const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     },
     {
         id: 'template-approval-flow-2',
-        name: 'Human Approval Workflow',
-        description: 'Route data through human review before processing continues.',
+        name: 'Regulatory compliance reporting',
+        description: 'Read regulations, reporting request, and automate the reporting of assets and activities to ensure compliance with regulations and standards.',
         category: 'Compliance',
         nodes: [
             { id: 't3-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
@@ -349,6 +368,25 @@ const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         id: 'template-email-notification-2',
         name: 'Pharmaceutical batch release validation',
         description: 'Automated analysis of production process data and batch record documentation to approve or reject the release of a pharmaceutical products ensuring compliance with regulations and standards.',
+        category: 'Quality Assurance',
+        nodes: [
+            { id: 't6-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
+            { id: 't6-fetch', type: 'fetchData', label: 'Fetch Records', x: 300, y: 200 },
+            { id: 't6-condition', type: 'condition', label: 'Check Condition', x: 500, y: 200, config: { processingMode: 'batch' } },
+            { id: 't6-email', type: 'sendEmail', label: 'Send Alert', x: 700, y: 100 },
+            { id: 't6-output', type: 'output', label: 'Log Status', x: 700, y: 300 },
+        ],
+        connections: [
+            { id: 'c6-1', fromNodeId: 't6-trigger', toNodeId: 't6-fetch' },
+            { id: 'c6-2', fromNodeId: 't6-fetch', toNodeId: 't6-condition' },
+            { id: 'c6-3', fromNodeId: 't6-condition', toNodeId: 't6-email', outputType: 'true' },
+            { id: 'c6-4', fromNodeId: 't6-condition', toNodeId: 't6-output', outputType: 'false' },
+        ]
+    },
+    {
+        id: 'template-email-notification-3',
+        name: 'Classification of deviations and feedbacks for prioritization',
+        description: 'Automated collection and analysis of reclamations and feedbacks to classify them into categories and prioritize them for further action.',
         category: 'Quality Assurance',
         nodes: [
             { id: 't6-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
