@@ -148,7 +148,7 @@ interface WorkflowTemplate {
     id: string;
     name: string;
     description: string;
-    category: 'Data Processing' | 'Automation' | 'Integration' | 'Analysis';
+    category: 'Compliance' | 'Process Optimization' | 'Planning' | 'Reporting' | 'Quality Assurance';
     nodes: WorkflowNode[];
     connections: Connection[];
 }
@@ -156,9 +156,9 @@ interface WorkflowTemplate {
 const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     {
         id: 'template-data-filtering',
-        name: 'Data Filtering & Export',
+        name: 'Advanced control and monitorization of a chemical process',
         description: 'Fetch data from a source, filter it based on conditions, and output the results.',
-        category: 'Data Processing',
+        category: 'Process Optimization',
         nodes: [
             { id: 't1-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
             { id: 't1-fetch', type: 'fetchData', label: 'Fetch Data', x: 300, y: 200 },
@@ -174,9 +174,9 @@ const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     },
     {
         id: 'template-ai-enrichment',
-        name: 'AI Data Enrichment',
-        description: 'Process data through AI to add insights, then save the enriched results.',
-        category: 'Analysis',
+        name: 'Automated data collection for quality reporting in wineries',
+        description: 'Centralization of climate, laboratory, production and storage data for automated reporting to regulatory authorities, clients and stakeholders.',
+        category: 'Reporting',
         nodes: [
             { id: 't2-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
             { id: 't2-fetch', type: 'fetchData', label: 'Fetch Data', x: 300, y: 200 },
@@ -192,10 +192,87 @@ const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         ]
     },
     {
+        id: 'template-ai-enrichment-3',
+        name: 'Scope 3 emissions automated reporting',
+        description: 'Centralization of climate, laboratory, production and storage data for automated reporting to regulatory authorities, clients and stakeholders.',
+        category: 'Reporting',
+        nodes: [
+            { id: 't2-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
+            { id: 't2-fetch', type: 'fetchData', label: 'Fetch Data', x: 300, y: 200 },
+            { id: 't2-llm', type: 'llm', label: 'AI Analysis', x: 500, y: 200, config: { llmPrompt: 'Analyze this data and provide insights:', llmIncludeInput: true } },
+            { id: 't2-add-field', type: 'addField', label: 'Add Insights Field', x: 700, y: 200 },
+            { id: 't2-save', type: 'saveRecords', label: 'Save Results', x: 900, y: 200 },
+        ],
+        connections: [
+            { id: 'c2-1', fromNodeId: 't2-trigger', toNodeId: 't2-fetch' },
+            { id: 'c2-2', fromNodeId: 't2-fetch', toNodeId: 't2-llm' },
+            { id: 'c2-3', fromNodeId: 't2-llm', toNodeId: 't2-add-field' },
+            { id: 'c2-4', fromNodeId: 't2-add-field', toNodeId: 't2-save' },
+        ]
+    },
+    {
+        id: 'template-ai-enrichment-4',
+        name: 'Renewable energy assets portfolio management and reporting',
+        description: 'Automated collection of climate, asset performance & maintenance data for reporting to renewable energy asset owners and stakeholders.',
+        category: 'Reporting',
+        nodes: [
+            { id: 't2-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
+            { id: 't2-fetch', type: 'fetchData', label: 'Fetch Data', x: 300, y: 200 },
+            { id: 't2-llm', type: 'llm', label: 'AI Analysis', x: 500, y: 200, config: { llmPrompt: 'Analyze this data and provide insights:', llmIncludeInput: true } },
+            { id: 't2-add-field', type: 'addField', label: 'Add Insights Field', x: 700, y: 200 },
+            { id: 't2-save', type: 'saveRecords', label: 'Save Results', x: 900, y: 200 },
+        ],
+        connections: [
+            { id: 'c2-1', fromNodeId: 't2-trigger', toNodeId: 't2-fetch' },
+            { id: 'c2-2', fromNodeId: 't2-fetch', toNodeId: 't2-llm' },
+            { id: 'c2-3', fromNodeId: 't2-llm', toNodeId: 't2-add-field' },
+            { id: 'c2-4', fromNodeId: 't2-add-field', toNodeId: 't2-save' },
+        ]
+    },
+    {
+        id: 'template-ai-enrichment-2',
+        name: 'Predictive maintenance planning Agent',
+        description: 'Read equipment specs and documentation, sensor data and current maintenance scheduling information to provide insights, alerts and recommendations of improved plannings, as well as its estimated saving costs.',
+        category: 'Planning',
+        nodes: [
+            { id: 't2-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
+            { id: 't2-fetch', type: 'fetchData', label: 'Fetch Data', x: 300, y: 200 },
+            { id: 't2-llm', type: 'llm', label: 'AI Analysis', x: 500, y: 200, config: { llmPrompt: 'Analyze this data and provide insights:', llmIncludeInput: true } },
+            { id: 't2-add-field', type: 'addField', label: 'Add Insights Field', x: 700, y: 200 },
+            { id: 't2-save', type: 'saveRecords', label: 'Save Results', x: 900, y: 200 },
+        ],
+        connections: [
+            { id: 'c2-1', fromNodeId: 't2-trigger', toNodeId: 't2-fetch' },
+            { id: 'c2-2', fromNodeId: 't2-fetch', toNodeId: 't2-llm' },
+            { id: 'c2-3', fromNodeId: 't2-llm', toNodeId: 't2-add-field' },
+            { id: 'c2-4', fromNodeId: 't2-add-field', toNodeId: 't2-save' },
+        ]
+    },
+    
+    {
         id: 'template-approval-flow',
+        name: 'Good Manufacturing Practices (GMP) report',
+        description: 'Read auditor observations, manufacturing process data, and products information to generate a GMP report and its CAPAs (Corrective and Preventive Actions).',
+        category: 'Compliance',
+        nodes: [
+            { id: 't3-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
+            { id: 't3-input', type: 'manualInput', label: 'Request Details', x: 300, y: 200, config: { inputVarName: 'request', inputVarValue: '' } },
+            { id: 't3-approval', type: 'humanApproval', label: 'Manager Approval', x: 500, y: 200 },
+            { id: 't3-approved', type: 'output', label: 'Approved Output', x: 700, y: 100 },
+            { id: 't3-rejected', type: 'output', label: 'Rejected Output', x: 700, y: 300 },
+        ],
+        connections: [
+            { id: 'c3-1', fromNodeId: 't3-trigger', toNodeId: 't3-input' },
+            { id: 'c3-2', fromNodeId: 't3-input', toNodeId: 't3-approval' },
+            { id: 'c3-3', fromNodeId: 't3-approval', toNodeId: 't3-approved', outputType: 'true' },
+            { id: 'c3-4', fromNodeId: 't3-approval', toNodeId: 't3-rejected', outputType: 'false' },
+        ]
+    },
+    {
+        id: 'template-approval-flow-2',
         name: 'Human Approval Workflow',
         description: 'Route data through human review before processing continues.',
-        category: 'Automation',
+        category: 'Compliance',
         nodes: [
             { id: 't3-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
             { id: 't3-input', type: 'manualInput', label: 'Request Details', x: 300, y: 200, config: { inputVarName: 'request', inputVarValue: '' } },
@@ -212,9 +289,9 @@ const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     },
     {
         id: 'template-data-merge',
-        name: 'Data Join & Merge',
+        name: 'What-if scenario analysis for production optimization',
         description: 'Combine data from two different sources into a unified dataset.',
-        category: 'Data Processing',
+        category: 'Process Optimization',
         nodes: [
             { id: 't4-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 250 },
             { id: 't4-fetch1', type: 'fetchData', label: 'Source A', x: 300, y: 150 },
@@ -232,9 +309,9 @@ const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     },
     {
         id: 'template-api-integration',
-        name: 'External API Integration',
-        description: 'Fetch data from an external API, process it, and save to database.',
-        category: 'Integration',
+        name: 'Energy costs reduction Agent',
+        description: 'Personalized recommendations for reducing energy costs while maintaining the same quality of products and services.',
+        category: 'Process Optimization',
         nodes: [
             { id: 't5-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
             { id: 't5-http', type: 'http', label: 'API Request', x: 300, y: 200, config: { httpUrl: 'https://api.example.com/data' } },
@@ -251,9 +328,28 @@ const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     },
     {
         id: 'template-email-notification',
-        name: 'Email Notification Flow',
-        description: 'Monitor data conditions and send email notifications when criteria are met.',
-        category: 'Automation',
+        name: 'Real-time plastic quality prediction',
+        description: 'Usage of manufacturing sensor data to calculate plastic properties every 5 minutes to ensure the quality control and send alerts when deviations occur.',
+        category: 'Quality Assurance',
+        nodes: [
+            { id: 't6-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
+            { id: 't6-fetch', type: 'fetchData', label: 'Fetch Records', x: 300, y: 200 },
+            { id: 't6-condition', type: 'condition', label: 'Check Condition', x: 500, y: 200, config: { processingMode: 'batch' } },
+            { id: 't6-email', type: 'sendEmail', label: 'Send Alert', x: 700, y: 100 },
+            { id: 't6-output', type: 'output', label: 'Log Status', x: 700, y: 300 },
+        ],
+        connections: [
+            { id: 'c6-1', fromNodeId: 't6-trigger', toNodeId: 't6-fetch' },
+            { id: 'c6-2', fromNodeId: 't6-fetch', toNodeId: 't6-condition' },
+            { id: 'c6-3', fromNodeId: 't6-condition', toNodeId: 't6-email', outputType: 'true' },
+            { id: 'c6-4', fromNodeId: 't6-condition', toNodeId: 't6-output', outputType: 'false' },
+        ]
+    },
+    {
+        id: 'template-email-notification-2',
+        name: 'Pharmaceutical batch release validation',
+        description: 'Automated analysis of production process data and batch record documentation to approve or reject the release of a pharmaceutical products ensuring compliance with regulations and standards.',
+        category: 'Quality Assurance',
         nodes: [
             { id: 't6-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
             { id: 't6-fetch', type: 'fetchData', label: 'Fetch Records', x: 300, y: 200 },
@@ -616,8 +712,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         selectedTemplateCategory === 'All' || template.category === selectedTemplateCategory
     );
 
-    // Get unique template categories
-    const templateCategories = ['All', ...Array.from(new Set(WORKFLOW_TEMPLATES.map(t => t.category)))];
+    // Template categories in fixed order
+    const templateCategories = ['All', 'Compliance', 'Process Optimization', 'Planning', 'Reporting', 'Quality Assurance'];
 
     const fetchWorkflows = async () => {
         try {
