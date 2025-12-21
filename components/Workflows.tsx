@@ -769,9 +769,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         const isListView = location.pathname === '/workflows';
         const isWorkflowView = location.pathname.startsWith('/workflow/');
         
+        console.log('[Workflows] URL sync - pathname:', location.pathname, 'isListView:', isListView, 'isWorkflowView:', isWorkflowView);
+        
         if (isListView) {
-            // On /workflows, show list view
+            // On /workflows, show list view and clear current workflow
+            console.log('[Workflows] Switching to list view');
             setCurrentView('list');
+            setCurrentWorkflowId(null);
+            setNodes([]);
+            setConnections([]);
+            setWorkflowName('Untitled Workflow');
+            lastLoadedWorkflowIdRef.current = null;
         } else if (isWorkflowView && urlWorkflowId) {
             // On /workflow/:id, load the workflow if not already loaded
             if (urlWorkflowId !== lastLoadedWorkflowIdRef.current) {
