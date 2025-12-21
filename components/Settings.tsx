@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Plus, X, Search, Building } from 'lucide-react';
+import { User, Mail, Plus, X, Search, Building, BookOpen, ToggleLeft, ToggleRight } from 'lucide-react';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import { API_BASE } from '../config';
 
 interface SettingsProps {
     onViewChange?: (view: string) => void;
+    onShowTutorial?: () => void;
 }
 
 interface OrgUser {
@@ -16,12 +17,15 @@ interface OrgUser {
     companyRole?: string;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ onViewChange }) => {
-    const [activeTab, setActiveTab] = useState<'general' | 'team' | 'billing'>('team');
+export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial }) => {
+    const [activeTab, setActiveTab] = useState<'general' | 'team' | 'billing'>('general');
     const [users, setUsers] = useState<OrgUser[]>([]);
     const [isInviting, setIsInviting] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+    const [tutorialEnabled, setTutorialEnabled] = useState(() => {
+        return !localStorage.getItem('intemic_tutorial_completed');
+    });
 
     useEffect(() => {
         if (activeTab === 'team') {
@@ -79,7 +83,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange }) => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-slate-50">
+        <div className="flex flex-col h-full bg-slate-50" data-tutorial="settings-content">
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
                 <div className="flex items-center gap-3">
@@ -185,13 +189,64 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange }) => {
                         </div>
                     )}
 
-                    {activeTab !== 'team' && (
+                    {activeTab === 'general' && (
+                        <div className="space-y-6">
+                            <div>
+                                <h2 className="text-lg font-semibold text-slate-800">Preferences</h2>
+                                <p className="text-slate-500 text-sm">Customize your experience.</p>
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                {/* Tutorial Setting */}
+                                <div className="p-6 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 bg-teal-50 rounded-xl">
+                                            <BookOpen className="w-6 h-6 text-teal-600" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-medium text-slate-800">Product Tutorial</h3>
+                                            <p className="text-sm text-slate-500">
+                                                {tutorialEnabled 
+                                                    ? 'Tutorial will show on next page refresh'
+                                                    : 'Enable to see the guided tour again'
+                                                }
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            if (tutorialEnabled) {
+                                                localStorage.setItem('intemic_tutorial_completed', 'true');
+                                                setTutorialEnabled(false);
+                                            } else {
+                                                localStorage.removeItem('intemic_tutorial_completed');
+                                                setTutorialEnabled(true);
+                                                // Optionally show tutorial immediately
+                                                if (onShowTutorial) {
+                                                    onShowTutorial();
+                                                }
+                                            }
+                                        }}
+                                        className="flex items-center"
+                                    >
+                                        {tutorialEnabled ? (
+                                            <ToggleRight className="w-12 h-12 text-teal-500" />
+                                        ) : (
+                                            <ToggleLeft className="w-12 h-12 text-slate-300" />
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'billing' && (
                         <div className="text-center py-20 bg-white rounded-xl border border-slate-200 border-dashed">
                             <div className="text-slate-400 mb-2">
                                 <Building size={48} className="mx-auto opacity-20" />
                             </div>
                             <h3 className="text-lg font-medium text-slate-800">Coming Soon</h3>
-                            <p className="text-slate-500">This settings section is under development.</p>
+                            <p className="text-slate-500">Billing settings are under development.</p>
                         </div>
                     )}
                 </div>

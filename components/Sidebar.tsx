@@ -46,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
     return (
       <Link
         to={route}
+        data-tutorial={`nav-${view}`}
         className={`flex items-center px-4 py-2 my-1 text-sm font-medium rounded-md cursor-pointer transition-colors ${active
           ? 'bg-[#E3EFF1] text-[#1F5F68]'
           : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
@@ -64,7 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
   );
 
   return (
-    <div className="w-64 bg-[#F5F7F9] border-r border-slate-200 h-screen flex flex-col sticky top-0 font-sans">
+    <div data-tutorial="sidebar" className="w-64 bg-[#F5F7F9] border-r border-slate-200 h-screen flex flex-col sticky top-0 font-sans">
       {/* Logo Area */}
       <div className="p-6 flex items-center mb-2">
         <img

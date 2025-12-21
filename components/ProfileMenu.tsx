@@ -161,6 +161,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate }) => {
         <>
         <div className="relative" ref={menuRef}>
             <button
+                data-tutorial="profile-menu"
                 onClick={() => setIsOpen(!isOpen)}
                 className="rounded-full shadow-md hover:ring-2 hover:ring-teal-500 transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
             >

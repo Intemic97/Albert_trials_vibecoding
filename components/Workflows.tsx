@@ -3009,7 +3009,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     );
 
     return (
-        <div className="flex flex-col h-full bg-slate-50">
+        <div className="flex flex-col h-full bg-slate-50" data-tutorial="workflows-content">
             {currentView === 'list' ? (
                 /* Workflows List View */
                 <>
@@ -3113,6 +3113,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                         {/* Create New Card */}
                         <div
+                            data-tutorial="create-workflow"
                             onClick={createNewWorkflow}
                             className="border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center min-h-[200px] text-slate-400 hover:border-teal-500 hover:text-teal-600 hover:bg-teal-50 transition-all cursor-pointer group"
                         >
@@ -3134,7 +3135,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 /* Canvas View */
                 <div className="flex flex-1 h-full">
                     {/* Sidebar */}
-                    <div className={`${isSidebarCollapsed ? 'w-14' : 'w-72'} bg-slate-50 border-r border-slate-200 flex flex-col shadow-sm z-10 h-full transition-all duration-300`}>
+                    <div data-tutorial="node-palette" className={`${isSidebarCollapsed ? 'w-14' : 'w-72'} bg-slate-50 border-r border-slate-200 flex flex-col shadow-sm z-10 h-full transition-all duration-300`}>
 
                         {!isSidebarCollapsed ? (
                             <>
@@ -3239,7 +3240,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     </div>
 
                     {/* Canvas */}
-                    <div className="flex-1 relative overflow-hidden bg-slate-50 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px]">
+                    <div data-tutorial="workflow-canvas" className="flex-1 relative overflow-hidden bg-slate-50 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px]">
                         <div className="absolute top-4 left-4 right-8 z-10 flex items-center gap-4">
                             <div className="flex-1">
                                 <input

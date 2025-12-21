@@ -366,7 +366,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, onViewChange }) =>
     };
 
     return (
-        <div className="flex flex-col h-full bg-slate-50">
+        <div className="flex flex-col h-full bg-slate-50" data-tutorial="overview-content">
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-20 shrink-0">
                 <div className="flex items-center gap-3">

@@ -9,7 +9,7 @@ import { Workflows } from './components/Workflows';
 import { LoginPage } from './components/LoginPage';
 import { VerifyEmail } from './components/VerifyEmail';
 import { AcceptInvite } from './components/AcceptInvite';
-import { TutorialOverlay } from './components/TutorialOverlay';
+import { InteractiveTutorial } from './components/InteractiveTutorial';
 import { Settings } from './components/Settings';
 import { SharedDashboard } from './components/SharedDashboard';
 import { AdminPanel } from './components/AdminPanel';
@@ -806,7 +806,7 @@ function AuthenticatedApp() {
             )}
             
             {showTutorial && (
-                <TutorialOverlay 
+                <InteractiveTutorial 
                     onComplete={() => {
                         localStorage.setItem('intemic_tutorial_completed', 'true');
                         setShowTutorial(false);
@@ -849,13 +849,13 @@ function AuthenticatedApp() {
                         <Reporting entities={entities} companyInfo={companyInfo} onViewChange={handleNavigate} />
                     } />
                     <Route path="/settings" element={
-                        <Settings onViewChange={handleNavigate} />
+                        <Settings onViewChange={handleNavigate} onShowTutorial={() => setShowTutorial(true)} />
                     } />
                     <Route path="/admin" element={
                         <AdminPanel onNavigate={handleNavigate} />
                     } />
                     <Route path="/database/:entityId?" element={
-                    <>
+                    <div data-tutorial="database-content" className="contents">
                         {/* Top Header */}
                         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
                             {activeEntity ? (
@@ -1733,7 +1733,7 @@ function AuthenticatedApp() {
                             </div>
                         )}
 
-                    </>
+                    </div>
                     } />
                 </Routes>
             </main>

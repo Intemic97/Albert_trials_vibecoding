@@ -1,0 +1,544 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { 
+    X, 
+    ChevronRight, 
+    ChevronLeft,
+    Sparkles,
+    MousePointer,
+    GripVertical
+} from 'lucide-react';
+
+interface TutorialMedia {
+    type: 'video' | 'gif' | 'image';
+    src: string; // Path to the media file (e.g., '/tutorial/drag-drop.mp4')
+    alt?: string; // Alt text for accessibility
+}
+
+interface TutorialStep {
+    id: string;
+    title: string;
+    description: string;
+    targetSelector?: string; // CSS selector for the element to highlight
+    route?: string; // Route to navigate to
+    position?: 'top' | 'bottom' | 'left' | 'right' | 'center';
+    action?: 'click' | 'hover' | 'observe'; // What the user should do
+    waitForElement?: boolean; // Wait for the element to appear
+    media?: TutorialMedia; // Optional video/gif/image to show
+}
+
+const TUTORIAL_STEPS: TutorialStep[] = [
+    {
+        id: 'welcome',
+        title: 'Welcome to Intemic! 👋',
+        description: 'Let\'s take a quick tour of the platform. We\'ll guide you through each section step by step.',
+        position: 'center',
+    },
+    {
+        id: 'sidebar',
+        title: 'Navigation Sidebar',
+        description: 'This is your main navigation. Click on any section to explore different parts of the platform.',
+        targetSelector: '[data-tutorial="sidebar"]',
+        route: '/dashboard',
+        position: 'right',
+    },
+    {
+        id: 'dashboards-nav',
+        title: 'Dashboards Section',
+        description: 'Click on "Dashboards" to create custom analytics views with charts, tables, and KPIs.',
+        targetSelector: '[data-tutorial="nav-dashboard"]',
+        route: '/dashboard',
+        position: 'right',
+        action: 'click',
+    },
+    {
+        id: 'dashboards-content',
+        title: 'Custom Dashboards 📊',
+        description: 'Build interactive dashboards with widgets. Add charts, tables, and insights powered by your data and AI.',
+        targetSelector: '[data-tutorial="dashboard-content"]',
+        route: '/dashboard',
+        position: 'bottom',
+        waitForElement: true,
+        media: { type: 'video', src: '/tutorial/dashboards.mp4' },
+    },
+    {
+        id: 'workflows-nav',
+        title: 'Workflows Section',
+        description: 'Click on "Workflows" to see where the magic happens - build automated data pipelines with our visual editor.',
+        targetSelector: '[data-tutorial="nav-workflows"]',
+        route: '/dashboard',
+        position: 'right',
+        action: 'click',
+    },
+    {
+        id: 'workflows-list',
+        title: 'Your Workflows',
+        description: 'Here you can see all your workflows. Click on "Create new workflow" to start building your first automation!',
+        targetSelector: '[data-tutorial="workflows-content"]',
+        route: '/workflows',
+        position: 'bottom',
+        waitForElement: true,
+    },
+    {
+        id: 'create-workflow',
+        title: 'Create Your First Workflow',
+        description: 'Click here to create a new workflow. This opens the visual editor where you can build your data pipeline.',
+        targetSelector: '[data-tutorial="create-workflow"]',
+        route: '/workflows',
+        position: 'right',
+        action: 'click',
+        waitForElement: true,
+    },
+    {
+        id: 'node-palette',
+        title: 'Components Panel 🧩',
+        description: 'This is your toolbox! It contains all the building blocks for your workflow: triggers, data operations, logic, and actions.',
+        targetSelector: '[data-tutorial="node-palette"]',
+        position: 'right',
+        waitForElement: true,
+        // To add a video: media: { type: 'video', src: '/tutorial/components-panel.mp4' }
+    },
+    {
+        id: 'workflow-canvas',
+        title: 'The Canvas ✨',
+        description: 'Drag components from the left panel and drop them here to build your workflow. Connect nodes by dragging from one output to another input.',
+        targetSelector: '[data-tutorial="workflow-canvas"]',
+        position: 'left',
+        waitForElement: true,
+        // To add a gif: media: { type: 'gif', src: '/tutorial/connect-nodes.gif' }
+    },
+    {
+        id: 'try-drag-drop',
+        title: 'Try It Out! 🎯',
+        description: 'Now try dragging a component (like "Trigger" or "API Call") from the left panel onto the canvas. This is how you build workflows!',
+        targetSelector: '[data-tutorial="node-palette"]',
+        position: 'right',
+        // To add a video: media: { type: 'video', src: '/tutorial/drag-drop-demo.mp4' }
+    },
+    {
+        id: 'database-nav',
+        title: 'Database Section',
+        description: 'Now let\'s check the Database. Click here to define your data structure with custom entities and properties.',
+        targetSelector: '[data-tutorial="nav-database"]',
+        position: 'right',
+        action: 'click',
+    },
+    {
+        id: 'database-content',
+        title: 'Data Structure',
+        description: 'Create entities (like tables) and define properties (like columns). This is your flexible data schema that workflows can use.',
+        targetSelector: '[data-tutorial="database-content"]',
+        route: '/database',
+        position: 'bottom',
+        waitForElement: true,
+    },
+    {
+        id: 'settings-nav',
+        title: 'Settings',
+        description: 'Click on "Settings" to manage your team, profile, and organization preferences.',
+        targetSelector: '[data-tutorial="nav-settings"]',
+        route: '/database',
+        position: 'right',
+        action: 'click',
+    },
+    {
+        id: 'settings-content',
+        title: 'Team Management',
+        description: 'Invite team members, manage roles, and configure your organization settings here.',
+        targetSelector: '[data-tutorial="settings-content"]',
+        route: '/settings',
+        position: 'bottom',
+        waitForElement: true,
+    },
+    {
+        id: 'profile',
+        title: 'Your Profile',
+        description: 'Click your avatar to access your profile, switch organizations, or log out.',
+        targetSelector: '[data-tutorial="profile-menu"]',
+        route: '/settings',
+        position: 'left',
+    },
+    {
+        id: 'complete',
+        title: 'You\'re Ready! 🎉',
+        description: 'That\'s the tour! Start exploring and building amazing workflows. You can restart this tutorial anytime from Settings > General.',
+        position: 'center',
+    },
+];
+
+interface InteractiveTutorialProps {
+    onComplete: () => void;
+    onSkip: () => void;
+}
+
+export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialProps) {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [currentStep, setCurrentStep] = useState(0);
+    const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+    const [isTransitioning, setIsTransitioning] = useState(false);
+
+    const step = TUTORIAL_STEPS[currentStep];
+    const isFirstStep = currentStep === 0;
+    const isLastStep = currentStep === TUTORIAL_STEPS.length - 1;
+    const progress = ((currentStep + 1) / TUTORIAL_STEPS.length) * 100;
+
+    // Find and highlight target element
+    const updateTargetPosition = useCallback(() => {
+        if (!step.targetSelector) {
+            setTargetRect(null);
+            return;
+        }
+
+        const element = document.querySelector(step.targetSelector);
+        if (element) {
+            const rect = element.getBoundingClientRect();
+            setTargetRect(rect);
+        } else {
+            setTargetRect(null);
+        }
+    }, [step.targetSelector]);
+
+    // Navigate to the correct route
+    useEffect(() => {
+        if (step.route && location.pathname !== step.route) {
+            setIsTransitioning(true);
+            navigate(step.route);
+            // Wait for navigation and DOM update
+            setTimeout(() => {
+                setIsTransitioning(false);
+                updateTargetPosition();
+            }, 300);
+        } else {
+            updateTargetPosition();
+        }
+    }, [step, navigate, location.pathname, updateTargetPosition]);
+
+    // Update position on resize/scroll
+    useEffect(() => {
+        const handleUpdate = () => updateTargetPosition();
+        window.addEventListener('resize', handleUpdate);
+        window.addEventListener('scroll', handleUpdate, true);
+        
+        // Also update periodically in case elements move
+        const interval = setInterval(handleUpdate, 500);
+
+        return () => {
+            window.removeEventListener('resize', handleUpdate);
+            window.removeEventListener('scroll', handleUpdate, true);
+            clearInterval(interval);
+        };
+    }, [updateTargetPosition]);
+
+    // Wait for element to appear
+    useEffect(() => {
+        if (step.waitForElement && step.targetSelector) {
+            const checkElement = setInterval(() => {
+                const element = document.querySelector(step.targetSelector!);
+                if (element) {
+                    updateTargetPosition();
+                    clearInterval(checkElement);
+                }
+            }, 100);
+            
+            return () => clearInterval(checkElement);
+        }
+    }, [step, updateTargetPosition]);
+
+    const handleNext = () => {
+        if (isLastStep) {
+            onComplete();
+        } else {
+            setCurrentStep(prev => prev + 1);
+        }
+    };
+
+    const handlePrev = () => {
+        if (!isFirstStep) {
+            setCurrentStep(prev => prev - 1);
+        }
+    };
+
+    const handleSkip = () => {
+        onSkip();
+    };
+
+    // Calculate tooltip position
+    const getTooltipStyle = (): React.CSSProperties => {
+        if (!targetRect || step.position === 'center') {
+            return {
+                position: 'fixed',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+            };
+        }
+
+        const padding = 16;
+        const tooltipWidth = step.media ? 420 : 360;
+        const tooltipHeight = step.media ? 380 : 200; // Larger when media present
+
+        switch (step.position) {
+            case 'right':
+                return {
+                    position: 'fixed',
+                    top: Math.max(padding, Math.min(targetRect.top, window.innerHeight - tooltipHeight - padding)),
+                    left: Math.min(targetRect.right + padding, window.innerWidth - tooltipWidth - padding),
+                };
+            case 'left':
+                return {
+                    position: 'fixed',
+                    top: Math.max(padding, Math.min(targetRect.top, window.innerHeight - tooltipHeight - padding)),
+                    left: Math.max(padding, targetRect.left - tooltipWidth - padding),
+                };
+            case 'bottom':
+                return {
+                    position: 'fixed',
+                    top: Math.min(targetRect.bottom + padding, window.innerHeight - tooltipHeight - padding),
+                    left: Math.max(padding, Math.min(targetRect.left, window.innerWidth - tooltipWidth - padding)),
+                };
+            case 'top':
+                return {
+                    position: 'fixed',
+                    top: Math.max(padding, targetRect.top - tooltipHeight - padding),
+                    left: Math.max(padding, Math.min(targetRect.left, window.innerWidth - tooltipWidth - padding)),
+                };
+            default:
+                return {
+                    position: 'fixed',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                };
+        }
+    };
+
+    // Get spotlight clip path
+    const getSpotlightClipPath = (): string => {
+        if (!targetRect) return '';
+        
+        const padding = 8;
+        const x = targetRect.left - padding;
+        const y = targetRect.top - padding;
+        const width = targetRect.width + padding * 2;
+        const height = targetRect.height + padding * 2;
+        const radius = 12;
+
+        // Create a rounded rectangle cutout
+        return `
+            polygon(
+                0% 0%, 
+                0% 100%, 
+                ${x}px 100%, 
+                ${x}px ${y + radius}px,
+                ${x + radius}px ${y}px,
+                ${x + width - radius}px ${y}px,
+                ${x + width}px ${y + radius}px,
+                ${x + width}px ${y + height - radius}px,
+                ${x + width - radius}px ${y + height}px,
+                ${x + radius}px ${y + height}px,
+                ${x}px ${y + height - radius}px,
+                ${x}px 100%,
+                100% 100%, 
+                100% 0%
+            )
+        `;
+    };
+
+    // Handle click on highlighted element
+    const handleHighlightClick = useCallback(() => {
+        if (step.action === 'click') {
+            // Click the actual element
+            const element = document.querySelector(step.targetSelector!) as HTMLElement;
+            if (element) {
+                element.click();
+            }
+            // Advance to next step after a short delay
+            setTimeout(() => {
+                handleNext();
+            }, 100);
+        } else {
+            // For non-click steps, just advance
+            handleNext();
+        }
+    }, [step, handleNext]);
+
+    return (
+        <div className="fixed inset-0 z-[9999] pointer-events-none">
+            {/* Overlay with spotlight cutout - blocks clicks outside spotlight */}
+            <div 
+                className="absolute inset-0 bg-slate-950/80 transition-all duration-300 pointer-events-auto"
+                style={targetRect ? { clipPath: getSpotlightClipPath() } : {}}
+            />
+
+            {/* Clickable area over highlighted element */}
+            {targetRect && (
+                <div
+                    onClick={handleHighlightClick}
+                    className="absolute cursor-pointer transition-all duration-300 pointer-events-auto"
+                    style={{
+                        left: targetRect.left - 8,
+                        top: targetRect.top - 8,
+                        width: targetRect.width + 16,
+                        height: targetRect.height + 16,
+                        zIndex: 10000,
+                    }}
+                />
+            )}
+
+            {/* Highlight border around target */}
+            {targetRect && (
+                <div
+                    className="absolute border-2 border-teal-400 rounded-xl pointer-events-none transition-all duration-300 animate-pulse"
+                    style={{
+                        left: targetRect.left - 8,
+                        top: targetRect.top - 8,
+                        width: targetRect.width + 16,
+                        height: targetRect.height + 16,
+                        boxShadow: '0 0 0 4px rgba(20, 184, 166, 0.2), 0 0 20px rgba(20, 184, 166, 0.3)',
+                    }}
+                />
+            )}
+
+            {/* Tooltip */}
+            <div
+                className={`${step.media ? 'w-[420px]' : 'w-[360px]'} bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 pointer-events-auto`}
+                style={getTooltipStyle()}
+            >
+                {/* Progress bar */}
+                <div className="h-1 bg-slate-100">
+                    <div 
+                        className="h-full bg-gradient-to-r from-teal-500 to-blue-500 transition-all duration-500"
+                        style={{ width: `${progress}%` }}
+                    />
+                </div>
+
+                {/* Content */}
+                <div className="p-6">
+                    {/* Step indicator */}
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2 text-teal-600">
+                            <Sparkles size={16} />
+                            <span className="text-xs font-medium">
+                                Step {currentStep + 1} of {TUTORIAL_STEPS.length}
+                            </span>
+                        </div>
+                        <button
+                            onClick={handleSkip}
+                            className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-100 rounded transition-colors"
+                            title="Skip tutorial"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+
+                    {/* Title */}
+                    <h3 className="text-lg font-bold text-slate-800 mb-2">
+                        {step.title}
+                    </h3>
+
+                    {/* Description */}
+                    <p className="text-slate-600 text-sm leading-relaxed mb-4">
+                        {step.description}
+                    </p>
+
+                    {/* Media (video/gif/image) */}
+                    {step.media && (
+                        <div className="mb-4 rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+                            {step.media.type === 'video' ? (
+                                <video
+                                    src={step.media.src}
+                                    autoPlay
+                                    loop
+                                    muted
+                                    playsInline
+                                    className="w-full h-auto max-h-[180px] object-contain"
+                                >
+                                    Your browser does not support the video tag.
+                                </video>
+                            ) : (
+                                <img
+                                    src={step.media.src}
+                                    alt={step.media.alt || step.title}
+                                    className="w-full h-auto max-h-[180px] object-contain"
+                                />
+                            )}
+                        </div>
+                    )}
+
+                    {/* Action hint */}
+                    {targetRect && (
+                        <div className="flex items-center gap-2 text-xs text-teal-600 bg-teal-50 px-3 py-2 rounded-lg mb-4">
+                            {step.id === 'try-drag-drop' || step.id === 'node-palette' || step.id === 'workflow-canvas' ? (
+                                <>
+                                    <GripVertical size={14} />
+                                    <span>Drag & drop components to build your workflow</span>
+                                </>
+                            ) : (
+                                <>
+                                    <MousePointer size={14} />
+                                    <span>
+                                        {step.action === 'click' 
+                                            ? 'Click the highlighted element to navigate' 
+                                            : 'Click the highlighted area or Next to continue'}
+                                    </span>
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Navigation */}
+                    <div className="flex items-center justify-between">
+                        <button
+                            onClick={handlePrev}
+                            disabled={isFirstStep}
+                            className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                isFirstStep
+                                    ? 'text-slate-300 cursor-not-allowed'
+                                    : 'text-slate-600 hover:bg-slate-100'
+                            }`}
+                        >
+                            <ChevronLeft size={16} />
+                            Back
+                        </button>
+
+                        <div className="flex gap-1">
+                            {TUTORIAL_STEPS.map((_, index) => (
+                                <div
+                                    key={index}
+                                    className={`w-1.5 h-1.5 rounded-full transition-all ${
+                                        index === currentStep
+                                            ? 'w-4 bg-teal-500'
+                                            : index < currentStep
+                                                ? 'bg-teal-300'
+                                                : 'bg-slate-200'
+                                    }`}
+                                />
+                            ))}
+                        </div>
+
+                        <button
+                            onClick={handleNext}
+                            className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                isLastStep
+                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600'
+                                    : 'bg-slate-800 text-white hover:bg-slate-700'
+                            }`}
+                        >
+                            {isLastStep ? 'Finish' : 'Next'}
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Loading state during transitions */}
+            {isTransitioning && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+            )}
+        </div>
+    );
+}
+
