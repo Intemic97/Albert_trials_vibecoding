@@ -8,6 +8,7 @@ import { Overview } from './components/Overview';
 import { Workflows } from './components/Workflows';
 import { LoginPage } from './components/LoginPage';
 import { VerifyEmail } from './components/VerifyEmail';
+import { AcceptInvite } from './components/AcceptInvite';
 import { Settings } from './components/Settings';
 import { SharedDashboard } from './components/SharedDashboard';
 import { AdminPanel } from './components/AdminPanel';
@@ -777,6 +778,7 @@ function AuthenticatedApp() {
         return (
             <Routes>
                 <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/invite" element={<AcceptInvite />} />
                 <Route path="*" element={<LoginPage />} />
             </Routes>
         );

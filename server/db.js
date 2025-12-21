@@ -156,6 +156,19 @@ async function initDb() {
       FOREIGN KEY(userId) REFERENCES users(id),
       FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS pending_invitations (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      organizationId TEXT NOT NULL,
+      invitedBy TEXT,
+      invitedByName TEXT,
+      token TEXT UNIQUE NOT NULL,
+      status TEXT DEFAULT 'pending',
+      createdAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(invitedBy) REFERENCES users(id)
+    );
   `);
 
   // Migration: Add profilePhoto and companyRole columns to users table if they don't exist

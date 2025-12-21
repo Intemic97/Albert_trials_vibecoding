@@ -292,6 +292,7 @@ async function getOrganizationUsers(req, res) {
 async function inviteUser(req, res) {
     const { email } = req.body;
     const orgId = req.user.orgId;
+    const inviterId = req.user.sub;
 
     if (!email) {
         return res.status(400).json({ error: 'Email is required' });
@@ -300,32 +301,108 @@ async function inviteUser(req, res) {
     const db = await openDb();
 
     try {
-        // Check if user exists
-        const user = await db.get('SELECT id FROM users WHERE email = ?', [email]);
+        // Get inviter info and organization name
+        const inviter = await db.get('SELECT name FROM users WHERE id = ?', [inviterId]);
+        const org = await db.get('SELECT name FROM organizations WHERE id = ?', [orgId]);
 
-        if (user) {
+        // Check if user already exists
+        const existingUser = await db.get('SELECT id FROM users WHERE email = ?', [email]);
+
+        if (existingUser) {
             // Check if already in org
             const existingMember = await db.get(
                 'SELECT * FROM user_organizations WHERE userId = ? AND organizationId = ?',
-                [user.id, orgId]
+                [existingUser.id, orgId]
             );
 
             if (existingMember) {
                 return res.status(400).json({ error: 'User is already a member of this organization' });
             }
 
-            // Add to org
+            // Add existing user to org directly
             await db.run(
                 'INSERT INTO user_organizations (userId, organizationId, role) VALUES (?, ?, ?)',
-                [user.id, orgId, 'member']
+                [existingUser.id, orgId, 'member']
             );
 
-            res.json({ message: 'User added to organization', added: true });
-        } else {
-            // Mock invite for non-existing user
-            // In a real app, this would send an email and create a pending invite record
-            res.json({ message: 'Invitation email sent', added: false });
+            return res.json({ message: 'User added to organization', added: true });
         }
+
+        // Check if there's already a pending invitation for this email to this org
+        const existingInvite = await db.get(
+            'SELECT id FROM pending_invitations WHERE email = ? AND organizationId = ? AND status = ?',
+            [email, orgId, 'pending']
+        );
+
+        if (existingInvite) {
+            return res.status(400).json({ error: 'An invitation has already been sent to this email' });
+        }
+
+        // Create invitation token
+        const inviteToken = crypto.randomBytes(32).toString('hex');
+        const inviteId = Math.random().toString(36).substr(2, 9);
+        const now = new Date().toISOString();
+
+        // Save invitation to database
+        await db.run(
+            'INSERT INTO pending_invitations (id, email, organizationId, invitedBy, invitedByName, token, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [inviteId, email, orgId, inviterId, inviter?.name || 'A team member', inviteToken, 'pending', now]
+        );
+
+        // Send invitation email
+        const inviteUrl = `${APP_URL}/invite?token=${inviteToken}`;
+        
+        try {
+            await resend.emails.send({
+                from: 'Intemic <noreply@notifications.intemic.com>',
+                to: email,
+                subject: `You've been invited to join ${org?.name || 'a team'} on Intemic`,
+                html: `
+                    <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+                        <div style="text-align: center; margin-bottom: 40px;">
+                            <h1 style="color: #1F5F68; margin: 0;">You're Invited!</h1>
+                        </div>
+                        
+                        <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                            Hi there,
+                        </p>
+                        
+                        <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                            <strong>${inviter?.name || 'A team member'}</strong> has invited you to join 
+                            <strong>${org?.name || 'their organization'}</strong> on Intemic.
+                        </p>
+                        
+                        <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                            Click the button below to create your account and join the team:
+                        </p>
+                        
+                        <div style="text-align: center; margin: 40px 0;">
+                            <a href="${inviteUrl}" 
+                               style="background-color: #1F5F68; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
+                                Accept Invitation
+                            </a>
+                        </div>
+                        
+                        <p style="color: #6B7280; font-size: 14px; line-height: 1.6;">
+                            Or copy and paste this link in your browser:<br>
+                            <a href="${inviteUrl}" style="color: #1F5F68; word-break: break-all;">${inviteUrl}</a>
+                        </p>
+                        
+                        <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 40px 0;">
+                        
+                        <p style="color: #9CA3AF; font-size: 12px; text-align: center;">
+                            If you didn't expect this invitation, you can safely ignore this email.
+                        </p>
+                    </div>
+                `
+            });
+            console.log(`[Auth] Invitation email sent to ${email} for org ${org?.name}`);
+        } catch (emailError) {
+            console.error('[Auth] Failed to send invitation email:', emailError);
+            // Don't fail the invitation if email fails
+        }
+
+        res.json({ message: 'Invitation email sent', added: false });
 
     } catch (error) {
         console.error('InviteUser error:', error);
@@ -523,4 +600,122 @@ async function resendVerification(req, res) {
     }
 }
 
-module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding, verifyEmail, resendVerification };
+// Validate invitation token and return invitation details
+async function validateInvitation(req, res) {
+    const { token } = req.query;
+
+    if (!token) {
+        return res.status(400).json({ error: 'Invitation token is required' });
+    }
+
+    const db = await openDb();
+
+    try {
+        const invitation = await db.get(`
+            SELECT pi.*, o.name as organizationName 
+            FROM pending_invitations pi
+            JOIN organizations o ON pi.organizationId = o.id
+            WHERE pi.token = ? AND pi.status = 'pending'
+        `, [token]);
+
+        if (!invitation) {
+            return res.status(400).json({ error: 'Invalid or expired invitation' });
+        }
+
+        res.json({
+            email: invitation.email,
+            organizationName: invitation.organizationName,
+            invitedByName: invitation.invitedByName
+        });
+
+    } catch (error) {
+        console.error('ValidateInvitation error:', error);
+        res.status(500).json({ error: 'Failed to validate invitation' });
+    }
+}
+
+// Register with invitation token
+async function registerWithInvitation(req, res) {
+    const { email, password, name, token } = req.body;
+
+    if (!email || !password || !name || !token) {
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    const db = await openDb();
+
+    try {
+        // Validate invitation
+        const invitation = await db.get(
+            'SELECT * FROM pending_invitations WHERE token = ? AND status = ? AND email = ?',
+            [token, 'pending', email]
+        );
+
+        if (!invitation) {
+            return res.status(400).json({ error: 'Invalid invitation or email mismatch' });
+        }
+
+        // Check if user already exists
+        const existingUser = await db.get('SELECT id FROM users WHERE email = ?', [email]);
+        if (existingUser) {
+            return res.status(400).json({ error: 'User already exists. Please login instead.' });
+        }
+
+        const userId = Math.random().toString(36).substr(2, 9);
+        const now = new Date().toISOString();
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+        // Transaction
+        await db.run('BEGIN TRANSACTION');
+
+        // Create User (already verified since they came via invitation)
+        await db.run(
+            'INSERT INTO users (id, email, password, name, createdAt, emailVerified) VALUES (?, ?, ?, ?, ?, 1)',
+            [userId, email, hashedPassword, name, now]
+        );
+
+        // Link User to Organization from invitation
+        await db.run(
+            'INSERT INTO user_organizations (userId, organizationId, role) VALUES (?, ?, ?)',
+            [userId, invitation.organizationId, 'member']
+        );
+
+        // Mark invitation as accepted
+        await db.run(
+            'UPDATE pending_invitations SET status = ? WHERE id = ?',
+            ['accepted', invitation.id]
+        );
+
+        await db.run('COMMIT');
+
+        // Auto-login
+        const token_jwt = jwt.sign(
+            { sub: userId, email, orgId: invitation.organizationId }, 
+            JWT_SECRET, 
+            { expiresIn: '24h' }
+        );
+
+        res.cookie('auth_token', token_jwt, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 24 * 60 * 60 * 1000
+        });
+
+        console.log(`[Auth] User ${email} registered via invitation and joined org ${invitation.organizationId}`);
+
+        res.status(201).json({ 
+            message: 'Registration successful!', 
+            user: { id: userId, name, email, orgId: invitation.organizationId }
+        });
+
+    } catch (error) {
+        await db.run('ROLLBACK');
+        console.error('RegisterWithInvitation error:', error);
+        res.status(500).json({ error: 'Registration failed' });
+    }
+}
+
+module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding, verifyEmail, resendVerification, validateInvitation, registerWithInvitation };

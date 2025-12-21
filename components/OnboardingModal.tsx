@@ -89,14 +89,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-300">
                 {/* Header */}
-                <div className="bg-gradient-to-br from-teal-500 to-teal-600 px-6 py-8 text-white">
+                <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-8 text-white rounded-t-2xl">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="p-2 bg-white/20 rounded-lg backdrop-blur">
                             <Sparkles size={24} />
                         </div>
                         <div>
                             <h1 className="text-xl font-bold">Welcome to Intemic!</h1>
-                            <p className="text-teal-100 text-sm">Hi {user?.name}, let's get to know you</p>
+                            <p className="text-slate-300 text-sm">Hi {user?.name}, let's get to know you</p>
                         </div>
                     </div>
                     
@@ -161,7 +161,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                     <button
                         onClick={handleNext}
                         disabled={!canProceed || isSubmitting}
-                        className={`flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-xl font-medium hover:from-teal-600 hover:to-teal-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-teal-500/25`}
+                        className={`flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-xl font-medium hover:from-slate-600 hover:to-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-slate-500/25`}
                     >
                         {isSubmitting ? (
                             <>
