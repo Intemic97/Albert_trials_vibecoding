@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { User, Building2, Mail, Lock, ArrowRight, Loader2, CheckCircle, RefreshCw } from 'lucide-react';
 import { API_BASE } from '../config';
@@ -234,7 +235,17 @@ export function LoginPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300">Password</label>
+                            <div className="flex items-center justify-between">
+                                <label className="text-sm font-medium text-slate-300">Password</label>
+                                {isLogin && (
+                                    <Link 
+                                        to="/forgot-password" 
+                                        className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                                    >
+                                        Forgot password?
+                                    </Link>
+                                )}
+                            </div>
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                                 <input

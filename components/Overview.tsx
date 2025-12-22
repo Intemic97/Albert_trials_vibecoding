@@ -52,6 +52,7 @@ interface PendingApproval {
 
 interface OverviewProps {
     entities: Entity[];
+    entitiesLoading?: boolean;
     onViewChange?: (view: string) => void;
 }
 
@@ -109,7 +110,7 @@ const DEFAULT_KPIS: KPIConfig[] = [
     }
 ];
 
-export const Overview: React.FC<OverviewProps> = ({ entities, onViewChange }) => {
+export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = false, onViewChange }) => {
     const [kpis, setKpis] = useState<KPIConfig[]>([]);
     const [kpiValues, setKpiValues] = useState<Record<string, number | null>>({});
     const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
@@ -364,6 +365,31 @@ export const Overview: React.FC<OverviewProps> = ({ entities, onViewChange }) =>
             default: return op;
         }
     };
+
+    // Show loading state when entities are being fetched
+    if (entitiesLoading) {
+        return (
+            <div className="flex flex-col h-full bg-slate-50">
+                {/* Header */}
+                <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-20 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <LayoutDashboard className="text-teal-600" size={24} />
+                        <h1 className="text-xl font-bold text-slate-800">Overview</h1>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                        <ProfileMenu onNavigate={onViewChange} />
+                    </div>
+                </header>
+                {/* Loading state */}
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                        <div className="w-12 h-12 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin mx-auto mb-4"></div>
+                        <p className="text-slate-500">Loading your data...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col h-full bg-slate-50" data-tutorial="overview-content">

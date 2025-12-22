@@ -9,6 +9,8 @@ import { Workflows } from './components/Workflows';
 import { LoginPage } from './components/LoginPage';
 import { VerifyEmail } from './components/VerifyEmail';
 import { AcceptInvite } from './components/AcceptInvite';
+import { ForgotPassword } from './components/ForgotPassword';
+import { ResetPassword } from './components/ResetPassword';
 import { InteractiveTutorial } from './components/InteractiveTutorial';
 import { Settings } from './components/Settings';
 import { SharedDashboard } from './components/SharedDashboard';
@@ -45,6 +47,7 @@ function AuthenticatedApp() {
     const navigate = useNavigate();
     const location = useLocation();
     const [entities, setEntities] = useState<Entity[]>([]);
+    const [entitiesLoading, setEntitiesLoading] = useState(true);
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
     const previousUserIdRef = React.useRef<string | undefined>(undefined);
     
@@ -200,6 +203,7 @@ function AuthenticatedApp() {
     }, [activeEntityId, activeTab]);
 
     const fetchEntities = async () => {
+        setEntitiesLoading(true);
         try {
             const res = await fetch(`${API_BASE}/entities`, { credentials: 'include' });
             const data = await res.json();
@@ -213,6 +217,8 @@ function AuthenticatedApp() {
         } catch (error) {
             console.error('Error fetching entities:', error);
             setEntities([]);
+        } finally {
+            setEntitiesLoading(false);
         }
     };
 
@@ -778,11 +784,25 @@ function AuthenticatedApp() {
         return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Loading...</div>;
     }
 
-    if (!isAuthenticated) {
+    // These routes should be accessible regardless of authentication status
+    const currentPath = location.pathname;
+    const publicPaths = ['/verify-email', '/invite', '/forgot-password', '/reset-password'];
+    const isPublicPath = publicPaths.some(path => currentPath.startsWith(path));
+
+    if (isPublicPath) {
         return (
             <Routes>
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/invite" element={<AcceptInvite />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+            </Routes>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return (
+            <Routes>
                 <Route path="*" element={<LoginPage />} />
             </Routes>
         );
@@ -829,6 +849,7 @@ function AuthenticatedApp() {
                     <Route path="/overview" element={
                         <Overview
                             entities={entities}
+                            entitiesLoading={entitiesLoading}
                             onViewChange={handleNavigate}
                         />
                     } />

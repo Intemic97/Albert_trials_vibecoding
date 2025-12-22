@@ -718,4 +718,168 @@ async function registerWithInvitation(req, res) {
     }
 }
 
-module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding, verifyEmail, resendVerification, validateInvitation, registerWithInvitation };
+// Request password reset - sends email with reset link
+async function forgotPassword(req, res) {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const db = await openDb();
+
+    try {
+        // Find user by email
+        const user = await db.get('SELECT id, name, emailVerified FROM users WHERE email = ?', [email]);
+
+        // Always return success to prevent email enumeration attacks
+        if (!user) {
+            console.log(`[Auth] Password reset requested for non-existent email: ${email}`);
+            return res.json({ message: 'If an account exists with this email, you will receive a password reset link.' });
+        }
+
+        // Generate reset token
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour from now
+
+        // Save token to database
+        await db.run(
+            'UPDATE users SET resetPasswordToken = ?, resetPasswordExpires = ? WHERE id = ?',
+            [resetToken, resetExpires, user.id]
+        );
+
+        // Send reset email
+        const resetUrl = `${APP_URL}/reset-password?token=${resetToken}`;
+
+        try {
+            await resend.emails.send({
+                from: 'Intemic <noreply@notifications.intemic.com>',
+                to: email,
+                subject: 'Reset your Intemic password',
+                html: `
+                    <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+                        <div style="text-align: center; margin-bottom: 40px;">
+                            <h1 style="color: #1F5F68; margin: 0;">Reset Your Password</h1>
+                        </div>
+                        
+                        <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                            Hi${user.name ? ` ${user.name}` : ''},
+                        </p>
+                        
+                        <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                            We received a request to reset the password for your Intemic account. 
+                            Click the button below to create a new password:
+                        </p>
+                        
+                        <div style="text-align: center; margin: 40px 0;">
+                            <a href="${resetUrl}" 
+                               style="background-color: #1F5F68; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
+                                Reset Password
+                            </a>
+                        </div>
+                        
+                        <p style="color: #6B7280; font-size: 14px; line-height: 1.6;">
+                            Or copy and paste this link in your browser:<br>
+                            <a href="${resetUrl}" style="color: #1F5F68; word-break: break-all;">${resetUrl}</a>
+                        </p>
+                        
+                        <p style="color: #6B7280; font-size: 14px; line-height: 1.6;">
+                            This link will expire in <strong>1 hour</strong>.
+                        </p>
+                        
+                        <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 40px 0;">
+                        
+                        <p style="color: #9CA3AF; font-size: 12px; text-align: center;">
+                            If you didn't request a password reset, you can safely ignore this email. 
+                            Your password will remain unchanged.
+                        </p>
+                    </div>
+                `
+            });
+            console.log(`[Auth] Password reset email sent to ${email}`);
+        } catch (emailError) {
+            console.error('[Auth] Failed to send password reset email:', emailError);
+            return res.status(500).json({ error: 'Failed to send reset email. Please try again.' });
+        }
+
+        res.json({ message: 'If an account exists with this email, you will receive a password reset link.' });
+
+    } catch (error) {
+        console.error('ForgotPassword error:', error);
+        res.status(500).json({ error: 'An error occurred. Please try again.' });
+    }
+}
+
+// Validate reset token
+async function validateResetToken(req, res) {
+    const { token } = req.query;
+
+    if (!token) {
+        return res.status(400).json({ error: 'Reset token is required' });
+    }
+
+    const db = await openDb();
+
+    try {
+        const user = await db.get(
+            'SELECT id, email FROM users WHERE resetPasswordToken = ? AND resetPasswordExpires > ?',
+            [token, new Date().toISOString()]
+        );
+
+        if (!user) {
+            return res.status(400).json({ error: 'Invalid or expired reset token' });
+        }
+
+        res.json({ valid: true, email: user.email });
+
+    } catch (error) {
+        console.error('ValidateResetToken error:', error);
+        res.status(500).json({ error: 'Failed to validate reset token' });
+    }
+}
+
+// Reset password with token
+async function resetPassword(req, res) {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+        return res.status(400).json({ error: 'Token and password are required' });
+    }
+
+    if (password.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    const db = await openDb();
+
+    try {
+        // Find user with valid token
+        const user = await db.get(
+            'SELECT id, email FROM users WHERE resetPasswordToken = ? AND resetPasswordExpires > ?',
+            [token, new Date().toISOString()]
+        );
+
+        if (!user) {
+            return res.status(400).json({ error: 'Invalid or expired reset token' });
+        }
+
+        // Hash new password
+        const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+        // Update password and clear reset token
+        await db.run(
+            'UPDATE users SET password = ?, resetPasswordToken = NULL, resetPasswordExpires = NULL WHERE id = ?',
+            [hashedPassword, user.id]
+        );
+
+        console.log(`[Auth] Password reset successful for ${user.email}`);
+
+        res.json({ message: 'Password has been reset successfully. You can now log in with your new password.' });
+
+    } catch (error) {
+        console.error('ResetPassword error:', error);
+        res.status(500).json({ error: 'Failed to reset password' });
+    }
+}
+
+module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding, verifyEmail, resendVerification, validateInvitation, registerWithInvitation, forgotPassword, validateResetToken, resetPassword };

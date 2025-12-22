@@ -10,7 +10,7 @@ const { WebSocketServer } = require('ws');
 const { initDb, openDb } = require('./db');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const cookieParser = require('cookie-parser');
-const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding, verifyEmail, resendVerification, validateInvitation, registerWithInvitation } = require('./auth');
+const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding, verifyEmail, resendVerification, validateInvitation, registerWithInvitation, forgotPassword, validateResetToken, resetPassword } = require('./auth');
 
 const app = express();
 const server = http.createServer(app);
@@ -505,6 +505,9 @@ app.get('/api/auth/verify-email', verifyEmail);
 app.post('/api/auth/resend-verification', resendVerification);
 app.get('/api/auth/validate-invitation', validateInvitation);
 app.post('/api/auth/register-with-invitation', registerWithInvitation);
+app.post('/api/auth/forgot-password', forgotPassword);
+app.get('/api/auth/validate-reset-token', validateResetToken);
+app.post('/api/auth/reset-password', resetPassword);
 app.get('/api/auth/me', authenticateToken, getMe);
 app.get('/api/auth/organizations', authenticateToken, getOrganizations);
 app.post('/api/auth/switch-org', authenticateToken, switchOrganization);

@@ -253,6 +253,18 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  // Migration: Add password reset columns
+  try {
+    await db.exec(`ALTER TABLE users ADD COLUMN resetPasswordToken TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE users ADD COLUMN resetPasswordExpires TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   return db;
 }
 
