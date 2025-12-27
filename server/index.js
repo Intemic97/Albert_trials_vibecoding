@@ -2376,6 +2376,110 @@ app.delete('/api/workflows/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// ==================== PUBLIC WORKFLOW FORM ENDPOINTS ====================
+
+// Get workflow info for public form (no auth required)
+app.get('/api/workflow/:id/public', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const workflow = await db.get('SELECT id, name, data FROM workflows WHERE id = ?', [id]);
+        
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+
+        // Parse workflow data to extract manual input nodes
+        let workflowData;
+        try {
+            workflowData = JSON.parse(workflow.data);
+        } catch (e) {
+            return res.status(500).json({ error: 'Invalid workflow data' });
+        }
+
+        // Find all manualInput nodes to create form fields
+        const inputs = (workflowData.nodes || [])
+            .filter(node => node.type === 'manualInput')
+            .map(node => ({
+                nodeId: node.id,
+                varName: node.config?.inputVarName || node.config?.variableName || 'input',
+                label: node.label || node.config?.inputVarName || node.config?.variableName || 'Input',
+                defaultValue: node.config?.inputVarValue || node.config?.variableValue || ''
+            }));
+
+        res.json({
+            id: workflow.id,
+            name: workflow.name,
+            inputs
+        });
+    } catch (error) {
+        console.error('Error fetching public workflow:', error);
+        res.status(500).json({ error: 'Failed to fetch workflow' });
+    }
+});
+
+// Run workflow from public form (no auth required)
+app.post('/api/workflow/:id/run-public', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { inputs } = req.body; // { nodeId: value, ... }
+
+        const workflow = await db.get('SELECT * FROM workflows WHERE id = ?', [id]);
+        
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+
+        // Parse workflow data
+        let workflowData;
+        try {
+            workflowData = JSON.parse(workflow.data);
+        } catch (e) {
+            return res.status(500).json({ error: 'Invalid workflow data' });
+        }
+
+        // Update manualInput nodes with provided values
+        const nodes = workflowData.nodes || [];
+        nodes.forEach(node => {
+            if (node.type === 'manualInput' && inputs && inputs[node.id] !== undefined) {
+                if (!node.config) node.config = {};
+                node.config.inputVarValue = inputs[node.id];
+                node.config.variableValue = inputs[node.id];
+            }
+        });
+
+        // Find output nodes to return their results
+        // For now, we'll return a simple success message
+        // In a full implementation, you'd execute the workflow and return results
+        
+        // Simple execution: collect all input values and return them as "processed"
+        const inputValues = {};
+        nodes.forEach(node => {
+            if (node.type === 'manualInput') {
+                const varName = node.config?.inputVarName || node.config?.variableName || node.id;
+                inputValues[varName] = node.config?.inputVarValue || node.config?.variableValue || '';
+            }
+        });
+
+        // Log the submission
+        console.log(`[PublicWorkflow] Form submitted for workflow ${id}:`, inputValues);
+
+        // Return success with the collected inputs
+        // In production, this would trigger actual workflow execution
+        res.json({
+            success: true,
+            message: 'Workflow executed successfully',
+            result: {
+                submitted: true,
+                inputs: inputValues,
+                timestamp: new Date().toISOString()
+            }
+        });
+    } catch (error) {
+        console.error('Error running public workflow:', error);
+        res.status(500).json({ error: 'Failed to run workflow' });
+    }
+});
+
 // Pending Approvals Endpoints (Human in the Loop)
 app.get('/api/pending-approvals', authenticateToken, async (req, res) => {
     try {

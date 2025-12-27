@@ -661,7 +661,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // Generate shareable URL and embed code
     const getShareableUrl = () => {
         const baseUrl = window.location.origin;
-        return `${baseUrl}/workflow/${currentWorkflowId || 'draft'}`;
+        return `${baseUrl}/form/${currentWorkflowId || 'draft'}`;
     };
 
     const getEmbedCode = () => {

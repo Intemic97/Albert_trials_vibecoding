@@ -6,6 +6,7 @@ import { Reporting } from './components/Reporting';
 import { Dashboard } from './components/Dashboard';
 import { Overview } from './components/Overview';
 import { Workflows } from './components/Workflows';
+import { PublicWorkflowForm } from './components/PublicWorkflowForm';
 import { LoginPage } from './components/LoginPage';
 import { VerifyEmail } from './components/VerifyEmail';
 import { AcceptInvite } from './components/AcceptInvite';
@@ -795,6 +796,7 @@ function AuthenticatedApp() {
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/invite" element={<AcceptInvite />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/form/:workflowId" element={<PublicWorkflowForm />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
             </Routes>
         );
