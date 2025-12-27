@@ -2377,7 +2377,124 @@ app.delete('/api/workflows/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// ==================== WEBHOOK ENDPOINTS ====================
+
+// Receive webhook and trigger workflow execution
+app.post('/api/webhook/:workflowId', async (req, res) => {
+    try {
+        const { workflowId } = req.params;
+        const webhookData = req.body;
+
+        console.log(`[Webhook] Received for workflow ${workflowId}:`, JSON.stringify(webhookData));
+
+        // Verify workflow exists
+        const workflow = await db.get('SELECT * FROM workflows WHERE id = ?', [workflowId]);
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+
+        // Execute workflow with webhook data as input
+        const executor = new WorkflowExecutor(db);
+        const result = await executor.executeWorkflow(workflowId, { _webhookData: webhookData });
+
+        res.json({
+            success: true,
+            executionId: result.executionId,
+            status: result.status,
+            results: result.results,  // Include workflow results
+            message: 'Webhook processed successfully'
+        });
+    } catch (error) {
+        console.error('[Webhook] Error:', error);
+        res.status(500).json({ error: error.message || 'Webhook processing failed' });
+    }
+});
+
+// Webhook with custom token for security
+app.post('/api/webhook/:workflowId/:token', async (req, res) => {
+    try {
+        const { workflowId, token } = req.params;
+        const webhookData = req.body;
+
+        console.log(`[Webhook] Received for workflow ${workflowId} with token`);
+
+        // Verify workflow exists and token matches
+        const workflow = await db.get('SELECT * FROM workflows WHERE id = ?', [workflowId]);
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+
+        // Parse workflow data to check webhook token
+        const workflowData = JSON.parse(workflow.data);
+        const webhookNode = (workflowData.nodes || []).find(n => n.type === 'webhook');
+        
+        if (webhookNode?.config?.webhookToken && webhookNode.config.webhookToken !== token) {
+            return res.status(401).json({ error: 'Invalid webhook token' });
+        }
+
+        // Execute workflow with webhook data
+        const executor = new WorkflowExecutor(db);
+        const result = await executor.executeWorkflow(workflowId, { _webhookData: webhookData });
+
+        res.json({
+            success: true,
+            executionId: result.executionId,
+            status: result.status,
+            message: 'Webhook processed successfully'
+        });
+    } catch (error) {
+        console.error('[Webhook] Error:', error);
+        res.status(500).json({ error: error.message || 'Webhook processing failed' });
+    }
+});
+
+// Get webhook URL for a workflow
+app.get('/api/workflow/:id/webhook-url', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const baseUrl = process.env.API_URL || process.env.FRONTEND_URL?.replace(/:\d+/, ':3001') || 'http://localhost:3001';
+        
+        // Generate a simple token based on workflow id
+        const crypto = require('crypto');
+        const token = crypto.createHash('md5').update(id + 'webhook-secret').digest('hex').substring(0, 12);
+
+        res.json({
+            webhookUrl: `${baseUrl}/api/webhook/${id}`,
+            webhookUrlWithToken: `${baseUrl}/api/webhook/${id}/${token}`,
+            token
+        });
+    } catch (error) {
+        console.error('Error generating webhook URL:', error);
+        res.status(500).json({ error: 'Failed to generate webhook URL' });
+    }
+});
+
 // ==================== PUBLIC WORKFLOW FORM ENDPOINTS ====================
+
+// Debug endpoint to see workflow data
+app.get('/api/workflow/:id/debug', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const workflow = await db.get('SELECT * FROM workflows WHERE id = ?', [id]);
+        
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+
+        const data = JSON.parse(workflow.data || '{}');
+        res.json({
+            id: workflow.id,
+            name: workflow.name,
+            nodeCount: data.nodes?.length || 0,
+            connectionCount: data.connections?.length || 0,
+            nodes: data.nodes?.map(n => ({ id: n.id, type: n.type, label: n.label })) || [],
+            connections: data.connections || []
+        });
+    } catch (error) {
+        console.error('Debug error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // Get workflow info for public form (no auth required)
 app.get('/api/workflow/:id/public', async (req, res) => {
@@ -2537,21 +2654,29 @@ app.get('/api/workflow/execution/:execId/logs', authenticateToken, async (req, r
     }
 });
 
-// Get execution history for a workflow
-app.get('/api/workflow/:id/executions', authenticateToken, async (req, res) => {
+// Get execution history for a workflow (public - for webhook debugging)
+app.get('/api/workflow/:id/executions', async (req, res) => {
     try {
         const { id } = req.params;
         const limit = parseInt(req.query.limit) || 20;
         
         const executions = await db.all(`
-            SELECT id, status, triggerType, createdAt, startedAt, completedAt, error
+            SELECT id, status, triggerType, inputs, nodeResults, finalOutput, createdAt, startedAt, completedAt, error
             FROM workflow_executions 
             WHERE workflowId = ?
             ORDER BY createdAt DESC
             LIMIT ?
         `, [id, limit]);
 
-        res.json(executions);
+        // Parse JSON fields
+        const parsed = executions.map(e => ({
+            ...e,
+            inputs: e.inputs ? JSON.parse(e.inputs) : null,
+            nodeResults: e.nodeResults ? JSON.parse(e.nodeResults) : null,
+            finalOutput: e.finalOutput ? JSON.parse(e.finalOutput) : null
+        }));
+
+        res.json(parsed);
     } catch (error) {
         console.error('Error fetching executions:', error);
         res.status(500).json({ error: 'Failed to fetch executions' });

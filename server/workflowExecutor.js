@@ -50,14 +50,40 @@ class WorkflowExecutor {
             // Update status to running
             await this.updateExecutionStatus('running', { startedAt: now });
 
-            // Find trigger node and start execution
+            // Find starting node(s) - trigger, webhook, or nodes with no incoming connections
             const triggerNode = this.nodes.find(n => n.type === 'trigger');
-            if (!triggerNode) {
-                throw new Error('No trigger node found in workflow');
-            }
+            const webhookNode = this.nodes.find(n => n.type === 'webhook');
+            
+            if (triggerNode) {
+                // Start from trigger
+                await this.executeNode(triggerNode.id, null, true);
+            } else if (webhookNode) {
+                // Start from webhook - pass webhook data as input
+                const webhookInput = inputs._webhookData || {};
+                await this.executeNode(webhookNode.id, webhookInput, true);
+            } else {
+                // No trigger or webhook - find root nodes (nodes with no incoming connections)
+                const nodesWithIncoming = new Set(this.connections.map(c => c.toNodeId));
+                const rootNodes = this.nodes.filter(n => 
+                    !nodesWithIncoming.has(n.id) && n.type !== 'comment'
+                );
 
-            // Execute from trigger
-            await this.executeNode(triggerNode.id, null, true);
+                if (rootNodes.length === 0) {
+                    // Fallback: start with manualInput nodes
+                    const inputNodes = this.nodes.filter(n => n.type === 'manualInput');
+                    if (inputNodes.length === 0) {
+                        throw new Error('No starting nodes found in workflow');
+                    }
+                    for (const node of inputNodes) {
+                        await this.executeNode(node.id, null, true);
+                    }
+                } else {
+                    // Execute all root nodes
+                    for (const node of rootNodes) {
+                        await this.executeNode(node.id, null, true);
+                    }
+                }
+            }
 
             // Mark as completed
             await this.updateExecutionStatus('completed', {
@@ -197,6 +223,7 @@ class WorkflowExecutor {
             splitColumns: () => this.handleSplitColumns(node, inputData),
             comment: () => this.handleComment(node, inputData),
             humanApproval: () => this.handleHumanApproval(node, inputData),
+            webhook: () => this.handleWebhook(node, inputData),
         };
 
         const handler = handlers[node.type];
@@ -617,11 +644,31 @@ class WorkflowExecutor {
         };
     }
 
+    async handleWebhook(node, inputData) {
+        // Webhook node receives external data
+        // inputData comes directly from the webhook POST body
+        const webhookData = inputData || node.config?.webhookData || this.webhookData || {};
+        
+        console.log('[Webhook] Processing data:', JSON.stringify(webhookData));
+        
+        return {
+            success: true,
+            message: `Webhook received ${Object.keys(webhookData).length} fields`,
+            outputData: webhookData,
+            data: webhookData, // Also include as 'data' for compatibility
+            webhookId: node.config?.webhookId || node.id,
+            receivedAt: new Date().toISOString()
+        };
+    }
+
     // ==================== HELPER METHODS ====================
 
     applyInputs(inputs) {
         // Apply form inputs to manualInput nodes
         Object.entries(inputs).forEach(([nodeId, value]) => {
+            // Skip special keys
+            if (nodeId.startsWith('_')) return;
+            
             const node = this.nodes.find(n => n.id === nodeId);
             if (node && node.type === 'manualInput') {
                 if (!node.config) node.config = {};
@@ -629,11 +676,24 @@ class WorkflowExecutor {
                 node.config.variableValue = value;
             }
         });
+
+        // Apply webhook data to webhook nodes
+        if (inputs._webhookData) {
+            const webhookNodes = this.nodes.filter(n => n.type === 'webhook');
+            webhookNodes.forEach(node => {
+                if (!node.config) node.config = {};
+                node.config.webhookData = inputs._webhookData;
+            });
+            this.webhookData = inputs._webhookData;
+        }
     }
 
     getNextNodes(nodeId, result) {
         // Get connections from this node
         const outgoing = this.connections.filter(c => c.fromNodeId === nodeId);
+        
+        console.log(`[getNextNodes] Node ${nodeId} has ${outgoing.length} outgoing connections`);
+        console.log(`[getNextNodes] All connections:`, JSON.stringify(this.connections.map(c => ({from: c.fromNodeId, to: c.toNodeId}))));
         
         // For condition nodes, filter by conditionResult
         if (result?.conditionResult !== undefined) {
@@ -648,9 +708,13 @@ class WorkflowExecutor {
                 .filter(Boolean);
         }
 
-        return outgoing
+        const nextNodes = outgoing
             .map(c => this.nodes.find(n => n.id === c.toNodeId))
             .filter(Boolean);
+        
+        console.log(`[getNextNodes] Next nodes to execute:`, nextNodes.map(n => ({id: n.id, type: n.type, label: n.label})));
+        
+        return nextNodes;
     }
 
     evaluateCondition(actual, operator, expected) {

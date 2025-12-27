@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import { API_BASE } from '../config';
@@ -22,7 +22,7 @@ const generateUUID = (): string => {
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'splitColumns' | 'mysql' | 'sendEmail';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'webhook';
     label: string;
     x: number;
     y: number;
@@ -111,7 +111,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'splitColumns' | 'mysql' | 'sendEmail';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'webhook';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -121,6 +121,7 @@ interface DraggableItem {
 const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'trigger', label: 'Manual Trigger', icon: Play, description: 'Manually start the workflow', category: 'Triggers' },
     { type: 'trigger', label: 'Schedule', icon: Workflow, description: 'Run on a specific schedule', category: 'Triggers' },
+    { type: 'webhook', label: 'Webhook', icon: Globe, description: 'Receive data from external services', category: 'Triggers' },
     { type: 'fetchData', label: 'Fetch Data', icon: Database, description: 'Get records from an entity', category: 'Data' },
     { type: 'excelInput', label: 'Excel/CSV Input', icon: FileSpreadsheet, description: 'Load data from Excel or CSV', category: 'Data' },
     { type: 'saveRecords', label: 'Save to Database', icon: Database, description: 'Create or update records', category: 'Data' },
@@ -566,6 +567,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [configuringHttpNodeId, setConfiguringHttpNodeId] = useState<string | null>(null);
     const [httpUrl, setHttpUrl] = useState<string>('');
 
+    // Webhook Node State
+    const [configuringWebhookNodeId, setConfiguringWebhookNodeId] = useState<string | null>(null);
+    const [webhookUrl, setWebhookUrl] = useState<string>('');
+    const [webhookToken, setWebhookToken] = useState<string>('');
+
     // MySQL Node State
     const [configuringMySQLNodeId, setConfiguringMySQLNodeId] = useState<string | null>(null);
     const [mysqlHost, setMysqlHost] = useState<string>('localhost');
@@ -618,6 +624,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [runnerInputs, setRunnerInputs] = useState<{ [nodeId: string]: string }>({});
     const [runnerOutputs, setRunnerOutputs] = useState<{ [nodeId: string]: any }>({});
     const [isRunningWorkflow, setIsRunningWorkflow] = useState<boolean>(false);
+
+    // Execution History State
+    const [showExecutionHistory, setShowExecutionHistory] = useState<boolean>(false);
+    const [executionHistory, setExecutionHistory] = useState<any[]>([]);
+    const [loadingExecutions, setLoadingExecutions] = useState<boolean>(false);
+    const [selectedExecution, setSelectedExecution] = useState<any>(null);
 
     // Workflows List View State
     const [currentView, setCurrentView] = useState<'list' | 'canvas'>('list');
@@ -1460,6 +1472,35 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 : n
         ));
         setConfiguringHttpNodeId(null);
+    };
+
+    // Webhook Node Functions
+    const openWebhookConfig = async (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'webhook') {
+            setConfiguringWebhookNodeId(nodeId);
+            // Fetch webhook URL from backend
+            try {
+                const res = await fetch(`${API_BASE}/workflow/${currentWorkflowId}/webhook-url`, {
+                    credentials: 'include'
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setWebhookUrl(data.webhookUrl || '');
+                    setWebhookToken(data.token || '');
+                }
+            } catch (e) {
+                console.error('Failed to fetch webhook URL:', e);
+                // Fallback to local URL
+                setWebhookUrl(`${window.location.origin.replace(':5173', ':3001')}/api/webhook/${currentWorkflowId}`);
+            }
+        }
+    };
+
+    const closeWebhookConfig = () => {
+        setConfiguringWebhookNodeId(null);
+        setWebhookUrl('');
+        setWebhookToken('');
         setHttpUrl('');
     };
 
@@ -1806,6 +1847,45 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setRunnerInputs(initialInputs);
         setRunnerOutputs({});
         setShowRunnerModal(true);
+    };
+
+    // Execution History Functions
+    const loadExecutionHistory = async () => {
+        if (!currentWorkflowId) return;
+        
+        setLoadingExecutions(true);
+        try {
+            const res = await fetch(`${API_BASE}/workflow/${currentWorkflowId}/executions?limit=20`, {
+                credentials: 'include'
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setExecutionHistory(data);
+            }
+        } catch (error) {
+            console.error('Failed to load execution history:', error);
+        } finally {
+            setLoadingExecutions(false);
+        }
+    };
+
+    const openExecutionHistory = () => {
+        loadExecutionHistory();
+        setShowExecutionHistory(true);
+        setSelectedExecution(null);
+    };
+
+    const formatDate = (dateString: string) => {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        return date.toLocaleString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
     };
 
     const runWorkflowFromRunner = async () => {
@@ -3137,6 +3217,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'splitColumns': return 'bg-sky-100 text-sky-600';
             case 'excelInput': return 'bg-emerald-100 text-emerald-600';
             case 'sendEmail': return 'bg-rose-100 text-rose-600';
+            case 'webhook': return 'bg-purple-100 text-purple-600';
             default: return 'bg-slate-100 text-slate-600';
         }
     };
@@ -3496,6 +3577,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     {isRunning ? 'Running...' : 'Run'}
                                 </button>
                                 <button
+                                    onClick={openExecutionHistory}
+                                    disabled={!currentWorkflowId}
+                                    className={`flex items-center px-2.5 py-1.5 rounded-md shadow-sm transition-colors text-xs font-medium ${!currentWorkflowId
+                                        ? 'bg-slate-300 cursor-not-allowed text-slate-500'
+                                        : 'bg-violet-600 hover:bg-violet-700 text-white'
+                                        }`}
+                                    title="View execution history"
+                                >
+                                    <Clock size={14} className="mr-1" />
+                                    History
+                                </button>
+                                <button
                                     onClick={openWorkflowRunner}
                                     disabled={nodes.length === 0}
                                     className={`flex items-center px-2.5 py-1.5 rounded-md shadow-sm transition-colors text-xs font-medium ${nodes.length === 0
@@ -3838,6 +3931,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openManualInputConfig(node.id);
                                             } else if (node.type === 'http') {
                                                 openHttpConfig(node.id);
+                                            } else if (node.type === 'webhook') {
+                                                openWebhookConfig(node.id);
                                             } else if (node.type === 'mysql') {
                                                 openMySQLConfig(node.id);
                                             } else if (node.type === 'sendEmail') {
@@ -4352,6 +4447,91 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium"
                                         >
                                             Save
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Webhook Configuration Modal */}
+                        {configuringWebhookNodeId && (
+                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={closeWebhookConfig}>
+                                <div className="bg-white rounded-lg shadow-xl p-6 w-[500px]" onClick={(e) => e.stopPropagation()}>
+                                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                        <Globe className="text-purple-600" size={20} />
+                                        Webhook Configuration
+                                    </h3>
+                                    <div className="space-y-4">
+                                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                                            <p className="text-sm text-purple-800 mb-2 font-medium">
+                                                Your Webhook URL
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    readOnly
+                                                    value={webhookUrl}
+                                                    className="flex-1 px-3 py-2 bg-white border border-purple-200 rounded-lg text-sm font-mono text-slate-700"
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(webhookUrl);
+                                                        showToast('Webhook URL copied!', 'success');
+                                                    }}
+                                                    className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
+                                                >
+                                                    Copy
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                                            <p className="text-sm text-slate-700 mb-2 font-medium">
+                                                URL with Token (more secure)
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    readOnly
+                                                    value={`${webhookUrl}/${webhookToken}`}
+                                                    className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-mono text-slate-700"
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(`${webhookUrl}/${webhookToken}`);
+                                                        showToast('Secure webhook URL copied!', 'success');
+                                                    }}
+                                                    className="px-3 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-sm font-medium"
+                                                >
+                                                    Copy
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="text-sm text-slate-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                            <p className="font-medium text-blue-800 mb-1">How to use:</p>
+                                            <ol className="list-decimal list-inside space-y-1 text-blue-700">
+                                                <li>Copy the webhook URL above</li>
+                                                <li>Configure your external service to POST data to this URL</li>
+                                                <li>The workflow will execute automatically when data is received</li>
+                                            </ol>
+                                        </div>
+
+                                        <div className="text-xs text-slate-500">
+                                            <p className="font-medium mb-1">Example cURL:</p>
+                                            <pre className="bg-slate-800 text-green-400 p-2 rounded overflow-x-auto">
+{`curl -X POST ${webhookUrl} \\
+  -H "Content-Type: application/json" \\
+  -d '{"key": "value"}'`}
+                                            </pre>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 justify-end mt-4">
+                                        <button
+                                            onClick={closeWebhookConfig}
+                                            className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-medium"
+                                        >
+                                            Close
                                         </button>
                                     </div>
                                 </div>
@@ -6542,6 +6722,181 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                 Cancel
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Execution History Modal */}
+            {showExecutionHistory && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowExecutionHistory(false)}>
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-violet-600 to-violet-700 px-6 py-4 text-white rounded-t-xl shrink-0">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <History size={24} />
+                                    <div>
+                                        <h3 className="font-bold text-lg">Execution History</h3>
+                                        <p className="text-violet-200 text-sm">View past workflow executions and their results</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setShowExecutionHistory(false)} className="text-white/80 hover:text-white">
+                                    <X size={24} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-hidden flex">
+                            {/* Executions List */}
+                            <div className="w-1/3 border-r border-slate-200 overflow-y-auto">
+                                <div className="p-3 border-b border-slate-100 bg-slate-50">
+                                    <button
+                                        onClick={loadExecutionHistory}
+                                        className="w-full px-3 py-2 bg-violet-100 text-violet-700 rounded-lg text-sm font-medium hover:bg-violet-200 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        {loadingExecutions ? (
+                                            <div className="w-4 h-4 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                            <History size={14} />
+                                        )}
+                                        Refresh
+                                    </button>
+                                </div>
+                                {loadingExecutions ? (
+                                    <div className="p-8 text-center text-slate-500">
+                                        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                                        Loading...
+                                    </div>
+                                ) : executionHistory.length === 0 ? (
+                                    <div className="p-8 text-center text-slate-500">
+                                        <History size={32} className="mx-auto mb-2 text-slate-300" />
+                                        <p>No executions yet</p>
+                                        <p className="text-xs mt-1">Run the workflow or send a webhook to see executions here</p>
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-slate-100">
+                                        {executionHistory.map((exec) => (
+                                            <button
+                                                key={exec.id}
+                                                onClick={() => setSelectedExecution(exec)}
+                                                className={`w-full p-3 text-left hover:bg-slate-50 transition-colors ${selectedExecution?.id === exec.id ? 'bg-violet-50 border-l-2 border-violet-500' : ''}`}
+                                            >
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                                        exec.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                                        exec.status === 'failed' ? 'bg-red-100 text-red-700' :
+                                                        exec.status === 'running' ? 'bg-yellow-100 text-yellow-700' :
+                                                        'bg-slate-100 text-slate-700'
+                                                    }`}>
+                                                        {exec.status}
+                                                    </span>
+                                                    {exec.triggerType && (
+                                                        <span className="text-xs text-slate-400">{exec.triggerType}</span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-slate-500">{formatDate(exec.createdAt)}</p>
+                                                <p className="text-xs text-slate-400 font-mono truncate">{exec.id}</p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Execution Details */}
+                            <div className="flex-1 overflow-y-auto p-4">
+                                {selectedExecution ? (
+                                    <div className="space-y-4">
+                                        <div className="bg-slate-50 rounded-lg p-4">
+                                            <h4 className="font-semibold text-slate-800 mb-2">Execution Details</h4>
+                                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                                <div>
+                                                    <span className="text-slate-500">Status:</span>
+                                                    <span className={`ml-2 font-medium ${
+                                                        selectedExecution.status === 'completed' ? 'text-green-600' :
+                                                        selectedExecution.status === 'failed' ? 'text-red-600' :
+                                                        'text-slate-600'
+                                                    }`}>{selectedExecution.status}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-500">Trigger:</span>
+                                                    <span className="ml-2 font-medium text-slate-700">{selectedExecution.triggerType || 'manual'}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-500">Started:</span>
+                                                    <span className="ml-2 text-slate-700">{formatDate(selectedExecution.startedAt)}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-500">Completed:</span>
+                                                    <span className="ml-2 text-slate-700">{formatDate(selectedExecution.completedAt)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {selectedExecution.inputs && Object.keys(selectedExecution.inputs).length > 0 && (
+                                            <div className="bg-blue-50 rounded-lg p-4">
+                                                <h4 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                                                    <ArrowRight size={16} />
+                                                    Inputs
+                                                </h4>
+                                                <pre className="text-xs bg-white p-3 rounded border border-blue-100 overflow-x-auto max-h-40">
+                                                    {JSON.stringify(selectedExecution.inputs, null, 2)}
+                                                </pre>
+                                            </div>
+                                        )}
+
+                                        {selectedExecution.nodeResults && Object.keys(selectedExecution.nodeResults).length > 0 && (
+                                            <div className="bg-green-50 rounded-lg p-4">
+                                                <h4 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
+                                                    <CheckCircle size={16} />
+                                                    Node Results
+                                                </h4>
+                                                <div className="space-y-2">
+                                                    {Object.entries(selectedExecution.nodeResults).map(([nodeId, result]: [string, any]) => {
+                                                        const node = nodes.find(n => n.id === nodeId);
+                                                        return (
+                                                            <div key={nodeId} className="bg-white p-3 rounded border border-green-100">
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <span className="font-medium text-slate-700">{node?.label || nodeId}</span>
+                                                                    {result.success && <Check size={14} className="text-green-500" />}
+                                                                </div>
+                                                                {result.message && (
+                                                                    <p className="text-xs text-slate-500 mb-1">{result.message}</p>
+                                                                )}
+                                                                {result.outputData && (
+                                                                    <pre className="text-xs bg-slate-50 p-2 rounded overflow-x-auto max-h-32">
+                                                                        {JSON.stringify(result.outputData, null, 2)}
+                                                                    </pre>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {selectedExecution.error && (
+                                            <div className="bg-red-50 rounded-lg p-4">
+                                                <h4 className="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                                    <XCircle size={16} />
+                                                    Error
+                                                </h4>
+                                                <pre className="text-xs bg-white p-3 rounded border border-red-100 text-red-600 overflow-x-auto">
+                                                    {selectedExecution.error}
+                                                </pre>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="h-full flex items-center justify-center text-slate-400">
+                                        <div className="text-center">
+                                            <Eye size={48} className="mx-auto mb-3 text-slate-300" />
+                                            <p>Select an execution to view details</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
