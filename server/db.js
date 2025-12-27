@@ -265,6 +265,33 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  // Migration: Add Stripe subscription columns to organizations table
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN subscriptionPlan TEXT DEFAULT 'free'`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN stripeCustomerId TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN stripeSubscriptionId TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN subscriptionStatus TEXT DEFAULT 'active'`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN subscriptionCurrentPeriodEnd TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   return db;
 }
 
