@@ -8,6 +8,7 @@ const pdfParse = require('pdf-parse');
 const XLSX = require('xlsx');
 const { WebSocketServer } = require('ws');
 const { initDb, openDb } = require('./db');
+const { WorkflowExecutor } = require('./workflowExecutor');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 // Stripe configuration
@@ -2417,66 +2418,219 @@ app.get('/api/workflow/:id/public', async (req, res) => {
     }
 });
 
-// Run workflow from public form (no auth required)
+// Run workflow from public form (no auth required) - FULL EXECUTION
 app.post('/api/workflow/:id/run-public', async (req, res) => {
     try {
         const { id } = req.params;
         const { inputs } = req.body; // { nodeId: value, ... }
 
-        const workflow = await db.get('SELECT * FROM workflows WHERE id = ?', [id]);
-        
-        if (!workflow) {
-            return res.status(404).json({ error: 'Workflow not found' });
-        }
+        console.log(`[WorkflowExecutor] Public execution started for workflow ${id}`);
 
-        // Parse workflow data
-        let workflowData;
-        try {
-            workflowData = JSON.parse(workflow.data);
-        } catch (e) {
-            return res.status(500).json({ error: 'Invalid workflow data' });
-        }
+        const executor = new WorkflowExecutor(db);
+        const result = await executor.executeWorkflow(id, inputs || {});
 
-        // Update manualInput nodes with provided values
-        const nodes = workflowData.nodes || [];
-        nodes.forEach(node => {
-            if (node.type === 'manualInput' && inputs && inputs[node.id] !== undefined) {
-                if (!node.config) node.config = {};
-                node.config.inputVarValue = inputs[node.id];
-                node.config.variableValue = inputs[node.id];
-            }
-        });
-
-        // Find output nodes to return their results
-        // For now, we'll return a simple success message
-        // In a full implementation, you'd execute the workflow and return results
-        
-        // Simple execution: collect all input values and return them as "processed"
-        const inputValues = {};
-        nodes.forEach(node => {
-            if (node.type === 'manualInput') {
-                const varName = node.config?.inputVarName || node.config?.variableName || node.id;
-                inputValues[varName] = node.config?.inputVarValue || node.config?.variableValue || '';
-            }
-        });
-
-        // Log the submission
-        console.log(`[PublicWorkflow] Form submitted for workflow ${id}:`, inputValues);
-
-        // Return success with the collected inputs
-        // In production, this would trigger actual workflow execution
         res.json({
             success: true,
-            message: 'Workflow executed successfully',
-            result: {
-                submitted: true,
-                inputs: inputValues,
-                timestamp: new Date().toISOString()
-            }
+            executionId: result.executionId,
+            status: result.status,
+            result: result.results
         });
     } catch (error) {
         console.error('Error running public workflow:', error);
-        res.status(500).json({ error: 'Failed to run workflow' });
+        res.status(500).json({ error: error.message || 'Failed to run workflow' });
+    }
+});
+
+// ==================== WORKFLOW EXECUTION ENDPOINTS ====================
+
+// Execute workflow (authenticated)
+app.post('/api/workflow/:id/execute', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { inputs } = req.body;
+
+        console.log(`[WorkflowExecutor] Authenticated execution started for workflow ${id}`);
+
+        const executor = new WorkflowExecutor(db);
+        const result = await executor.executeWorkflow(id, inputs || {}, req.user.orgId);
+
+        res.json({
+            success: true,
+            executionId: result.executionId,
+            status: result.status,
+            result: result.results
+        });
+    } catch (error) {
+        console.error('Error executing workflow:', error);
+        res.status(500).json({ error: error.message || 'Failed to execute workflow' });
+    }
+});
+
+// Execute a single node (authenticated)
+app.post('/api/workflow/:id/execute-node', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { nodeId, inputData, recursive } = req.body;
+
+        if (!nodeId) {
+            return res.status(400).json({ error: 'nodeId is required' });
+        }
+
+        console.log(`[WorkflowExecutor] Single node execution: ${nodeId} (recursive: ${recursive})`);
+
+        const executor = new WorkflowExecutor(db);
+        const result = await executor.executeSingleNode(id, nodeId, inputData, recursive || false);
+
+        res.json({
+            success: true,
+            executionId: result.executionId,
+            nodeId: result.nodeId,
+            result: result.result
+        });
+    } catch (error) {
+        console.error('Error executing node:', error);
+        res.status(500).json({ error: error.message || 'Failed to execute node' });
+    }
+});
+
+// Get execution status
+app.get('/api/workflow/execution/:execId', authenticateToken, async (req, res) => {
+    try {
+        const { execId } = req.params;
+        const execution = await db.get('SELECT * FROM workflow_executions WHERE id = ?', [execId]);
+
+        if (!execution) {
+            return res.status(404).json({ error: 'Execution not found' });
+        }
+
+        // Parse JSON fields
+        execution.inputs = execution.inputs ? JSON.parse(execution.inputs) : null;
+        execution.nodeResults = execution.nodeResults ? JSON.parse(execution.nodeResults) : null;
+        execution.finalOutput = execution.finalOutput ? JSON.parse(execution.finalOutput) : null;
+
+        res.json(execution);
+    } catch (error) {
+        console.error('Error fetching execution:', error);
+        res.status(500).json({ error: 'Failed to fetch execution' });
+    }
+});
+
+// Get execution logs
+app.get('/api/workflow/execution/:execId/logs', authenticateToken, async (req, res) => {
+    try {
+        const { execId } = req.params;
+        const logs = await db.all(
+            'SELECT * FROM execution_logs WHERE executionId = ? ORDER BY timestamp ASC',
+            [execId]
+        );
+
+        // Parse JSON fields
+        logs.forEach(log => {
+            log.inputData = log.inputData ? JSON.parse(log.inputData) : null;
+            log.outputData = log.outputData ? JSON.parse(log.outputData) : null;
+        });
+
+        res.json(logs);
+    } catch (error) {
+        console.error('Error fetching execution logs:', error);
+        res.status(500).json({ error: 'Failed to fetch logs' });
+    }
+});
+
+// Get execution history for a workflow
+app.get('/api/workflow/:id/executions', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const limit = parseInt(req.query.limit) || 20;
+        
+        const executions = await db.all(`
+            SELECT id, status, triggerType, createdAt, startedAt, completedAt, error
+            FROM workflow_executions 
+            WHERE workflowId = ?
+            ORDER BY createdAt DESC
+            LIMIT ?
+        `, [id, limit]);
+
+        res.json(executions);
+    } catch (error) {
+        console.error('Error fetching executions:', error);
+        res.status(500).json({ error: 'Failed to fetch executions' });
+    }
+});
+
+// Cancel execution
+app.post('/api/workflow/execution/:execId/cancel', authenticateToken, async (req, res) => {
+    try {
+        const { execId } = req.params;
+        
+        await db.run(
+            'UPDATE workflow_executions SET status = ?, completedAt = ? WHERE id = ? AND status IN (?, ?)',
+            ['cancelled', new Date().toISOString(), execId, 'pending', 'running']
+        );
+
+        res.json({ success: true, message: 'Execution cancelled' });
+    } catch (error) {
+        console.error('Error cancelling execution:', error);
+        res.status(500).json({ error: 'Failed to cancel execution' });
+    }
+});
+
+// Resume paused execution (for human approval)
+app.post('/api/workflow/execution/:execId/resume', authenticateToken, async (req, res) => {
+    try {
+        const { execId } = req.params;
+        const { approved } = req.body;
+
+        const execution = await db.get('SELECT * FROM workflow_executions WHERE id = ?', [execId]);
+        
+        if (!execution) {
+            return res.status(404).json({ error: 'Execution not found' });
+        }
+
+        if (execution.status !== 'paused') {
+            return res.status(400).json({ error: 'Execution is not paused' });
+        }
+
+        if (!approved) {
+            // Rejected - mark as failed
+            await db.run(
+                'UPDATE workflow_executions SET status = ?, error = ?, completedAt = ? WHERE id = ?',
+                ['failed', 'Rejected by human approval', new Date().toISOString(), execId]
+            );
+            return res.json({ success: true, message: 'Execution rejected' });
+        }
+
+        // Approved - continue execution from current node
+        const workflow = await db.get('SELECT * FROM workflows WHERE id = ?', [execution.workflowId]);
+        const executor = new WorkflowExecutor(db, execId);
+        
+        // Load workflow data
+        const workflowData = JSON.parse(workflow.data);
+        executor.nodes = workflowData.nodes || [];
+        executor.connections = workflowData.connections || [];
+        executor.workflow = workflow;
+        executor.nodeResults = execution.nodeResults ? JSON.parse(execution.nodeResults) : {};
+
+        // Update status to running
+        await db.run('UPDATE workflow_executions SET status = ? WHERE id = ?', ['running', execId]);
+
+        // Get next nodes after the approval node and continue
+        const nextNodes = executor.getNextNodes(execution.currentNodeId, { conditionResult: true });
+        
+        for (const nextNode of nextNodes) {
+            await executor.executeNode(nextNode.id, null, true);
+        }
+
+        // Mark as completed
+        await db.run(
+            'UPDATE workflow_executions SET status = ?, completedAt = ?, nodeResults = ? WHERE id = ?',
+            ['completed', new Date().toISOString(), JSON.stringify(executor.nodeResults), execId]
+        );
+
+        res.json({ success: true, message: 'Execution resumed and completed' });
+    } catch (error) {
+        console.error('Error resuming execution:', error);
+        res.status(500).json({ error: error.message || 'Failed to resume execution' });
     }
 });
 

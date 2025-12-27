@@ -169,6 +169,39 @@ async function initDb() {
       FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE,
       FOREIGN KEY(invitedBy) REFERENCES users(id)
     );
+
+    CREATE TABLE IF NOT EXISTS workflow_executions (
+      id TEXT PRIMARY KEY,
+      workflowId TEXT NOT NULL,
+      organizationId TEXT,
+      status TEXT DEFAULT 'pending',
+      triggerType TEXT DEFAULT 'manual',
+      inputs TEXT,
+      currentNodeId TEXT,
+      nodeResults TEXT,
+      finalOutput TEXT,
+      error TEXT,
+      createdAt TEXT,
+      startedAt TEXT,
+      completedAt TEXT,
+      FOREIGN KEY(workflowId) REFERENCES workflows(id) ON DELETE CASCADE,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS execution_logs (
+      id TEXT PRIMARY KEY,
+      executionId TEXT NOT NULL,
+      nodeId TEXT,
+      nodeType TEXT,
+      nodeLabel TEXT,
+      status TEXT,
+      inputData TEXT,
+      outputData TEXT,
+      error TEXT,
+      duration INTEGER,
+      timestamp TEXT,
+      FOREIGN KEY(executionId) REFERENCES workflow_executions(id) ON DELETE CASCADE
+    );
   `);
 
   // Migration: Add profilePhoto and companyRole columns to users table if they don't exist

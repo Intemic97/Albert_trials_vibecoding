@@ -82,7 +82,25 @@ export const PublicWorkflowForm: React.FC = () => {
                 return;
             }
 
-            setResult(data.result);
+            // Extract meaningful results
+            const executionResult = {
+                executionId: data.executionId,
+                status: data.status,
+                nodeResults: data.result || {}
+            };
+
+            // Find output node results
+            const outputResults = Object.entries(executionResult.nodeResults)
+                .filter(([_, value]: [string, any]) => value?.isFinal || value?.outputData)
+                .map(([nodeId, value]: [string, any]) => ({
+                    nodeId,
+                    data: value?.outputData || value
+                }));
+
+            setResult({
+                ...executionResult,
+                outputs: outputResults.length > 0 ? outputResults : null
+            });
         } catch (err) {
             setSubmitError('Failed to connect to server');
         } finally {
@@ -210,13 +228,32 @@ export const PublicWorkflowForm: React.FC = () => {
                             <div className="bg-gradient-to-r from-emerald-50 to-teal-50 px-6 py-4 border-b border-emerald-200">
                                 <h2 className="font-semibold text-emerald-800 flex items-center gap-2">
                                     <CheckCircle size={18} className="text-emerald-600" />
-                                    Result
+                                    Workflow Executed Successfully
                                 </h2>
+                                <p className="text-sm text-emerald-600 mt-1">
+                                    Execution ID: {result.executionId}
+                                </p>
                             </div>
-                            <div className="p-6">
-                                <pre className="bg-slate-50 rounded-xl p-4 overflow-x-auto text-sm text-slate-700 border border-slate-200">
-                                    {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
-                                </pre>
+                            <div className="p-6 space-y-4">
+                                {result.outputs && result.outputs.length > 0 ? (
+                                    result.outputs.map((output: any, idx: number) => (
+                                        <div key={idx} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                            <p className="text-xs text-slate-500 mb-2 font-medium">Output {idx + 1}</p>
+                                            <pre className="overflow-x-auto text-sm text-slate-700 whitespace-pre-wrap">
+                                                {typeof output.data === 'string' 
+                                                    ? output.data 
+                                                    : JSON.stringify(output.data, null, 2)}
+                                            </pre>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                        <p className="text-xs text-slate-500 mb-2 font-medium">Full Result</p>
+                                        <pre className="overflow-x-auto text-sm text-slate-700 whitespace-pre-wrap">
+                                            {JSON.stringify(result.nodeResults, null, 2)}
+                                        </pre>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
