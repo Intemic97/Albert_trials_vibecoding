@@ -787,7 +787,7 @@ function AuthenticatedApp() {
 
     // These routes should be accessible regardless of authentication status
     const currentPath = location.pathname;
-    const publicPaths = ['/verify-email', '/invite', '/forgot-password', '/reset-password'];
+    const publicPaths = ['/verify-email', '/invite', '/forgot-password', '/reset-password', '/form'];
     const isPublicPath = publicPaths.some(path => currentPath.startsWith(path));
 
     if (isPublicPath) {
