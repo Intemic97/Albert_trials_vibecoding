@@ -304,12 +304,75 @@ class WorkflowExecutor {
     }
 
     async handleSaveRecords(node, inputData) {
-        // TODO: Implement save records logic
-        return {
-            success: true,
-            message: 'Save records not fully implemented yet',
-            outputData: inputData
-        };
+        const tableName = node.config?.tableName || node.config?.entityName || 'saved_records';
+        const mode = node.config?.saveMode || 'insert'; // insert, upsert, update
+        
+        try {
+            // Ensure table exists
+            await this.db.run(`
+                CREATE TABLE IF NOT EXISTS ${tableName} (
+                    id TEXT PRIMARY KEY,
+                    data TEXT,
+                    workflowId TEXT,
+                    executionId TEXT,
+                    createdAt TEXT,
+                    updatedAt TEXT
+                )
+            `);
+
+            let savedCount = 0;
+            const records = Array.isArray(inputData) ? inputData : [inputData];
+            const savedIds = [];
+
+            for (const record of records) {
+                const recordId = record.id || generateId();
+                const now = new Date().toISOString();
+                
+                if (mode === 'upsert' && record.id) {
+                    // Check if exists
+                    const existing = await this.db.get(
+                        `SELECT id FROM ${tableName} WHERE id = ?`,
+                        [record.id]
+                    );
+                    
+                    if (existing) {
+                        await this.db.run(
+                            `UPDATE ${tableName} SET data = ?, updatedAt = ? WHERE id = ?`,
+                            [JSON.stringify(record), now, record.id]
+                        );
+                    } else {
+                        await this.db.run(
+                            `INSERT INTO ${tableName} (id, data, workflowId, executionId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+                            [recordId, JSON.stringify(record), this.workflow?.id, this.executionId, now, now]
+                        );
+                    }
+                } else {
+                    await this.db.run(
+                        `INSERT INTO ${tableName} (id, data, workflowId, executionId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
+                        [recordId, JSON.stringify(record), this.workflow?.id, this.executionId, now, now]
+                    );
+                }
+                
+                savedIds.push(recordId);
+                savedCount++;
+            }
+
+            return {
+                success: true,
+                message: `Saved ${savedCount} record(s) to '${tableName}'`,
+                outputData: inputData,
+                savedIds,
+                tableName
+            };
+        } catch (error) {
+            console.error('[SaveRecords] Error:', error);
+            return {
+                success: false,
+                message: `Failed to save records: ${error.message}`,
+                outputData: inputData,
+                error: error.message
+            };
+        }
     }
 
     async handleAddField(node, inputData) {
