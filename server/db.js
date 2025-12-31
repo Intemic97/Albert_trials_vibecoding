@@ -268,6 +268,26 @@ async function initDb() {
       uploadedAt TEXT,
       FOREIGN KEY(reportId) REFERENCES reports(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS report_comments (
+      id TEXT PRIMARY KEY,
+      reportId TEXT NOT NULL,
+      sectionId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      userName TEXT,
+      selectedText TEXT,
+      startOffset INTEGER,
+      endOffset INTEGER,
+      commentText TEXT NOT NULL,
+      suggestionText TEXT,
+      status TEXT DEFAULT 'open',
+      createdAt TEXT,
+      updatedAt TEXT,
+      resolvedAt TEXT,
+      resolvedBy TEXT,
+      FOREIGN KEY(reportId) REFERENCES reports(id) ON DELETE CASCADE,
+      FOREIGN KEY(userId) REFERENCES users(id)
+    );
   `);
 
   // Migration: Add profilePhoto and companyRole columns to users table if they don't exist

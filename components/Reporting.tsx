@@ -5,7 +5,7 @@ import { Entity } from '../types';
 import { 
     Sparkles, FileText, FlaskConical, Clipboard, Wrench, AlertTriangle, Download,
     Plus, Trash2, Edit3, X, ChevronDown, ChevronRight, GripVertical, Save, Loader2,
-    Clock, User, Calendar, FileCheck, MoreVertical
+    Clock, User, Calendar, FileCheck, MoreVertical, Search
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -107,6 +107,10 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
     
     // Organization users for reviewer dropdown
     const [orgUsers, setOrgUsers] = useState<OrgUser[]>([]);
+    
+    // Search/filter state
+    const [documentsSearch, setDocumentsSearch] = useState('');
+    const [templatesSearch, setTemplatesSearch] = useState('');
 
     // Fetch all data on mount
     useEffect(() => {
@@ -347,6 +351,20 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                             </button>
                         </div>
 
+                        {/* Search Documents */}
+                        {reports.length > 0 && (
+                            <div className="relative mb-4">
+                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search by name, creator or reviewer..."
+                                    value={documentsSearch}
+                                    onChange={(e) => setDocumentsSearch(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                                />
+                            </div>
+                        )}
+
                         {reportsLoading ? (
                             <div className="flex items-center justify-center py-12">
                                 <Loader2 className="animate-spin text-teal-600" size={24} />
@@ -365,7 +383,17 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {reports.map((report) => {
+                                {reports
+                                    .filter(report => {
+                                        if (!documentsSearch.trim()) return true;
+                                        const search = documentsSearch.toLowerCase();
+                                        return (
+                                            report.name.toLowerCase().includes(search) ||
+                                            report.createdByName?.toLowerCase().includes(search) ||
+                                            report.reviewerName?.toLowerCase().includes(search)
+                                        );
+                                    })
+                                    .map((report) => {
                                     const status = statusConfig[report.status];
                                     return (
                                         <div
@@ -439,6 +467,20 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                             </button>
                         </div>
 
+                        {/* Search Templates */}
+                        {templates.length > 0 && (
+                            <div className="relative mb-4">
+                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search templates by name..."
+                                    value={templatesSearch}
+                                    onChange={(e) => setTemplatesSearch(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                                />
+                            </div>
+                        )}
+
                         {templatesLoading ? (
                             <div className="flex items-center justify-center py-12">
                                 <Loader2 className="animate-spin text-teal-600" size={24} />
@@ -457,7 +499,12 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                {templates.map((template) => {
+                                {templates
+                                    .filter(template => {
+                                        if (!templatesSearch.trim()) return true;
+                                        return template.name.toLowerCase().includes(templatesSearch.toLowerCase());
+                                    })
+                                    .map((template) => {
                                     const IconComponent = getIconComponent(template.icon);
                                     return (
                                         <div

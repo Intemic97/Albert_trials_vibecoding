@@ -3868,6 +3868,170 @@ app.put('/api/reports/:id/sections/:sectionId', authenticateToken, async (req, r
     }
 });
 
+// ==================== REPORT COMMENTS ENDPOINTS ====================
+
+// Get all comments for a report
+app.get('/api/reports/:id/comments', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const report = await db.get(
+            'SELECT id FROM reports WHERE id = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+        
+        if (!report) {
+            return res.status(404).json({ error: 'Report not found' });
+        }
+        
+        const comments = await db.all(`
+            SELECT c.*, u.name as userName, u.email as userEmail,
+                   resolver.name as resolvedByName
+            FROM report_comments c
+            LEFT JOIN users u ON c.userId = u.id
+            LEFT JOIN users resolver ON c.resolvedBy = resolver.id
+            WHERE c.reportId = ?
+            ORDER BY c.createdAt DESC
+        `, [id]);
+        
+        res.json(comments);
+    } catch (error) {
+        console.error('Error fetching comments:', error);
+        res.status(500).json({ error: 'Failed to fetch comments' });
+    }
+});
+
+// Create a new comment
+app.post('/api/reports/:id/comments', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { sectionId, selectedText, startOffset, endOffset, commentText, suggestionText } = req.body;
+        
+        const report = await db.get(
+            'SELECT id FROM reports WHERE id = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+        
+        if (!report) {
+            return res.status(404).json({ error: 'Report not found' });
+        }
+        
+        // Get user info
+        const user = await db.get('SELECT name FROM users WHERE id = ?', [req.user.sub]);
+        
+        const commentId = Math.random().toString(36).substr(2, 9);
+        const now = new Date().toISOString();
+        
+        await db.run(`
+            INSERT INTO report_comments (id, reportId, sectionId, userId, userName, selectedText, startOffset, endOffset, commentText, suggestionText, status, createdAt, updatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)
+        `, [commentId, id, sectionId, req.user.sub, user?.name || 'Unknown', selectedText, startOffset, endOffset, commentText, suggestionText || null, now, now]);
+        
+        const comment = await db.get('SELECT * FROM report_comments WHERE id = ?', [commentId]);
+        
+        res.json(comment);
+    } catch (error) {
+        console.error('Error creating comment:', error);
+        res.status(500).json({ error: 'Failed to create comment' });
+    }
+});
+
+// Update a comment
+app.put('/api/reports/:id/comments/:commentId', authenticateToken, async (req, res) => {
+    try {
+        const { id, commentId } = req.params;
+        const { commentText, suggestionText } = req.body;
+        const now = new Date().toISOString();
+        
+        const comment = await db.get(`
+            SELECT c.* FROM report_comments c
+            JOIN reports r ON c.reportId = r.id
+            WHERE c.id = ? AND r.id = ? AND r.organizationId = ?
+        `, [commentId, id, req.user.orgId]);
+        
+        if (!comment) {
+            return res.status(404).json({ error: 'Comment not found' });
+        }
+        
+        // Only the author can edit their comment
+        if (comment.userId !== req.user.sub) {
+            return res.status(403).json({ error: 'You can only edit your own comments' });
+        }
+        
+        await db.run(`
+            UPDATE report_comments SET commentText = ?, suggestionText = ?, updatedAt = ? WHERE id = ?
+        `, [commentText, suggestionText || null, now, commentId]);
+        
+        res.json({ message: 'Comment updated' });
+    } catch (error) {
+        console.error('Error updating comment:', error);
+        res.status(500).json({ error: 'Failed to update comment' });
+    }
+});
+
+// Resolve/unresolve a comment
+app.put('/api/reports/:id/comments/:commentId/resolve', authenticateToken, async (req, res) => {
+    try {
+        const { id, commentId } = req.params;
+        const { resolved } = req.body;
+        const now = new Date().toISOString();
+        
+        const comment = await db.get(`
+            SELECT c.* FROM report_comments c
+            JOIN reports r ON c.reportId = r.id
+            WHERE c.id = ? AND r.id = ? AND r.organizationId = ?
+        `, [commentId, id, req.user.orgId]);
+        
+        if (!comment) {
+            return res.status(404).json({ error: 'Comment not found' });
+        }
+        
+        if (resolved) {
+            await db.run(`
+                UPDATE report_comments SET status = 'resolved', resolvedAt = ?, resolvedBy = ?, updatedAt = ? WHERE id = ?
+            `, [now, req.user.sub, now, commentId]);
+        } else {
+            await db.run(`
+                UPDATE report_comments SET status = 'open', resolvedAt = NULL, resolvedBy = NULL, updatedAt = ? WHERE id = ?
+            `, [now, commentId]);
+        }
+        
+        res.json({ message: resolved ? 'Comment resolved' : 'Comment reopened' });
+    } catch (error) {
+        console.error('Error resolving comment:', error);
+        res.status(500).json({ error: 'Failed to resolve comment' });
+    }
+});
+
+// Delete a comment
+app.delete('/api/reports/:id/comments/:commentId', authenticateToken, async (req, res) => {
+    try {
+        const { id, commentId } = req.params;
+        
+        const comment = await db.get(`
+            SELECT c.* FROM report_comments c
+            JOIN reports r ON c.reportId = r.id
+            WHERE c.id = ? AND r.id = ? AND r.organizationId = ?
+        `, [commentId, id, req.user.orgId]);
+        
+        if (!comment) {
+            return res.status(404).json({ error: 'Comment not found' });
+        }
+        
+        // Only the author can delete their comment
+        if (comment.userId !== req.user.sub) {
+            return res.status(403).json({ error: 'You can only delete your own comments' });
+        }
+        
+        await db.run('DELETE FROM report_comments WHERE id = ?', [commentId]);
+        
+        res.json({ message: 'Comment deleted' });
+    } catch (error) {
+        console.error('Error deleting comment:', error);
+        res.status(500).json({ error: 'Failed to delete comment' });
+    }
+});
+
 // Stripe Webhook to handle subscription events
 app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
     const sig = req.headers['stripe-signature'];
