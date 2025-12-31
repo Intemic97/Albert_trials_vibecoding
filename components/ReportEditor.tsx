@@ -841,88 +841,168 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
 
                     {/* Generate Tab */}
                     {activeTab === 'generate' && (
-                        <div className="max-w-4xl mx-auto space-y-6">
-                            {/* Section Info */}
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                <div className="flex items-start justify-between mb-4">
-                                    <div>
-                                        <h2 className="text-lg font-semibold text-slate-800">
-                                            {selectedSection?.title || 'Select a section'}
-                                        </h2>
-                                        {selectedSection?.content && (
-                                            <p className="text-sm text-slate-500 mt-1">{selectedSection.content}</p>
+                        <div className="flex gap-6 h-full">
+                            {/* Main Content */}
+                            <div className="flex-1 overflow-y-auto space-y-6">
+                                {/* Section Info */}
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div>
+                                            <h2 className="text-lg font-semibold text-slate-800">
+                                                {selectedSection?.title || 'Select a section'}
+                                            </h2>
+                                            {selectedSection?.content && (
+                                                <p className="text-sm text-slate-500 mt-1">{selectedSection.content}</p>
+                                            )}
+                                        </div>
+                                        {report.contexts.length > 0 && (
+                                            <span className="px-2 py-1 text-xs bg-teal-50 text-teal-600 rounded-full">
+                                                {report.contexts.length} context doc{report.contexts.length > 1 ? 's' : ''}
+                                            </span>
                                         )}
                                     </div>
-                                    {report.contexts.length > 0 && (
-                                        <span className="px-2 py-1 text-xs bg-teal-50 text-teal-600 rounded-full">
-                                            {report.contexts.length} context doc{report.contexts.length > 1 ? 's' : ''}
-                                        </span>
-                                    )}
-                                </div>
 
-                                {selectedSection?.generationRules && (
-                                    <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg mb-4">
-                                        <p className="text-sm text-amber-800">
-                                            <strong>Generation Rules:</strong> {selectedSection.generationRules}
-                                        </p>
-                                    </div>
-                                )}
-
-                                {/* Prompt Input */}
-                                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                                        Write your prompt for this section
-                                    </label>
-                                    <PromptInput
-                                        key={selectedSectionId}
-                                        entities={entities}
-                                        companyInfo={companyInfo}
-                                        onGenerate={handleGenerate}
-                                        isGenerating={isGenerating}
-                                        initialValue={selectedSection?.userPrompt || ''}
-                                        placeholder="Describe what you want in this section. Mention @entities to include data..."
-                                        buttonLabel="Generate"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Generated Content */}
-                            {(editingContent || selectedSection?.generatedContent) && (
-                                <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-                                    <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                                        <h3 className="font-semibold text-slate-800">Generated Content</h3>
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => setActiveTab('preview')}
-                                                className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                            >
-                                                <Eye size={16} className="inline mr-1" />
-                                                Preview
-                                            </button>
-                                            <button
-                                                onClick={handleSaveSection}
-                                                disabled={isSaving}
-                                                className="px-3 py-1.5 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
-                                            >
-                                                {isSaving ? (
-                                                    <Loader2 size={16} className="animate-spin" />
-                                                ) : (
-                                                    <Save size={16} />
-                                                )}
-                                                Save
-                                            </button>
+                                    {selectedSection?.generationRules && (
+                                        <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg mb-4">
+                                            <p className="text-sm text-amber-800">
+                                                <strong>Generation Rules:</strong> {selectedSection.generationRules}
+                                            </p>
                                         </div>
-                                    </div>
-                                    <div className="p-6">
-                                        <textarea
-                                            value={editingContent}
-                                            onChange={(e) => setEditingContent(e.target.value)}
-                                            className="w-full min-h-[300px] p-4 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-y font-mono text-sm"
-                                            placeholder="Generated content will appear here..."
+                                    )}
+
+                                    {/* Prompt Input */}
+                                    <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Write your prompt for this section
+                                        </label>
+                                        <PromptInput
+                                            key={selectedSectionId}
+                                            entities={entities}
+                                            companyInfo={companyInfo}
+                                            onGenerate={handleGenerate}
+                                            isGenerating={isGenerating}
+                                            initialValue={selectedSection?.userPrompt || ''}
+                                            placeholder="Describe what you want in this section. Mention @entities to include data..."
+                                            buttonLabel="Generate"
                                         />
                                     </div>
                                 </div>
-                            )}
+
+                                {/* Generated Content */}
+                                {(editingContent || selectedSection?.generatedContent) && (
+                                    <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+                                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                                            <h3 className="font-semibold text-slate-800">Generated Content</h3>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => setActiveTab('preview')}
+                                                    className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                                >
+                                                    <Eye size={16} className="inline mr-1" />
+                                                    Preview
+                                                </button>
+                                                <button
+                                                    onClick={handleSaveSection}
+                                                    disabled={isSaving}
+                                                    className="px-3 py-1.5 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                                                >
+                                                    {isSaving ? (
+                                                        <Loader2 size={16} className="animate-spin" />
+                                                    ) : (
+                                                        <Save size={16} />
+                                                    )}
+                                                    Save
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="p-6">
+                                            <textarea
+                                                value={editingContent}
+                                                onChange={(e) => setEditingContent(e.target.value)}
+                                                className="w-full min-h-[300px] p-4 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-y font-mono text-sm"
+                                                placeholder="Generated content will appear here..."
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Comments Panel */}
+                            <div className="w-80 shrink-0 overflow-y-auto">
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="font-semibold text-slate-800">Comments</h3>
+                                        <span className="text-xs text-slate-500">
+                                            {sectionComments.filter(c => c.status === 'open').length} open
+                                        </span>
+                                    </div>
+
+                                    {sectionComments.length === 0 ? (
+                                        <div className="text-center py-8 text-slate-400">
+                                            <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
+                                            <p className="text-sm">No comments for this section</p>
+                                            <p className="text-xs mt-1">Comments from Review tab will appear here</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {sectionComments.map(comment => (
+                                                <div 
+                                                    key={comment.id}
+                                                    className={`p-3 rounded-lg border transition-all ${
+                                                        comment.status === 'resolved'
+                                                            ? 'bg-slate-50 border-slate-200 opacity-60'
+                                                            : 'bg-white border-slate-200 hover:border-blue-300'
+                                                    }`}
+                                                >
+                                                    {/* Comment Header */}
+                                                    <div className="flex items-start justify-between mb-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                                                                <User size={12} className="text-blue-600" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-medium text-slate-700">{comment.userName}</p>
+                                                                <p className="text-xs text-slate-400">
+                                                                    {new Date(comment.createdAt).toLocaleDateString()}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        {/* Resolve Button */}
+                                                        {comment.status === 'open' && (
+                                                            <button
+                                                                onClick={() => handleResolveComment(comment.id, true)}
+                                                                className="p-1 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded"
+                                                                title="Mark as resolved"
+                                                            >
+                                                                <CheckCheck size={14} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Selected Text Preview */}
+                                                    <div className="mb-2 px-2 py-1 bg-yellow-100 rounded text-xs text-slate-600 italic">
+                                                        "{comment.selectedText.slice(0, 60)}{comment.selectedText.length > 60 ? '...' : ''}"
+                                                    </div>
+
+                                                    {/* Comment Text */}
+                                                    <p className={`text-sm ${comment.status === 'resolved' ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                                                        {comment.commentText}
+                                                    </p>
+
+                                                    {/* Resolved Badge */}
+                                                    {comment.status === 'resolved' && (
+                                                        <div className="mt-2 flex items-center gap-1 text-xs text-teal-600">
+                                                            <CheckCircle2 size={12} />
+                                                            Resolved
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     )}
 
