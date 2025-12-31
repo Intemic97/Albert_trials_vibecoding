@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
     FileText, ArrowLeft, Eye, Upload, Sparkles, Check, Clock, Send,
-    ChevronRight, Loader2, X, File, Trash2, CheckCircle2, Circle,
+    ChevronRight, ChevronDown, Loader2, X, File, Trash2, CheckCircle2, Circle,
     Save, AlertCircle, User, Calendar, MessageSquare, MoreVertical,
-    Edit3, CheckCheck, CornerDownRight
+    Edit3, CheckCheck, CornerDownRight, Plus, GripVertical, Clipboard,
+    FlaskConical, Wrench, AlertTriangle, Settings
 } from 'lucide-react';
 import { Entity } from '../types';
 import { PromptInput } from './PromptInput';
@@ -106,6 +107,10 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
     const [editCommentText, setEditCommentText] = useState('');
     const [showCommentInput, setShowCommentInput] = useState(false);
     const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [showTemplateModal, setShowTemplateModal] = useState(false);
+    const [templateData, setTemplateData] = useState<any>(null);
+    const [templateUsage, setTemplateUsage] = useState<any>(null);
     
     const fileInputRef = useRef<HTMLInputElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -224,6 +229,82 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
         setNewSuggestionText('');
         setShowCommentInput(false);
         window.getSelection()?.removeAllRanges();
+    };
+
+    // Transform flat sections array to nested structure for the modal
+    const transformSectionsToNested = (flatSections: any[]) => {
+        const parentSections = flatSections.filter(s => !s.parentId);
+        return parentSections.map(parent => ({
+            id: parent.id,
+            title: parent.title,
+            content: parent.content || '',
+            generationRules: parent.generationRules || '',
+            items: flatSections
+                .filter(s => s.parentId === parent.id)
+                .sort((a, b) => a.sortOrder - b.sortOrder)
+                .map(item => ({
+                    id: item.id,
+                    title: item.title,
+                    content: item.content || '',
+                    generationRules: item.generationRules || ''
+                })),
+            isExpanded: true
+        })).sort((a, b) => {
+            const aOrder = flatSections.find(s => s.id === a.id)?.sortOrder || 0;
+            const bOrder = flatSections.find(s => s.id === b.id)?.sortOrder || 0;
+            return aOrder - bOrder;
+        });
+    };
+
+    const handleOpenTemplateModal = async () => {
+        if (!report) return;
+        try {
+            // Fetch template data
+            const templateRes = await fetch(`${API_BASE}/report-templates/${report.templateId}`, {
+                credentials: 'include'
+            });
+            if (templateRes.ok) {
+                const template = await templateRes.json();
+                // Transform flat sections to nested structure
+                const transformedTemplate = {
+                    ...template,
+                    sections: transformSectionsToNested(template.sections || [])
+                };
+                setTemplateData(transformedTemplate);
+            }
+            
+            // Fetch usage data
+            const usageRes = await fetch(`${API_BASE}/report-templates/${report.templateId}/usage`, {
+                credentials: 'include'
+            });
+            if (usageRes.ok) {
+                const usage = await usageRes.json();
+                setTemplateUsage(usage);
+            }
+            
+            setShowTemplateModal(true);
+        } catch (error) {
+            console.error('Error fetching template:', error);
+        }
+    };
+
+    const handleSaveTemplate = async (templateUpdate: any) => {
+        if (!templateData) return;
+        try {
+            const res = await fetch(`${API_BASE}/report-templates/${templateData.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(templateUpdate),
+                credentials: 'include'
+            });
+            if (res.ok) {
+                setShowTemplateModal(false);
+                // Refresh the report to get updated sections
+                fetchReport();
+            }
+        } catch (error) {
+            console.error('Error saving template:', error);
+        }
     };
 
     const handleUpdateComment = async (commentId: string) => {
@@ -542,8 +623,23 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                             const isPast = currentStatusIndex > idx;
                             // Line should be green if we've reached or passed that stage
                             const isLineComplete = currentStatusIndex >= idx;
-                            // Review button is disabled if not all sections are complete
-                            const isDisabled = status === 'review' && !allSectionsComplete && report.status === 'draft';
+                            
+                            // Determine if button is disabled and why
+                            let isDisabled = false;
+                            let disabledReason = '';
+                            
+                            if (status === 'review' && !allSectionsComplete && report.status === 'draft') {
+                                isDisabled = true;
+                                disabledReason = `Complete all sections first (${completedSectionsCount}/${parentSections.length})`;
+                            } else if (status === 'ready_to_send') {
+                                if (report.status === 'draft') {
+                                    isDisabled = true;
+                                    disabledReason = 'The document needs to be reviewed first';
+                                } else if (openCommentsCount > 0) {
+                                    isDisabled = true;
+                                    disabledReason = `Resolve all comments first (${openCommentsCount} open)`;
+                                }
+                            }
                             
                             return (
                                 <React.Fragment key={status}>
@@ -567,10 +663,10 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                             <StatusIcon size={16} />
                                             {config.label}
                                         </button>
-                                        {/* Tooltip for disabled Review button */}
-                                        {isDisabled && (
+                                        {/* Tooltip for disabled buttons */}
+                                        {isDisabled && disabledReason && (
                                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                                Complete all sections first ({completedSectionsCount}/{parentSections.length})
+                                                {disabledReason}
                                                 <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
                                             </div>
                                         )}
@@ -632,6 +728,13 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                     <div className="p-4">
                         <div className="flex items-center justify-between mb-3">
                             <h3 className="text-sm font-semibold text-slate-700">SECTIONS</h3>
+                            <button
+                                onClick={handleOpenTemplateModal}
+                                className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                                title="Edit template"
+                            >
+                                <Settings size={16} />
+                            </button>
                         </div>
                         <nav className="space-y-1">
                             {parentSections.map((section, idx) => {
@@ -888,18 +991,30 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                     </div>
                                 </div>
 
-                                {/* Generated Content */}
+                                {/* Generated Content with Highlighted Comments */}
                                 {(editingContent || selectedSection?.generatedContent) && (
                                     <div className="bg-white rounded-xl shadow-sm border border-slate-200">
                                         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                                            <h3 className="font-semibold text-slate-800">Generated Content</h3>
+                                            <div>
+                                                <h3 className="font-semibold text-slate-800">Generated Content</h3>
+                                                {sectionComments.filter(c => c.status === 'open').length > 0 && (
+                                                    <p className="text-xs text-amber-600 mt-0.5">
+                                                        {sectionComments.filter(c => c.status === 'open').length} comment{sectionComments.filter(c => c.status === 'open').length !== 1 ? 's' : ''} to address
+                                                    </p>
+                                                )}
+                                            </div>
                                             <div className="flex items-center gap-2">
+                                                {/* Toggle View/Edit Mode */}
                                                 <button
-                                                    onClick={() => setActiveTab('preview')}
-                                                    className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                                    onClick={() => setIsEditMode(!isEditMode)}
+                                                    className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1 ${
+                                                        isEditMode 
+                                                            ? 'bg-blue-100 text-blue-700' 
+                                                            : 'text-slate-600 hover:bg-slate-100'
+                                                    }`}
                                                 >
-                                                    <Eye size={16} className="inline mr-1" />
-                                                    Preview
+                                                    <Edit3 size={16} />
+                                                    {isEditMode ? 'Editing' : 'Edit'}
                                                 </button>
                                                 <button
                                                     onClick={handleSaveSection}
@@ -915,13 +1030,24 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                 </button>
                                             </div>
                                         </div>
+                                        
                                         <div className="p-6">
-                                            <textarea
-                                                value={editingContent}
-                                                onChange={(e) => setEditingContent(e.target.value)}
-                                                className="w-full min-h-[300px] p-4 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-y font-mono text-sm"
-                                                placeholder="Generated content will appear here..."
-                                            />
+                                            {isEditMode ? (
+                                                <textarea
+                                                    value={editingContent}
+                                                    onChange={(e) => setEditingContent(e.target.value)}
+                                                    className="w-full min-h-[300px] p-4 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-y font-mono text-sm"
+                                                    placeholder="Generated content will appear here..."
+                                                    autoFocus
+                                                />
+                                            ) : (
+                                                <div 
+                                                    className="min-h-[300px] p-4 border border-slate-200 rounded-lg bg-slate-50 text-sm whitespace-pre-wrap leading-relaxed cursor-pointer hover:bg-slate-100 transition-colors"
+                                                    dangerouslySetInnerHTML={{ __html: highlightedHtml || editingContent }}
+                                                    onClick={() => setIsEditMode(true)}
+                                                    title="Click to edit"
+                                                />
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -1249,6 +1375,326 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                         </div>
                     )}
                 </main>
+            </div>
+
+            {/* Template Edit Modal */}
+            {showTemplateModal && templateData && (
+                <TemplateEditModal
+                    template={templateData}
+                    onSave={handleSaveTemplate}
+                    onClose={() => setShowTemplateModal(false)}
+                    usage={templateUsage}
+                />
+            )}
+        </div>
+    );
+};
+
+// Template Edit Modal Component
+interface ModalTemplateSection {
+    id?: string;
+    title: string;
+    content?: string;
+    generationRules?: string;
+    items: ModalTemplateItem[];
+    isExpanded?: boolean;
+}
+
+interface ModalTemplateItem {
+    id?: string;
+    title: string;
+    content: string;
+    generationRules: string;
+}
+
+interface TemplateEditModalProps {
+    template: any;
+    onSave: (template: any) => void;
+    onClose: () => void;
+    usage?: { inUse: boolean; reportCount: number; reports: any[] } | null;
+}
+
+const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave, onClose, usage }) => {
+    const [name, setName] = useState(template?.name || '');
+    const [description, setDescription] = useState(template?.description || '');
+    const [icon, setIcon] = useState(template?.icon || 'FileText');
+    const [sections, setSections] = useState<ModalTemplateSection[]>(() => {
+        if (template?.sections && template.sections.length > 0) {
+            return template.sections.map((s: any) => ({
+                id: s.id,
+                title: s.title || '',
+                content: s.content || '',
+                generationRules: s.generationRules || '',
+                items: Array.isArray(s.items) ? s.items.map((item: any) => ({
+                    id: item.id,
+                    title: item.title || '',
+                    content: item.content || '',
+                    generationRules: item.generationRules || ''
+                })) : [],
+                isExpanded: true
+            }));
+        }
+        return [{ title: '', items: [], isExpanded: true }];
+    });
+    const [isSaving, setIsSaving] = useState(false);
+
+    const iconOptions = [
+        { value: 'FileText', label: 'Document', Icon: FileText },
+        { value: 'FlaskConical', label: 'Flask', Icon: FlaskConical },
+        { value: 'Clipboard', label: 'Clipboard', Icon: Clipboard },
+        { value: 'Wrench', label: 'Wrench', Icon: Wrench },
+        { value: 'AlertTriangle', label: 'Alert', Icon: AlertTriangle },
+        { value: 'Sparkles', label: 'Sparkles', Icon: Sparkles }
+    ];
+
+    const addSection = () => {
+        setSections([...sections, { title: '', items: [], isExpanded: true }]);
+    };
+
+    const removeSection = (index: number) => {
+        setSections(sections.filter((_, i) => i !== index));
+    };
+
+    const updateSection = (index: number, updates: Partial<ModalTemplateSection>) => {
+        setSections(sections.map((s, i) => i === index ? { ...s, ...updates } : s));
+    };
+
+    const toggleSection = (index: number) => {
+        setSections(sections.map((s, i) => i === index ? { ...s, isExpanded: !s.isExpanded } : s));
+    };
+
+    const addItem = (sectionIndex: number) => {
+        const newSections = [...sections];
+        newSections[sectionIndex].items.push({ title: '', content: '', generationRules: '' });
+        setSections(newSections);
+    };
+
+    const removeItem = (sectionIndex: number, itemIndex: number) => {
+        const newSections = [...sections];
+        newSections[sectionIndex].items = newSections[sectionIndex].items.filter((_, i) => i !== itemIndex);
+        setSections(newSections);
+    };
+
+    const updateItem = (sectionIndex: number, itemIndex: number, updates: Partial<ModalTemplateItem>) => {
+        const newSections = [...sections];
+        newSections[sectionIndex].items[itemIndex] = { ...newSections[sectionIndex].items[itemIndex], ...updates };
+        setSections(newSections);
+    };
+
+    const handleSubmit = async () => {
+        if (!name.trim()) {
+            alert('Please enter a template name');
+            return;
+        }
+        setIsSaving(true);
+        try {
+            await onSave({
+                name: name.trim(),
+                description: description.trim(),
+                icon,
+                sections: sections.filter(s => s.title.trim()).map(s => ({
+                    id: s.id, // Preserve existing section ID
+                    title: s.title,
+                    content: s.content || '',
+                    generationRules: s.generationRules || '',
+                    items: s.items.filter(i => i.title.trim()).map(item => ({
+                        id: item.id, // Preserve existing item ID
+                        title: item.title,
+                        content: item.content || '',
+                        generationRules: item.generationRules || ''
+                    }))
+                }))
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+                {/* Header */}
+                <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
+                    <h2 className="text-xl font-bold text-slate-800">Edit Template</h2>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                        <X size={20} className="text-slate-500" />
+                    </button>
+                </div>
+
+                {/* Usage Warning */}
+                {usage?.inUse && (
+                    <div className="px-6 py-3 bg-amber-50 border-b border-amber-100">
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={20} />
+                            <div>
+                                <p className="text-sm font-medium text-amber-800">
+                                    This template is used in {usage.reportCount} document{usage.reportCount !== 1 ? 's' : ''}
+                                </p>
+                                <p className="text-xs text-amber-600 mt-1">
+                                    Modifying sections may affect existing documents.
+                                </p>
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                    {usage.reports.slice(0, 5).map((report: any) => (
+                                        <span key={report.id} className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
+                                            {report.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    {/* Basic Info */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Template Name *</label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Icon</label>
+                            <div className="flex gap-2">
+                                {iconOptions.map(({ value, label, Icon }) => (
+                                    <button
+                                        key={value}
+                                        onClick={() => setIcon(value)}
+                                        className={`p-2 rounded-lg border-2 transition-all ${
+                                            icon === value
+                                                ? 'border-teal-500 bg-teal-50 text-teal-600'
+                                                : 'border-slate-200 hover:border-slate-300 text-slate-500'
+                                        }`}
+                                        title={label}
+                                    >
+                                        <Icon size={20} />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                        <input
+                            type="text"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                        />
+                    </div>
+
+                    {/* Sections */}
+                    <div>
+                        <div className="flex items-center justify-between mb-3">
+                            <label className="text-sm font-medium text-slate-700">Sections</label>
+                            <button onClick={addSection} className="flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700 font-medium">
+                                <Plus size={16} />
+                                Add Section
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            {sections.map((section, sIdx) => (
+                                <div key={sIdx} className="border border-slate-200 rounded-lg overflow-hidden">
+                                    <div className="bg-slate-50 px-4 py-3 flex items-center gap-3">
+                                        <button onClick={() => toggleSection(sIdx)} className="text-slate-400 hover:text-slate-600">
+                                            {section.isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                                        </button>
+                                        <span className="text-sm text-slate-500 font-medium">Section {sIdx + 1} Title</span>
+                                        <input
+                                            type="text"
+                                            value={section.title}
+                                            onChange={(e) => updateSection(sIdx, { title: e.target.value })}
+                                            className="flex-1 px-2 py-1 border border-slate-200 rounded focus:ring-1 focus:ring-teal-500 outline-none text-sm"
+                                        />
+                                        <button onClick={() => addItem(sIdx)} className="p-1 text-teal-600 hover:bg-teal-50 rounded" title="Add item">
+                                            <Plus size={18} />
+                                        </button>
+                                        <button onClick={() => removeSection(sIdx)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Remove section">
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
+
+                                    {section.isExpanded && (
+                                        <div className="p-4 space-y-3">
+                                            {section.items.length > 0 ? (
+                                                <div className="space-y-3">
+                                                    {section.items.map((item, iIdx) => (
+                                                        <div key={iIdx} className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                                                            <div className="flex items-start gap-2 mb-2">
+                                                                <GripVertical size={16} className="text-slate-300 mt-2 shrink-0" />
+                                                                <div className="flex-1 space-y-2">
+                                                                    <div>
+                                                                        <label className="text-xs text-slate-500">Item Title</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={item.title}
+                                                                            onChange={(e) => updateItem(sIdx, iIdx, { title: e.target.value })}
+                                                                            className="w-full px-2 py-1.5 border border-slate-200 rounded focus:ring-1 focus:ring-teal-500 outline-none text-sm"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-xs text-slate-500">Content</label>
+                                                                        <textarea
+                                                                            value={item.content}
+                                                                            onChange={(e) => updateItem(sIdx, iIdx, { content: e.target.value })}
+                                                                            rows={2}
+                                                                            className="w-full px-2 py-1.5 border border-slate-200 rounded focus:ring-1 focus:ring-teal-500 outline-none text-sm resize-none"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-xs text-slate-500">Generation Rules <span className="text-slate-400">(optional)</span></label>
+                                                                        <textarea
+                                                                            value={item.generationRules}
+                                                                            onChange={(e) => updateItem(sIdx, iIdx, { generationRules: e.target.value })}
+                                                                            rows={2}
+                                                                            className="w-full px-2 py-1.5 border border-slate-200 rounded focus:ring-1 focus:ring-teal-500 outline-none text-sm resize-none"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                                <button onClick={() => removeItem(sIdx, iIdx)} className="p-1 text-red-400 hover:bg-red-50 rounded shrink-0" title="Remove item">
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="text-center py-4 border-2 border-dashed border-slate-200 rounded-lg">
+                                                    <p className="text-sm text-slate-400">No items in this section</p>
+                                                    <button onClick={() => addItem(sIdx)} className="mt-2 text-sm text-teal-600 hover:text-teal-700 font-medium">
+                                                        + Add item
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 shrink-0">
+                    <button onClick={onClose} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors">
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={isSaving}
+                        className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                        {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                        Save Changes
+                    </button>
+                </div>
             </div>
         </div>
     );
