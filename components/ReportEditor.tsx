@@ -662,7 +662,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                         ? `${config.bg} ${config.color} ring-2 ring-offset-2 ring-teal-500/30`
                                                         : isPast
                                                             ? 'bg-teal-50 text-teal-600'
-                                                            : 'bg-white text-slate-400 hover:bg-slate-100'
+                                                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900 cursor-pointer'
                                             }`}
                                         >
                                             <StatusIcon size={16} />
@@ -1153,16 +1153,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                 Select text to add comments • {sectionComments.filter(c => c.status === 'open').length} open comment{sectionComments.filter(c => c.status === 'open').length !== 1 ? 's' : ''}
                                             </p>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => handleStatusChange('ready_to_send')}
-                                                className="flex items-center gap-2 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-colors"
-                                            >
-                                                <Send size={14} />
-                                                Ready to Send
-                                            </button>
                                         </div>
-                                    </div>
 
                                     {/* Content Area */}
                                     <div 
