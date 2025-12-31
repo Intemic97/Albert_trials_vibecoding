@@ -227,6 +227,47 @@ async function initDb() {
       FOREIGN KEY(templateId) REFERENCES report_templates(id) ON DELETE CASCADE,
       FOREIGN KEY(parentId) REFERENCES template_sections(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS reports (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT NOT NULL,
+      templateId TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      status TEXT DEFAULT 'draft',
+      createdBy TEXT NOT NULL,
+      reviewerId TEXT,
+      deadline TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(templateId) REFERENCES report_templates(id),
+      FOREIGN KEY(createdBy) REFERENCES users(id),
+      FOREIGN KEY(reviewerId) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS report_sections (
+      id TEXT PRIMARY KEY,
+      reportId TEXT NOT NULL,
+      templateSectionId TEXT NOT NULL,
+      content TEXT,
+      userPrompt TEXT,
+      status TEXT DEFAULT 'empty',
+      generatedAt TEXT,
+      FOREIGN KEY(reportId) REFERENCES reports(id) ON DELETE CASCADE,
+      FOREIGN KEY(templateSectionId) REFERENCES template_sections(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS report_contexts (
+      id TEXT PRIMARY KEY,
+      reportId TEXT NOT NULL,
+      fileName TEXT NOT NULL,
+      filePath TEXT NOT NULL,
+      fileSize INTEGER,
+      extractedText TEXT,
+      uploadedAt TEXT,
+      FOREIGN KEY(reportId) REFERENCES reports(id) ON DELETE CASCADE
+    );
   `);
 
   // Migration: Add profilePhoto and companyRole columns to users table if they don't exist

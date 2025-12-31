@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams, Navi
 import { Sidebar } from './components/Sidebar';
 import { EntityCard } from './components/EntityCard';
 import { Reporting } from './components/Reporting';
+import { ReportEditor } from './components/ReportEditor';
 import { Dashboard } from './components/Dashboard';
 import { Overview } from './components/Overview';
 import { Workflows } from './components/Workflows';
@@ -874,6 +875,9 @@ function AuthenticatedApp() {
                     } />
                     <Route path="/reports" element={
                         <Reporting entities={entities} companyInfo={companyInfo} onViewChange={handleNavigate} />
+                    } />
+                    <Route path="/reports/:reportId" element={
+                        <ReportEditor entities={entities} companyInfo={companyInfo} onViewChange={handleNavigate} />
                     } />
                     <Route path="/settings" element={
                         <Settings onViewChange={handleNavigate} onShowTutorial={() => setShowTutorial(true)} />

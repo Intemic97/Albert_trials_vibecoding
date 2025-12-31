@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { useNavigate } from 'react-router-dom';
 import { Entity } from '../types';
 import { 
     Sparkles, FileText, FlaskConical, Clipboard, Wrench, AlertTriangle, Download,
-    Plus, Trash2, Edit3, X, ChevronDown, ChevronRight, GripVertical, Save, Loader2
+    Plus, Trash2, Edit3, X, ChevronDown, ChevronRight, GripVertical, Save, Loader2,
+    Clock, User, Calendar, FileCheck, MoreVertical
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -46,6 +48,32 @@ interface ReportTemplate {
     updatedAt?: string;
 }
 
+// Saved report from database
+interface SavedReport {
+    id: string;
+    name: string;
+    description: string;
+    status: 'draft' | 'review' | 'ready_to_send';
+    templateId: string;
+    templateName: string;
+    createdBy: string;
+    createdByName: string;
+    createdByEmail: string;
+    reviewerId?: string;
+    reviewerName?: string;
+    reviewerEmail?: string;
+    deadline?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+// Organization user for reviewer dropdown
+interface OrgUser {
+    id: string;
+    name: string;
+    email: string;
+}
+
 // Icon mapping for templates
 const iconMap: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
     FileText,
@@ -56,78 +84,34 @@ const iconMap: Record<string, React.ComponentType<{ size?: number; className?: s
     Sparkles
 };
 
-// Default templates for new organizations (will be used if no templates exist)
-const defaultTemplates: Omit<ReportTemplate, 'id' | 'createdAt' | 'updatedAt'>[] = [
-    {
-        name: 'GMP Production Summary',
-        description: 'Comprehensive production report covering batches, yields, and deviations',
-        icon: 'FileText',
-        sections: [
-            {
-                title: '1. Executive Summary',
-                items: [
-                    { title: 'Overview', content: 'Overview of production activities in the reporting period', generationRules: '' },
-                    { title: 'Key Performance Indicators', content: 'Key performance indicators and metrics', generationRules: '' },
-                    { title: 'Critical Findings', content: 'Critical findings and recommendations', generationRules: '' }
-                ]
-            },
-            {
-                title: '2. Batch Production Overview',
-                items: [
-                    { title: 'Batches Produced', content: 'List all batches produced with numbers, products, and quantities', generationRules: '' },
-                    { title: 'Yield Analysis', content: 'Batch yield analysis and efficiency metrics', generationRules: '' }
-                ]
-            },
-            {
-                title: '3. Quality Metrics',
-                items: [
-                    { title: 'QC Results', content: 'In-process quality control results', generationRules: '' },
-                    { title: 'Deviations', content: 'Summary of any deviations encountered', generationRules: '' }
-                ]
-            }
-        ]
-    },
-    {
-        name: 'Quality Control Report',
-        description: 'Focus on testing, specifications, and quality events',
-        icon: 'FlaskConical',
-        sections: [
-            {
-                title: '1. QC Testing Summary',
-                items: [
-                    { title: 'Tests Performed', content: 'Overview of all quality control tests performed', generationRules: '' },
-                    { title: 'Methods Used', content: 'Test methods and specifications used', generationRules: '' }
-                ]
-            },
-            {
-                title: '2. Results Analysis',
-                items: [
-                    { title: 'Results Summary', content: 'Summary of results by product/batch', generationRules: '' },
-                    { title: 'OOS Events', content: 'List of any out-of-specification results', generationRules: '' }
-                ]
-            }
-        ]
-    }
-];
+const statusConfig = {
+    draft: { label: 'Draft', color: 'text-amber-600', bg: 'bg-amber-50', borderColor: 'border-amber-200' },
+    review: { label: 'In Review', color: 'text-blue-600', bg: 'bg-blue-50', borderColor: 'border-blue-200' },
+    ready_to_send: { label: 'Ready', color: 'text-teal-600', bg: 'bg-teal-50', borderColor: 'border-teal-200' }
+};
 
 export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onViewChange }) => {
-    const [isLoading, setIsLoading] = useState(false);
-    const [report, setReport] = useState<string | null>(null);
-    const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
-    const [templatePrompt, setTemplatePrompt] = useState('');
+    const navigate = useNavigate();
     
-    // Templates management
+    // Templates state
     const [templates, setTemplates] = useState<ReportTemplate[]>([]);
     const [templatesLoading, setTemplatesLoading] = useState(true);
     const [showTemplateModal, setShowTemplateModal] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState<ReportTemplate | null>(null);
+    
+    // Reports state
+    const [reports, setReports] = useState<SavedReport[]>([]);
+    const [reportsLoading, setReportsLoading] = useState(true);
+    const [showNewReportModal, setShowNewReportModal] = useState(false);
+    
+    // Organization users for reviewer dropdown
+    const [orgUsers, setOrgUsers] = useState<OrgUser[]>([]);
 
-    const reportRef = useRef<HTMLDivElement>(null);
-    const resultsContainerRef = useRef<HTMLDivElement>(null);
-
-    // Fetch templates on mount
+    // Fetch all data on mount
     useEffect(() => {
         fetchTemplates();
+        fetchReports();
+        fetchOrgUsers();
     }, []);
 
     const fetchTemplates = async () => {
@@ -138,7 +122,6 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
             });
             if (res.ok) {
                 const data = await res.json();
-                // Transform flat sections to nested structure
                 const transformedTemplates = data.map((template: any) => ({
                     ...template,
                     sections: transformSectionsToNested(template.sections || [])
@@ -149,6 +132,37 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
             console.error('Error fetching templates:', error);
         } finally {
             setTemplatesLoading(false);
+        }
+    };
+
+    const fetchReports = async () => {
+        setReportsLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/reports`, {
+                credentials: 'include'
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setReports(data);
+            }
+        } catch (error) {
+            console.error('Error fetching reports:', error);
+        } finally {
+            setReportsLoading(false);
+        }
+    };
+
+    const fetchOrgUsers = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/organization/users`, {
+                credentials: 'include'
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setOrgUsers(data);
+            }
+        } catch (error) {
+            console.error('Error fetching org users:', error);
         }
     };
 
@@ -177,53 +191,6 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
         });
     };
 
-    // Generate prompt from template sections
-    const generatePromptFromTemplate = (template: ReportTemplate): string => {
-        let prompt = `Generate a comprehensive ${template.name} with the following sections:\n\n`;
-        
-        template.sections.forEach((section, sIdx) => {
-            prompt += `${section.title}\n`;
-            if (section.content) {
-                prompt += `   - ${section.content}\n`;
-            }
-            if (section.generationRules) {
-                prompt += `   [Rules: ${section.generationRules}]\n`;
-            }
-            section.items.forEach((item) => {
-                prompt += `   - ${item.title}`;
-                if (item.content) {
-                    prompt += `: ${item.content}`;
-                }
-                prompt += '\n';
-                if (item.generationRules) {
-                    prompt += `     [Rules: ${item.generationRules}]\n`;
-                }
-            });
-            prompt += '\n';
-        });
-        
-        prompt += '\nPlease provide detailed analysis with data-driven insights. Reference relevant @Entity data where applicable.';
-        return prompt;
-    };
-
-    // Auto-scroll to results when report is generated
-    useEffect(() => {
-        if (report && resultsContainerRef.current) {
-            setTimeout(() => {
-                resultsContainerRef.current?.scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'start' 
-                });
-            }, 100);
-        }
-    }, [report]);
-
-    const handleTemplateSelect = (template: ReportTemplate) => {
-        setSelectedTemplate(template);
-        const prompt = generatePromptFromTemplate(template);
-        setTemplatePrompt(prompt);
-    };
-
     const handleCreateTemplate = () => {
         setEditingTemplate(null);
         setShowTemplateModal(true);
@@ -246,10 +213,6 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
             });
             if (res.ok) {
                 setTemplates(prev => prev.filter(t => t.id !== templateId));
-                if (selectedTemplate?.id === templateId) {
-                    setSelectedTemplate(null);
-                    setTemplatePrompt('');
-                }
             }
         } catch (error) {
             console.error('Error deleting template:', error);
@@ -259,7 +222,6 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
     const handleSaveTemplate = async (templateData: Omit<ReportTemplate, 'id' | 'createdAt' | 'updatedAt'>) => {
         try {
             if (editingTemplate) {
-                // Update existing
                 const res = await fetch(`${API_BASE}/report-templates/${editingTemplate.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -270,7 +232,6 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                     fetchTemplates();
                 }
             } else {
-                // Create new
                 const res = await fetch(`${API_BASE}/report-templates`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -288,106 +249,43 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
         }
     };
 
-    const handleGenerate = async (prompt: string, mentionedEntityIds: string[]) => {
-        if (!prompt.trim()) return;
-
-        setIsLoading(true);
-        setReport(null);
-
+    const handleCreateReport = async (reportData: {
+        name: string;
+        description: string;
+        templateId: string;
+        reviewerId: string | null;
+        deadline: string | null;
+    }) => {
         try {
-            await fetch(`${API_BASE}/node-feedback`, {
+            const res = await fetch(`${API_BASE}/reports`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    nodeType: 'report_prompt',
-                    nodeLabel: 'Reports',
-                    feedbackText: prompt
-                }),
+                body: JSON.stringify(reportData),
                 credentials: 'include'
             });
-        } catch (e) {
-            // Silent fail
-        }
-
-        try {
-            const res = await fetch(`${API_BASE}/generate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt,
-                    mentionedEntityIds
-                }),
-                credentials: 'include'
-            });
-
-            const data = await res.json();
-            if (data.error) {
-                throw new Error(data.error);
+            if (res.ok) {
+                const { id } = await res.json();
+                navigate(`/reports/${id}`);
             }
-            setReport(data.response);
         } catch (error) {
-            console.error('Error generating report:', error);
-            setReport('Failed to generate report. Please try again.');
-        } finally {
-            setIsLoading(false);
+            console.error('Error creating report:', error);
         }
     };
 
-    const handleDownloadPDF = async () => {
-        if (!reportRef.current || !report) return;
+    const handleDeleteReport = async (reportId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!confirm('Are you sure you want to delete this report?')) return;
 
         try {
-            const tempContainer = document.createElement('div');
-            tempContainer.style.position = 'absolute';
-            tempContainer.style.left = '-9999px';
-            tempContainer.style.width = '210mm';
-            tempContainer.style.padding = '20mm';
-            tempContainer.style.backgroundColor = 'white';
-            tempContainer.style.fontFamily = 'Arial, sans-serif';
-
-            const clonedReport = reportRef.current.cloneNode(true) as HTMLElement;
-            tempContainer.appendChild(clonedReport);
-            document.body.appendChild(tempContainer);
-
-            const canvas = await html2canvas(tempContainer, {
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff'
+            const res = await fetch(`${API_BASE}/reports/${reportId}`, {
+                method: 'DELETE',
+                credentials: 'include'
             });
-
-            document.body.removeChild(tempContainer);
-
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4'
-            });
-
-            const imgWidth = 210;
-            const pageHeight = 297;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            let heightLeft = imgHeight;
-            let position = 0;
-
-            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
-
-            while (heightLeft > 0) {
-                position = heightLeft - imgHeight;
-                pdf.addPage();
-                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
+            if (res.ok) {
+                setReports(prev => prev.filter(r => r.id !== reportId));
             }
-
-            const timestamp = new Date().toISOString().split('T')[0];
-            const filename = `report_${timestamp}.pdf`;
-
-            pdf.save(filename);
         } catch (error) {
-            console.error('Error generating PDF:', error);
-            alert('Failed to generate PDF. Please try again.');
+            console.error('Error deleting report:', error);
         }
     };
 
@@ -402,8 +300,8 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                 <div className="flex items-center gap-3">
                     <Sparkles className="text-teal-600" size={24} />
                     <div>
-                        <h1 className="text-xl font-bold text-slate-800">AI Reporting</h1>
-                        <p className="text-xs text-slate-500">Generate insights from your data</p>
+                        <h1 className="text-xl font-bold text-slate-800">Reports</h1>
+                        <p className="text-xs text-slate-500">Create and manage your documents</p>
                     </div>
                 </div>
                 <div className="flex items-center space-x-4">
@@ -413,17 +311,109 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
 
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                <div className="max-w-4xl mx-auto space-y-8">
+                <div className="max-w-6xl mx-auto space-y-8">
+
+                    {/* My Documents Section */}
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                            <FileCheck className="text-teal-600" size={20} />
+                            <h2 className="text-lg font-semibold text-slate-800">My Documents</h2>
+                            <span className="text-xs text-slate-400 ml-2">{reports.length} document{reports.length !== 1 ? 's' : ''}</span>
+                            <button
+                                onClick={() => setShowNewReportModal(true)}
+                                className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium transition-colors"
+                            >
+                                <Plus size={16} />
+                                New Document
+                            </button>
+                        </div>
+
+                        {reportsLoading ? (
+                            <div className="flex items-center justify-center py-12">
+                                <Loader2 className="animate-spin text-teal-600" size={24} />
+                            </div>
+                        ) : reports.length === 0 ? (
+                            <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-lg">
+                                <FileText className="mx-auto text-slate-300" size={48} />
+                                <p className="text-slate-500 mt-2">No documents yet</p>
+                                <p className="text-slate-400 text-sm mt-1">Create your first document to get started</p>
+                                <button
+                                    onClick={() => setShowNewReportModal(true)}
+                                    className="mt-4 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-colors"
+                                >
+                                    Create Document
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {reports.map((report) => {
+                                    const status = statusConfig[report.status];
+                                    return (
+                                        <div
+                                            key={report.id}
+                                            onClick={() => navigate(`/reports/${report.id}`)}
+                                            className={`group relative p-4 rounded-lg border-2 transition-all duration-200 hover:shadow-md cursor-pointer bg-white ${status.borderColor} hover:border-teal-400`}
+                                        >
+                                            {/* Status Badge */}
+                                            <div className={`absolute top-3 right-3 px-2 py-0.5 text-xs font-medium rounded-full ${status.bg} ${status.color}`}>
+                                                {status.label}
+                                            </div>
+
+                                            {/* Delete Button */}
+                                            <button
+                                                onClick={(e) => handleDeleteReport(report.id, e)}
+                                                className="absolute top-3 right-20 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+
+                                            <div className="pr-16">
+                                                <h3 className="font-semibold text-slate-800 mb-1 truncate">
+                                                    {report.name}
+                                                </h3>
+                                                <p className="text-xs text-slate-500 mb-3">
+                                                    {report.templateName}
+                                                </p>
+                                            </div>
+
+                                            <div className="space-y-2 text-sm">
+                                                <div className="flex items-center gap-2 text-slate-600">
+                                                    <User size={14} className="text-slate-400" />
+                                                    <span className="truncate">{report.createdByName}</span>
+                                                </div>
+                                                {report.reviewerName && (
+                                                    <div className="flex items-center gap-2 text-slate-600">
+                                                        <User size={14} className="text-blue-400" />
+                                                        <span className="truncate">Reviewer: {report.reviewerName}</span>
+                                                    </div>
+                                                )}
+                                                {report.deadline && (
+                                                    <div className="flex items-center gap-2 text-slate-600">
+                                                        <Calendar size={14} className="text-amber-500" />
+                                                        <span>{new Date(report.deadline).toLocaleDateString()}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+                                                <span>Updated {new Date(report.updatedAt).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
 
                     {/* Templates Section */}
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                         <div className="flex items-center gap-2 mb-4">
                             <FileText className="text-teal-600" size={20} />
                             <h2 className="text-lg font-semibold text-slate-800">Report Templates</h2>
-                            <span className="text-xs text-slate-500 ml-2">Select a template to get started</span>
+                            <span className="text-xs text-slate-400 ml-2">Templates define the structure of your documents</span>
                             <button
                                 onClick={handleCreateTemplate}
-                                className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-colors"
+                                className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium transition-colors"
                             >
                                 <Plus size={16} />
                                 New Template
@@ -433,13 +423,12 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                         {templatesLoading ? (
                             <div className="flex items-center justify-center py-12">
                                 <Loader2 className="animate-spin text-teal-600" size={24} />
-                                <span className="ml-2 text-slate-500">Loading templates...</span>
                             </div>
                         ) : templates.length === 0 ? (
                             <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-lg">
                                 <FileText className="mx-auto text-slate-300" size={48} />
                                 <p className="text-slate-500 mt-2">No templates yet</p>
-                                <p className="text-slate-400 text-sm mt-1">Create your first template to get started</p>
+                                <p className="text-slate-400 text-sm mt-1">Create your first template to structure your documents</p>
                                 <button
                                     onClick={handleCreateTemplate}
                                     className="mt-4 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-colors"
@@ -448,19 +437,13 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                 </button>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                 {templates.map((template) => {
                                     const IconComponent = getIconComponent(template.icon);
-                                    const isSelected = selectedTemplate?.id === template.id;
                                     return (
                                         <div
                                             key={template.id}
-                                            onClick={() => handleTemplateSelect(template)}
-                                            className={`group relative text-left p-4 rounded-lg border-2 transition-all duration-200 hover:shadow-md cursor-pointer ${
-                                                isSelected
-                                                    ? 'border-teal-500 bg-teal-50 shadow-md'
-                                                    : 'border-slate-200 bg-white hover:border-teal-300'
-                                            }`}
+                                            className="group relative p-4 rounded-lg border border-slate-200 bg-white hover:border-teal-300 hover:shadow-sm transition-all"
                                         >
                                             {/* Action buttons */}
                                             <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -481,117 +464,27 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                             </div>
 
                                             <div className="flex items-start gap-3">
-                                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-                                                    isSelected
-                                                        ? 'bg-teal-600 text-white'
-                                                        : 'bg-slate-100 text-slate-600 group-hover:bg-teal-100 group-hover:text-teal-600'
-                                                }`}>
+                                                <div className="w-10 h-10 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
                                                     <IconComponent size={20} />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className={`font-semibold text-sm mb-1 transition-colors ${
-                                                        isSelected ? 'text-teal-700' : 'text-slate-800 group-hover:text-teal-700'
-                                                    }`}>
+                                                    <h3 className="font-semibold text-sm text-slate-800 truncate">
                                                         {template.name}
                                                     </h3>
-                                                    <p className="text-xs text-slate-500 line-clamp-2">
+                                                    <p className="text-xs text-slate-500 line-clamp-2 mt-1">
                                                         {template.description}
                                                     </p>
-                                                    <p className="text-xs text-slate-400 mt-1">
-                                                        {template.sections.length} sections
+                                                    <p className="text-xs text-slate-400 mt-2">
+                                                        {template.sections.length} section{template.sections.length !== 1 ? 's' : ''}
                                                     </p>
                                                 </div>
                                             </div>
-                                            {isSelected && (
-                                                <div className="mt-3 flex items-center gap-1 text-xs text-teal-600 font-medium">
-                                                    <Sparkles size={12} />
-                                                    <span>Template loaded</span>
-                                                </div>
-                                            )}
                                         </div>
                                     );
                                 })}
                             </div>
                         )}
                     </div>
-
-                    {/* Selected Template Preview */}
-                    {selectedTemplate && (
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                            <div className="flex items-center gap-2 mb-4">
-                                <ChevronDown className="text-teal-600" size={20} />
-                                <h2 className="text-lg font-semibold text-slate-800">Template Structure</h2>
-                                <span className="text-xs text-slate-400 ml-2">{selectedTemplate.name}</span>
-                            </div>
-                            <div className="space-y-2">
-                                {selectedTemplate.sections.map((section, idx) => (
-                                    <div key={section.id || idx} className="border border-slate-100 rounded-lg overflow-hidden">
-                                        <div className="bg-slate-50 px-4 py-2 font-medium text-slate-700 text-sm">
-                                            {section.title}
-                                        </div>
-                                        {section.items.length > 0 && (
-                                            <div className="px-4 py-2 space-y-1">
-                                                {section.items.map((item, itemIdx) => (
-                                                    <div key={item.id || itemIdx} className="text-sm text-slate-600 pl-4 border-l-2 border-teal-200">
-                                                        <span className="font-medium">{item.title}</span>
-                                                        {item.content && (
-                                                            <span className="text-slate-400"> — {item.content}</span>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Input Area */}
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 relative group focus-within:ring-2 focus-within:ring-teal-500/20 transition-all">
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                            Draft your query
-                        </label>
-
-                        <PromptInput
-                            key={selectedTemplate?.id || 'empty'}
-                            entities={entities}
-                            companyInfo={companyInfo}
-                            onGenerate={handleGenerate}
-                            isGenerating={isLoading}
-                            initialValue={templatePrompt}
-                            placeholder="e.g. Analyze the capacity of @Factories and list any issues..."
-                            buttonLabel="Generate Report"
-                        />
-                    </div>
-
-                    {/* Results Area */}
-                    {report && (
-                        <div 
-                            ref={resultsContainerRef}
-                            className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 animate-in fade-in slide-in-from-bottom-4 duration-500"
-                        >
-                            <div className="flex items-center gap-3 mb-6 pb-6 border-b border-slate-100">
-                                <div className="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center">
-                                    <Sparkles className="text-teal-600" size={20} />
-                                </div>
-                                <div className="flex-1">
-                                    <h2 className="text-lg font-bold text-slate-800">Generated Insights</h2>
-                                    <p className="text-sm text-slate-500">Based on your data context</p>
-                                </div>
-                                <button
-                                    onClick={handleDownloadPDF}
-                                    className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium shadow-sm transition-all"
-                                >
-                                    <Download size={16} />
-                                    Download PDF
-                                </button>
-                            </div>
-                            <div ref={reportRef} className="prose prose-slate max-w-none">
-                                <ReactMarkdown>{report}</ReactMarkdown>
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
 
@@ -606,6 +499,176 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                     }}
                 />
             )}
+
+            {/* New Report Modal */}
+            {showNewReportModal && (
+                <NewReportModal
+                    templates={templates}
+                    orgUsers={orgUsers}
+                    onSave={handleCreateReport}
+                    onClose={() => setShowNewReportModal(false)}
+                />
+            )}
+        </div>
+    );
+};
+
+// New Report Modal Component
+interface NewReportModalProps {
+    templates: ReportTemplate[];
+    orgUsers: OrgUser[];
+    onSave: (data: { name: string; description: string; templateId: string; reviewerId: string | null; deadline: string | null }) => void;
+    onClose: () => void;
+}
+
+const NewReportModal: React.FC<NewReportModalProps> = ({ templates, orgUsers, onSave, onClose }) => {
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [templateId, setTemplateId] = useState('');
+    const [reviewerId, setReviewerId] = useState('');
+    const [deadline, setDeadline] = useState('');
+    const [isCreating, setIsCreating] = useState(false);
+
+    const handleSubmit = async () => {
+        if (!name.trim()) {
+            alert('Please enter a document name');
+            return;
+        }
+        if (!templateId) {
+            alert('Please select a template');
+            return;
+        }
+
+        setIsCreating(true);
+        await onSave({
+            name: name.trim(),
+            description: description.trim(),
+            templateId,
+            reviewerId: reviewerId || null,
+            deadline: deadline || null
+        });
+        setIsCreating(false);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+                {/* Header */}
+                <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                    <h2 className="text-xl font-bold text-slate-800">New Document</h2>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                        <X size={20} className="text-slate-500" />
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                            Document Name *
+                        </label>
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="e.g., Q4 Production Audit"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                            Description <span className="text-slate-400">(optional)</span>
+                        </label>
+                        <textarea
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Brief description of this document..."
+                            rows={2}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-none"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                            Template *
+                        </label>
+                        <select
+                            value={templateId}
+                            onChange={(e) => setTemplateId(e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
+                        >
+                            <option value="">Select a template...</option>
+                            {templates.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
+                        {templates.length === 0 && (
+                            <p className="text-sm text-amber-600 mt-1">
+                                No templates available. Create a template first.
+                            </p>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                            Reviewer <span className="text-slate-400">(optional)</span>
+                        </label>
+                        <select
+                            value={reviewerId}
+                            onChange={(e) => setReviewerId(e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
+                        >
+                            <option value="">No reviewer assigned</option>
+                            {orgUsers.map(u => (
+                                <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                            Deadline <span className="text-slate-400">(optional)</span>
+                        </label>
+                        <input
+                            type="date"
+                            value={deadline}
+                            onChange={(e) => setDeadline(e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                        />
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-3">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={isCreating || templates.length === 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white rounded-lg font-medium transition-colors"
+                    >
+                        {isCreating ? (
+                            <>
+                                <Loader2 size={16} className="animate-spin" />
+                                Creating...
+                            </>
+                        ) : (
+                            <>
+                                <Plus size={16} />
+                                Create Document
+                            </>
+                        )}
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };

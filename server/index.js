@@ -3298,6 +3298,483 @@ app.delete('/api/report-templates/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// ==================== REPORTS ENDPOINTS ====================
+
+// Get all reports for organization
+app.get('/api/reports', authenticateToken, async (req, res) => {
+    try {
+        const reports = await db.all(`
+            SELECT r.*, 
+                   u.name as createdByName, u.email as createdByEmail,
+                   rev.name as reviewerName, rev.email as reviewerEmail,
+                   t.name as templateName
+            FROM reports r
+            LEFT JOIN users u ON r.createdBy = u.id
+            LEFT JOIN users rev ON r.reviewerId = rev.id
+            LEFT JOIN report_templates t ON r.templateId = t.id
+            WHERE r.organizationId = ?
+            ORDER BY r.updatedAt DESC
+        `, [req.user.orgId]);
+        
+        res.json(reports);
+    } catch (error) {
+        console.error('Error fetching reports:', error);
+        res.status(500).json({ error: 'Failed to fetch reports' });
+    }
+});
+
+// Get single report with all sections and contexts
+app.get('/api/reports/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const report = await db.get(`
+            SELECT r.*, 
+                   u.name as createdByName, u.email as createdByEmail,
+                   rev.name as reviewerName, rev.email as reviewerEmail,
+                   t.name as templateName
+            FROM reports r
+            LEFT JOIN users u ON r.createdBy = u.id
+            LEFT JOIN users rev ON r.reviewerId = rev.id
+            LEFT JOIN report_templates t ON r.templateId = t.id
+            WHERE r.id = ? AND r.organizationId = ?
+        `, [id, req.user.orgId]);
+        
+        if (!report) {
+            return res.status(404).json({ error: 'Report not found' });
+        }
+        
+        // Get template sections
+        const templateSections = await db.all(`
+            SELECT * FROM template_sections 
+            WHERE templateId = ? 
+            ORDER BY sortOrder ASC
+        `, [report.templateId]);
+        
+        // Get report sections (generated content)
+        const reportSections = await db.all(`
+            SELECT * FROM report_sections 
+            WHERE reportId = ?
+        `, [id]);
+        
+        // Get contexts
+        const contexts = await db.all(`
+            SELECT id, fileName, fileSize, uploadedAt 
+            FROM report_contexts 
+            WHERE reportId = ?
+            ORDER BY uploadedAt DESC
+        `, [id]);
+        
+        // Merge template sections with report sections
+        const sections = templateSections.map(ts => {
+            const rs = reportSections.find(r => r.templateSectionId === ts.id);
+            return {
+                ...ts,
+                reportSectionId: rs?.id,
+                generatedContent: rs?.content || null,
+                userPrompt: rs?.userPrompt || null,
+                sectionStatus: rs?.status || 'empty',
+                generatedAt: rs?.generatedAt || null
+            };
+        });
+        
+        report.sections = sections;
+        report.contexts = contexts;
+        
+        res.json(report);
+    } catch (error) {
+        console.error('Error fetching report:', error);
+        res.status(500).json({ error: 'Failed to fetch report' });
+    }
+});
+
+// Create new report
+app.post('/api/reports', authenticateToken, async (req, res) => {
+    try {
+        const { name, description, templateId, reviewerId, deadline } = req.body;
+        const id = Math.random().toString(36).substr(2, 9);
+        const now = new Date().toISOString();
+        
+        await db.run(`
+            INSERT INTO reports (id, organizationId, templateId, name, description, status, createdBy, reviewerId, deadline, createdAt, updatedAt)
+            VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)
+        `, [id, req.user.orgId, templateId, name, description || '', req.user.sub, reviewerId || null, deadline || null, now, now]);
+        
+        // Create empty report sections for each template section
+        const templateSections = await db.all(
+            'SELECT id FROM template_sections WHERE templateId = ? AND parentId IS NULL ORDER BY sortOrder',
+            [templateId]
+        );
+        
+        for (const section of templateSections) {
+            const sectionId = Math.random().toString(36).substr(2, 9);
+            await db.run(`
+                INSERT INTO report_sections (id, reportId, templateSectionId, status)
+                VALUES (?, ?, ?, 'empty')
+            `, [sectionId, id, section.id]);
+        }
+        
+        // Also create for subsections
+        const subSections = await db.all(
+            'SELECT id FROM template_sections WHERE templateId = ? AND parentId IS NOT NULL ORDER BY sortOrder',
+            [templateId]
+        );
+        
+        for (const section of subSections) {
+            const sectionId = Math.random().toString(36).substr(2, 9);
+            await db.run(`
+                INSERT INTO report_sections (id, reportId, templateSectionId, status)
+                VALUES (?, ?, ?, 'empty')
+            `, [sectionId, id, section.id]);
+        }
+        
+        res.json({ id, message: 'Report created' });
+    } catch (error) {
+        console.error('Error creating report:', error);
+        res.status(500).json({ error: 'Failed to create report' });
+    }
+});
+
+// Update report metadata
+app.put('/api/reports/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, description, reviewerId, deadline } = req.body;
+        const now = new Date().toISOString();
+        
+        const existing = await db.get(
+            'SELECT id FROM reports WHERE id = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+        
+        if (!existing) {
+            return res.status(404).json({ error: 'Report not found' });
+        }
+        
+        await db.run(`
+            UPDATE reports 
+            SET name = ?, description = ?, reviewerId = ?, deadline = ?, updatedAt = ?
+            WHERE id = ?
+        `, [name, description, reviewerId, deadline, now, id]);
+        
+        res.json({ message: 'Report updated' });
+    } catch (error) {
+        console.error('Error updating report:', error);
+        res.status(500).json({ error: 'Failed to update report' });
+    }
+});
+
+// Update report status
+app.put('/api/reports/:id/status', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+        const now = new Date().toISOString();
+        
+        const validStatuses = ['draft', 'review', 'ready_to_send'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+        
+        const existing = await db.get(
+            'SELECT id FROM reports WHERE id = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+        
+        if (!existing) {
+            return res.status(404).json({ error: 'Report not found' });
+        }
+        
+        await db.run(
+            'UPDATE reports SET status = ?, updatedAt = ? WHERE id = ?',
+            [status, now, id]
+        );
+        
+        res.json({ message: 'Status updated', status });
+    } catch (error) {
+        console.error('Error updating report status:', error);
+        res.status(500).json({ error: 'Failed to update status' });
+    }
+});
+
+// Delete report
+app.delete('/api/reports/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const existing = await db.get(
+            'SELECT id FROM reports WHERE id = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+        
+        if (!existing) {
+            return res.status(404).json({ error: 'Report not found' });
+        }
+        
+        // Delete associated context files
+        const contexts = await db.all('SELECT filePath FROM report_contexts WHERE reportId = ?', [id]);
+        for (const ctx of contexts) {
+            try {
+                fs.unlinkSync(ctx.filePath);
+            } catch (e) {
+                // File might not exist
+            }
+        }
+        
+        await db.run('DELETE FROM reports WHERE id = ?', [id]);
+        
+        res.json({ message: 'Report deleted' });
+    } catch (error) {
+        console.error('Error deleting report:', error);
+        res.status(500).json({ error: 'Failed to delete report' });
+    }
+});
+
+// Upload context PDF for report
+app.post('/api/reports/:id/context', authenticateToken, upload.single('file'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const existing = await db.get(
+            'SELECT id FROM reports WHERE id = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+        
+        if (!existing) {
+            return res.status(404).json({ error: 'Report not found' });
+        }
+        
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+        
+        // Extract text from PDF
+        let extractedText = '';
+        try {
+            const dataBuffer = fs.readFileSync(req.file.path);
+            const pdfData = await pdfParse(dataBuffer);
+            extractedText = pdfData.text;
+        } catch (e) {
+            console.error('Error extracting PDF text:', e);
+        }
+        
+        const contextId = Math.random().toString(36).substr(2, 9);
+        const now = new Date().toISOString();
+        
+        await db.run(`
+            INSERT INTO report_contexts (id, reportId, fileName, filePath, fileSize, extractedText, uploadedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `, [contextId, id, req.file.originalname, req.file.path, req.file.size, extractedText, now]);
+        
+        res.json({ 
+            id: contextId, 
+            fileName: req.file.originalname, 
+            fileSize: req.file.size,
+            uploadedAt: now,
+            hasExtractedText: extractedText.length > 0
+        });
+    } catch (error) {
+        console.error('Error uploading context:', error);
+        res.status(500).json({ error: 'Failed to upload context' });
+    }
+});
+
+// Delete context
+app.delete('/api/reports/:id/context/:contextId', authenticateToken, async (req, res) => {
+    try {
+        const { id, contextId } = req.params;
+        
+        const context = await db.get(`
+            SELECT rc.* FROM report_contexts rc
+            JOIN reports r ON rc.reportId = r.id
+            WHERE rc.id = ? AND r.id = ? AND r.organizationId = ?
+        `, [contextId, id, req.user.orgId]);
+        
+        if (!context) {
+            return res.status(404).json({ error: 'Context not found' });
+        }
+        
+        // Delete file
+        try {
+            fs.unlinkSync(context.filePath);
+        } catch (e) {
+            // File might not exist
+        }
+        
+        await db.run('DELETE FROM report_contexts WHERE id = ?', [contextId]);
+        
+        res.json({ message: 'Context deleted' });
+    } catch (error) {
+        console.error('Error deleting context:', error);
+        res.status(500).json({ error: 'Failed to delete context' });
+    }
+});
+
+// Generate content for a section
+app.post('/api/reports/:id/sections/:sectionId/generate', authenticateToken, async (req, res) => {
+    try {
+        const { id, sectionId } = req.params;
+        const { prompt, mentionedEntityIds } = req.body;
+        
+        // Verify report ownership
+        const report = await db.get(
+            'SELECT * FROM reports WHERE id = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+        
+        if (!report) {
+            return res.status(404).json({ error: 'Report not found' });
+        }
+        
+        // Get template section info
+        const templateSection = await db.get(
+            'SELECT * FROM template_sections WHERE id = ?',
+            [sectionId]
+        );
+        
+        if (!templateSection) {
+            return res.status(404).json({ error: 'Section not found' });
+        }
+        
+        // Get all context texts for this report
+        const contexts = await db.all(
+            'SELECT extractedText FROM report_contexts WHERE reportId = ?',
+            [id]
+        );
+        const contextText = contexts.map(c => c.extractedText).filter(Boolean).join('\n\n---\n\n');
+        
+        // Get entity data for mentioned entities
+        let entityContext = '';
+        if (mentionedEntityIds && mentionedEntityIds.length > 0) {
+            for (const entityId of mentionedEntityIds) {
+                const entity = await db.get('SELECT * FROM entities WHERE id = ?', [entityId]);
+                if (entity) {
+                    const records = await db.all(`
+                        SELECT r.*, rv.propertyId, rv.value, p.name as propertyName
+                        FROM records r
+                        LEFT JOIN record_values rv ON r.id = rv.recordId
+                        LEFT JOIN properties p ON rv.propertyId = p.id
+                        WHERE r.entityId = ?
+                    `, [entityId]);
+                    
+                    entityContext += `\n\n### ${entity.name} Data:\n`;
+                    // Group records
+                    const recordMap = new Map();
+                    for (const rec of records) {
+                        if (!recordMap.has(rec.id)) {
+                            recordMap.set(rec.id, {});
+                        }
+                        if (rec.propertyName && rec.value) {
+                            recordMap.get(rec.id)[rec.propertyName] = rec.value;
+                        }
+                    }
+                    entityContext += JSON.stringify(Array.from(recordMap.values()), null, 2);
+                }
+            }
+        }
+        
+        // Build the full prompt for AI
+        const systemPrompt = `You are generating content for a professional report section.
+Section Title: ${templateSection.title}
+Section Description: ${templateSection.content || 'No specific description'}
+Generation Rules: ${templateSection.generationRules || 'Write in a professional, clear manner'}
+
+${contextText ? `CONTEXT DOCUMENTS:\n${contextText}\n\n` : ''}
+${entityContext ? `ENTITY DATA:${entityContext}\n\n` : ''}
+
+Based on the user's prompt and the context provided, generate appropriate content for this section.
+Write in a professional tone suitable for a formal report.`;
+
+        // Call OpenAI
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: prompt }
+            ],
+            max_tokens: 2000
+        });
+        
+        const generatedContent = completion.choices[0]?.message?.content || '';
+        const now = new Date().toISOString();
+        
+        // Check if report_section exists, create or update
+        const existingSection = await db.get(
+            'SELECT id FROM report_sections WHERE reportId = ? AND templateSectionId = ?',
+            [id, sectionId]
+        );
+        
+        if (existingSection) {
+            await db.run(`
+                UPDATE report_sections 
+                SET content = ?, userPrompt = ?, status = 'generated', generatedAt = ?
+                WHERE id = ?
+            `, [generatedContent, prompt, now, existingSection.id]);
+        } else {
+            const newSectionId = Math.random().toString(36).substr(2, 9);
+            await db.run(`
+                INSERT INTO report_sections (id, reportId, templateSectionId, content, userPrompt, status, generatedAt)
+                VALUES (?, ?, ?, ?, ?, 'generated', ?)
+            `, [newSectionId, id, sectionId, generatedContent, prompt, now]);
+        }
+        
+        // Update report timestamp
+        await db.run('UPDATE reports SET updatedAt = ? WHERE id = ?', [now, id]);
+        
+        res.json({ content: generatedContent, generatedAt: now });
+    } catch (error) {
+        console.error('Error generating section:', error);
+        res.status(500).json({ error: 'Failed to generate content' });
+    }
+});
+
+// Save/update section content manually
+app.put('/api/reports/:id/sections/:sectionId', authenticateToken, async (req, res) => {
+    try {
+        const { id, sectionId } = req.params;
+        const { content } = req.body;
+        const now = new Date().toISOString();
+        
+        const report = await db.get(
+            'SELECT id FROM reports WHERE id = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+        
+        if (!report) {
+            return res.status(404).json({ error: 'Report not found' });
+        }
+        
+        const existingSection = await db.get(
+            'SELECT id FROM report_sections WHERE reportId = ? AND templateSectionId = ?',
+            [id, sectionId]
+        );
+        
+        if (existingSection) {
+            await db.run(`
+                UPDATE report_sections 
+                SET content = ?, status = 'edited', generatedAt = ?
+                WHERE id = ?
+            `, [content, now, existingSection.id]);
+        } else {
+            const newSectionId = Math.random().toString(36).substr(2, 9);
+            await db.run(`
+                INSERT INTO report_sections (id, reportId, templateSectionId, content, status, generatedAt)
+                VALUES (?, ?, ?, ?, 'edited', ?)
+            `, [newSectionId, id, sectionId, content, now]);
+        }
+        
+        await db.run('UPDATE reports SET updatedAt = ? WHERE id = ?', [now, id]);
+        
+        res.json({ message: 'Section saved' });
+    } catch (error) {
+        console.error('Error saving section:', error);
+        res.status(500).json({ error: 'Failed to save section' });
+    }
+});
+
 // Stripe Webhook to handle subscription events
 app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
     const sig = req.headers['stripe-signature'];
