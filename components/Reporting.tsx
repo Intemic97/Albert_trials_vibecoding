@@ -98,6 +98,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
     const [templatesLoading, setTemplatesLoading] = useState(true);
     const [showTemplateModal, setShowTemplateModal] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState<ReportTemplate | null>(null);
+    const [templateUsage, setTemplateUsage] = useState<{ inUse: boolean; reportCount: number; reports: any[] } | null>(null);
     
     // Reports state
     const [reports, setReports] = useState<SavedReport[]>([]);
@@ -196,8 +197,25 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
         setShowTemplateModal(true);
     };
 
-    const handleEditTemplate = (template: ReportTemplate, e: React.MouseEvent) => {
+    const handleEditTemplate = async (template: ReportTemplate, e: React.MouseEvent) => {
         e.stopPropagation();
+        
+        // Check if template is in use
+        try {
+            const res = await fetch(`${API_BASE}/report-templates/${template.id}/usage`, {
+                credentials: 'include'
+            });
+            if (res.ok) {
+                const usage = await res.json();
+                setTemplateUsage(usage);
+            } else {
+                setTemplateUsage(null);
+            }
+        } catch (error) {
+            console.error('Error checking template usage:', error);
+            setTemplateUsage(null);
+        }
+        
         setEditingTemplate(template);
         setShowTemplateModal(true);
     };
@@ -244,6 +262,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
             }
             setShowTemplateModal(false);
             setEditingTemplate(null);
+            setTemplateUsage(null);
         } catch (error) {
             console.error('Error saving template:', error);
         }
@@ -379,7 +398,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                             <div className="space-y-2 text-sm">
                                                 <div className="flex items-center gap-2 text-slate-600">
                                                     <User size={14} className="text-slate-400" />
-                                                    <span className="truncate">{report.createdByName}</span>
+                                                    <span className="truncate">Creator: {report.createdByName}</span>
                                                 </div>
                                                 {report.reviewerName && (
                                                     <div className="flex items-center gap-2 text-slate-600">
@@ -496,7 +515,9 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                     onClose={() => {
                         setShowTemplateModal(false);
                         setEditingTemplate(null);
+                        setTemplateUsage(null);
                     }}
+                    usage={templateUsage}
                 />
             )}
 
@@ -678,9 +699,10 @@ interface TemplateEditModalProps {
     template: ReportTemplate | null;
     onSave: (template: Omit<ReportTemplate, 'id' | 'createdAt' | 'updatedAt'>) => void;
     onClose: () => void;
+    usage?: { inUse: boolean; reportCount: number; reports: any[] } | null;
 }
 
-const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave, onClose }) => {
+const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave, onClose, usage }) => {
     const [name, setName] = useState(template?.name || '');
     const [description, setDescription] = useState(template?.description || '');
     const [icon, setIcon] = useState(template?.icon || 'FileText');
@@ -688,6 +710,7 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
         template?.sections || [{ title: '', items: [], isExpanded: true }]
     );
     const [isSaving, setIsSaving] = useState(false);
+    const [showUsageWarning, setShowUsageWarning] = useState(false);
 
     const iconOptions = [
         { value: 'FileText', label: 'Document', Icon: FileText },
@@ -773,6 +796,35 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                         <X size={20} className="text-slate-500" />
                     </button>
                 </div>
+
+                {/* Usage Warning */}
+                {usage?.inUse && (
+                    <div className="px-6 py-3 bg-amber-50 border-b border-amber-100">
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={20} />
+                            <div>
+                                <p className="text-sm font-medium text-amber-800">
+                                    This template is used in {usage.reportCount} document{usage.reportCount !== 1 ? 's' : ''}
+                                </p>
+                                <p className="text-xs text-amber-600 mt-1">
+                                    Modifying sections may affect existing documents. Changes to section structure will be applied.
+                                </p>
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                    {usage.reports.slice(0, 5).map((report: any) => (
+                                        <span key={report.id} className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
+                                            {report.name}
+                                        </span>
+                                    ))}
+                                    {usage.reports.length > 5 && (
+                                        <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
+                                            +{usage.reports.length - 5} more
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">

@@ -3216,6 +3216,41 @@ app.post('/api/report-templates', authenticateToken, async (req, res) => {
     }
 });
 
+// Get template usage (which reports use this template)
+app.get('/api/report-templates/:id/usage', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Verify ownership
+        const existing = await db.get(
+            'SELECT id FROM report_templates WHERE id = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+        
+        if (!existing) {
+            return res.status(404).json({ error: 'Template not found' });
+        }
+        
+        // Get all reports using this template
+        const reports = await db.all(`
+            SELECT r.id, r.name, r.status, r.createdAt, u.name as createdByName
+            FROM reports r
+            LEFT JOIN users u ON r.createdBy = u.id
+            WHERE r.templateId = ?
+            ORDER BY r.createdAt DESC
+        `, [id]);
+        
+        res.json({ 
+            inUse: reports.length > 0,
+            reportCount: reports.length,
+            reports 
+        });
+    } catch (error) {
+        console.error('Error checking template usage:', error);
+        res.status(500).json({ error: 'Failed to check template usage' });
+    }
+});
+
 // Update template
 app.put('/api/report-templates/:id', authenticateToken, async (req, res) => {
     try {
@@ -3238,32 +3273,90 @@ app.put('/api/report-templates/:id', authenticateToken, async (req, res) => {
             [name, description || '', icon || 'FileText', now, id]
         );
         
-        // Delete all existing sections and recreate
-        await db.run('DELETE FROM template_sections WHERE templateId = ?', [id]);
+        // Get existing section IDs
+        const existingSections = await db.all(
+            'SELECT id FROM template_sections WHERE templateId = ?',
+            [id]
+        );
+        const existingSectionIds = existingSections.map(s => s.id);
+        
+        // Collect new section IDs that will be kept/created
+        const newSectionIds = new Set();
         
         if (sections && sections.length > 0) {
             for (let i = 0; i < sections.length; i++) {
                 const section = sections[i];
-                const sectionId = section.id || Math.random().toString(36).substr(2, 9);
-                await db.run(
-                    `INSERT INTO template_sections (id, templateId, parentId, title, content, generationRules, sortOrder)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                    [sectionId, id, null, section.title, section.content || '', section.generationRules || '', i]
-                );
+                const sectionId = section.id && existingSectionIds.includes(section.id) 
+                    ? section.id 
+                    : Math.random().toString(36).substr(2, 9);
+                newSectionIds.add(sectionId);
+                
+                // Check if section exists
+                const sectionExists = await db.get('SELECT id FROM template_sections WHERE id = ?', [sectionId]);
+                
+                if (sectionExists) {
+                    // Update existing section
+                    await db.run(
+                        `UPDATE template_sections SET title = ?, content = ?, generationRules = ?, sortOrder = ?, parentId = NULL WHERE id = ?`,
+                        [section.title, section.content || '', section.generationRules || '', i, sectionId]
+                    );
+                } else {
+                    // Insert new section
+                    await db.run(
+                        `INSERT INTO template_sections (id, templateId, parentId, title, content, generationRules, sortOrder)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                        [sectionId, id, null, section.title, section.content || '', section.generationRules || '', i]
+                    );
+                }
                 
                 // Handle subsections (items)
                 if (section.items && section.items.length > 0) {
                     for (let j = 0; j < section.items.length; j++) {
                         const item = section.items[j];
-                        const itemId = item.id || Math.random().toString(36).substr(2, 9);
-                        await db.run(
-                            `INSERT INTO template_sections (id, templateId, parentId, title, content, generationRules, sortOrder)
-                             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                            [itemId, id, sectionId, item.title, item.content || '', item.generationRules || '', j]
-                        );
+                        const itemId = item.id && existingSectionIds.includes(item.id)
+                            ? item.id
+                            : Math.random().toString(36).substr(2, 9);
+                        newSectionIds.add(itemId);
+                        
+                        const itemExists = await db.get('SELECT id FROM template_sections WHERE id = ?', [itemId]);
+                        
+                        if (itemExists) {
+                            await db.run(
+                                `UPDATE template_sections SET title = ?, content = ?, generationRules = ?, sortOrder = ?, parentId = ? WHERE id = ?`,
+                                [item.title, item.content || '', item.generationRules || '', j, sectionId, itemId]
+                            );
+                        } else {
+                            await db.run(
+                                `INSERT INTO template_sections (id, templateId, parentId, title, content, generationRules, sortOrder)
+                                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                                [itemId, id, sectionId, item.title, item.content || '', item.generationRules || '', j]
+                            );
+                        }
                     }
                 }
             }
+        }
+        
+        // Delete sections that are no longer in the template (only if not referenced)
+        const sectionsToDelete = existingSectionIds.filter(sid => !newSectionIds.has(sid));
+        
+        for (const sectionId of sectionsToDelete) {
+            // Check if this section is referenced by any report_sections
+            const hasReferences = await db.get(
+                'SELECT id FROM report_sections WHERE templateSectionId = ?',
+                [sectionId]
+            );
+            
+            if (hasReferences) {
+                // Set the reference to NULL instead of failing
+                await db.run(
+                    'UPDATE report_sections SET templateSectionId = NULL WHERE templateSectionId = ?',
+                    [sectionId]
+                );
+            }
+            
+            // Now safe to delete
+            await db.run('DELETE FROM template_sections WHERE id = ?', [sectionId]);
         }
         
         res.json({ message: 'Template updated' });

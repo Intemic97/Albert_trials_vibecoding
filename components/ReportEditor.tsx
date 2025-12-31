@@ -429,6 +429,12 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                     {/* Report Info */}
                     <div className="p-4 border-t border-slate-200">
                         <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3">Document Info</h4>
+                        {report.createdByName && (
+                            <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
+                                <User size={14} />
+                                <span>Creator: {report.createdByName}</span>
+                            </div>
+                        )}
                         {report.reviewerName && (
                             <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
                                 <User size={14} />
