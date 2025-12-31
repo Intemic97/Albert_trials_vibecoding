@@ -202,6 +202,31 @@ async function initDb() {
       timestamp TEXT,
       FOREIGN KEY(executionId) REFERENCES workflow_executions(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS report_templates (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      icon TEXT DEFAULT 'FileText',
+      createdBy TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(createdBy) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS template_sections (
+      id TEXT PRIMARY KEY,
+      templateId TEXT NOT NULL,
+      parentId TEXT,
+      title TEXT NOT NULL,
+      content TEXT,
+      generationRules TEXT,
+      sortOrder INTEGER DEFAULT 0,
+      FOREIGN KEY(templateId) REFERENCES report_templates(id) ON DELETE CASCADE,
+      FOREIGN KEY(parentId) REFERENCES template_sections(id) ON DELETE CASCADE
+    );
   `);
 
   // Migration: Add profilePhoto and companyRole columns to users table if they don't exist

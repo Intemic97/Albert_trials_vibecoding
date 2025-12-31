@@ -3104,6 +3104,200 @@ app.post('/api/billing/create-portal-session', authenticateToken, async (req, re
     }
 });
 
+// ==================== REPORT TEMPLATES ENDPOINTS ====================
+
+// Get all templates for organization
+app.get('/api/report-templates', authenticateToken, async (req, res) => {
+    try {
+        const templates = await db.all(
+            `SELECT id, name, description, icon, createdBy, createdAt, updatedAt 
+             FROM report_templates 
+             WHERE organizationId = ? 
+             ORDER BY updatedAt DESC`,
+            [req.user.orgId]
+        );
+        
+        // For each template, get its sections
+        for (const template of templates) {
+            template.sections = await db.all(
+                `SELECT id, parentId, title, content, generationRules, sortOrder 
+                 FROM template_sections 
+                 WHERE templateId = ? 
+                 ORDER BY sortOrder ASC`,
+                [template.id]
+            );
+        }
+        
+        res.json(templates);
+    } catch (error) {
+        console.error('Error fetching report templates:', error);
+        res.status(500).json({ error: 'Failed to fetch report templates' });
+    }
+});
+
+// Get single template with sections
+app.get('/api/report-templates/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const template = await db.get(
+            `SELECT * FROM report_templates WHERE id = ? AND organizationId = ?`,
+            [id, req.user.orgId]
+        );
+        
+        if (!template) {
+            return res.status(404).json({ error: 'Template not found' });
+        }
+        
+        template.sections = await db.all(
+            `SELECT id, parentId, title, content, generationRules, sortOrder 
+             FROM template_sections 
+             WHERE templateId = ? 
+             ORDER BY sortOrder ASC`,
+            [id]
+        );
+        
+        res.json(template);
+    } catch (error) {
+        console.error('Error fetching template:', error);
+        res.status(500).json({ error: 'Failed to fetch template' });
+    }
+});
+
+// Create new template
+app.post('/api/report-templates', authenticateToken, async (req, res) => {
+    try {
+        const { name, description, icon, sections } = req.body;
+        const id = Math.random().toString(36).substr(2, 9);
+        const now = new Date().toISOString();
+        
+        await db.run(
+            `INSERT INTO report_templates (id, organizationId, name, description, icon, createdBy, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, req.user.orgId, name, description || '', icon || 'FileText', req.user.sub, now, now]
+        );
+        
+        // Insert sections if provided
+        if (sections && sections.length > 0) {
+            for (let i = 0; i < sections.length; i++) {
+                const section = sections[i];
+                const sectionId = Math.random().toString(36).substr(2, 9);
+                await db.run(
+                    `INSERT INTO template_sections (id, templateId, parentId, title, content, generationRules, sortOrder)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [sectionId, id, section.parentId || null, section.title, section.content || '', section.generationRules || '', i]
+                );
+                
+                // Handle subsections
+                if (section.items && section.items.length > 0) {
+                    for (let j = 0; j < section.items.length; j++) {
+                        const item = section.items[j];
+                        const itemId = Math.random().toString(36).substr(2, 9);
+                        await db.run(
+                            `INSERT INTO template_sections (id, templateId, parentId, title, content, generationRules, sortOrder)
+                             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                            [itemId, id, sectionId, item.title, item.content || '', item.generationRules || '', j]
+                        );
+                    }
+                }
+            }
+        }
+        
+        // Return the created template with sections
+        const createdTemplate = await db.get('SELECT * FROM report_templates WHERE id = ?', [id]);
+        createdTemplate.sections = await db.all(
+            'SELECT * FROM template_sections WHERE templateId = ? ORDER BY sortOrder ASC',
+            [id]
+        );
+        
+        res.json(createdTemplate);
+    } catch (error) {
+        console.error('Error creating template:', error);
+        res.status(500).json({ error: 'Failed to create template' });
+    }
+});
+
+// Update template
+app.put('/api/report-templates/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, description, icon, sections } = req.body;
+        const now = new Date().toISOString();
+        
+        // Verify ownership
+        const existing = await db.get(
+            'SELECT id FROM report_templates WHERE id = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+        
+        if (!existing) {
+            return res.status(404).json({ error: 'Template not found' });
+        }
+        
+        await db.run(
+            `UPDATE report_templates SET name = ?, description = ?, icon = ?, updatedAt = ? WHERE id = ?`,
+            [name, description || '', icon || 'FileText', now, id]
+        );
+        
+        // Delete all existing sections and recreate
+        await db.run('DELETE FROM template_sections WHERE templateId = ?', [id]);
+        
+        if (sections && sections.length > 0) {
+            for (let i = 0; i < sections.length; i++) {
+                const section = sections[i];
+                const sectionId = section.id || Math.random().toString(36).substr(2, 9);
+                await db.run(
+                    `INSERT INTO template_sections (id, templateId, parentId, title, content, generationRules, sortOrder)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [sectionId, id, null, section.title, section.content || '', section.generationRules || '', i]
+                );
+                
+                // Handle subsections (items)
+                if (section.items && section.items.length > 0) {
+                    for (let j = 0; j < section.items.length; j++) {
+                        const item = section.items[j];
+                        const itemId = item.id || Math.random().toString(36).substr(2, 9);
+                        await db.run(
+                            `INSERT INTO template_sections (id, templateId, parentId, title, content, generationRules, sortOrder)
+                             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                            [itemId, id, sectionId, item.title, item.content || '', item.generationRules || '', j]
+                        );
+                    }
+                }
+            }
+        }
+        
+        res.json({ message: 'Template updated' });
+    } catch (error) {
+        console.error('Error updating template:', error);
+        res.status(500).json({ error: 'Failed to update template' });
+    }
+});
+
+// Delete template
+app.delete('/api/report-templates/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Verify ownership
+        const existing = await db.get(
+            'SELECT id FROM report_templates WHERE id = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+        
+        if (!existing) {
+            return res.status(404).json({ error: 'Template not found' });
+        }
+        
+        // Sections will be cascade deleted
+        await db.run('DELETE FROM report_templates WHERE id = ?', [id]);
+        
+        res.json({ message: 'Template deleted' });
+    } catch (error) {
+        console.error('Error deleting template:', error);
+        res.status(500).json({ error: 'Failed to delete template' });
+    }
+});
+
 // Stripe Webhook to handle subscription events
 app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
     const sig = req.headers['stripe-signature'];
