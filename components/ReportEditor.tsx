@@ -5,12 +5,13 @@ import {
     ChevronRight, ChevronDown, Loader2, X, File, Trash2, CheckCircle2, Circle,
     Save, AlertCircle, User, Calendar, MessageSquare, MoreVertical,
     Edit3, CheckCheck, CornerDownRight, Plus, GripVertical, Clipboard,
-    FlaskConical, Wrench, AlertTriangle, Settings
+    FlaskConical, Wrench, AlertTriangle
 } from 'lucide-react';
 import { Entity } from '../types';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu } from './ProfileMenu';
 import { API_BASE } from '../config';
+import { useAuth } from '../context/AuthContext';
 
 interface ReportEditorProps {
     entities: Entity[];
@@ -88,6 +89,7 @@ const statusConfig = {
 export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInfo, onViewChange }) => {
     const { reportId } = useParams<{ reportId: string }>();
     const navigate = useNavigate();
+    const { user } = useAuth();
     
     const [report, setReport] = useState<Report | null>(null);
     const [loading, setLoading] = useState(true);
@@ -635,6 +637,9 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                 if (report.status === 'draft') {
                                     isDisabled = true;
                                     disabledReason = 'The document needs to be reviewed first';
+                                } else if (report.reviewerId && user?.id !== report.reviewerId) {
+                                    isDisabled = true;
+                                    disabledReason = 'Only the assigned reviewer can mark as ready';
                                 } else if (openCommentsCount > 0) {
                                     isDisabled = true;
                                     disabledReason = `Resolve all comments first (${openCommentsCount} open)`;
@@ -733,7 +738,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                 className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
                                 title="Edit template"
                             >
-                                <Settings size={16} />
+                                <Edit3 size={16} />
                             </button>
                         </div>
                         <nav className="space-y-1">
