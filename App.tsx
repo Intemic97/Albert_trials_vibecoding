@@ -844,7 +844,10 @@ function AuthenticatedApp() {
                     }}
                 />
             )}
-            <Sidebar activeView={currentView} onNavigate={handleNavigate} />
+            {/* Hide sidebar when in report editor for more space */}
+            {!location.pathname.match(/^\/reports\/[^/]+$/) && (
+                <Sidebar activeView={currentView} onNavigate={handleNavigate} />
+            )}
 
             <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
                 <Routes>

@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
     FileText, ArrowLeft, Eye, Upload, Sparkles, Check, Clock, Send,
-    ChevronRight, ChevronDown, Loader2, X, File, Trash2, CheckCircle2, Circle,
+    ChevronRight, ChevronDown, ChevronLeft, Loader2, X, File, Trash2, CheckCircle2, Circle,
     Save, AlertCircle, User, Calendar, MessageSquare, MoreVertical,
     Edit3, CheckCheck, CornerDownRight, Plus, GripVertical, Clipboard,
-    FlaskConical, Wrench, AlertTriangle
+    FlaskConical, Wrench, AlertTriangle, Bot, PanelRightClose, PanelRightOpen
 } from 'lucide-react';
 import { Entity } from '../types';
 import { PromptInput } from './PromptInput';
@@ -111,6 +111,8 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
     const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
     const [isEditMode, setIsEditMode] = useState(false);
     const [showTemplateModal, setShowTemplateModal] = useState(false);
+    const [rightPanelOpen, setRightPanelOpen] = useState(false);
+    const [rightPanelTab, setRightPanelTab] = useState<'comments' | 'assistant'>('comments');
     const [templateData, setTemplateData] = useState<any>(null);
     const [templateUsage, setTemplateUsage] = useState<any>(null);
     
@@ -1058,81 +1060,153 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                 )}
                             </div>
 
-                            {/* Comments Panel */}
-                            <div className="w-80 shrink-0 overflow-y-auto">
-                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="font-semibold text-slate-800">Comments</h3>
-                                        <span className="text-xs text-slate-500">
-                                            {sectionComments.filter(c => c.status === 'open').length} open
-                                        </span>
+                            {/* Collapsible Right Panel */}
+                            <div className={`shrink-0 flex transition-all duration-300 ${rightPanelOpen ? 'w-80' : 'w-12'}`}>
+                                {/* Tab buttons when closed */}
+                                {!rightPanelOpen && (
+                                    <div className="flex flex-col gap-2 p-1">
+                                        <button
+                                            onClick={() => { setRightPanelOpen(true); setRightPanelTab('comments'); }}
+                                            className={`p-2.5 rounded-lg border transition-all relative ${
+                                                sectionComments.filter(c => c.status === 'open').length > 0
+                                                    ? 'bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100'
+                                                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                                            }`}
+                                            title="Comments"
+                                        >
+                                            <MessageSquare size={18} />
+                                            {sectionComments.filter(c => c.status === 'open').length > 0 && (
+                                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center">
+                                                    {sectionComments.filter(c => c.status === 'open').length}
+                                                </span>
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => { setRightPanelOpen(true); setRightPanelTab('assistant'); }}
+                                            className="p-2.5 rounded-lg border bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all"
+                                            title="AI Assistant"
+                                        >
+                                            <Bot size={18} />
+                                        </button>
                                     </div>
+                                )}
 
-                                    {sectionComments.length === 0 ? (
-                                        <div className="text-center py-8 text-slate-400">
-                                            <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
-                                            <p className="text-sm">No comments for this section</p>
-                                            <p className="text-xs mt-1">Comments from Review tab will appear here</p>
+                                {/* Expanded Panel */}
+                                {rightPanelOpen && (
+                                    <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                                        {/* Panel Header with Tabs */}
+                                        <div className="flex items-center border-b border-slate-200 bg-slate-50">
+                                            <button
+                                                onClick={() => setRightPanelTab('comments')}
+                                                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors relative ${
+                                                    rightPanelTab === 'comments'
+                                                        ? 'text-teal-600 bg-white'
+                                                        : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                <MessageSquare size={16} />
+                                                Comments
+                                                {sectionComments.filter(c => c.status === 'open').length > 0 && (
+                                                    <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
+                                                        {sectionComments.filter(c => c.status === 'open').length}
+                                                    </span>
+                                                )}
+                                            </button>
+                                            <button
+                                                onClick={() => setRightPanelTab('assistant')}
+                                                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                                                    rightPanelTab === 'assistant'
+                                                        ? 'text-teal-600 bg-white'
+                                                        : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                <Bot size={16} />
+                                                AI Assistant
+                                            </button>
+                                            <button
+                                                onClick={() => setRightPanelOpen(false)}
+                                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                                                title="Close panel"
+                                            >
+                                                <ChevronRight size={18} />
+                                            </button>
                                         </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {sectionComments.map(comment => (
-                                                <div 
-                                                    key={comment.id}
-                                                    className={`p-3 rounded-lg border transition-all ${
-                                                        comment.status === 'resolved'
-                                                            ? 'bg-slate-50 border-slate-200 opacity-60'
-                                                            : 'bg-white border-slate-200 hover:border-blue-300'
-                                                    }`}
-                                                >
-                                                    {/* Comment Header */}
-                                                    <div className="flex items-start justify-between mb-2">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-                                                                <User size={12} className="text-blue-600" />
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-sm font-medium text-slate-700">{comment.userName}</p>
-                                                                <p className="text-xs text-slate-400">
-                                                                    {new Date(comment.createdAt).toLocaleDateString()}
-                                                                </p>
-                                                            </div>
+
+                                        {/* Panel Content */}
+                                        <div className="flex-1 overflow-y-auto p-4">
+                                            {rightPanelTab === 'comments' && (
+                                                <>
+                                                    {sectionComments.length === 0 ? (
+                                                        <div className="text-center py-8 text-slate-400">
+                                                            <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
+                                                            <p className="text-sm">No comments for this section</p>
+                                                            <p className="text-xs mt-1">Comments from Review tab will appear here</p>
                                                         </div>
-                                                        
-                                                        {/* Resolve Button */}
-                                                        {comment.status === 'open' && (
-                                                            <button
-                                                                onClick={() => handleResolveComment(comment.id, true)}
-                                                                className="p-1 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded"
-                                                                title="Mark as resolved"
-                                                            >
-                                                                <CheckCheck size={14} />
-                                                            </button>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Selected Text Preview */}
-                                                    <div className="mb-2 px-2 py-1 bg-yellow-100 rounded text-xs text-slate-600 italic">
-                                                        "{comment.selectedText.slice(0, 60)}{comment.selectedText.length > 60 ? '...' : ''}"
-                                                    </div>
-
-                                                    {/* Comment Text */}
-                                                    <p className={`text-sm ${comment.status === 'resolved' ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
-                                                        {comment.commentText}
-                                                    </p>
-
-                                                    {/* Resolved Badge */}
-                                                    {comment.status === 'resolved' && (
-                                                        <div className="mt-2 flex items-center gap-1 text-xs text-teal-600">
-                                                            <CheckCircle2 size={12} />
-                                                            Resolved
+                                                    ) : (
+                                                        <div className="space-y-3">
+                                                            {sectionComments.map(comment => (
+                                                                <div 
+                                                                    key={comment.id}
+                                                                    className={`p-3 rounded-lg border transition-all ${
+                                                                        comment.status === 'resolved'
+                                                                            ? 'bg-slate-50 border-slate-200 opacity-60'
+                                                                            : 'bg-white border-slate-200 hover:border-blue-300'
+                                                                    }`}
+                                                                >
+                                                                    <div className="flex items-start justify-between mb-2">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                                                                                <User size={12} className="text-blue-600" />
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-sm font-medium text-slate-700">{comment.userName}</p>
+                                                                                <p className="text-xs text-slate-400">
+                                                                                    {new Date(comment.createdAt).toLocaleDateString()}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                        {comment.status === 'open' && (
+                                                                            <button
+                                                                                onClick={() => handleResolveComment(comment.id, true)}
+                                                                                className="p-1 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded"
+                                                                                title="Mark as resolved"
+                                                                            >
+                                                                                <CheckCheck size={14} />
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="mb-2 px-2 py-1 bg-yellow-100 rounded text-xs text-slate-600 italic">
+                                                                        "{comment.selectedText.slice(0, 60)}{comment.selectedText.length > 60 ? '...' : ''}"
+                                                                    </div>
+                                                                    <p className={`text-sm ${comment.status === 'resolved' ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                                                                        {comment.commentText}
+                                                                    </p>
+                                                                    {comment.status === 'resolved' && (
+                                                                        <div className="mt-2 flex items-center gap-1 text-xs text-teal-600">
+                                                                            <CheckCircle2 size={12} />
+                                                                            Resolved
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ))}
                                                         </div>
                                                     )}
+                                                </>
+                                            )}
+
+                                            {rightPanelTab === 'assistant' && (
+                                                <div className="text-center py-8 text-slate-400">
+                                                    <Bot size={40} className="mx-auto mb-3 opacity-50" />
+                                                    <p className="text-sm font-medium text-slate-600">AI Assistant</p>
+                                                    <p className="text-xs mt-1">Coming soon...</p>
+                                                    <p className="text-xs mt-3 text-slate-400">
+                                                        Ask questions about your document, get suggestions, and more.
+                                                    </p>
                                                 </div>
-                                            ))}
+                                            )}
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -1221,152 +1295,198 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                 </div>
                             </div>
 
-                            {/* Comments Panel */}
-                            <div className="w-80 shrink-0 overflow-y-auto">
-                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="font-semibold text-slate-800">Comments</h3>
-                                        <span className="text-xs text-slate-500">
-                                            {sectionComments.filter(c => c.status === 'open').length} open
-                                        </span>
+                            {/* Collapsible Right Panel */}
+                            <div className={`shrink-0 flex transition-all duration-300 ${rightPanelOpen ? 'w-80' : 'w-12'}`}>
+                                {/* Tab buttons when closed */}
+                                {!rightPanelOpen && (
+                                    <div className="flex flex-col gap-2 p-1">
+                                        <button
+                                            onClick={() => { setRightPanelOpen(true); setRightPanelTab('comments'); }}
+                                            className={`p-2.5 rounded-lg border transition-all relative ${
+                                                sectionComments.filter(c => c.status === 'open').length > 0
+                                                    ? 'bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100'
+                                                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                                            }`}
+                                            title="Comments"
+                                        >
+                                            <MessageSquare size={18} />
+                                            {sectionComments.filter(c => c.status === 'open').length > 0 && (
+                                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center">
+                                                    {sectionComments.filter(c => c.status === 'open').length}
+                                                </span>
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => { setRightPanelOpen(true); setRightPanelTab('assistant'); }}
+                                            className="p-2.5 rounded-lg border bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all"
+                                            title="AI Assistant"
+                                        >
+                                            <Bot size={18} />
+                                        </button>
                                     </div>
+                                )}
 
-                                    {sectionComments.length === 0 ? (
-                                        <div className="text-center py-8 text-slate-400">
-                                            <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
-                                            <p className="text-sm">No comments yet</p>
-                                            <p className="text-xs mt-1">Select text to add a comment</p>
+                                {/* Expanded Panel */}
+                                {rightPanelOpen && (
+                                    <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                                        {/* Panel Header with Tabs */}
+                                        <div className="flex items-center border-b border-slate-200 bg-slate-50">
+                                            <button
+                                                onClick={() => setRightPanelTab('comments')}
+                                                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors relative ${
+                                                    rightPanelTab === 'comments'
+                                                        ? 'text-teal-600 bg-white'
+                                                        : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                <MessageSquare size={16} />
+                                                Comments
+                                                {sectionComments.filter(c => c.status === 'open').length > 0 && (
+                                                    <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
+                                                        {sectionComments.filter(c => c.status === 'open').length}
+                                                    </span>
+                                                )}
+                                            </button>
+                                            <button
+                                                onClick={() => setRightPanelTab('assistant')}
+                                                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                                                    rightPanelTab === 'assistant'
+                                                        ? 'text-teal-600 bg-white'
+                                                        : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                <Bot size={16} />
+                                                AI Assistant
+                                            </button>
+                                            <button
+                                                onClick={() => setRightPanelOpen(false)}
+                                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                                                title="Close panel"
+                                            >
+                                                <ChevronRight size={18} />
+                                            </button>
                                         </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {sectionComments.map(comment => (
-                                                <div 
-                                                    key={comment.id}
-                                                    className={`p-3 rounded-lg border transition-all ${
-                                                        comment.status === 'resolved'
-                                                            ? 'bg-slate-50 border-slate-200 opacity-60'
-                                                            : activeCommentId === comment.id
-                                                                ? 'bg-yellow-50 border-yellow-300 ring-2 ring-yellow-200'
-                                                                : 'bg-white border-slate-200 hover:border-blue-300'
-                                                    }`}
-                                                    onClick={() => setActiveCommentId(comment.id)}
-                                                >
-                                                    {/* Comment Header */}
-                                                    <div className="flex items-start justify-between mb-2">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-                                                                <User size={12} className="text-blue-600" />
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-sm font-medium text-slate-700">{comment.userName}</p>
-                                                                <p className="text-xs text-slate-400">
-                                                                    {new Date(comment.createdAt).toLocaleDateString()}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        {/* Actions Menu */}
-                                                        <div className="flex items-center gap-1">
-                                                            {comment.status === 'open' ? (
-                                                                <>
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleResolveComment(comment.id, true);
-                                                                        }}
-                                                                        className="p-1 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded"
-                                                                        title="Resolve"
-                                                                    >
-                                                                        <CheckCheck size={14} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setEditingCommentId(comment.id);
-                                                                            setEditCommentText(comment.commentText);
-                                                                        }}
-                                                                        className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded"
-                                                                        title="Edit"
-                                                                    >
-                                                                        <Edit3 size={14} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleDeleteComment(comment.id);
-                                                                        }}
-                                                                        className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
-                                                                        title="Delete"
-                                                                    >
-                                                                        <Trash2 size={14} />
-                                                                    </button>
-                                                                </>
-                                                            ) : (
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleResolveComment(comment.id, false);
-                                                                    }}
-                                                                    className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded"
-                                                                    title="Reopen"
-                                                                >
-                                                                    <CornerDownRight size={14} />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </div>
 
-                                                    {/* Selected Text Preview */}
-                                                    <div className="mb-2 px-2 py-1 bg-yellow-100 rounded text-xs text-slate-600 italic">
-                                                        "{comment.selectedText.slice(0, 60)}{comment.selectedText.length > 60 ? '...' : ''}"
-                                                    </div>
-
-                                                    {/* Comment Text */}
-                                                    {editingCommentId === comment.id ? (
-                                                        <div className="space-y-2">
-                                                            <textarea
-                                                                value={editCommentText}
-                                                                onChange={(e) => setEditCommentText(e.target.value)}
-                                                                className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none resize-none"
-                                                                rows={2}
-                                                                autoFocus
-                                                            />
-                                                            <div className="flex gap-2">
-                                                                <button
-                                                                    onClick={() => handleUpdateComment(comment.id)}
-                                                                    className="px-2 py-1 bg-blue-600 text-white rounded text-xs"
-                                                                >
-                                                                    Save
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setEditingCommentId(null);
-                                                                        setEditCommentText('');
-                                                                    }}
-                                                                    className="px-2 py-1 text-slate-600 hover:bg-slate-100 rounded text-xs"
-                                                                >
-                                                                    Cancel
-                                                                </button>
-                                                            </div>
+                                        {/* Panel Content */}
+                                        <div className="flex-1 overflow-y-auto p-4">
+                                            {rightPanelTab === 'comments' && (
+                                                <>
+                                                    {sectionComments.length === 0 ? (
+                                                        <div className="text-center py-8 text-slate-400">
+                                                            <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
+                                                            <p className="text-sm">No comments yet</p>
+                                                            <p className="text-xs mt-1">Select text to add a comment</p>
                                                         </div>
                                                     ) : (
-                                                        <p className={`text-sm ${comment.status === 'resolved' ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
-                                                            {comment.commentText}
-                                                        </p>
-                                                    )}
-
-                                                    {/* Resolved Badge */}
-                                                    {comment.status === 'resolved' && (
-                                                        <div className="mt-2 flex items-center gap-1 text-xs text-teal-600">
-                                                            <CheckCircle2 size={12} />
-                                                            Resolved
+                                                        <div className="space-y-3">
+                                                            {sectionComments.map(comment => (
+                                                                <div 
+                                                                    key={comment.id}
+                                                                    className={`p-3 rounded-lg border transition-all ${
+                                                                        comment.status === 'resolved'
+                                                                            ? 'bg-slate-50 border-slate-200 opacity-60'
+                                                                            : activeCommentId === comment.id
+                                                                                ? 'bg-yellow-50 border-yellow-300 ring-2 ring-yellow-200'
+                                                                                : 'bg-white border-slate-200 hover:border-blue-300'
+                                                                    }`}
+                                                                    onClick={() => setActiveCommentId(comment.id)}
+                                                                >
+                                                                    <div className="flex items-start justify-between mb-2">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                                                                                <User size={12} className="text-blue-600" />
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-sm font-medium text-slate-700">{comment.userName}</p>
+                                                                                <p className="text-xs text-slate-400">
+                                                                                    {new Date(comment.createdAt).toLocaleDateString()}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1">
+                                                                            {comment.status === 'open' ? (
+                                                                                <>
+                                                                                    <button
+                                                                                        onClick={(e) => { e.stopPropagation(); handleResolveComment(comment.id, true); }}
+                                                                                        className="p-1 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded"
+                                                                                        title="Resolve"
+                                                                                    >
+                                                                                        <CheckCheck size={14} />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={(e) => { e.stopPropagation(); setEditingCommentId(comment.id); setEditCommentText(comment.commentText); }}
+                                                                                        className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                                                                                        title="Edit"
+                                                                                    >
+                                                                                        <Edit3 size={14} />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={(e) => { e.stopPropagation(); handleDeleteComment(comment.id); }}
+                                                                                        className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
+                                                                                        title="Delete"
+                                                                                    >
+                                                                                        <Trash2 size={14} />
+                                                                                    </button>
+                                                                                </>
+                                                                            ) : (
+                                                                                <button
+                                                                                    onClick={(e) => { e.stopPropagation(); handleResolveComment(comment.id, false); }}
+                                                                                    className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded"
+                                                                                    title="Reopen"
+                                                                                >
+                                                                                    <CornerDownRight size={14} />
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="mb-2 px-2 py-1 bg-yellow-100 rounded text-xs text-slate-600 italic">
+                                                                        "{comment.selectedText.slice(0, 60)}{comment.selectedText.length > 60 ? '...' : ''}"
+                                                                    </div>
+                                                                    {editingCommentId === comment.id ? (
+                                                                        <div className="space-y-2">
+                                                                            <textarea
+                                                                                value={editCommentText}
+                                                                                onChange={(e) => setEditCommentText(e.target.value)}
+                                                                                className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none resize-none"
+                                                                                rows={2}
+                                                                                autoFocus
+                                                                            />
+                                                                            <div className="flex gap-2">
+                                                                                <button onClick={() => handleUpdateComment(comment.id)} className="px-2 py-1 bg-blue-600 text-white rounded text-xs">Save</button>
+                                                                                <button onClick={() => { setEditingCommentId(null); setEditCommentText(''); }} className="px-2 py-1 text-slate-600 hover:bg-slate-100 rounded text-xs">Cancel</button>
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <p className={`text-sm ${comment.status === 'resolved' ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                                                                            {comment.commentText}
+                                                                        </p>
+                                                                    )}
+                                                                    {comment.status === 'resolved' && (
+                                                                        <div className="mt-2 flex items-center gap-1 text-xs text-teal-600">
+                                                                            <CheckCircle2 size={12} />
+                                                                            Resolved
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ))}
                                                         </div>
                                                     )}
+                                                </>
+                                            )}
+
+                                            {rightPanelTab === 'assistant' && (
+                                                <div className="text-center py-8 text-slate-400">
+                                                    <Bot size={40} className="mx-auto mb-3 opacity-50" />
+                                                    <p className="text-sm font-medium text-slate-600">AI Assistant</p>
+                                                    <p className="text-xs mt-1">Coming soon...</p>
+                                                    <p className="text-xs mt-3 text-slate-400">
+                                                        Ask questions about your document, get suggestions, and more.
+                                                    </p>
                                                 </div>
-                                            ))}
+                                            )}
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
