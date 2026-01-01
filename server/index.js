@@ -4145,15 +4145,22 @@ app.post('/api/reports/:id/assistant/chat', authenticateToken, async (req, res) 
         
         // Get all sections for context
         const sections = await db.all(`
-            SELECT rs.*, ts.title, ts.sortOrder 
+            SELECT rs.id, rs.reportId, rs.templateSectionId, rs.content as generatedContent, 
+                   rs.userPrompt, rs.status, rs.generatedAt, ts.title, ts.sortOrder 
             FROM report_sections rs 
             LEFT JOIN template_sections ts ON rs.templateSectionId = ts.id 
             WHERE rs.reportId = ? 
             ORDER BY ts.sortOrder
         `, [id]);
         
+        console.log('[AI Assistant] Sections loaded:', sections.map(s => ({ title: s.title, hasContent: !!s.generatedContent })));
+        
         // Get the specific section if provided
         const currentSection = sectionId ? sections.find(s => s.id === sectionId) : null;
+        
+        if (currentSection) {
+            console.log('[AI Assistant] Current section:', currentSection.title, 'Content preview:', currentSection.generatedContent?.slice(0, 100));
+        }
         
         // Get context files content
         let contextContent = '';
