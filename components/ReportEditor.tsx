@@ -180,13 +180,15 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
             let currentSectionId = selectedSectionId;
 
             // Find which section is currently most visible in viewport
+            // We check from top to bottom and select the first section that's visible
             for (const section of sections) {
                 const element = document.getElementById(`preview-section-${section.id}`);
                 if (!element) continue;
 
                 const rect = element.getBoundingClientRect();
-                // Check if section is in viewport (at least 50% visible or top is near viewport top)
-                if (rect.top <= 200 && rect.bottom >= 100) {
+                // Activate when section's top is within the upper 30% of viewport (more aggressive)
+                // This means it highlights earlier as you scroll down
+                if (rect.top <= 250 && rect.bottom >= 250) {
                     currentSectionId = section.id;
                     break;
                 }
