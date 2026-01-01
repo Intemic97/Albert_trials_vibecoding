@@ -80,6 +80,29 @@ interface Comment {
 
 type TabType = 'preview' | 'context' | 'generate' | 'review';
 
+// AI Assistant interfaces
+interface AIMessage {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: Date;
+    suggestion?: {
+        sectionId: string;
+        sectionTitle: string;
+        originalContent: string;
+        suggestedContent: string;
+        status: 'pending' | 'accepted' | 'rejected';
+    };
+    files?: { name: string; id: string }[];
+}
+
+interface AIContextFile {
+    id: string;
+    name: string;
+    size: number;
+    uploadedAt: Date;
+}
+
 const statusConfig = {
     draft: { label: 'Draft', color: 'text-amber-600', bg: 'bg-amber-50', icon: Clock },
     review: { label: 'Review', color: 'text-blue-600', bg: 'bg-blue-50', icon: Eye },
@@ -116,7 +139,16 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
     const [templateData, setTemplateData] = useState<any>(null);
     const [templateUsage, setTemplateUsage] = useState<any>(null);
     
+    // AI Assistant states
+    const [aiMessages, setAiMessages] = useState<AIMessage[]>([]);
+    const [aiInput, setAiInput] = useState('');
+    const [aiContextFiles, setAiContextFiles] = useState<AIContextFile[]>([]);
+    const [isAiLoading, setIsAiLoading] = useState(false);
+    const [isUploadingAiFile, setIsUploadingAiFile] = useState(false);
+    
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const aiFileInputRef = useRef<HTMLInputElement>(null);
+    const aiMessagesEndRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -442,6 +474,181 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
         } catch (error) {
             console.error('Error deleting context:', error);
         }
+    };
+
+    // AI Assistant functions
+    const handleAiFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || !report) return;
+        
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        setIsUploadingAiFile(true);
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        try {
+            const res = await fetch(`${API_BASE}/reports/${report.id}/assistant/files`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+            if (res.ok) {
+                const newFile = await res.json();
+                setAiContextFiles(prev => [...prev, {
+                    id: newFile.id,
+                    name: newFile.fileName,
+                    size: newFile.fileSize || 0,
+                    uploadedAt: new Date()
+                }]);
+            }
+        } catch (error) {
+            console.error('Error uploading AI context file:', error);
+        } finally {
+            setIsUploadingAiFile(false);
+            if (aiFileInputRef.current) {
+                aiFileInputRef.current.value = '';
+            }
+        }
+    };
+
+    const handleDeleteAiFile = async (fileId: string) => {
+        if (!report) return;
+        try {
+            const res = await fetch(`${API_BASE}/reports/${report.id}/assistant/files/${fileId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            if (res.ok) {
+                setAiContextFiles(prev => prev.filter(f => f.id !== fileId));
+            }
+        } catch (error) {
+            console.error('Error deleting AI context file:', error);
+        }
+    };
+
+    const handleSendAiMessage = async () => {
+        if (!report || !aiInput.trim()) return;
+        
+        const userMessage: AIMessage = {
+            id: `msg-${Date.now()}`,
+            role: 'user',
+            content: aiInput,
+            timestamp: new Date()
+        };
+        
+        setAiMessages(prev => [...prev, userMessage]);
+        setAiInput('');
+        setIsAiLoading(true);
+        
+        // Scroll to bottom
+        setTimeout(() => {
+            aiMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+        
+        try {
+            const res = await fetch(`${API_BASE}/reports/${report.id}/assistant/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: aiInput,
+                    sectionId: selectedSectionId,
+                    contextFileIds: aiContextFiles.map(f => f.id)
+                }),
+                credentials: 'include'
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                const assistantMessage: AIMessage = {
+                    id: `msg-${Date.now()}-response`,
+                    role: 'assistant',
+                    content: data.response,
+                    timestamp: new Date(),
+                    suggestion: data.suggestion ? {
+                        sectionId: data.suggestion.sectionId,
+                        sectionTitle: data.suggestion.sectionTitle,
+                        originalContent: data.suggestion.originalContent,
+                        suggestedContent: data.suggestion.suggestedContent,
+                        status: 'pending'
+                    } : undefined
+                };
+                setAiMessages(prev => [...prev, assistantMessage]);
+            } else {
+                // Error message
+                const errorMessage: AIMessage = {
+                    id: `msg-${Date.now()}-error`,
+                    role: 'assistant',
+                    content: 'Sorry, I encountered an error. Please try again.',
+                    timestamp: new Date()
+                };
+                setAiMessages(prev => [...prev, errorMessage]);
+            }
+        } catch (error) {
+            console.error('Error sending AI message:', error);
+            const errorMessage: AIMessage = {
+                id: `msg-${Date.now()}-error`,
+                role: 'assistant',
+                content: 'Sorry, I encountered an error. Please try again.',
+                timestamp: new Date()
+            };
+            setAiMessages(prev => [...prev, errorMessage]);
+        } finally {
+            setIsAiLoading(false);
+            setTimeout(() => {
+                aiMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+        }
+    };
+
+    const handleAcceptSuggestion = async (messageId: string) => {
+        const message = aiMessages.find(m => m.id === messageId);
+        if (!message?.suggestion || !report) return;
+        
+        const { sectionId, suggestedContent } = message.suggestion;
+        
+        try {
+            const res = await fetch(`${API_BASE}/reports/${report.id}/sections/${sectionId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: suggestedContent }),
+                credentials: 'include'
+            });
+            
+            if (res.ok) {
+                // Update the message suggestion status
+                setAiMessages(prev => prev.map(m => 
+                    m.id === messageId 
+                        ? { ...m, suggestion: { ...m.suggestion!, status: 'accepted' as const } }
+                        : m
+                ));
+                
+                // Update the section content
+                setReport({
+                    ...report,
+                    sections: report.sections.map(s =>
+                        s.id === sectionId
+                            ? { ...s, generatedContent: suggestedContent, sectionStatus: 'edited' as const }
+                            : s
+                    )
+                });
+                
+                // Update editing content if it's the current section
+                if (sectionId === selectedSectionId) {
+                    setEditingContent(suggestedContent);
+                }
+            }
+        } catch (error) {
+            console.error('Error accepting suggestion:', error);
+        }
+    };
+
+    const handleRejectSuggestion = (messageId: string) => {
+        setAiMessages(prev => prev.map(m => 
+            m.id === messageId && m.suggestion
+                ? { ...m, suggestion: { ...m.suggestion, status: 'rejected' as const } }
+                : m
+        ));
     };
 
     const handleGenerate = async (prompt: string, mentionedEntityIds: string[]) => {
@@ -1195,13 +1402,168 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                             )}
 
                                             {rightPanelTab === 'assistant' && (
-                                                <div className="text-center py-8 text-slate-400">
-                                                    <Bot size={40} className="mx-auto mb-3 opacity-50" />
-                                                    <p className="text-sm font-medium text-slate-600">AI Assistant</p>
-                                                    <p className="text-xs mt-1">Coming soon...</p>
-                                                    <p className="text-xs mt-3 text-slate-400">
-                                                        Ask questions about your document, get suggestions, and more.
-                                                    </p>
+                                                <div className="flex flex-col h-full -m-4">
+                                                    {/* AI Context Files */}
+                                                    {aiContextFiles.length > 0 && (
+                                                        <div className="p-3 border-b border-slate-200 bg-slate-50">
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <span className="text-xs font-medium text-slate-600">Context Files</span>
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {aiContextFiles.map(file => (
+                                                                    <div key={file.id} className="flex items-center gap-1 px-2 py-1 bg-white rounded border border-slate-200 text-xs">
+                                                                        <File size={12} className="text-slate-400" />
+                                                                        <span className="truncate max-w-[100px]">{file.name}</span>
+                                                                        <button
+                                                                            onClick={() => handleDeleteAiFile(file.id)}
+                                                                            className="p-0.5 text-slate-400 hover:text-red-500"
+                                                                        >
+                                                                            <X size={12} />
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Messages */}
+                                                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                                        {aiMessages.length === 0 ? (
+                                                            <div className="text-center py-8 text-slate-400">
+                                                                <Bot size={40} className="mx-auto mb-3 opacity-50" />
+                                                                <p className="text-sm font-medium text-slate-600">AI Assistant</p>
+                                                                <p className="text-xs mt-1">Ask questions about your document</p>
+                                                                <p className="text-xs mt-2 text-slate-400">
+                                                                    I can help you review content, suggest improvements, and answer questions about all sections.
+                                                                </p>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                {aiMessages.map(message => (
+                                                                    <div
+                                                                        key={message.id}
+                                                                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                                                    >
+                                                                        <div className={`max-w-[85%] rounded-lg p-3 ${
+                                                                            message.role === 'user'
+                                                                                ? 'bg-teal-600 text-white'
+                                                                                : 'bg-slate-100 text-slate-700'
+                                                                        }`}>
+                                                                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                                                                            
+                                                                            {/* Suggestion Card */}
+                                                                            {message.suggestion && (
+                                                                                <div className="mt-3 p-3 bg-white rounded-lg border border-slate-200 shadow-sm">
+                                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                                        <Sparkles size={14} className="text-amber-500" />
+                                                                                        <span className="text-xs font-medium text-slate-700">
+                                                                                            Suggestion for: {message.suggestion.sectionTitle}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <div className="text-xs text-slate-600 bg-slate-50 rounded p-2 mb-2 max-h-32 overflow-y-auto">
+                                                                                        {message.suggestion.suggestedContent.slice(0, 300)}
+                                                                                        {message.suggestion.suggestedContent.length > 300 && '...'}
+                                                                                    </div>
+                                                                                    
+                                                                                    {message.suggestion.status === 'pending' ? (
+                                                                                        <div className="flex gap-2">
+                                                                                            <button
+                                                                                                onClick={() => handleAcceptSuggestion(message.id)}
+                                                                                                className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-teal-600 text-white rounded text-xs font-medium hover:bg-teal-700 transition-colors"
+                                                                                            >
+                                                                                                <Check size={12} />
+                                                                                                Accept
+                                                                                            </button>
+                                                                                            <button
+                                                                                                onClick={() => handleRejectSuggestion(message.id)}
+                                                                                                className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-slate-200 text-slate-700 rounded text-xs font-medium hover:bg-slate-300 transition-colors"
+                                                                                            >
+                                                                                                <X size={12} />
+                                                                                                Reject
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <div className={`text-xs font-medium flex items-center gap-1 ${
+                                                                                            message.suggestion.status === 'accepted' ? 'text-teal-600' : 'text-slate-400'
+                                                                                        }`}>
+                                                                                            {message.suggestion.status === 'accepted' ? (
+                                                                                                <><CheckCircle2 size={12} /> Accepted</>
+                                                                                            ) : (
+                                                                                                <><X size={12} /> Rejected</>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                            
+                                                                            <p className="text-xs opacity-60 mt-1">
+                                                                                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                                {isAiLoading && (
+                                                                    <div className="flex justify-start">
+                                                                        <div className="bg-slate-100 rounded-lg p-3">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <Loader2 size={14} className="animate-spin text-slate-500" />
+                                                                                <span className="text-sm text-slate-500">Thinking...</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                <div ref={aiMessagesEndRef} />
+                                                            </>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Input Area */}
+                                                    <div className="p-3 border-t border-slate-200 bg-white">
+                                                        <div className="flex items-end gap-2">
+                                                            <input
+                                                                type="file"
+                                                                ref={aiFileInputRef}
+                                                                onChange={handleAiFileUpload}
+                                                                className="hidden"
+                                                                accept=".pdf,.doc,.docx,.txt"
+                                                            />
+                                                            <button
+                                                                onClick={() => aiFileInputRef.current?.click()}
+                                                                disabled={isUploadingAiFile}
+                                                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                                                title="Upload file for context"
+                                                            >
+                                                                {isUploadingAiFile ? (
+                                                                    <Loader2 size={18} className="animate-spin" />
+                                                                ) : (
+                                                                    <Upload size={18} />
+                                                                )}
+                                                            </button>
+                                                            <div className="flex-1">
+                                                                <textarea
+                                                                    value={aiInput}
+                                                                    onChange={(e) => setAiInput(e.target.value)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                                                            e.preventDefault();
+                                                                            handleSendAiMessage();
+                                                                        }
+                                                                    }}
+                                                                    placeholder="Ask about the document..."
+                                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
+                                                                    rows={1}
+                                                                    style={{ minHeight: '40px', maxHeight: '100px' }}
+                                                                />
+                                                            </div>
+                                                            <button
+                                                                onClick={handleSendAiMessage}
+                                                                disabled={!aiInput.trim() || isAiLoading}
+                                                                className="p-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            >
+                                                                <Send size={18} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -1475,13 +1837,168 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                             )}
 
                                             {rightPanelTab === 'assistant' && (
-                                                <div className="text-center py-8 text-slate-400">
-                                                    <Bot size={40} className="mx-auto mb-3 opacity-50" />
-                                                    <p className="text-sm font-medium text-slate-600">AI Assistant</p>
-                                                    <p className="text-xs mt-1">Coming soon...</p>
-                                                    <p className="text-xs mt-3 text-slate-400">
-                                                        Ask questions about your document, get suggestions, and more.
-                                                    </p>
+                                                <div className="flex flex-col h-full -m-4">
+                                                    {/* AI Context Files */}
+                                                    {aiContextFiles.length > 0 && (
+                                                        <div className="p-3 border-b border-slate-200 bg-slate-50">
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <span className="text-xs font-medium text-slate-600">Context Files</span>
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {aiContextFiles.map(file => (
+                                                                    <div key={file.id} className="flex items-center gap-1 px-2 py-1 bg-white rounded border border-slate-200 text-xs">
+                                                                        <File size={12} className="text-slate-400" />
+                                                                        <span className="truncate max-w-[100px]">{file.name}</span>
+                                                                        <button
+                                                                            onClick={() => handleDeleteAiFile(file.id)}
+                                                                            className="p-0.5 text-slate-400 hover:text-red-500"
+                                                                        >
+                                                                            <X size={12} />
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Messages */}
+                                                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                                        {aiMessages.length === 0 ? (
+                                                            <div className="text-center py-8 text-slate-400">
+                                                                <Bot size={40} className="mx-auto mb-3 opacity-50" />
+                                                                <p className="text-sm font-medium text-slate-600">AI Assistant</p>
+                                                                <p className="text-xs mt-1">Ask questions about your document</p>
+                                                                <p className="text-xs mt-2 text-slate-400">
+                                                                    I can help you review content, suggest improvements, and answer questions about all sections.
+                                                                </p>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                {aiMessages.map(message => (
+                                                                    <div
+                                                                        key={message.id}
+                                                                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                                                    >
+                                                                        <div className={`max-w-[85%] rounded-lg p-3 ${
+                                                                            message.role === 'user'
+                                                                                ? 'bg-teal-600 text-white'
+                                                                                : 'bg-slate-100 text-slate-700'
+                                                                        }`}>
+                                                                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                                                                            
+                                                                            {/* Suggestion Card */}
+                                                                            {message.suggestion && (
+                                                                                <div className="mt-3 p-3 bg-white rounded-lg border border-slate-200 shadow-sm">
+                                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                                        <Sparkles size={14} className="text-amber-500" />
+                                                                                        <span className="text-xs font-medium text-slate-700">
+                                                                                            Suggestion for: {message.suggestion.sectionTitle}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <div className="text-xs text-slate-600 bg-slate-50 rounded p-2 mb-2 max-h-32 overflow-y-auto">
+                                                                                        {message.suggestion.suggestedContent.slice(0, 300)}
+                                                                                        {message.suggestion.suggestedContent.length > 300 && '...'}
+                                                                                    </div>
+                                                                                    
+                                                                                    {message.suggestion.status === 'pending' ? (
+                                                                                        <div className="flex gap-2">
+                                                                                            <button
+                                                                                                onClick={() => handleAcceptSuggestion(message.id)}
+                                                                                                className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-teal-600 text-white rounded text-xs font-medium hover:bg-teal-700 transition-colors"
+                                                                                            >
+                                                                                                <Check size={12} />
+                                                                                                Accept
+                                                                                            </button>
+                                                                                            <button
+                                                                                                onClick={() => handleRejectSuggestion(message.id)}
+                                                                                                className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-slate-200 text-slate-700 rounded text-xs font-medium hover:bg-slate-300 transition-colors"
+                                                                                            >
+                                                                                                <X size={12} />
+                                                                                                Reject
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <div className={`text-xs font-medium flex items-center gap-1 ${
+                                                                                            message.suggestion.status === 'accepted' ? 'text-teal-600' : 'text-slate-400'
+                                                                                        }`}>
+                                                                                            {message.suggestion.status === 'accepted' ? (
+                                                                                                <><CheckCircle2 size={12} /> Accepted</>
+                                                                                            ) : (
+                                                                                                <><X size={12} /> Rejected</>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                            
+                                                                            <p className="text-xs opacity-60 mt-1">
+                                                                                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                                {isAiLoading && (
+                                                                    <div className="flex justify-start">
+                                                                        <div className="bg-slate-100 rounded-lg p-3">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <Loader2 size={14} className="animate-spin text-slate-500" />
+                                                                                <span className="text-sm text-slate-500">Thinking...</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                <div ref={aiMessagesEndRef} />
+                                                            </>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Input Area */}
+                                                    <div className="p-3 border-t border-slate-200 bg-white">
+                                                        <div className="flex items-end gap-2">
+                                                            <input
+                                                                type="file"
+                                                                ref={aiFileInputRef}
+                                                                onChange={handleAiFileUpload}
+                                                                className="hidden"
+                                                                accept=".pdf,.doc,.docx,.txt"
+                                                            />
+                                                            <button
+                                                                onClick={() => aiFileInputRef.current?.click()}
+                                                                disabled={isUploadingAiFile}
+                                                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                                                title="Upload file for context"
+                                                            >
+                                                                {isUploadingAiFile ? (
+                                                                    <Loader2 size={18} className="animate-spin" />
+                                                                ) : (
+                                                                    <Upload size={18} />
+                                                                )}
+                                                            </button>
+                                                            <div className="flex-1">
+                                                                <textarea
+                                                                    value={aiInput}
+                                                                    onChange={(e) => setAiInput(e.target.value)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                                                            e.preventDefault();
+                                                                            handleSendAiMessage();
+                                                                        }
+                                                                    }}
+                                                                    placeholder="Ask about the document..."
+                                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
+                                                                    rows={1}
+                                                                    style={{ minHeight: '40px', maxHeight: '100px' }}
+                                                                />
+                                                            </div>
+                                                            <button
+                                                                onClick={handleSendAiMessage}
+                                                                disabled={!aiInput.trim() || isAiLoading}
+                                                                className="p-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            >
+                                                                <Send size={18} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>

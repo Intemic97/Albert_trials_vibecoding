@@ -290,6 +290,20 @@ async function initDb() {
     );
   `);
 
+  // Create AI assistant files table
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS ai_assistant_files (
+      id TEXT PRIMARY KEY,
+      reportId TEXT NOT NULL,
+      fileName TEXT NOT NULL,
+      filePath TEXT NOT NULL,
+      fileSize INTEGER,
+      extractedText TEXT,
+      uploadedAt TEXT,
+      FOREIGN KEY(reportId) REFERENCES reports(id) ON DELETE CASCADE
+    );
+  `);
+
   // Migration: Add profilePhoto and companyRole columns to users table if they don't exist
   try {
     await db.exec(`ALTER TABLE users ADD COLUMN profilePhoto TEXT`);

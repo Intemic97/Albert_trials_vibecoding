@@ -4032,6 +4032,247 @@ app.delete('/api/reports/:id/comments/:commentId', authenticateToken, async (req
     }
 });
 
+// ==================== AI ASSISTANT ENDPOINTS ====================
+
+// Configure storage for AI assistant files
+const aiAssistantStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const dir = path.join(__dirname, 'uploads', 'ai-assistant');
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + '-' + file.originalname);
+    }
+});
+
+const aiUpload = multer({ storage: aiAssistantStorage });
+
+// Upload file for AI assistant context
+app.post('/api/reports/:id/assistant/files', authenticateToken, aiUpload.single('file'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Verify report belongs to organization
+        const report = await db.get('SELECT * FROM reports WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
+        if (!report) {
+            return res.status(404).json({ error: 'Report not found' });
+        }
+        
+        const file = req.file;
+        if (!file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+        
+        // Extract text from file if possible
+        let extractedText = '';
+        if (file.mimetype === 'application/pdf') {
+            try {
+                const dataBuffer = fs.readFileSync(file.path);
+                const pdfData = await pdfParse(dataBuffer);
+                extractedText = pdfData.text;
+            } catch (err) {
+                console.error('Error parsing PDF:', err);
+            }
+        } else if (file.mimetype === 'text/plain') {
+            extractedText = fs.readFileSync(file.path, 'utf8');
+        }
+        
+        const fileId = `aifile-${Date.now()}`;
+        
+        // Store file reference in database
+        await db.run(`
+            INSERT INTO ai_assistant_files (id, reportId, fileName, filePath, fileSize, extractedText, uploadedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `, [fileId, id, file.originalname, file.path, file.size, extractedText, new Date().toISOString()]);
+        
+        res.json({
+            id: fileId,
+            fileName: file.originalname,
+            fileSize: file.size,
+            uploadedAt: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Error uploading AI assistant file:', error);
+        res.status(500).json({ error: 'Failed to upload file' });
+    }
+});
+
+// Delete AI assistant file
+app.delete('/api/reports/:id/assistant/files/:fileId', authenticateToken, async (req, res) => {
+    try {
+        const { id, fileId } = req.params;
+        
+        const file = await db.get(`
+            SELECT af.* FROM ai_assistant_files af
+            JOIN reports r ON af.reportId = r.id
+            WHERE af.id = ? AND r.id = ? AND r.organizationId = ?
+        `, [fileId, id, req.user.orgId]);
+        
+        if (!file) {
+            return res.status(404).json({ error: 'File not found' });
+        }
+        
+        // Delete physical file
+        if (fs.existsSync(file.filePath)) {
+            fs.unlinkSync(file.filePath);
+        }
+        
+        // Delete from database
+        await db.run('DELETE FROM ai_assistant_files WHERE id = ?', [fileId]);
+        
+        res.json({ message: 'File deleted' });
+    } catch (error) {
+        console.error('Error deleting AI assistant file:', error);
+        res.status(500).json({ error: 'Failed to delete file' });
+    }
+});
+
+// AI Assistant Chat endpoint
+app.post('/api/reports/:id/assistant/chat', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { message, sectionId, contextFileIds } = req.body;
+        
+        // Verify report belongs to organization
+        const report = await db.get('SELECT * FROM reports WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
+        if (!report) {
+            return res.status(404).json({ error: 'Report not found' });
+        }
+        
+        // Get all sections for context
+        const sections = await db.all(`
+            SELECT rs.*, ts.title, ts.sortOrder 
+            FROM report_sections rs 
+            LEFT JOIN template_sections ts ON rs.templateSectionId = ts.id 
+            WHERE rs.reportId = ? 
+            ORDER BY ts.sortOrder
+        `, [id]);
+        
+        // Get the specific section if provided
+        const currentSection = sectionId ? sections.find(s => s.id === sectionId) : null;
+        
+        // Get context files content
+        let contextContent = '';
+        if (contextFileIds && contextFileIds.length > 0) {
+            const files = await db.all(`
+                SELECT extractedText, fileName FROM ai_assistant_files 
+                WHERE id IN (${contextFileIds.map(() => '?').join(',')}) AND reportId = ?
+            `, [...contextFileIds, id]);
+            
+            contextContent = files.map(f => `[File: ${f.fileName}]\n${f.extractedText || '(No text extracted)'}`).join('\n\n');
+        }
+        
+        // Build context for the AI
+        const documentContext = sections.map(s => 
+            `[Section: ${s.title}]\n${s.generatedContent || '(Empty)'}`
+        ).join('\n\n---\n\n');
+        
+        // Check if user is asking for a suggestion/modification
+        const isSuggestionRequest = /suggest|improve|rewrite|modify|change|edit|fix|update|revise/i.test(message);
+        
+        // Prepare the prompt for OpenAI
+        const systemPrompt = `You are an AI assistant helping users with document creation and review.
+You have access to the full document with all its sections.
+
+${contextContent ? `Additional context files provided:\n${contextContent}\n\n` : ''}
+
+Current document sections:
+${documentContext}
+
+${currentSection ? `The user is currently viewing section: "${currentSection.title}"
+Current content: ${currentSection.generatedContent || '(Empty)'}` : ''}
+
+Instructions:
+- Answer questions about the document content
+- Help improve writing quality
+- Suggest changes when asked
+- Be concise and helpful
+- If the user asks for changes to a section, provide the complete suggested content
+
+${isSuggestionRequest && currentSection ? `
+IMPORTANT: Since the user seems to be asking for a modification, if you want to suggest changes to the current section, 
+respond with your explanation followed by a JSON block in this exact format:
+\`\`\`suggestion
+{
+  "sectionId": "${currentSection.id}",
+  "sectionTitle": "${currentSection.title}",
+  "originalContent": "${(currentSection.generatedContent || '').replace(/"/g, '\\"').slice(0, 200)}...",
+  "suggestedContent": "YOUR COMPLETE SUGGESTED CONTENT HERE"
+}
+\`\`\`
+Only include this if you're making a concrete suggestion for content changes.
+` : ''}`;
+
+        // Call OpenAI API
+        const openaiApiKey = process.env.OPENAI_API_KEY;
+        
+        if (!openaiApiKey) {
+            // Return a mock response for testing without API key
+            const mockResponse = {
+                response: `I understand you're asking about the document. Here's my analysis:\n\nBased on the current content across ${sections.length} sections, I can help you improve or answer questions about any part of the document.\n\n${currentSection ? `You're currently viewing "${currentSection.title}". Would you like me to suggest improvements for this section?` : 'Please select a section for more specific assistance.'}`,
+                suggestion: isSuggestionRequest && currentSection ? {
+                    sectionId: currentSection.id,
+                    sectionTitle: currentSection.title,
+                    originalContent: currentSection.generatedContent || '',
+                    suggestedContent: `${currentSection.generatedContent || ''}\n\n[AI Assistant suggested improvement based on your request: "${message}"]`
+                } : null
+            };
+            return res.json(mockResponse);
+        }
+        
+        const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${openaiApiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: message }
+                ],
+                max_tokens: 2000,
+                temperature: 0.7
+            })
+        });
+        
+        if (!openaiResponse.ok) {
+            throw new Error('OpenAI API error');
+        }
+        
+        const openaiData = await openaiResponse.json();
+        const assistantResponse = openaiData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+        
+        // Parse suggestion from response if present
+        let suggestion = null;
+        const suggestionMatch = assistantResponse.match(/```suggestion\n([\s\S]*?)\n```/);
+        if (suggestionMatch) {
+            try {
+                suggestion = JSON.parse(suggestionMatch[1]);
+            } catch (e) {
+                console.error('Error parsing suggestion:', e);
+            }
+        }
+        
+        // Clean response (remove suggestion block if present)
+        const cleanResponse = assistantResponse.replace(/```suggestion\n[\s\S]*?\n```/g, '').trim();
+        
+        res.json({
+            response: cleanResponse,
+            suggestion
+        });
+        
+    } catch (error) {
+        console.error('Error in AI assistant chat:', error);
+        res.status(500).json({ error: 'Failed to process message' });
+    }
+});
+
 // Stripe Webhook to handle subscription events
 app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
     const sig = req.headers['stripe-signature'];
