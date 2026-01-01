@@ -145,10 +145,20 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
     const [aiContextFiles, setAiContextFiles] = useState<AIContextFile[]>([]);
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [isUploadingAiFile, setIsUploadingAiFile] = useState(false);
+    const [applyToContent, setApplyToContent] = useState(true); // Por defecto aplica cambios al contenido
+    const [pendingSuggestion, setPendingSuggestion] = useState<{
+        messageId: string;
+        sectionId: string;
+        sectionTitle: string;
+        originalContent: string;
+        suggestedContent: string;
+    } | null>(null);
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
     
     const fileInputRef = useRef<HTMLInputElement>(null);
     const aiFileInputRef = useRef<HTMLInputElement>(null);
     const aiMessagesEndRef = useRef<HTMLDivElement>(null);
+    const generatedContentRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -553,15 +563,17 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 body: JSON.stringify({
                     message: aiInput,
                     sectionId: selectedSectionId,
-                    contextFileIds: aiContextFiles.map(f => f.id)
+                    contextFileIds: aiContextFiles.map(f => f.id),
+                    applyToContent: applyToContent // Indica si aplicar cambios al contenido
                 }),
                 credentials: 'include'
             });
             
             if (res.ok) {
                 const data = await res.json();
+                const messageId = `msg-${Date.now()}-response`;
                 const assistantMessage: AIMessage = {
-                    id: `msg-${Date.now()}-response`,
+                    id: messageId,
                     role: 'assistant',
                     content: data.response,
                     timestamp: new Date(),
@@ -574,6 +586,21 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                     } : undefined
                 };
                 setAiMessages(prev => [...prev, assistantMessage]);
+                
+                // If there's a suggestion, show it in the main content area
+                if (data.suggestion) {
+                    setPendingSuggestion({
+                        messageId,
+                        sectionId: data.suggestion.sectionId,
+                        sectionTitle: data.suggestion.sectionTitle,
+                        originalContent: data.suggestion.originalContent,
+                        suggestedContent: data.suggestion.suggestedContent
+                    });
+                    // Scroll to the content area
+                    setTimeout(() => {
+                        generatedContentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+                }
             } else {
                 // Error message
                 const errorMessage: AIMessage = {
@@ -599,6 +626,12 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 aiMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
             }, 100);
         }
+    };
+
+    // Show toast notification
+    const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
     };
 
     const handleAcceptSuggestion = async (messageId: string) => {
@@ -637,9 +670,14 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 if (sectionId === selectedSectionId) {
                     setEditingContent(suggestedContent);
                 }
+                
+                // Clear pending suggestion and show toast
+                setPendingSuggestion(null);
+                showToast('Changes saved successfully!', 'success');
             }
         } catch (error) {
             console.error('Error accepting suggestion:', error);
+            showToast('Failed to save changes', 'error');
         }
     };
 
@@ -649,6 +687,8 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 ? { ...m, suggestion: { ...m.suggestion, status: 'rejected' as const } }
                 : m
         ));
+        setPendingSuggestion(null);
+        showToast('Suggestion rejected', 'info');
     };
 
     const handleGenerate = async (prompt: string, mentionedEntityIds: string[]) => {
@@ -676,6 +716,11 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                             : s
                     )
                 });
+                
+                // Scroll to generated content after a short delay
+                setTimeout(() => {
+                    generatedContentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
             }
         } catch (error) {
             console.error('Error generating content:', error);
@@ -1205,9 +1250,48 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                     </div>
                                 </div>
 
+                                {/* AI Suggestion Preview */}
+                                {pendingSuggestion && pendingSuggestion.sectionId === selectedSectionId && (
+                                    <div ref={generatedContentRef} className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl shadow-sm border-2 border-purple-300 overflow-hidden">
+                                        <div className="px-6 py-4 bg-gradient-to-r from-purple-100 to-indigo-100 border-b border-purple-200 flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-purple-600 rounded-lg">
+                                                    <Bot size={20} className="text-white" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-semibold text-purple-900">AI Suggestion</h3>
+                                                    <p className="text-xs text-purple-600">Review the suggested changes below</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => handleAcceptSuggestion(pendingSuggestion.messageId)}
+                                                    className="px-4 py-2 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium shadow-sm"
+                                                >
+                                                    <Check size={16} />
+                                                    Accept
+                                                </button>
+                                                <button
+                                                    onClick={() => handleRejectSuggestion(pendingSuggestion.messageId)}
+                                                    className="px-4 py-2 text-sm bg-white hover:bg-slate-100 text-slate-700 rounded-lg transition-colors flex items-center gap-2 font-medium border border-slate-300 shadow-sm"
+                                                >
+                                                    <X size={16} />
+                                                    Reject
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="p-6">
+                                            <div className="min-h-[200px] p-4 bg-white border border-purple-200 rounded-lg text-sm whitespace-pre-wrap leading-relaxed">
+                                                {pendingSuggestion.suggestedContent}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Generated Content with Highlighted Comments */}
-                                {(editingContent || selectedSection?.generatedContent) && (
-                                    <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+                                {(editingContent || selectedSection?.generatedContent) && !(pendingSuggestion && pendingSuggestion.sectionId === selectedSectionId) && (
+                                    <div ref={generatedContentRef} className="bg-white rounded-xl shadow-sm border border-slate-200">
                                         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                                             <div>
                                                 <h3 className="font-semibold text-slate-800">Generated Content</h3>
@@ -1519,6 +1603,23 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
 
                                                     {/* Input Area */}
                                                     <div className="p-3 border-t border-slate-200 bg-white">
+                                                        {/* Toggle: Aplicar al contenido */}
+                                                        <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-100">
+                                                            <span className="text-xs text-slate-500">Aplicar cambios al contenido</span>
+                                                            <button
+                                                                onClick={() => setApplyToContent(!applyToContent)}
+                                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                                                                    applyToContent ? 'bg-teal-600' : 'bg-slate-200'
+                                                                }`}
+                                                                title={applyToContent ? "Los cambios se aplicarán directamente al documento" : "Solo responderá en el chat"}
+                                                            >
+                                                                <span
+                                                                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                                                                        applyToContent ? 'translate-x-4' : 'translate-x-0.5'
+                                                                    }`}
+                                                                />
+                                                            </button>
+                                                        </div>
                                                         <div className="flex items-end gap-2">
                                                             <input
                                                                 type="file"
@@ -1549,7 +1650,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                                             handleSendAiMessage();
                                                                         }
                                                                     }}
-                                                                    placeholder="Ask about the document..."
+                                                                    placeholder={applyToContent ? "Escribe qué cambios quieres..." : "Pregunta sobre el documento..."}
                                                                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
                                                                     rows={1}
                                                                     style={{ minHeight: '40px', maxHeight: '100px' }}
@@ -1954,6 +2055,23 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
 
                                                     {/* Input Area */}
                                                     <div className="p-3 border-t border-slate-200 bg-white">
+                                                        {/* Toggle: Aplicar al contenido */}
+                                                        <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-100">
+                                                            <span className="text-xs text-slate-500">Aplicar cambios al contenido</span>
+                                                            <button
+                                                                onClick={() => setApplyToContent(!applyToContent)}
+                                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                                                                    applyToContent ? 'bg-teal-600' : 'bg-slate-200'
+                                                                }`}
+                                                                title={applyToContent ? "Los cambios se aplicarán directamente al documento" : "Solo responderá en el chat"}
+                                                            >
+                                                                <span
+                                                                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                                                                        applyToContent ? 'translate-x-4' : 'translate-x-0.5'
+                                                                    }`}
+                                                                />
+                                                            </button>
+                                                        </div>
                                                         <div className="flex items-end gap-2">
                                                             <input
                                                                 type="file"
@@ -1984,7 +2102,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                                             handleSendAiMessage();
                                                                         }
                                                                     }}
-                                                                    placeholder="Ask about the document..."
+                                                                    placeholder={applyToContent ? "Escribe qué cambios quieres..." : "Pregunta sobre el documento..."}
                                                                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
                                                                     rows={1}
                                                                     style={{ minHeight: '40px', maxHeight: '100px' }}
@@ -2018,6 +2136,20 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                     onClose={() => setShowTemplateModal(false)}
                     usage={templateUsage}
                 />
+            )}
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed bottom-6 right-6 px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 z-50 animate-in slide-in-from-bottom-5 duration-300 ${
+                    toast.type === 'success' ? 'bg-teal-600 text-white' :
+                    toast.type === 'error' ? 'bg-red-600 text-white' :
+                    'bg-slate-800 text-white'
+                }`}>
+                    {toast.type === 'success' && <CheckCircle2 size={20} />}
+                    {toast.type === 'error' && <AlertCircle size={20} />}
+                    {toast.type === 'info' && <X size={20} />}
+                    <span className="font-medium">{toast.message}</span>
+                </div>
             )}
         </div>
     );

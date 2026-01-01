@@ -4135,7 +4135,7 @@ app.delete('/api/reports/:id/assistant/files/:fileId', authenticateToken, async 
 app.post('/api/reports/:id/assistant/chat', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const { message, sectionId, contextFileIds } = req.body;
+        const { message, sectionId, contextFileIds, applyToContent } = req.body;
         
         // Verify report belongs to organization
         const report = await db.get('SELECT * FROM reports WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
@@ -4178,11 +4178,39 @@ app.post('/api/reports/:id/assistant/chat', authenticateToken, async (req, res) 
             `[Section: ${s.title}]\n${s.generatedContent || '(Empty)'}`
         ).join('\n\n---\n\n');
         
-        // Check if user is asking for a suggestion/modification
-        const isSuggestionRequest = /suggest|improve|rewrite|modify|change|edit|fix|update|revise/i.test(message);
+        // Check if user is asking for a suggestion/modification (English and Spanish)
+        // OR if applyToContent mode is enabled (always treat as suggestion request)
+        const keywordMatch = /suggest|improve|rewrite|modify|change|edit|fix|update|revise|mejorar|cambiar|modificar|editar|corregir|reescribir|traducir|translate|escribe|write|rehacer|actualizar/i.test(message);
+        const isSuggestionRequest = applyToContent === true || keywordMatch;
+        
+        // Determine if we should force content generation mode
+        const forceContentMode = applyToContent === true && currentSection && currentSection.generatedContent;
         
         // Prepare the prompt for OpenAI
-        const systemPrompt = `You are an AI assistant helping users with document creation and review.
+        let systemPrompt;
+        
+        if (forceContentMode) {
+            // When applyToContent is ON, ask AI to return ONLY the modified content
+            systemPrompt = `You are an AI assistant that modifies document content based on user requests.
+
+Current section: "${currentSection.title}"
+Current content:
+"""
+${currentSection.generatedContent}
+"""
+
+${contextContent ? `Additional context files:\n${contextContent}\n\n` : ''}
+
+CRITICAL INSTRUCTIONS:
+- Apply the user's requested changes to the current content
+- Return ONLY the complete modified content - nothing else
+- Do NOT include explanations, introductions, or any text before or after the content
+- Do NOT include phrases like "Here is the modified content:" or "Sure, here it is:"
+- Just output the final content directly as if you were writing the document section
+- Preserve the overall structure and tone unless specifically asked to change it
+- If the request is unclear, make reasonable improvements while keeping the original meaning`;
+        } else {
+            systemPrompt = `You are an AI assistant helping users with document creation and review.
 You have access to the full document with all its sections.
 
 ${contextContent ? `Additional context files provided:\n${contextContent}\n\n` : ''}
@@ -4213,20 +4241,45 @@ respond with your explanation followed by a JSON block in this exact format:
 \`\`\`
 Only include this if you're making a concrete suggestion for content changes.
 ` : ''}`;
+        }
 
         // Call OpenAI API
         const openaiApiKey = process.env.OPENAI_API_KEY;
         
         if (!openaiApiKey) {
             // Return a mock response for testing without API key
-            const mockResponse = {
-                response: `I understand you're asking about the document. Here's my analysis:\n\nBased on the current content across ${sections.length} sections, I can help you improve or answer questions about any part of the document.\n\n${currentSection ? `You're currently viewing "${currentSection.title}". Would you like me to suggest improvements for this section?` : 'Please select a section for more specific assistance.'}`,
-                suggestion: isSuggestionRequest && currentSection ? {
+            let suggestionContent = null;
+            if (isSuggestionRequest && currentSection && currentSection.generatedContent) {
+                // Generate a meaningful mock suggestion based on the request
+                const originalText = currentSection.generatedContent;
+                let improvedText = originalText;
+                
+                // Simple transformations for demo purposes
+                if (/translate|traducir|inglés|english/i.test(message)) {
+                    improvedText = `[English translation of the content]\n\n${originalText}\n\n[This is a mock translation - connect OpenAI API for real translations]`;
+                } else if (/mejorar|improve|better/i.test(message)) {
+                    improvedText = `${originalText}\n\nAdditionally, this section has been enhanced with more professional language and clearer structure to improve readability and impact.`;
+                } else if (/más largo|longer|expand|ampliar/i.test(message)) {
+                    improvedText = `${originalText}\n\nFurthermore, expanding on the above points, it's important to note the following additional considerations and details that strengthen the overall narrative and provide more comprehensive coverage of the topic.`;
+                } else if (/más corto|shorter|resume|summarize/i.test(message)) {
+                    improvedText = originalText.split('.').slice(0, 2).join('.') + '.';
+                } else {
+                    improvedText = `${originalText}\n\n[Modified based on your request: "${message}"]`;
+                }
+                
+                suggestionContent = {
                     sectionId: currentSection.id,
                     sectionTitle: currentSection.title,
-                    originalContent: currentSection.generatedContent || '',
-                    suggestedContent: `${currentSection.generatedContent || ''}\n\n[AI Assistant suggested improvement based on your request: "${message}"]`
-                } : null
+                    originalContent: originalText,
+                    suggestedContent: improvedText
+                };
+            }
+            
+            const mockResponse = {
+                response: isSuggestionRequest && currentSection && currentSection.generatedContent
+                    ? `I've prepared a suggested modification for the section "${currentSection.title}" based on your request. Please review the changes below and click Accept to apply them or Reject to keep the original content.`
+                    : `I understand you're asking about the document. Based on the current content across ${sections.length} sections, I can help you improve or answer questions about any part of the document.\n\n${currentSection ? `You're currently viewing "${currentSection.title}".${currentSection.generatedContent ? ' Ask me to improve, translate, or modify this content.' : ' This section is empty - generate some content first.'}` : 'Please select a section for more specific assistance.'}`,
+                suggestion: suggestionContent
             };
             return res.json(mockResponse);
         }
@@ -4255,19 +4308,33 @@ Only include this if you're making a concrete suggestion for content changes.
         const openaiData = await openaiResponse.json();
         const assistantResponse = openaiData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
         
-        // Parse suggestion from response if present
+        // Handle response based on mode
         let suggestion = null;
-        const suggestionMatch = assistantResponse.match(/```suggestion\n([\s\S]*?)\n```/);
-        if (suggestionMatch) {
-            try {
-                suggestion = JSON.parse(suggestionMatch[1]);
-            } catch (e) {
-                console.error('Error parsing suggestion:', e);
-            }
-        }
+        let cleanResponse = assistantResponse;
         
-        // Clean response (remove suggestion block if present)
-        const cleanResponse = assistantResponse.replace(/```suggestion\n[\s\S]*?\n```/g, '').trim();
+        if (forceContentMode) {
+            // In force content mode, the AI response IS the suggested content
+            // Build the suggestion object programmatically
+            suggestion = {
+                sectionId: currentSection.id,
+                sectionTitle: currentSection.title,
+                originalContent: currentSection.generatedContent,
+                suggestedContent: assistantResponse.trim()
+            };
+            cleanResponse = `He preparado los cambios solicitados para la sección "${currentSection.title}". Revisa la sugerencia y haz clic en Aceptar para aplicar los cambios o Rechazar para mantener el contenido original.`;
+        } else {
+            // Parse suggestion from response if present (legacy mode)
+            const suggestionMatch = assistantResponse.match(/```suggestion\n([\s\S]*?)\n```/);
+            if (suggestionMatch) {
+                try {
+                    suggestion = JSON.parse(suggestionMatch[1]);
+                } catch (e) {
+                    console.error('Error parsing suggestion:', e);
+                }
+            }
+            // Clean response (remove suggestion block if present)
+            cleanResponse = assistantResponse.replace(/```suggestion\n[\s\S]*?\n```/g, '').trim();
+        }
         
         res.json({
             response: cleanResponse,
