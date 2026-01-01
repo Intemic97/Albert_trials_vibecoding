@@ -168,6 +168,49 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
         }
     }, [reportId]);
 
+    // Scroll Spy for Preview tab - detect which section is visible
+    useEffect(() => {
+        if (activeTab !== 'preview' || !report) return;
+
+        const handleScroll = () => {
+            const scrollContainer = document.getElementById('preview-scroll-container');
+            if (!scrollContainer) return;
+
+            const sections = report.sections;
+            let currentSectionId = selectedSectionId;
+
+            // Find which section is currently most visible in viewport
+            for (const section of sections) {
+                const element = document.getElementById(`preview-section-${section.id}`);
+                if (!element) continue;
+
+                const rect = element.getBoundingClientRect();
+                // Check if section is in viewport (at least 50% visible or top is near viewport top)
+                if (rect.top <= 200 && rect.bottom >= 100) {
+                    currentSectionId = section.id;
+                    break;
+                }
+            }
+
+            if (currentSectionId && currentSectionId !== selectedSectionId) {
+                setSelectedSectionId(currentSectionId);
+            }
+        };
+
+        const scrollContainer = document.getElementById('preview-scroll-container');
+        if (scrollContainer) {
+            scrollContainer.addEventListener('scroll', handleScroll);
+            // Run once on mount
+            handleScroll();
+        }
+
+        return () => {
+            if (scrollContainer) {
+                scrollContainer.removeEventListener('scroll', handleScroll);
+            }
+        };
+    }, [activeTab, report, selectedSectionId]);
+
     const fetchReport = async () => {
         setLoading(true);
         try {
@@ -571,6 +614,8 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
             
             if (res.ok) {
                 const data = await res.json();
+                console.log('[AI Assistant] Response received:', { hasResponse: !!data.response, hasSuggestion: !!data.suggestion, applyToContent });
+                
                 const messageId = `msg-${Date.now()}-response`;
                 const assistantMessage: AIMessage = {
                     id: messageId,
@@ -589,6 +634,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 
                 // If there's a suggestion, show it in the main content area
                 if (data.suggestion) {
+                    console.log('[AI Assistant] Setting pending suggestion and updating content');
                     setPendingSuggestion({
                         messageId,
                         sectionId: data.suggestion.sectionId,
@@ -596,6 +642,23 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                         originalContent: data.suggestion.originalContent,
                         suggestedContent: data.suggestion.suggestedContent
                     });
+                    
+                    // If applyToContent is true, update the editing content immediately
+                    if (applyToContent && data.suggestion.sectionId === selectedSectionId) {
+                        console.log('[AI Assistant] Applying content to editor');
+                        setEditingContent(data.suggestion.suggestedContent);
+                        
+                        // Also update the report state
+                        setReport({
+                            ...report,
+                            sections: report.sections.map(s =>
+                                s.id === data.suggestion.sectionId
+                                    ? { ...s, generatedContent: data.suggestion.suggestedContent, sectionStatus: 'edited' as const }
+                                    : s
+                            )
+                        });
+                    }
+                    
                     // Scroll to the content area
                     setTimeout(() => {
                         generatedContentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -603,6 +666,9 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 }
             } else {
                 // Error message
+                console.error('[AI Assistant] Backend returned error:', res.status, res.statusText);
+                const errorText = await res.text();
+                console.error('[AI Assistant] Error details:', errorText);
                 const errorMessage: AIMessage = {
                     id: `msg-${Date.now()}-error`,
                     role: 'assistant',
@@ -1010,6 +1076,16 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                             onClick={() => {
                                                 setSelectedSectionId(section.id);
                                                 setEditingContent(section.generatedContent || '');
+                                                
+                                                // In preview mode, scroll to the section
+                                                if (activeTab === 'preview') {
+                                                    setTimeout(() => {
+                                                        const element = document.getElementById(`preview-section-${section.id}`);
+                                                        if (element) {
+                                                            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                        }
+                                                    }, 100);
+                                                }
                                             }}
                                             className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors ${
                                                 isSelected
@@ -1040,6 +1116,16 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                             onClick={() => {
                                                                 setSelectedSectionId(sub.id);
                                                                 setEditingContent(sub.generatedContent || '');
+                                                                
+                                                                // In preview mode, scroll to the section
+                                                                if (activeTab === 'preview') {
+                                                                    setTimeout(() => {
+                                                                        const element = document.getElementById(`preview-section-${sub.id}`);
+                                                                        if (element) {
+                                                                            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                                        }
+                                                                    }, 100);
+                                                                }
                                                             }}
                                                             className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm transition-colors ${
                                                                 isSubSelected
@@ -1090,43 +1176,342 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 </aside>
 
                 {/* Main Content Area */}
-                <main className="flex-1 overflow-y-auto p-6">
+                <main className="flex-1 overflow-y-auto p-6" id="main-content-area">
                     {/* Preview Tab */}
                     {activeTab === 'preview' && (
-                        <div className="max-w-4xl mx-auto">
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                                    <div>
-                                        <h2 className="text-lg font-semibold text-slate-800">
-                                            {selectedSection?.title || 'Select a section'}
-                                        </h2>
-                                        {selectedSection && (
-                                            <p className="text-sm text-slate-500 mt-1">
-                                                {selectedSection.sectionStatus === 'empty' ? 'No content yet' : 
-                                                 selectedSection.sectionStatus === 'generated' ? 'AI Generated' : 'Edited'}
-                                            </p>
-                                        )}
+                        <div className="flex gap-6 h-full">
+                            {/* Main Content - All Sections */}
+                            <div className="flex-1 overflow-y-auto space-y-6" id="preview-scroll-container">
+                                <div className="max-w-4xl mx-auto space-y-8">
+                                    {parentSections.map((parentSection) => {
+                                        const subsections = getSubsections(parentSection.id);
+                                        const allSections = [parentSection, ...subsections];
+                                        
+                                        return allSections.map((section) => (
+                                            <div 
+                                                key={section.id}
+                                                id={`preview-section-${section.id}`}
+                                                data-section-id={section.id}
+                                                className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden scroll-mt-6"
+                                            >
+                                                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                                                    <div>
+                                                        <h2 className="text-lg font-semibold text-slate-800">
+                                                            {section.title}
+                                                        </h2>
+                                                        {section.content && (
+                                                            <p className="text-sm text-slate-500 mt-1">{section.content}</p>
+                                                        )}
+                                                    </div>
+                                                    {section.sectionStatus !== 'empty' && (
+                                                        <span className="px-2 py-1 text-xs bg-teal-50 text-teal-600 rounded-full flex items-center gap-1">
+                                                            <CheckCircle2 size={12} />
+                                                            Content ready
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="p-6 min-h-[200px]">
+                                                    {section.generatedContent ? (
+                                                        <div className="prose prose-slate max-w-none whitespace-pre-wrap">
+                                                            {section.generatedContent}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+                                                            <FileText size={40} className="mb-2 opacity-50" />
+                                                            <p className="text-sm">No content generated yet</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ));
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Collapsible Right Panel */}
+                            <div className={`shrink-0 flex transition-all duration-300 ${rightPanelOpen ? 'w-80' : 'w-12'}`}>
+                                {/* Tab buttons when closed */}
+                                {!rightPanelOpen && (
+                                    <div className="flex flex-col gap-2 p-1">
+                                        <button
+                                            onClick={() => { setRightPanelOpen(true); setRightPanelTab('comments'); }}
+                                            className={`p-2.5 rounded-lg border transition-all relative ${
+                                                comments.filter(c => c.sectionId === selectedSectionId && c.status === 'open').length > 0
+                                                    ? 'bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100'
+                                                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                                            }`}
+                                            title="Comments"
+                                        >
+                                            <MessageSquare size={18} />
+                                            {comments.filter(c => c.sectionId === selectedSectionId && c.status === 'open').length > 0 && (
+                                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center">
+                                                    {comments.filter(c => c.sectionId === selectedSectionId && c.status === 'open').length}
+                                                </span>
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => { setRightPanelOpen(true); setRightPanelTab('assistant'); }}
+                                            className="p-2.5 rounded-lg border bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all"
+                                            title="AI Assistant"
+                                        >
+                                            <Bot size={18} />
+                                        </button>
                                     </div>
-                                    {selectedSection?.sectionStatus !== 'empty' && (
-                                        <span className="px-2 py-1 text-xs bg-teal-50 text-teal-600 rounded-full flex items-center gap-1">
-                                            <CheckCircle2 size={12} />
-                                            Content ready
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="p-6 min-h-[400px]">
-                                    {selectedSection?.generatedContent ? (
-                                        <div className="prose prose-slate max-w-none whitespace-pre-wrap">
-                                            {selectedSection.generatedContent}
+                                )}
+
+                                {/* Expanded Panel */}
+                                {rightPanelOpen && (
+                                    <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                                        {/* Panel Header with Tabs */}
+                                        <div className="flex items-center border-b border-slate-200 bg-slate-50">
+                                            <button
+                                                onClick={() => setRightPanelTab('comments')}
+                                                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors relative ${
+                                                    rightPanelTab === 'comments'
+                                                        ? 'text-teal-600 bg-white'
+                                                        : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                <MessageSquare size={16} />
+                                                Comments
+                                                {comments.filter(c => c.sectionId === selectedSectionId && c.status === 'open').length > 0 && (
+                                                    <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
+                                                        {comments.filter(c => c.sectionId === selectedSectionId && c.status === 'open').length}
+                                                    </span>
+                                                )}
+                                            </button>
+                                            <button
+                                                onClick={() => setRightPanelTab('assistant')}
+                                                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                                                    rightPanelTab === 'assistant'
+                                                        ? 'text-teal-600 bg-white'
+                                                        : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                <Bot size={16} />
+                                                AI Assistant
+                                            </button>
+                                            <button
+                                                onClick={() => setRightPanelOpen(false)}
+                                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                                                title="Close panel"
+                                            >
+                                                <ChevronRight size={18} />
+                                            </button>
                                         </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-                                            <FileText size={48} className="mb-3 opacity-50" />
-                                            <p>No content generated yet</p>
-                                            <p className="text-sm mt-1">Go to Generate tab to create content</p>
+
+                                        {/* Panel Content */}
+                                        <div className="flex-1 overflow-y-auto p-4">
+                                            {rightPanelTab === 'comments' && (
+                                                <>
+                                                    {comments.filter(c => c.sectionId === selectedSectionId).length === 0 ? (
+                                                        <div className="text-center py-8 text-slate-400">
+                                                            <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
+                                                            <p className="text-sm">No comments for this section</p>
+                                                            <p className="text-xs mt-1">Select a section to view comments</p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-3">
+                                                            {comments.filter(c => c.sectionId === selectedSectionId).map(comment => (
+                                                                <div 
+                                                                    key={comment.id}
+                                                                    className={`p-3 rounded-lg border transition-all ${
+                                                                        comment.status === 'resolved'
+                                                                            ? 'bg-slate-50 border-slate-200 opacity-60'
+                                                                            : 'bg-white border-slate-200 hover:border-blue-300'
+                                                                    }`}
+                                                                >
+                                                                    <div className="flex items-start justify-between mb-2">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className="w-6 h-6 rounded-full bg-teal-600 flex items-center justify-center text-white text-xs font-semibold">
+                                                                                {comment.userName.charAt(0).toUpperCase()}
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-sm font-medium text-slate-700">{comment.userName}</p>
+                                                                                <p className="text-xs text-slate-400">
+                                                                                    {new Date(comment.createdAt).toLocaleString()}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                        {comment.status === 'resolved' && (
+                                                                            <CheckCircle2 size={14} className="text-slate-400" />
+                                                                        )}
+                                                                    </div>
+
+                                                                    {comment.selectedText && (
+                                                                        <div className="mb-2 p-2 bg-slate-50 border-l-2 border-teal-400 text-xs italic text-slate-600">
+                                                                            "{comment.selectedText}"
+                                                                        </div>
+                                                                    )}
+
+                                                                    <p className="text-sm text-slate-700 mb-2">{comment.commentText}</p>
+
+                                                                    {comment.suggestionText && (
+                                                                        <div className="mt-2 p-2 bg-teal-50 border border-teal-200 rounded text-xs">
+                                                                            <p className="font-medium text-teal-800 mb-1">Suggestion:</p>
+                                                                            <p className="text-teal-700">{comment.suggestionText}</p>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {comment.status === 'open' && comment.userId === user?.id && (
+                                                                        <button
+                                                                            onClick={() => handleResolveComment(comment.id, true)}
+                                                                            className="mt-2 text-xs text-teal-600 hover:text-teal-700 font-medium"
+                                                                        >
+                                                                            Mark as resolved
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+
+                                            {rightPanelTab === 'assistant' && (
+                                                <div className="flex flex-col h-full">
+                                                    {/* AI Context Files */}
+                                                    {aiContextFiles.length > 0 && (
+                                                        <div className="mb-4 pb-3 border-b border-slate-200">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <File size={14} className="text-slate-500" />
+                                                                <span className="text-xs font-medium text-slate-600">Context Files</span>
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                {aiContextFiles.map(file => (
+                                                                    <div key={file.id} className="flex items-center gap-2 text-xs bg-slate-50 rounded p-1.5">
+                                                                        <File size={12} className="text-red-500" />
+                                                                        <span className="flex-1 truncate text-slate-700">{file.name}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Chat Messages */}
+                                                    <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+                                                        {aiMessages.length === 0 ? (
+                                                            <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                                                                <Bot size={40} className="mb-2 opacity-50" />
+                                                                <p className="text-sm text-center">AI Assistant ready</p>
+                                                                <p className="text-xs text-center mt-1 px-4">Ask me to improve, translate, or modify content</p>
+                                                            </div>
+                                                        ) : (
+                                                            aiMessages.map((msg) => (
+                                                                <div
+                                                                    key={msg.id}
+                                                                    className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                                                >
+                                                                    {msg.role === 'assistant' && (
+                                                                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
+                                                                            <Bot size={14} className="text-white" />
+                                                                        </div>
+                                                                    )}
+                                                                    <div className={`max-w-[85%] rounded-lg p-2.5 text-sm ${
+                                                                        msg.role === 'user'
+                                                                            ? 'bg-teal-600 text-white'
+                                                                            : 'bg-slate-100 text-slate-800'
+                                                                    }`}>
+                                                                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                                                                        {msg.suggestion && (
+                                                                            <div className="mt-2 pt-2 border-t border-slate-200">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <button
+                                                                                        onClick={() => handleAcceptSuggestion(msg.id)}
+                                                                                        disabled={msg.suggestion.status !== 'pending'}
+                                                                                        className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
+                                                                                            msg.suggestion.status === 'accepted'
+                                                                                                ? 'bg-teal-100 text-teal-700 cursor-default'
+                                                                                                : msg.suggestion.status === 'rejected'
+                                                                                                ? 'bg-slate-200 text-slate-400 cursor-default'
+                                                                                                : 'bg-teal-600 text-white hover:bg-teal-700 cursor-pointer'
+                                                                                        }`}
+                                                                                    >
+                                                                                        {msg.suggestion.status === 'accepted' ? (
+                                                                                            <><Check size={12} /> Accepted</>
+                                                                                        ) : (
+                                                                                            <><Check size={12} /> Accept</>
+                                                                                        )}
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => handleRejectSuggestion(msg.id)}
+                                                                                        disabled={msg.suggestion.status !== 'pending'}
+                                                                                        className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
+                                                                                            msg.suggestion.status === 'rejected'
+                                                                                                ? 'bg-slate-200 text-slate-500 cursor-default'
+                                                                                                : msg.suggestion.status === 'accepted'
+                                                                                                ? 'bg-slate-200 text-slate-400 cursor-default'
+                                                                                                : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer'
+                                                                                        }`}
+                                                                                    >
+                                                                                        {msg.suggestion.status === 'rejected' ? (
+                                                                                            <><X size={12} /> Rejected</>
+                                                                                        ) : (
+                                                                                            <><X size={12} /> Reject</>
+                                                                                        )}
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    {msg.role === 'user' && (
+                                                                        <div className="w-6 h-6 rounded-full bg-teal-600 flex items-center justify-center flex-shrink-0 text-white text-xs font-semibold">
+                                                                            {user?.name?.charAt(0).toUpperCase()}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ))
+                                                        )}
+                                                        <div ref={aiMessagesEndRef} />
+                                                    </div>
+
+                                                    {/* Input Area */}
+                                                    <div className="border-t border-slate-200 pt-3">
+                                                        {/* Toggle: Aplicar al contenido */}
+                                                        <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-100">
+                                                            <span className="text-xs text-slate-500">Aplicar cambios al contenido</span>
+                                                            <button
+                                                                onClick={() => setApplyToContent(!applyToContent)}
+                                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                                                                    applyToContent ? 'bg-teal-600' : 'bg-slate-200'
+                                                                }`}
+                                                            >
+                                                                <span
+                                                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                                        applyToContent ? 'translate-x-5' : 'translate-x-0.5'
+                                                                    }`}
+                                                                />
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                type="text"
+                                                                value={aiInput}
+                                                                onChange={(e) => setAiInput(e.target.value)}
+                                                                onKeyPress={(e) => e.key === 'Enter' && !isAiLoading && handleSendAiMessage()}
+                                                                placeholder="Ask me anything..."
+                                                                disabled={!selectedSectionId}
+                                                                className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-slate-50 disabled:text-slate-400"
+                                                            />
+                                                            <button
+                                                                onClick={handleSendAiMessage}
+                                                                disabled={!aiInput.trim() || isAiLoading || !selectedSectionId}
+                                                                className="p-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-lg transition-colors"
+                                                            >
+                                                                {isAiLoading ? (
+                                                                    <Loader2 size={18} className="animate-spin" />
+                                                                ) : (
+                                                                    <Send size={18} />
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
