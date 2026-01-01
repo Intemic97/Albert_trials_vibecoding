@@ -145,7 +145,6 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
     const [aiContextFiles, setAiContextFiles] = useState<AIContextFile[]>([]);
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [isUploadingAiFile, setIsUploadingAiFile] = useState(false);
-    const [applyToContent, setApplyToContent] = useState(true); // Por defecto aplica cambios al contenido
     const [pendingSuggestion, setPendingSuggestion] = useState<{
         messageId: string;
         sectionId: string;
@@ -601,6 +600,10 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
             aiMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }, 100);
         
+        // Determine if we should apply to content based on active tab
+        // Only in Generate tab, we apply suggestions to the content area
+        const shouldApplyToContent = activeTab === 'generate';
+        
         try {
             const res = await fetch(`${API_BASE}/reports/${report.id}/assistant/chat`, {
                 method: 'POST',
@@ -609,14 +612,19 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                     message: aiInput,
                     sectionId: selectedSectionId,
                     contextFileIds: aiContextFiles.map(f => f.id),
-                    applyToContent: applyToContent // Indica si aplicar cambios al contenido
+                    applyToContent: shouldApplyToContent // true only in Generate tab
                 }),
                 credentials: 'include'
             });
             
             if (res.ok) {
                 const data = await res.json();
-                console.log('[AI Assistant] Response received:', { hasResponse: !!data.response, hasSuggestion: !!data.suggestion, applyToContent });
+                console.log('[AI Assistant] Response received:', { 
+                    hasResponse: !!data.response, 
+                    hasSuggestion: !!data.suggestion, 
+                    activeTab,
+                    shouldApplyToContent 
+                });
                 
                 const messageId = `msg-${Date.now()}-response`;
                 const assistantMessage: AIMessage = {
@@ -634,9 +642,11 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 };
                 setAiMessages(prev => [...prev, assistantMessage]);
                 
-                // If there's a suggestion, show it in the main content area
-                if (data.suggestion) {
-                    console.log('[AI Assistant] Setting pending suggestion and updating content');
+                // If there's a suggestion AND we're in Generate tab, show it in the content area
+                if (data.suggestion && activeTab === 'generate') {
+                    console.log('[AI Assistant] Setting pending suggestion for Generate tab');
+                    console.log('[AI Assistant] Suggestion data:', data.suggestion);
+                    
                     setPendingSuggestion({
                         messageId,
                         sectionId: data.suggestion.sectionId,
@@ -645,23 +655,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                         suggestedContent: data.suggestion.suggestedContent
                     });
                     
-                    // If applyToContent is true, update the editing content immediately
-                    if (applyToContent && data.suggestion.sectionId === selectedSectionId) {
-                        console.log('[AI Assistant] Applying content to editor');
-                        setEditingContent(data.suggestion.suggestedContent);
-                        
-                        // Also update the report state
-                        setReport({
-                            ...report,
-                            sections: report.sections.map(s =>
-                                s.id === data.suggestion.sectionId
-                                    ? { ...s, generatedContent: data.suggestion.suggestedContent, sectionStatus: 'edited' as const }
-                                    : s
-                            )
-                        });
-                    }
-                    
-                    // Scroll to the content area
+                    // Scroll to the content area to show the suggestion
                     setTimeout(() => {
                         generatedContentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }, 100);
@@ -703,10 +697,9 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
     };
 
     const handleAcceptSuggestion = async (messageId: string) => {
-        const message = aiMessages.find(m => m.id === messageId);
-        if (!message?.suggestion || !report) return;
+        if (!pendingSuggestion || !report) return;
         
-        const { sectionId, suggestedContent } = message.suggestion;
+        const { sectionId, suggestedContent } = pendingSuggestion;
         
         try {
             const res = await fetch(`${API_BASE}/reports/${report.id}/sections/${sectionId}`, {
@@ -717,6 +710,8 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
             });
             
             if (res.ok) {
+                console.log('[Accept] Content saved successfully');
+                
                 // Update the message suggestion status
                 setAiMessages(prev => prev.map(m => 
                     m.id === messageId 
@@ -742,6 +737,9 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 // Clear pending suggestion and show toast
                 setPendingSuggestion(null);
                 showToast('Changes saved successfully!', 'success');
+            } else {
+                console.error('[Accept] Failed to save:', res.status);
+                showToast('Failed to save changes', 'error');
             }
         } catch (error) {
             console.error('Error accepting suggestion:', error);
@@ -1152,29 +1150,6 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                             })}
                         </nav>
                     </div>
-                    
-                    {/* Report Info */}
-                    <div className="p-4 border-t border-slate-200">
-                        <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3">Document Info</h4>
-                        {report.createdByName && (
-                            <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
-                                <User size={14} />
-                                <span>Creator: {report.createdByName}</span>
-                            </div>
-                        )}
-                        {report.reviewerName && (
-                            <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
-                                <User size={14} />
-                                <span>Reviewer: {report.reviewerName}</span>
-                            </div>
-                        )}
-                        {report.deadline && (
-                            <div className="flex items-center gap-2 text-sm text-slate-600">
-                                <Calendar size={14} />
-                                <span>Deadline: {new Date(report.deadline).toLocaleDateString()}</span>
-                            </div>
-                        )}
-                    </div>
                 </aside>
 
                 {/* Main Content Area */}
@@ -1469,23 +1444,6 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
 
                                                     {/* Input Area */}
                                                     <div className="border-t border-slate-200 pt-3">
-                                                        {/* Toggle: Aplicar al contenido */}
-                                                        <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-100">
-                                                            <span className="text-xs text-slate-500">Aplicar cambios al contenido</span>
-                                                            <button
-                                                                onClick={() => setApplyToContent(!applyToContent)}
-                                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                                                                    applyToContent ? 'bg-teal-600' : 'bg-slate-200'
-                                                                }`}
-                                                            >
-                                                                <span
-                                                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                                                        applyToContent ? 'translate-x-5' : 'translate-x-0.5'
-                                                                    }`}
-                                                                />
-                                                            </button>
-                                                        </div>
-
                                                         <div className="flex gap-2">
                                                             <input
                                                                 type="text"
@@ -1990,23 +1948,6 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
 
                                                     {/* Input Area */}
                                                     <div className="p-3 border-t border-slate-200 bg-white">
-                                                        {/* Toggle: Aplicar al contenido */}
-                                                        <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-100">
-                                                            <span className="text-xs text-slate-500">Aplicar cambios al contenido</span>
-                                                            <button
-                                                                onClick={() => setApplyToContent(!applyToContent)}
-                                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                                                                    applyToContent ? 'bg-teal-600' : 'bg-slate-200'
-                                                                }`}
-                                                                title={applyToContent ? "Los cambios se aplicarán directamente al documento" : "Solo responderá en el chat"}
-                                                            >
-                                                                <span
-                                                                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                                                                        applyToContent ? 'translate-x-4' : 'translate-x-0.5'
-                                                                    }`}
-                                                                />
-                                                            </button>
-                                                        </div>
                                                         <div className="flex items-end gap-2">
                                                             <input
                                                                 type="file"
@@ -2037,7 +1978,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                                             handleSendAiMessage();
                                                                         }
                                                                     }}
-                                                                    placeholder={applyToContent ? "Escribe qué cambios quieres..." : "Pregunta sobre el documento..."}
+                                                                    placeholder="Escribe qué cambios quieres en esta sección..."
                                                                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
                                                                     rows={1}
                                                                     style={{ minHeight: '40px', maxHeight: '100px' }}
@@ -2442,23 +2383,6 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
 
                                                     {/* Input Area */}
                                                     <div className="p-3 border-t border-slate-200 bg-white">
-                                                        {/* Toggle: Aplicar al contenido */}
-                                                        <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-100">
-                                                            <span className="text-xs text-slate-500">Aplicar cambios al contenido</span>
-                                                            <button
-                                                                onClick={() => setApplyToContent(!applyToContent)}
-                                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                                                                    applyToContent ? 'bg-teal-600' : 'bg-slate-200'
-                                                                }`}
-                                                                title={applyToContent ? "Los cambios se aplicarán directamente al documento" : "Solo responderá en el chat"}
-                                                            >
-                                                                <span
-                                                                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                                                                        applyToContent ? 'translate-x-4' : 'translate-x-0.5'
-                                                                    }`}
-                                                                />
-                                                            </button>
-                                                        </div>
                                                         <div className="flex items-end gap-2">
                                                             <input
                                                                 type="file"
@@ -2489,7 +2413,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                                             handleSendAiMessage();
                                                                         }
                                                                     }}
-                                                                    placeholder={applyToContent ? "Escribe qué cambios quieres..." : "Pregunta sobre el documento..."}
+                                                                    placeholder="Escribe qué cambios quieres en esta sección..."
                                                                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
                                                                     rows={1}
                                                                     style={{ minHeight: '40px', maxHeight: '100px' }}

@@ -3462,8 +3462,13 @@ app.get('/api/reports/:id', authenticateToken, async (req, res) => {
         const sections = templateSections.map(ts => {
             const rs = reportSections.find(r => r.templateSectionId === ts.id);
             return {
-                ...ts,
-                reportSectionId: rs?.id,
+                id: rs?.id || ts.id, // Use report_section.id if exists, otherwise template_section.id
+                templateSectionId: ts.id,
+                title: ts.title,
+                content: ts.content,
+                generationRules: ts.generationRules,
+                sortOrder: ts.sortOrder,
+                parentId: ts.parentId,
                 generatedContent: rs?.content || null,
                 userPrompt: rs?.userPrompt || null,
                 sectionStatus: rs?.status || 'empty',
@@ -3831,6 +3836,8 @@ app.put('/api/reports/:id/sections/:sectionId', authenticateToken, async (req, r
         const { content } = req.body;
         const now = new Date().toISOString();
         
+        console.log('[Update Section] Request:', { reportId: id, sectionId, contentLength: content?.length });
+        
         const report = await db.get(
             'SELECT id FROM reports WHERE id = ? AND organizationId = ?',
             [id, req.user.orgId]
@@ -3840,25 +3847,45 @@ app.put('/api/reports/:id/sections/:sectionId', authenticateToken, async (req, r
             return res.status(404).json({ error: 'Report not found' });
         }
         
+        // Check if this is a report_section.id or a template_section.id
+        // First try to find by report_section.id (the new way)
         const existingSection = await db.get(
-            'SELECT id FROM report_sections WHERE reportId = ? AND templateSectionId = ?',
-            [id, sectionId]
+            'SELECT id FROM report_sections WHERE id = ? AND reportId = ?',
+            [sectionId, id]
         );
         
         if (existingSection) {
+            console.log('[Update Section] Updating existing section:', existingSection.id);
             await db.run(`
                 UPDATE report_sections 
                 SET content = ?, status = 'edited', generatedAt = ?
                 WHERE id = ?
             `, [content, now, existingSection.id]);
         } else {
-            const newSectionId = Math.random().toString(36).substr(2, 9);
-            await db.run(`
-                INSERT INTO report_sections (id, reportId, templateSectionId, content, status, generatedAt)
-                VALUES (?, ?, ?, ?, 'edited', ?)
-            `, [newSectionId, id, sectionId, content, now]);
+            // If not found, try by templateSectionId (the old way for backward compatibility)
+            const sectionByTemplate = await db.get(
+                'SELECT id FROM report_sections WHERE reportId = ? AND templateSectionId = ?',
+                [id, sectionId]
+            );
+            
+            if (sectionByTemplate) {
+                console.log('[Update Section] Updating by template:', sectionByTemplate.id);
+                await db.run(`
+                    UPDATE report_sections 
+                    SET content = ?, status = 'edited', generatedAt = ?
+                    WHERE id = ?
+                `, [content, now, sectionByTemplate.id]);
+            } else {
+                console.log('[Update Section] Creating new section');
+                const newSectionId = Math.random().toString(36).substr(2, 9);
+                await db.run(`
+                    INSERT INTO report_sections (id, reportId, templateSectionId, content, status, generatedAt)
+                    VALUES (?, ?, ?, ?, 'edited', ?)
+                `, [newSectionId, id, sectionId, content, now]);
+            }
         }
         
+        console.log('[Update Section] Section saved successfully');
         await db.run('UPDATE reports SET updatedAt = ? WHERE id = ?', [now, id]);
         
         res.json({ message: 'Section saved' });
@@ -4137,6 +4164,13 @@ app.post('/api/reports/:id/assistant/chat', authenticateToken, async (req, res) 
         const { id } = req.params;
         const { message, sectionId, contextFileIds, applyToContent } = req.body;
         
+        console.log('[AI Assistant Chat] Request received:', { 
+            reportId: id, 
+            sectionId, 
+            applyToContent, 
+            messagePreview: message?.slice(0, 50) 
+        });
+        
         // Verify report belongs to organization
         const report = await db.get('SELECT * FROM reports WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
         if (!report) {
@@ -4153,13 +4187,20 @@ app.post('/api/reports/:id/assistant/chat', authenticateToken, async (req, res) 
             ORDER BY ts.sortOrder
         `, [id]);
         
-        console.log('[AI Assistant] Sections loaded:', sections.map(s => ({ title: s.title, hasContent: !!s.generatedContent })));
+        console.log('[AI Assistant] Sections loaded:', sections.map(s => ({ id: s.id, title: s.title, hasContent: !!s.generatedContent })));
         
         // Get the specific section if provided
         const currentSection = sectionId ? sections.find(s => s.id === sectionId) : null;
         
+        console.log('[AI Assistant] Looking for section:', sectionId);
+        console.log('[AI Assistant] Available section IDs:', sections.map(s => s.id));
+        
         if (currentSection) {
-            console.log('[AI Assistant] Current section:', currentSection.title, 'Content preview:', currentSection.generatedContent?.slice(0, 100));
+            console.log('[AI Assistant] Current section:', {
+                title: currentSection.title,
+                hasContent: !!currentSection.generatedContent,
+                contentLength: currentSection.generatedContent?.length || 0
+            });
         }
         
         // Get context files content
@@ -4185,6 +4226,14 @@ app.post('/api/reports/:id/assistant/chat', authenticateToken, async (req, res) 
         
         // Determine if we should force content generation mode
         const forceContentMode = applyToContent === true && currentSection && currentSection.generatedContent;
+        
+        console.log('[AI Assistant] Mode check:', {
+            applyToContent,
+            hasCurrentSection: !!currentSection,
+            hasGeneratedContent: !!currentSection?.generatedContent,
+            forceContentMode,
+            isSuggestionRequest
+        });
         
         // Prepare the prompt for OpenAI
         let systemPrompt;
@@ -4321,7 +4370,9 @@ Only include this if you're making a concrete suggestion for content changes.
                 originalContent: currentSection.generatedContent,
                 suggestedContent: assistantResponse.trim()
             };
-            cleanResponse = `He preparado los cambios solicitados para la sección "${currentSection.title}". Revisa la sugerencia y haz clic en Aceptar para aplicar los cambios o Rechazar para mantener el contenido original.`;
+            
+            // Don't save automatically - let the user Accept/Reject
+            cleanResponse = `He preparado una sugerencia para la sección "${currentSection.title}". Revisa los cambios y haz clic en Aceptar para aplicarlos o Rechazar para descartarlos.`;
         } else {
             // Parse suggestion from response if present (legacy mode)
             const suggestionMatch = assistantResponse.match(/```suggestion\n([\s\S]*?)\n```/);
@@ -4339,6 +4390,11 @@ Only include this if you're making a concrete suggestion for content changes.
         res.json({
             response: cleanResponse,
             suggestion
+        });
+        
+        console.log('[AI Assistant] Response sent:', {
+            hasSuggestion: !!suggestion,
+            responseLength: cleanResponse?.length || 0
         });
         
     } catch (error) {
