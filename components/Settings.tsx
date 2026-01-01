@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Plus, X, Search, Building, BookOpen, ToggleLeft, ToggleRight, Check, Zap, Crown, Sparkles, CreditCard, ExternalLink, Loader2 } from 'lucide-react';
+import { User, Mail, Plus, X, Search, Building, BookOpen, ToggleLeft, ToggleRight, Check, Zap, Crown, Sparkles, CreditCard, ExternalLink, Loader2, Building2 } from 'lucide-react';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import { API_BASE } from '../config';
 
@@ -51,6 +51,19 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
     const [tutorialEnabled, setTutorialEnabled] = useState(() => {
         return !localStorage.getItem('intemic_tutorial_completed');
     });
+    
+    // Company Information State
+    const [companyInfo, setCompanyInfo] = useState({
+        name: '',
+        industry: '',
+        employees: '',
+        website: '',
+        linkedinUrl: '',
+        headquarters: '',
+        foundingYear: '',
+        overview: ''
+    });
+    const [isSavingCompany, setIsSavingCompany] = useState(false);
     
     // Billing state
     const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
@@ -249,8 +262,45 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
     useEffect(() => {
         if (activeTab === 'team') {
             fetchUsers();
+        } else if (activeTab === 'general') {
+            fetchCompanyInfo();
         }
     }, [activeTab]);
+    
+    const fetchCompanyInfo = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/company`, { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                setCompanyInfo(data);
+            }
+        } catch (error) {
+            console.error('Error fetching company info:', error);
+        }
+    };
+
+    const updateCompanyInfo = async () => {
+        setIsSavingCompany(true);
+        try {
+            const res = await fetch(`${API_BASE}/company`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(companyInfo),
+                credentials: 'include'
+            });
+            if (res.ok) {
+                setFeedback({ type: 'success', message: 'Company information saved successfully!' });
+            } else {
+                setFeedback({ type: 'error', message: 'Failed to save company information' });
+            }
+        } catch (error) {
+            console.error('Error saving company info:', error);
+            setFeedback({ type: 'error', message: 'An error occurred' });
+        } finally {
+            setIsSavingCompany(false);
+        }
+        setTimeout(() => setFeedback(null), 3000);
+    };
 
     const fetchUsers = async () => {
         try {
@@ -454,6 +504,136 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             <ToggleLeft className="w-12 h-12 text-slate-300" />
                                         )}
                                     </button>
+                                </div>
+                            </div>
+
+                            {/* Company Information Section */}
+                            <div>
+                                <h2 className="text-lg font-semibold text-slate-800 mt-8 mb-2">Company Information</h2>
+                                <p className="text-slate-500 text-sm">Manage your company's core information.</p>
+                            </div>
+
+                            {feedback && (
+                                <div className={`p-4 rounded-lg text-sm font-medium ${feedback.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                                    }`}>
+                                    {feedback.message}
+                                </div>
+                            )}
+
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+                                <div className="flex justify-between items-center mb-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-3 bg-teal-50 rounded-xl">
+                                            <Building2 className="w-6 h-6 text-teal-600" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-medium text-slate-800">Company Profile</h3>
+                                            <p className="text-sm text-slate-500">Update your organization details</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={updateCompanyInfo}
+                                        disabled={isSavingCompany}
+                                        className="px-4 py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+                                    >
+                                        {isSavingCompany ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                Saving...
+                                            </>
+                                        ) : (
+                                            'Save Changes'
+                                        )}
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
+                                        <input
+                                            type="text"
+                                            value={companyInfo.name}
+                                            onChange={(e) => setCompanyInfo({ ...companyInfo, name: e.target.value })}
+                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Industry</label>
+                                        <input
+                                            type="text"
+                                            value={companyInfo.industry}
+                                            onChange={(e) => setCompanyInfo({ ...companyInfo, industry: e.target.value })}
+                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Number of Employees</label>
+                                        <select
+                                            value={companyInfo.employees}
+                                            onChange={(e) => setCompanyInfo({ ...companyInfo, employees: e.target.value })}
+                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                        >
+                                            <option value="">Select...</option>
+                                            <option value="1-10">1-10</option>
+                                            <option value="11-50">11-50</option>
+                                            <option value="51-200">51-200</option>
+                                            <option value="201-500">201-500</option>
+                                            <option value="500+">500+</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Website</label>
+                                        <input
+                                            type="url"
+                                            value={companyInfo.website}
+                                            onChange={(e) => setCompanyInfo({ ...companyInfo, website: e.target.value })}
+                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">LinkedIn URL</label>
+                                        <input
+                                            type="url"
+                                            value={companyInfo.linkedinUrl}
+                                            onChange={(e) => setCompanyInfo({ ...companyInfo, linkedinUrl: e.target.value })}
+                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Headquarters Location</label>
+                                        <input
+                                            type="text"
+                                            value={companyInfo.headquarters}
+                                            onChange={(e) => setCompanyInfo({ ...companyInfo, headquarters: e.target.value })}
+                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Founding Year</label>
+                                        <input
+                                            type="text"
+                                            value={companyInfo.foundingYear}
+                                            onChange={(e) => setCompanyInfo({ ...companyInfo, foundingYear: e.target.value })}
+                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                        />
+                                    </div>
+
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Company Overview</label>
+                                        <textarea
+                                            rows={4}
+                                            value={companyInfo.overview}
+                                            onChange={(e) => setCompanyInfo({ ...companyInfo, overview: e.target.value })}
+                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            placeholder="Brief overview of your company..."
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>

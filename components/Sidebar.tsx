@@ -97,10 +97,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
           <NavItem icon={Database} label="Database" view="database" active={activeView === 'database'} />
           <NavItem icon={Cpu} label="Reports" view="reports" active={activeView === 'reports'} />
 
-          <SectionLabel label="Discover" />
-          <NavItem icon={FileText} label="Documentation" />
-
-
         </nav>
       </div>
 

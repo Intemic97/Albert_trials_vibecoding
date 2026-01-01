@@ -2510,7 +2510,7 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                 isExpanded: true
             }));
         }
-        return [{ title: '', items: [], isExpanded: true }];
+        return [{ title: '', content: '', generationRules: '', items: [], isExpanded: true }];
     });
     const [isSaving, setIsSaving] = useState(false);
 
@@ -2524,7 +2524,7 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
     ];
 
     const addSection = () => {
-        setSections([...sections, { title: '', items: [], isExpanded: true }]);
+        setSections([...sections, { title: '', content: '', generationRules: '', items: [], isExpanded: true }]);
     };
 
     const removeSection = (index: number) => {
@@ -2699,6 +2699,31 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
 
                                     {section.isExpanded && (
                                         <div className="p-4 space-y-3">
+                                            {/* Section Content and Generation Rules */}
+                                            <div className="bg-white rounded-lg p-3 border border-slate-200 space-y-3 mb-4">
+                                                <div>
+                                                    <label className="text-xs text-slate-500 font-medium">Content</label>
+                                                    <textarea
+                                                        value={section.content || ''}
+                                                        onChange={(e) => updateSection(sIdx, { content: e.target.value })}
+                                                        placeholder="Description of what this section should contain..."
+                                                        className="w-full px-2 py-1.5 border border-slate-200 rounded focus:ring-1 focus:ring-teal-500 outline-none text-sm resize-none"
+                                                        rows={2}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-slate-500 font-medium">Generation Rules (optional)</label>
+                                                    <textarea
+                                                        value={section.generationRules || ''}
+                                                        onChange={(e) => updateSection(sIdx, { generationRules: e.target.value })}
+                                                        placeholder="Special instructions for AI generation..."
+                                                        className="w-full px-2 py-1.5 border border-slate-200 rounded focus:ring-1 focus:ring-teal-500 outline-none text-sm resize-none"
+                                                        rows={2}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Section Items */}
                                             {section.items.length > 0 ? (
                                                 <div className="space-y-3">
                                                     {section.items.map((item, iIdx) => (

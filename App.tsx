@@ -170,23 +170,8 @@ function AuthenticatedApp() {
         }
     };
 
-    // Database Tab State
-    const [databaseTab, setDatabaseTab] = useState<'company' | 'entities'>('entities');
-
     // Entity Search State
     const [entitySearchQuery, setEntitySearchQuery] = useState('');
-
-    // Company Information State
-    const [companyInfo, setCompanyInfo] = useState({
-        name: '',
-        industry: '',
-        employees: '',
-        website: '',
-        linkedinUrl: '',
-        headquarters: '',
-        foundingYear: '',
-        overview: ''
-    });
 
     // Fetch Entities on Mount
     useEffect(() => {
@@ -221,33 +206,6 @@ function AuthenticatedApp() {
             setEntities([]);
         } finally {
             setEntitiesLoading(false);
-        }
-    };
-
-    const fetchCompanyInfo = async () => {
-        try {
-            const res = await fetch(`${API_BASE}/company`, { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setCompanyInfo(data);
-            }
-        } catch (error) {
-            console.error('Error fetching company info:', error);
-        }
-    };
-
-    const updateCompanyInfo = async () => {
-        try {
-            await fetch(`${API_BASE}/company`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(companyInfo),
-                credentials: 'include'
-            });
-            alert('Company information saved successfully!');
-        } catch (error) {
-            console.error('Error saving company info:', error);
-            alert('Failed to save company information');
         }
     };
 
@@ -877,10 +835,10 @@ function AuthenticatedApp() {
                         <Workflows entities={entities} onViewChange={handleNavigate} />
                     } />
                     <Route path="/reports" element={
-                        <Reporting entities={entities} companyInfo={companyInfo} onViewChange={handleNavigate} />
+                        <Reporting entities={entities} companyInfo={undefined} onViewChange={handleNavigate} />
                     } />
                     <Route path="/reports/:reportId" element={
-                        <ReportEditor entities={entities} companyInfo={companyInfo} onViewChange={handleNavigate} />
+                        <ReportEditor entities={entities} companyInfo={undefined} onViewChange={handleNavigate} />
                     } />
                     <Route path="/settings" element={
                         <Settings onViewChange={handleNavigate} onShowTutorial={() => setShowTutorial(true)} />
@@ -926,140 +884,8 @@ function AuthenticatedApp() {
                             {/* LIST VIEW */}
                             {!activeEntityId && (
                                 <div className="space-y-6">
-                                    {/* Database Tabs */}
-                                    <div className="flex space-x-6 border-b border-slate-200 mb-6">
-                                        <button
-                                            onClick={() => setDatabaseTab('company')}
-                                            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${databaseTab === 'company'
-                                                ? 'border-teal-600 text-teal-600'
-                                                : 'border-transparent text-slate-500 hover:text-slate-700'
-                                                }`}
-                                        >
-                                            Company Information
-                                        </button>
-                                        <button
-                                            onClick={() => setDatabaseTab('entities')}
-                                            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${databaseTab === 'entities'
-                                                ? 'border-teal-600 text-teal-600'
-                                                : 'border-transparent text-slate-500 hover:text-slate-700'
-                                                }`}
-                                        >
-                                            Entities
-                                        </button>
-                                    </div>
-
-                                    {/* Company Information Tab */}
-                                    {databaseTab === 'company' && (
-                                        <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-8">
-                                            <div className="flex justify-between items-center mb-6">
-                                                <div>
-                                                    <h2 className="text-lg font-semibold text-slate-800">Company Profile</h2>
-                                                    <p className="text-sm text-slate-500">Manage your company's core information.</p>
-                                                </div>
-                                                <button
-                                                    onClick={updateCompanyInfo}
-                                                    className="px-4 py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 transition-colors shadow-sm"
-                                                >
-                                                    Save Changes
-                                                </button>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                <div className="md:col-span-2">
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
-                                                    <input
-                                                        type="text"
-                                                        value={companyInfo.name}
-                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, name: e.target.value })}
-                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Industry</label>
-                                                    <input
-                                                        type="text"
-                                                        value={companyInfo.industry}
-                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, industry: e.target.value })}
-                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Number of Employees</label>
-                                                    <select
-                                                        value={companyInfo.employees}
-                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, employees: e.target.value })}
-                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                                                    >
-                                                        <option value="">Select...</option>
-                                                        <option value="1-10">1-10</option>
-                                                        <option value="11-50">11-50</option>
-                                                        <option value="51-200">51-200</option>
-                                                        <option value="201-500">201-500</option>
-                                                        <option value="500+">500+</option>
-                                                    </select>
-                                                </div>
-
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Website</label>
-                                                    <input
-                                                        type="url"
-                                                        value={companyInfo.website}
-                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, website: e.target.value })}
-                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">LinkedIn URL</label>
-                                                    <input
-                                                        type="url"
-                                                        value={companyInfo.linkedinUrl}
-                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, linkedinUrl: e.target.value })}
-                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Headquarters Location</label>
-                                                    <input
-                                                        type="text"
-                                                        value={companyInfo.headquarters}
-                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, headquarters: e.target.value })}
-                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Founding Year</label>
-                                                    <input
-                                                        type="text"
-                                                        value={companyInfo.foundingYear}
-                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, foundingYear: e.target.value })}
-                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                                                    />
-                                                </div>
-
-                                                <div className="md:col-span-2">
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">Company Overview</label>
-                                                    <textarea
-                                                        rows={4}
-                                                        value={companyInfo.overview}
-                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, overview: e.target.value })}
-                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                                                        placeholder="Brief overview of your company..."
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Entities Tab (Existing View) */}
-                                    {databaseTab === 'entities' && (
-                                        <div className="space-y-6">
-                                            {/* Toolbar */}
-                                            <div className="flex justify-between items-center">
+                                    {/* Toolbar */}
+                                    <div className="flex justify-between items-center">
                                                 <div className="text-sm text-slate-500">
                                                     {entitySearchQuery 
                                                         ? `Showing ${entities.filter(e => e.name.toLowerCase().includes(entitySearchQuery.toLowerCase()) || e.description?.toLowerCase().includes(entitySearchQuery.toLowerCase())).length} of ${entities.length} entities`
@@ -1121,8 +947,6 @@ function AuthenticatedApp() {
                                                     <span className="font-medium">Create new entity</span>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )}
                                 </div>
                             )}
 
