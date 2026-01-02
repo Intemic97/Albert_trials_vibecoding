@@ -152,18 +152,18 @@ wss.on('connection', (ws) => {
                                 cursor: null
                             });
                             
-                            console.log(`[WS] User ${user.name || user.id} (socket: ${socketId}) joined workflow ${workflowId} (${room.size} users in room)`);
+                            // console.log(`[WS] User ${user.name || user.id} (socket: ${socketId}) joined workflow ${workflowId} (${room.size} users in room)`);
                             
                             // Debug: Log all active rooms and users
-                            console.log('[WS] === ACTIVE ROOMS DEBUG ===');
-                            workflowRooms.forEach((roomUsers, roomWorkflowId) => {
-                                const userList = [];
-                                roomUsers.forEach((data, sid) => {
-                                    userList.push(`${data.user?.name || 'Unknown'}(${sid.substring(0, 10)}...)`);
-                                });
-                                console.log(`[WS] Room ${roomWorkflowId}: ${userList.join(', ')}`);
-                            });
-                            console.log('[WS] === END ROOMS DEBUG ===');
+                            // console.log('[WS] === ACTIVE ROOMS DEBUG ===');
+                            // workflowRooms.forEach((roomUsers, roomWorkflowId) => {
+                            //     const userList = [];
+                            //     roomUsers.forEach((data, sid) => {
+                            //         userList.push(`${data.user?.name || 'Unknown'}(${sid.substring(0, 10)}...)`);
+                            //     });
+                            //     console.log(`[WS] Room ${roomWorkflowId}: ${userList.join(', ')}`);
+                            // });
+                            // console.log('[WS] === END ROOMS DEBUG ===');
                             
                             // Send existing users to the new user (exclude own user's other tabs)
                             const existingUsers = [];
@@ -188,14 +188,14 @@ wss.on('connection', (ws) => {
                             
                             // Notify others about new user (exclude other tabs of the same user)
                             const newUserData = room.get(socketId);
-                            console.log(`[WS] Broadcasting user_joined for ${user.name || user.id} to workflow ${workflowId}`);
-                            console.log(`[WS] Room has ${room.size} users, will notify others (excluding socket ${socketId} and userId ${user.id})`);
+                            // console.log(`[WS] Broadcasting user_joined for ${user.name || user.id} to workflow ${workflowId}`);
+                            // console.log(`[WS] Room has ${room.size} users, will notify others (excluding socket ${socketId} and userId ${user.id})`);
                             
                             // Debug: list who will receive the message
-                            room.forEach((data, id) => {
-                                const willReceive = id !== socketId && (!user.id || data.user?.id !== user.id);
-                                console.log(`[WS]   - ${data.user?.name || id}: willReceive=${willReceive} (socketMatch=${id === socketId}, userIdMatch=${data.user?.id === user.id})`);
-                            });
+                            // room.forEach((data, id) => {
+                            //     const willReceive = id !== socketId && (!user.id || data.user?.id !== user.id);
+                            //     console.log(`[WS]   - ${data.user?.name || id}: willReceive=${willReceive} (socketMatch=${id === socketId}, userIdMatch=${data.user?.id === user.id})`);
+                            // });
                             
                             broadcastToRoom(workflowId, {
                                 type: 'user_joined',
@@ -240,7 +240,7 @@ wss.on('connection', (ws) => {
                     
                     if (currentWorkflowId && workflowRooms.has(currentWorkflowId)) {
                         const room = workflowRooms.get(currentWorkflowId);
-                        console.log(`[WS] node_move from ${userData?.name || socketId}: nodeId=${nodeId}, x=${Math.round(x)}, y=${Math.round(y)}, room size=${room.size}`);
+                        // console.log(`[WS] node_move from ${userData?.name || socketId}: nodeId=${nodeId}, x=${Math.round(x)}, y=${Math.round(y)}, room size=${room.size}`);
                         
                         // Broadcast node movement to others
                         broadcastToRoom(currentWorkflowId, {
@@ -251,7 +251,7 @@ wss.on('connection', (ws) => {
                             movedBy: socketId
                         }, socketId);
                     } else {
-                        console.log(`[WS] node_move IGNORED: currentWorkflowId=${currentWorkflowId}, hasRoom=${workflowRooms.has(currentWorkflowId)}`);
+                        // console.log(`[WS] node_move IGNORED: currentWorkflowId=${currentWorkflowId}, hasRoom=${workflowRooms.has(currentWorkflowId)}`);
                     }
                     break;
                 }
@@ -401,9 +401,9 @@ function broadcastToRoom(workflowId, message, excludeSocketId = null, excludeUse
     });
     
     // Log for node updates to help debug
-    if (message.type === 'node_update' || message.type === 'node_added' || message.type === 'node_deleted') {
-        console.log(`[WS] Broadcast ${message.type} to ${sentCount} users (room size: ${room.size}, excluded: ${excludeSocketId})`);
-    }
+    // if (message.type === 'node_update' || message.type === 'node_added' || message.type === 'node_deleted') {
+    //     console.log(`[WS] Broadcast ${message.type} to ${sentCount} users (room size: ${room.size}, excluded: ${excludeSocketId})`);
+    // }
 }
 
 function leaveRoom(socketId, workflowId) {
@@ -2139,6 +2139,136 @@ Output format:
     } catch (error) {
         console.error('Error generating workflow:', error);
         res.status(500).json({ error: 'Failed to generate workflow' });
+    }
+});
+
+// AI Workflow Assistant Chat Endpoint
+app.post('/api/workflows/assistant/chat', authenticateToken, async (req, res) => {
+    console.log('[Workflow AI Chat] Request received');
+    try {
+        const { message, workflowId, workflowName, nodes, connections, entities } = req.body;
+        
+        if (!process.env.OPENAI_API_KEY) {
+            return res.status(500).json({ error: 'OpenAI API Key not configured' });
+        }
+
+        console.log('[Workflow AI Chat] Message:', message);
+        console.log('[Workflow AI Chat] Workflow:', workflowName, '- Nodes:', nodes.length, '- Connections:', connections.length);
+
+        // Build context about the current workflow
+        const workflowContext = {
+            name: workflowName,
+            nodes: nodes.map(n => ({
+                id: n.id,
+                type: n.type,
+                label: n.label,
+                config: n.config
+            })),
+            connections: connections.map(c => ({
+                from: c.fromNodeId,
+                to: c.toNodeId,
+                outputType: c.outputType,
+                inputPort: c.inputPort
+            })),
+            entities: entities.map(e => ({
+                id: e.id,
+                name: e.name,
+                properties: e.properties
+            }))
+        };
+
+        const systemPrompt = `You are an AI workflow assistant. You help users build and modify automation workflows.
+
+Current Workflow Context:
+${JSON.stringify(workflowContext, null, 2)}
+
+Available node types:
+- trigger: Start workflow (Manual or Schedule)
+- fetchData: Get records from database
+- condition: If/Else branching (outputs: true/false)
+- join: Combine data from two sources (inputs: A/B)
+- addField: Add field to records
+- llm: AI text generation
+- python: Run Python code
+- http: HTTP request
+- manualInput: Define variable
+- saveRecords: Save to database
+- output: Display results
+- humanApproval: Wait for approval
+- excelInput: Load Excel/CSV
+- pdfInput: Extract PDF text
+- splitColumns: Split data by columns
+- mysql: Query MySQL database
+- sendEmail: Send email
+- webhook: Receive external data
+
+When the user asks to add nodes or modify the workflow:
+1. Respond with a friendly explanation of what you're suggesting
+2. Include a "suggestion" object with the workflow modification
+
+Response format when suggesting workflow changes:
+{
+  "message": "I'll add a Fetch Data node to get customer records...",
+  "suggestion": {
+    "type": "nodes",
+    "description": "Add Fetch Data node for customers",
+    "nodes": [
+      {
+        "id": "node_new_1",
+        "type": "fetchData",
+        "label": "Fetch Customers",
+        "x": 430,
+        "y": 250,
+        "config": { "selectedEntityId": "uuid", "selectedEntityName": "Customers" }
+      }
+    ],
+    "connections": [
+      {
+        "id": "conn_new_1",
+        "fromNodeId": "existing_node_id",
+        "toNodeId": "node_new_1"
+      }
+    ]
+  }
+}
+
+Response format for general questions (no workflow changes):
+{
+  "message": "Your response here..."
+}
+
+IMPORTANT:
+- Only include "suggestion" when the user wants to ADD or MODIFY nodes
+- For questions or explanations, just return "message"
+- Position new nodes thoughtfully (consider existing node positions)
+- Generate unique IDs for new nodes/connections
+- Always respond in JSON format`;
+
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: message }
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.7
+        });
+
+        const aiResponse = JSON.parse(completion.choices[0].message.content);
+        console.log('[Workflow AI Chat] Response:', aiResponse.message);
+        
+        if (aiResponse.suggestion) {
+            console.log('[Workflow AI Chat] Suggestion type:', aiResponse.suggestion.type);
+        }
+
+        res.json(aiResponse);
+
+    } catch (error) {
+        console.error('[Workflow AI Chat] Error:', error);
+        res.status(500).json({ error: 'Failed to process AI chat message' });
     }
 });
 

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut, Bot } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import { API_BASE } from '../config';
@@ -149,6 +149,24 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'output', label: 'Output', icon: LogOut, description: 'Display workflow output data', category: 'Actions' },
     { type: 'comment', label: 'Comment', icon: MessageSquare, description: 'Add a note or comment', category: 'Other' },
 ];
+
+// AI Workflow Assistant interfaces
+interface AIWorkflowMessage {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: Date;
+    workflowSuggestion?: WorkflowSuggestion;
+}
+
+interface WorkflowSuggestion {
+    type: 'nodes' | 'connections' | 'modification';
+    description: string;
+    nodes?: WorkflowNode[];
+    connections?: Connection[];
+    status: 'pending' | 'accepted' | 'rejected';
+}
+
 
 // Pre-defined workflow templates
 interface WorkflowTemplate {
@@ -658,8 +676,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [waitingApprovalNodeId, setWaitingApprovalNodeId] = useState<string | null>(null);
     const [pendingApprovalData, setPendingApprovalData] = useState<{ inputData: any, resolve: () => void } | null>(null);
 
-    // AI Workflow Assistant State
+    // AI Workflow Assistant State (Chat Panel)
     const [showAiAssistant, setShowAiAssistant] = useState<boolean>(false);
+    const [aiChatMessages, setAiChatMessages] = useState<AIWorkflowMessage[]>([]);
+    const [aiChatInput, setAiChatInput] = useState<string>('');
+    const [isAiChatLoading, setIsAiChatLoading] = useState<boolean>(false);
+    const [pendingWorkflowSuggestion, setPendingWorkflowSuggestion] = useState<WorkflowSuggestion | null>(null);
+    const aiChatMessagesEndRef = useRef<HTMLDivElement>(null);
 
     // Node Feedback Popup State
     const [feedbackPopupNodeId, setFeedbackPopupNodeId] = useState<string | null>(null);
@@ -3138,6 +3161,149 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         showToast(`Workflow ${mode === 'replace' ? 'created' : 'added'} successfully!`, 'success');
     };
 
+    // AI Chat Assistant Functions
+    const handleSendWorkflowAiMessage = async () => {
+        if (!aiChatInput.trim() || isAiChatLoading) return;
+
+        const userMessage: AIWorkflowMessage = {
+            id: `msg-${Date.now()}`,
+            role: 'user',
+            content: aiChatInput,
+            timestamp: new Date()
+        };
+
+        setAiChatMessages(prev => [...prev, userMessage]);
+        setAiChatInput('');
+        setIsAiChatLoading(true);
+
+        // Scroll to bottom
+        setTimeout(() => {
+            aiChatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+
+        try {
+            const res = await fetch(`${API_BASE}/workflows/assistant/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: aiChatInput,
+                    workflowId: currentWorkflowId,
+                    workflowName: workflowName,
+                    nodes: nodes,
+                    connections: connections,
+                    entities: entities.map(e => ({
+                        id: e.id,
+                        name: e.name,
+                        properties: e.properties?.map((p: any) => ({ name: p.name, type: p.type })) || []
+                    }))
+                }),
+                credentials: 'include'
+            });
+
+            if (!res.ok) {
+                throw new Error('Failed to get AI response');
+            }
+
+            const data = await res.json();
+            
+            const assistantMessage: AIWorkflowMessage = {
+                id: `msg-${Date.now()}-assistant`,
+                role: 'assistant',
+                content: data.message,
+                timestamp: new Date(),
+                workflowSuggestion: data.suggestion ? {
+                    type: data.suggestion.type,
+                    description: data.suggestion.description,
+                    nodes: data.suggestion.nodes,
+                    connections: data.suggestion.connections,
+                    status: 'pending'
+                } : undefined
+            };
+
+            setAiChatMessages(prev => [...prev, assistantMessage]);
+            
+            if (assistantMessage.workflowSuggestion) {
+                setPendingWorkflowSuggestion(assistantMessage.workflowSuggestion);
+            }
+
+            // Scroll to bottom
+            setTimeout(() => {
+                aiChatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+
+        } catch (error) {
+            console.error('Error sending AI message:', error);
+            const errorMessage: AIWorkflowMessage = {
+                id: `msg-${Date.now()}-error`,
+                role: 'assistant',
+                content: 'Sorry, I encountered an error. Please try again.',
+                timestamp: new Date()
+            };
+            setAiChatMessages(prev => [...prev, errorMessage]);
+        } finally {
+            setIsAiChatLoading(false);
+        }
+    };
+
+    const handleAcceptWorkflowSuggestion = () => {
+        if (!pendingWorkflowSuggestion) return;
+
+        const { type, nodes: suggestedNodes, connections: suggestedConnections } = pendingWorkflowSuggestion;
+
+        if (type === 'nodes' && suggestedNodes) {
+            // Add new nodes to canvas
+            const processedNodes = suggestedNodes.map(n => ({
+                ...n,
+                id: generateUUID(),
+                status: 'idle' as const
+            }));
+
+            setNodes(prev => [...prev, ...processedNodes]);
+
+            if (suggestedConnections) {
+                // Create ID mapping
+                const idMap: { [key: string]: string } = {};
+                suggestedNodes.forEach((oldNode, i) => {
+                    idMap[oldNode.id] = processedNodes[i].id;
+                });
+
+                const processedConnections = suggestedConnections.map(c => ({
+                    ...c,
+                    id: generateUUID(),
+                    fromNodeId: idMap[c.fromNodeId] || c.fromNodeId,
+                    toNodeId: idMap[c.toNodeId] || c.toNodeId
+                }));
+
+                setConnections(prev => [...prev, ...processedConnections]);
+            }
+
+            showToast('Workflow nodes added successfully!', 'success');
+        }
+
+        // Update message status
+        setAiChatMessages(prev => prev.map(msg =>
+            msg.workflowSuggestion === pendingWorkflowSuggestion
+                ? { ...msg, workflowSuggestion: { ...msg.workflowSuggestion!, status: 'accepted' } }
+                : msg
+        ));
+
+        setPendingWorkflowSuggestion(null);
+    };
+
+    const handleRejectWorkflowSuggestion = () => {
+        if (!pendingWorkflowSuggestion) return;
+
+        // Update message status
+        setAiChatMessages(prev => prev.map(msg =>
+            msg.workflowSuggestion === pendingWorkflowSuggestion
+                ? { ...msg, workflowSuggestion: { ...msg.workflowSuggestion!, status: 'rejected' } }
+                : msg
+        ));
+
+        setPendingWorkflowSuggestion(null);
+        showToast('Suggestion rejected', 'success');
+    };
+
     const handleDragStart = (e: React.DragEvent, item: DraggableItem) => {
         setDraggingItem(item);
         e.dataTransfer.effectAllowed = 'copy';
@@ -3908,10 +4074,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 {/* AI Assistant Button */}
                                 <button
                                     onClick={() => setShowAiAssistant(true)}
-                                    className="p-2 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-full hover:shadow-md hover:scale-105 transition-all"
+                                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 rounded-lg transition-colors"
                                     title="AI Workflow Assistant"
                                 >
-                                    <Sparkles size={18} />
+                                    <Sparkles size={16} className="text-slate-700" />
+                                    <span className="text-sm font-medium text-slate-700">Ask</span>
                                 </button>
                                 
                                 <div className="w-px h-6 bg-slate-300"></div>
@@ -4553,6 +4720,141 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 )}
                             </div> {/* Close transform div */}
                         </div> {/* Close canvas div */}
+
+                        {/* AI Assistant Panel (Right Side) */}
+                        {showAiAssistant && (
+                            <div className="fixed top-0 right-0 w-[450px] h-screen bg-white border-l border-slate-200 flex flex-col shadow-2xl z-50">
+                                {/* Header */}
+                            <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-4 text-white flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <Sparkles size={24} />
+                                    <div>
+                                        <h3 className="font-bold text-lg">AI Workflow Assistant</h3>
+                                        <p className="text-sm text-slate-300">Ask me about your workflow</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowAiAssistant(false)}
+                                    className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+                                    title="Close"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            {/* Chat Messages */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+                                {aiChatMessages.length === 0 ? (
+                                    <div className="text-center py-12 text-slate-400">
+                                        <Sparkles size={48} className="mx-auto mb-4 opacity-50" />
+                                        <p className="text-sm font-medium text-slate-600">AI Workflow Assistant</p>
+                                        <p className="text-xs mt-2 px-6">
+                                            I can help you build workflows, suggest nodes, and answer questions about your automation.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {aiChatMessages.map(message => (
+                                            <div
+                                                key={message.id}
+                                                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                            >
+                                                <div className={`max-w-[85%] rounded-lg p-3 ${
+                                                    message.role === 'user'
+                                                        ? 'bg-slate-700 text-white'
+                                                        : 'bg-white text-slate-700 border border-slate-200'
+                                                }`}>
+                                                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                                                    
+                                                    {/* Workflow Suggestion Card */}
+                                                    {message.workflowSuggestion && (
+                                                        <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-300">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <Workflow size={16} className="text-slate-600" />
+                                                                <span className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                                                                    Workflow Suggestion
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-xs text-slate-600 mb-3">
+                                                                {message.workflowSuggestion.description}
+                                                            </p>
+                                                            
+                                                            {message.workflowSuggestion.status === 'pending' && (
+                                                                <div className="flex gap-2">
+                                                                    <button
+                                                                        onClick={handleAcceptWorkflowSuggestion}
+                                                                        className="flex-1 px-3 py-1.5 bg-teal-600 text-white rounded text-xs font-medium hover:bg-teal-700 transition-colors flex items-center justify-center gap-1"
+                                                                    >
+                                                                        <Check size={14} />
+                                                                        Accept
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={handleRejectWorkflowSuggestion}
+                                                                        className="flex-1 px-3 py-1.5 bg-slate-200 text-slate-700 rounded text-xs font-medium hover:bg-slate-300 transition-colors flex items-center justify-center gap-1"
+                                                                    >
+                                                                        <XCircle size={14} />
+                                                                        Reject
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {message.workflowSuggestion.status === 'accepted' && (
+                                                                <div className="flex items-center gap-2 text-teal-700 text-xs font-medium">
+                                                                    <CheckCircle size={14} />
+                                                                    <span>Applied to workflow</span>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {message.workflowSuggestion.status === 'rejected' && (
+                                                                <div className="flex items-center gap-2 text-slate-500 text-xs font-medium">
+                                                                    <XCircle size={14} />
+                                                                    <span>Rejected</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <div ref={aiChatMessagesEndRef} />
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Input Area */}
+                            <div className="p-4 border-t border-slate-200 bg-white">
+                                {isAiChatLoading && (
+                                    <div className="mb-3 flex items-center gap-2 text-sm text-slate-500">
+                                        <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                                        <span>Thinking...</span>
+                                    </div>
+                                )}
+                                <div className="flex gap-2">
+                                    <textarea
+                                        value={aiChatInput}
+                                        onChange={(e) => setAiChatInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleSendWorkflowAiMessage();
+                                            }
+                                        }}
+                                        placeholder="Ask me to add nodes, modify connections, or explain your workflow..."
+                                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-slate-500 focus:border-transparent outline-none"
+                                        rows={2}
+                                        disabled={isAiChatLoading}
+                                    />
+                                    <button
+                                        onClick={handleSendWorkflowAiMessage}
+                                        disabled={!aiChatInput.trim() || isAiChatLoading}
+                                        className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    >
+                                        <Sparkles size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        )}
 
                         {/* Configuration Modal */}
                         {configuringNodeId && (
@@ -6943,86 +7245,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     >
                         <X size={14} />
                     </button>
-                </div>
-            )}
-
-            {/* AI Workflow Assistant Modal */}
-            {showAiAssistant && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !isGeneratingWorkflow && setShowAiAssistant(false)}>
-                    <div className="bg-white rounded-xl shadow-2xl w-[500px] flex flex-col" onClick={e => e.stopPropagation()}>
-                        {/* Header */}
-                        <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-4 text-white rounded-t-xl shrink-0">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <Sparkles size={24} />
-                                    <div>
-                                        <h3 className="font-bold text-lg">AI Workflow Assistant</h3>
-                                        <p className="text-slate-300 text-sm">Describe your workflow in natural language</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setShowAiAssistant(false)}
-                                    disabled={isGeneratingWorkflow}
-                                    className="p-1 hover:bg-white/20 rounded-lg transition-colors disabled:opacity-50"
-                                >
-                                    <X size={20} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="p-6">
-                            <textarea
-                                value={aiPrompt}
-                                onChange={e => setAiPrompt(e.target.value)}
-                                placeholder="Example: Fetch all customers, filter those with orders greater than 100, and display the results..."
-                                className="w-full h-28 p-3 border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent text-slate-800 text-sm"
-                                disabled={isGeneratingWorkflow}
-                            />
-
-                            {/* Available Entities */}
-                            {entities.length > 0 && (
-                                <div className="mt-3 p-2 bg-slate-50 rounded-lg">
-                                    <p className="text-xs font-medium text-slate-600 mb-1">Your entities:</p>
-                                    <div className="flex flex-wrap gap-1">
-                                        {entities.map(e => (
-                                            <span key={e.id} className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs border border-slate-200">
-                                                {e.name}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Footer */}
-                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 rounded-b-xl shrink-0">
-                            <button
-                                onClick={() => setShowAiAssistant(false)}
-                                disabled={isGeneratingWorkflow}
-                                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleGenerateWorkflow}
-                                disabled={!aiPrompt.trim() || isGeneratingWorkflow}
-                                className="px-5 py-2 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-lg hover:from-slate-800 hover:to-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                            >
-                                {isGeneratingWorkflow ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        Generating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Sparkles size={16} />
-                                        Generate
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </div>
                 </div>
             )}
 

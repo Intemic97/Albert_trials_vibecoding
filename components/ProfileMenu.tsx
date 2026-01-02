@@ -44,7 +44,7 @@ export const UserAvatar: React.FC<{
 
 export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate }) => {
     const { user, logout, organizations, switchOrganization, updateProfile, refreshOrganizations } = useAuth();
-    console.log('[ProfileMenu] user.isAdmin:', user?.isAdmin);
+    // console.log('[ProfileMenu] user.isAdmin:', user?.isAdmin);
     const [isOpen, setIsOpen] = useState(false);
     const [view, setView] = useState<'main' | 'organizations'>('main');
     const [showProfileModal, setShowProfileModal] = useState(false);
