@@ -22,7 +22,7 @@ const generateUUID = (): string => {
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'webhook';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'webhook';
     label: string;
     x: number;
     y: number;
@@ -116,7 +116,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'webhook';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'webhook';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -131,7 +131,6 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'excelInput', label: 'Excel/CSV Input', icon: FileSpreadsheet, description: 'Load data from Excel or CSV', category: 'Data' },
     { type: 'pdfInput', label: 'PDF Input', icon: FileText, description: 'Extract text from PDF files', category: 'Data' },
     { type: 'saveRecords', label: 'Save to Database', icon: Database, description: 'Create or update records', category: 'Data' },
-    { type: 'equipment', label: 'Equipment', icon: Wrench, description: 'Use specific equipment data', category: 'Data' },
     { type: 'http', label: 'HTTP Request', icon: Globe, description: 'Fetch data from an external API', category: 'Data' },
     { type: 'mysql', label: 'MySQL', icon: Database, description: 'Query data from MySQL database', category: 'Data' },
     { type: 'esios', label: 'Energy Prices', icon: Zap, description: 'Fetch prices from Red Eléctrica', category: 'Data' },
@@ -543,12 +542,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
-    // Equipment Node State
-    const [configuringEquipmentNodeId, setConfiguringEquipmentNodeId] = useState<string | null>(null);
-    const [equipmentRecords, setEquipmentRecords] = useState<any[]>([]);
-    const [selectedEquipmentId, setSelectedEquipmentId] = useState<string>('');
-    const [isLoadingEquipments, setIsLoadingEquipments] = useState(false);
 
     // LLM Node State
     const [configuringLLMNodeId, setConfiguringLLMNodeId] = useState<string | null>(null);
@@ -1404,81 +1397,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     };
 
     const openEquipmentConfig = async (nodeId: string) => {
-        const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'equipment') {
-            setConfiguringEquipmentNodeId(nodeId);
-            setSelectedEquipmentId(node.config?.recordId || '');
-
-            // Find "Equipment" or "Equipments" entity
-            const equipmentEntity = entities.find(e =>
-                e.name.toLowerCase() === 'equipment' ||
-                e.name.toLowerCase() === 'equipments'
-            );
-
-            if (equipmentEntity) {
-                setIsLoadingEquipments(true);
-                try {
-                    const res = await fetch(`${API_BASE}/entities/${equipmentEntity.id}/records`, { credentials: 'include' });
-                    const data = await res.json();
-                    if (Array.isArray(data)) {
-                        setEquipmentRecords(data);
-                    } else {
-                        console.error('Expected array from equipment records API, got:', data);
-                        setEquipmentRecords([]);
-                    }
-                } catch (error) {
-                    console.error('Error fetching equipment records:', error);
-                    setEquipmentRecords([]);
-                } finally {
-                    setIsLoadingEquipments(false);
-                }
-            } else {
-                alert('No "Equipment" entity found. Please create one first.');
-                setEquipmentRecords([]);
-            }
-        }
+        // Equipment node removed
     };
 
     const saveEquipmentConfig = () => {
-        if (!configuringEquipmentNodeId || !selectedEquipmentId) return;
-
-        const record = equipmentRecords.find(r => r.id === selectedEquipmentId);
-
-        // Find the Equipment entity to understand the schema
-        const equipmentEntity = entities.find(e =>
-            e.name.toLowerCase() === 'equipment' ||
-            e.name.toLowerCase() === 'equipments'
-        );
-
-        let recordName = 'Unknown Equipment';
-
-        if (record && equipmentEntity) {
-            // 1. Try to find a property named "name" or "title"
-            const nameProp = equipmentEntity.properties.find(p => p.name.toLowerCase() === 'name' || p.name.toLowerCase() === 'title');
-            if (nameProp && record.values[nameProp.id]) {
-                recordName = record.values[nameProp.id];
-            } else {
-                // 2. Fallback to the first "text" property
-                const firstTextProp = equipmentEntity.properties.find(p => p.type === 'text');
-                if (firstTextProp && record.values[firstTextProp.id]) {
-                    recordName = record.values[firstTextProp.id];
-                } else {
-                    // 3. Fallback to ID
-                    recordName = record.id;
-                }
-            }
-        } else if (record) {
-            recordName = record.id;
-        }
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringEquipmentNodeId
-                ? { ...n, label: recordName, config: { ...n.config, recordId: selectedEquipmentId, recordName } }
-                : n
-        ));
-        setConfiguringEquipmentNodeId(null);
-        setSelectedEquipmentId('');
-        setEquipmentRecords([]);
+        // Equipment node removed
     };
 
     const openLLMConfig = (nodeId: string) => {
@@ -2182,40 +2105,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 result = `Fetched ${records.length} records from ${node.config.entityName}`;
             } catch (error) {
                 result = 'Error fetching data';
-                updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result });
-                return;
-            }
-        } else if (node.type === 'equipment') {
-            if (!node.config?.recordId) {
-                result = 'Error: No equipment selected';
-                updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result });
-                return;
-            }
-
-            try {
-                const equipmentEntity = entities.find(e =>
-                    e.name.toLowerCase() === 'equipment' ||
-                    e.name.toLowerCase() === 'equipments'
-                );
-
-                if (!equipmentEntity) {
-                    throw new Error('Equipment entity not found');
-                }
-
-                const res = await fetch(`${API_BASE}/entities/${equipmentEntity.id}/records`, { credentials: 'include' });
-                const records = await res.json();
-                const record = records.find((r: any) => r.id === node.config?.recordId);
-
-                if (record) {
-                    nodeData = [record];
-                    result = `Fetched equipment: ${node.config.recordName}`;
-                } else {
-                    result = 'Equipment record not found';
-                    updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result });
-                    return;
-                }
-            } catch (error) {
-                result = 'Error fetching equipment';
                 updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result });
                 return;
             }
@@ -3595,7 +3484,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'action': return 'bg-blue-100 text-blue-600';
             case 'condition': return 'bg-amber-100 text-amber-600';
             case 'fetchData': return 'bg-teal-100 text-teal-600';
-            case 'equipment': return 'bg-orange-100 text-orange-600';
             case 'humanApproval': return 'bg-orange-100 text-orange-600';
             case 'addField': return 'bg-indigo-100 text-indigo-600';
             case 'saveRecords': return 'bg-emerald-100 text-emerald-600';
@@ -4251,8 +4139,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openAddFieldConfig(node.id);
                                             } else if (node.type === 'saveRecords') {
                                                 openSaveRecordsConfig(node.id);
-                                            } else if (node.type === 'equipment') {
-                                                openEquipmentConfig(node.id);
                                             } else if (node.type === 'llm') {
                                                 openLLMConfig(node.id);
                                             } else if (node.type === 'python') {
@@ -4290,7 +4176,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             top: node.y,
                                             transform: 'translate(-50%, -50%)', // Center on drop point
                                             width: '192px', // Enforce fixed width (w-48)
-                                            cursor: (node.data || ['fetchData', 'condition', 'addField', 'saveRecords', 'equipment', 'llm'].includes(node.type)) ? 'grab' : 'default',
+                                            cursor: (node.data || ['fetchData', 'condition', 'addField', 'saveRecords', 'llm'].includes(node.type)) ? 'grab' : 'default',
                                             // Fixed height for nodes with dual connectors to ensure consistent positioning
                                             ...(node.type === 'condition' || node.type === 'join' || node.type === 'splitColumns' ? { minHeight: '112px' } : {})
                                         }}
@@ -6605,82 +6491,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             </div>
                         )}
                     </div>
-
-                    {/* Equipment Config Modal */}
-                    {configuringEquipmentNodeId && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                            <div className="bg-white rounded-xl shadow-xl p-6 w-96 max-w-full">
-                                <h3 className="text-lg font-bold text-slate-800 mb-4">Select Equipment</h3>
-
-                                <div className="mb-4">
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                                        Equipment Record
-                                    </label>
-                                    {isLoadingEquipments ? (
-                                        <div className="text-sm text-slate-500">Loading equipments...</div>
-                                    ) : equipmentRecords.length > 0 ? (
-                                        <select
-                                            value={selectedEquipmentId}
-                                            onChange={(e) => setSelectedEquipmentId(e.target.value)}
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
-                                        >
-                                            <option value="">Select an equipment...</option>
-                                            {equipmentRecords.map(record => {
-                                                // Find the Equipment entity to understand the schema
-                                                const equipmentEntity = entities.find(e =>
-                                                    e.name.toLowerCase() === 'equipment' ||
-                                                    e.name.toLowerCase() === 'equipments'
-                                                );
-
-                                                let name = record.id;
-                                                if (equipmentEntity) {
-                                                    const nameProp = equipmentEntity.properties.find(p => p.name.toLowerCase() === 'name' || p.name.toLowerCase() === 'title');
-                                                    if (nameProp && record.values[nameProp.id]) {
-                                                        name = record.values[nameProp.id];
-                                                    } else {
-                                                        const firstTextProp = equipmentEntity.properties.find(p => p.type === 'text');
-                                                        if (firstTextProp && record.values[firstTextProp.id]) {
-                                                            name = record.values[firstTextProp.id];
-                                                        }
-                                                    }
-                                                } else {
-                                                    // Fallback if entity not found (shouldn't happen given the check above)
-                                                    const firstVal = Object.values(record.values || {}).find(v => typeof v === 'string');
-                                                    if (firstVal) name = firstVal as string;
-                                                }
-
-                                                return (
-                                                    <option key={record.id} value={record.id}>
-                                                        {String(name)}
-                                                    </option>
-                                                );
-                                            })}
-                                        </select>
-                                    ) : (
-                                        <div className="text-sm text-red-500">
-                                            No equipment records found. Please create an "Equipment" entity and add records.
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="flex justify-end gap-2">
-                                    <button
-                                        onClick={() => setConfiguringEquipmentNodeId(null)}
-                                        className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={saveEquipmentConfig}
-                                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-                                        disabled={!selectedEquipmentId}
-                                    >
-                                        Save
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
                     {/* LLM Config Modal */}
                     {configuringLLMNodeId && (
