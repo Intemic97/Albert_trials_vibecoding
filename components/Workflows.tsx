@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import { API_BASE } from '../config';
@@ -3903,41 +3903,52 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 );
                             })}
                             
-                            {/* AI Assistant Floating Button */}
-                            <button
-                                onClick={() => setShowAiAssistant(true)}
-                                className="absolute bottom-4 left-4 z-20 w-12 h-12 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center"
-                                title="AI Workflow Assistant"
-                            >
-                                <Sparkles size={22} />
-                            </button>
-
-                            {/* Zoom Controls */}
-                            <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2">
+                            {/* Canvas Controls - Centered at Bottom */}
+                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-white rounded-full shadow-lg border border-slate-200 px-4 py-2">
+                                {/* AI Assistant Button */}
                                 <button
-                                    onClick={() => setCanvasZoom(prev => Math.min(prev * 1.2, 3))}
-                                    className="px-3 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm font-bold"
-                                    title="Zoom In"
+                                    onClick={() => setShowAiAssistant(true)}
+                                    className="p-2 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-full hover:shadow-md hover:scale-105 transition-all"
+                                    title="AI Workflow Assistant"
                                 >
-                                    +
+                                    <Sparkles size={18} />
                                 </button>
+                                
+                                <div className="w-px h-6 bg-slate-300"></div>
+                                
+                                {/* Zoom Out */}
                                 <button
                                     onClick={() => setCanvasZoom(prev => Math.max(prev / 1.2, 0.25))}
-                                    className="px-3 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm font-bold"
+                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                                     title="Zoom Out"
                                 >
-                                    −
+                                    <ZoomOut size={18} className="text-slate-700" />
                                 </button>
-                                <button
-                                    onClick={resetView}
-                                    className="px-3 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm text-xs"
-                                    title="Reset View"
-                                >
-                                    Reset
-                                </button>
-                                <div className="px-3 py-1 bg-white border border-slate-300 rounded-lg shadow-sm text-xs text-center">
+                                
+                                {/* Zoom Level */}
+                                <div className="px-3 py-1 text-sm font-medium text-slate-700 min-w-[60px] text-center">
                                     {Math.round(canvasZoom * 100)}%
                                 </div>
+                                
+                                {/* Zoom In */}
+                                <button
+                                    onClick={() => setCanvasZoom(prev => Math.min(prev * 1.2, 3))}
+                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                                    title="Zoom In"
+                                >
+                                    <ZoomIn size={18} className="text-slate-700" />
+                                </button>
+                                
+                                <div className="w-px h-6 bg-slate-300"></div>
+                                
+                                {/* Fit View */}
+                                <button
+                                    onClick={resetView}
+                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                                    title="Fit view to screen"
+                                >
+                                    <Maximize2 size={18} className="text-slate-700" />
+                                </button>
                             </div>
 
                             {/* Content with transform */}
