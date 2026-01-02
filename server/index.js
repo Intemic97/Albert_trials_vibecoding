@@ -3933,6 +3933,8 @@ app.post('/api/reports/:id/sections/:sectionId/generate', authenticateToken, asy
         const { id, sectionId } = req.params;
         const { prompt, mentionedEntityIds } = req.body;
         
+        console.log('[Generate] Request received:', { reportId: id, sectionId, prompt: prompt?.slice(0, 50) });
+        
         // Verify report ownership
         const report = await db.get(
             'SELECT * FROM reports WHERE id = ? AND organizationId = ?',
@@ -3943,13 +3945,35 @@ app.post('/api/reports/:id/sections/:sectionId/generate', authenticateToken, asy
             return res.status(404).json({ error: 'Report not found' });
         }
         
-        // Get template section info
-        const templateSection = await db.get(
-            'SELECT * FROM template_sections WHERE id = ?',
+        // First, try to find if sectionId is a report_sections.id (the new way)
+        let reportSection = await db.get(
+            'SELECT * FROM report_sections WHERE id = ?',
             [sectionId]
         );
         
+        let templateSectionId;
+        if (reportSection) {
+            // sectionId is a report_sections.id, get the templateSectionId from it
+            templateSectionId = reportSection.templateSectionId;
+            console.log('[Generate] Found report section, templateSectionId:', templateSectionId);
+        } else {
+            // sectionId might be a templateSectionId (old way), try to find or create report_section
+            templateSectionId = sectionId;
+            reportSection = await db.get(
+                'SELECT * FROM report_sections WHERE reportId = ? AND templateSectionId = ?',
+                [id, templateSectionId]
+            );
+            console.log('[Generate] Using sectionId as templateSectionId:', templateSectionId);
+        }
+        
+        // Get template section info
+        const templateSection = await db.get(
+            'SELECT * FROM template_sections WHERE id = ?',
+            [templateSectionId]
+        );
+        
         if (!templateSection) {
+            console.error('[Generate] Template section not found:', templateSectionId);
             return res.status(404).json({ error: 'Section not found' });
         }
         
@@ -4006,6 +4030,7 @@ Write in a professional tone suitable for a formal report.`;
         const OpenAI = require('openai');
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
         
+        console.log('[Generate] Calling OpenAI...');
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             messages: [
@@ -4018,10 +4043,12 @@ Write in a professional tone suitable for a formal report.`;
         const generatedContent = completion.choices[0]?.message?.content || '';
         const now = new Date().toISOString();
         
+        console.log('[Generate] Content generated, length:', generatedContent.length);
+        
         // Check if report_section exists, create or update
         const existingSection = await db.get(
             'SELECT id FROM report_sections WHERE reportId = ? AND templateSectionId = ?',
-            [id, sectionId]
+            [id, templateSectionId]
         );
         
         if (existingSection) {
@@ -4030,12 +4057,14 @@ Write in a professional tone suitable for a formal report.`;
                 SET content = ?, userPrompt = ?, status = 'generated', generatedAt = ?
                 WHERE id = ?
             `, [generatedContent, prompt, now, existingSection.id]);
+            console.log('[Generate] Updated existing section:', existingSection.id);
         } else {
             const newSectionId = Math.random().toString(36).substr(2, 9);
             await db.run(`
                 INSERT INTO report_sections (id, reportId, templateSectionId, content, userPrompt, status, generatedAt)
                 VALUES (?, ?, ?, ?, ?, 'generated', ?)
-            `, [newSectionId, id, sectionId, generatedContent, prompt, now]);
+            `, [newSectionId, id, templateSectionId, generatedContent, prompt, now]);
+            console.log('[Generate] Created new section:', newSectionId);
         }
         
         // Update report timestamp

@@ -760,6 +760,8 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
     const handleGenerate = async (prompt: string, mentionedEntityIds: string[]) => {
         if (!report || !selectedSectionId || !prompt.trim()) return;
         
+        console.log('[Generate] Starting generation:', { reportId: report.id, sectionId: selectedSectionId, prompt: prompt.slice(0, 50) });
+        
         setIsGenerating(true);
         try {
             const res = await fetch(`${API_BASE}/reports/${report.id}/sections/${selectedSectionId}/generate`, {
@@ -769,8 +771,11 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 credentials: 'include'
             });
             
+            console.log('[Generate] Response status:', res.status);
+            
             if (res.ok) {
                 const { content, generatedAt } = await res.json();
+                console.log('[Generate] Content received, length:', content?.length);
                 setEditingContent(content);
                 
                 // Update the section in state
@@ -787,6 +792,9 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 setTimeout(() => {
                     generatedContentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }, 100);
+            } else {
+                const errorText = await res.text();
+                console.error('[Generate] Error response:', errorText);
             }
         } catch (error) {
             console.error('Error generating content:', error);
