@@ -643,6 +643,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [showWidgetExplanation, setShowWidgetExplanation] = useState<boolean>(false);
     const [showEmailSmtpSettings, setShowEmailSmtpSettings] = useState<boolean>(false);
 
+    // Unsaved Changes Confirmation
+    const [showExitConfirmation, setShowExitConfirmation] = useState<boolean>(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+
     // ESIOS Node State
     const [configuringEsiosNodeId, setConfiguringEsiosNodeId] = useState<string | null>(null);
     const [esiosArchiveId, setEsiosArchiveId] = useState<string>('1001'); // PVPC indicator ID
@@ -958,8 +962,25 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     };
 
     const backToList = () => {
-        navigate('/workflows');
+        // Show confirmation popup if there might be unsaved changes
+        if (currentView === 'canvas' && (nodes.length > 0 || workflowName.trim())) {
+            setShowExitConfirmation(true);
+        } else {
+            navigate('/workflows');
+        }
         // The useEffect will handle setting currentView to 'list'
+    };
+
+    const confirmExitWithoutSaving = () => {
+        setShowExitConfirmation(false);
+        setHasUnsavedChanges(false);
+        navigate('/workflows');
+    };
+
+    const confirmExitWithSaving = async () => {
+        setShowExitConfirmation(false);
+        await saveWorkflow();
+        navigate('/workflows');
     };
 
     // Load workflows on mount
@@ -7823,6 +7844,64 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </>
                                 ) : (
                                     'Submit Feedback'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Exit Confirmation Modal */}
+            {showExitConfirmation && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70]" onClick={() => setShowExitConfirmation(false)}>
+                    <div className="bg-white rounded-xl shadow-2xl p-6 w-[420px] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
+                                <AlertCircle size={24} className="text-amber-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">Unsaved Changes</h3>
+                                <p className="text-sm text-slate-500">Do you want to save your workflow before leaving?</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-50 rounded-lg p-3 mb-5">
+                            <p className="text-sm text-slate-600">
+                                <span className="font-medium">Workflow:</span> {workflowName || 'Untitled Workflow'}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">
+                                {nodes.length} node{nodes.length !== 1 ? 's' : ''} • {connections.length} connection{connections.length !== 1 ? 's' : ''}
+                            </p>
+                        </div>
+
+                        <div className="flex gap-2 justify-end">
+                            <button
+                                onClick={() => setShowExitConfirmation(false)}
+                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmExitWithoutSaving}
+                                className="px-4 py-2 border border-red-200 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm font-medium"
+                            >
+                                Don't Save
+                            </button>
+                            <button
+                                onClick={confirmExitWithSaving}
+                                disabled={isSaving}
+                                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium flex items-center gap-2"
+                            >
+                                {isSaving ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save size={16} />
+                                        Save & Exit
+                                    </>
                                 )}
                             </button>
                         </div>
