@@ -818,6 +818,45 @@ app.post('/api/parse-spreadsheet', authenticateToken, upload.single('file'), (re
     }
 });
 
+// Parse PDF file endpoint
+app.post('/api/parse-pdf', authenticateToken, upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const filePath = path.join(uploadsDir, req.file.filename);
+        const ext = path.extname(req.file.originalname).toLowerCase();
+
+        if (ext !== '.pdf') {
+            fs.unlinkSync(filePath);
+            return res.status(400).json({ error: 'Unsupported file format. Please upload .pdf files.' });
+        }
+
+        // Read PDF file
+        const dataBuffer = fs.readFileSync(filePath);
+        
+        // Parse PDF
+        const pdfData = await pdfParse(dataBuffer);
+
+        // Clean up uploaded file after parsing
+        fs.unlinkSync(filePath);
+
+        res.json({
+            success: true,
+            text: pdfData.text,
+            pages: pdfData.numpages,
+            info: pdfData.info,
+            metadata: pdfData.metadata,
+            fileName: req.file.originalname
+        });
+
+    } catch (error) {
+        console.error('Error parsing PDF:', error);
+        res.status(500).json({ error: 'Failed to parse PDF: ' + error.message });
+    }
+});
+
 // Helper function to parse CSV lines (handles quoted values with commas)
 function parseCSVLine(line) {
     const result = [];

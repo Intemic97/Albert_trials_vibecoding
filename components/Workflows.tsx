@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import { API_BASE } from '../config';
@@ -22,7 +22,7 @@ const generateUUID = (): string => {
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'webhook';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'webhook';
     label: string;
     x: number;
     y: number;
@@ -70,6 +70,11 @@ interface WorkflowNode {
         headers?: string[];
         parsedData?: any[];
         rowCount?: number;
+        // For PDF input nodes:
+        pdfText?: string;
+        pages?: number;
+        info?: any;
+        metadata?: any;
         // Processing mode (for condition, llm, etc.)
         processingMode?: 'batch' | 'perRow';  // batch = all rows together, perRow = filter/process each row
         // For split columns nodes:
@@ -111,7 +116,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'webhook';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'equipment' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'webhook';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -124,6 +129,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'webhook', label: 'Webhook', icon: Globe, description: 'Receive data from external services', category: 'Triggers' },
     { type: 'fetchData', label: 'Fetch Data', icon: Database, description: 'Get records from an entity', category: 'Data' },
     { type: 'excelInput', label: 'Excel/CSV Input', icon: FileSpreadsheet, description: 'Load data from Excel or CSV', category: 'Data' },
+    { type: 'pdfInput', label: 'PDF Input', icon: FileText, description: 'Extract text from PDF files', category: 'Data' },
     { type: 'saveRecords', label: 'Save to Database', icon: Database, description: 'Create or update records', category: 'Data' },
     { type: 'equipment', label: 'Equipment', icon: Wrench, description: 'Use specific equipment data', category: 'Data' },
     { type: 'http', label: 'HTTP Request', icon: Globe, description: 'Fetch data from an external API', category: 'Data' },
@@ -193,7 +199,7 @@ const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         ]
     },
     {
-        id: 'template-ai-enrichment-3',
+        id: 'template-ai-enrichment-32',
         name: 'Scope 3 emissions automated reporting',
         description: 'Automated collection of supplier and customer data for scope 3 emissions calculation and reporting.',
         category: 'Reporting',
@@ -558,6 +564,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [excelPreviewData, setExcelPreviewData] = useState<{ headers: string[], data: any[], rowCount: number } | null>(null);
     const [isParsingExcel, setIsParsingExcel] = useState(false);
 
+    // PDF Input Node State
+    const [configuringPdfNodeId, setConfiguringPdfNodeId] = useState<string | null>(null);
+    const [pdfFile, setPdfFile] = useState<File | null>(null);
+    const [pdfPreviewData, setPdfPreviewData] = useState<{ text: string, pages: number, fileName: string } | null>(null);
+    const [isParsingPdf, setIsParsingPdf] = useState(false);
+
     // Manual Input Node State
     const [configuringManualInputNodeId, setConfiguringManualInputNodeId] = useState<string | null>(null);
     const [manualInputVarName, setManualInputVarName] = useState<string>('');
@@ -622,6 +634,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // Workflow Runner State
     const [showRunnerModal, setShowRunnerModal] = useState<boolean>(false);
     const [runnerInputs, setRunnerInputs] = useState<{ [nodeId: string]: string }>({});
+    const [runnerFileInputs, setRunnerFileInputs] = useState<{ [nodeId: string]: File | null }>({});
     const [runnerOutputs, setRunnerOutputs] = useState<{ [nodeId: string]: any }>({});
     const [isRunningWorkflow, setIsRunningWorkflow] = useState<boolean>(false);
 
@@ -1266,6 +1279,86 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setExcelPreviewData(null);
     };
 
+    const openPdfConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'pdfInput') {
+            setConfiguringPdfNodeId(nodeId);
+            // If the node already has parsed data, show preview
+            if (node.config?.pdfText) {
+                setPdfPreviewData({
+                    text: node.config.pdfText,
+                    pages: node.config.pages || 0,
+                    fileName: node.config.fileName || ''
+                });
+            } else {
+                setPdfPreviewData(null);
+            }
+            setPdfFile(null);
+        }
+    };
+
+    const handlePdfFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setPdfFile(file);
+        setIsParsingPdf(true);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const res = await fetch(`${API_BASE}/parse-pdf`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+
+            if (!res.ok) {
+                throw new Error('Failed to parse PDF');
+            }
+
+            const result = await res.json();
+            setPdfPreviewData({
+                text: result.text,
+                pages: result.pages,
+                fileName: result.fileName
+            });
+
+            // Save parsed data to node config
+            if (configuringPdfNodeId) {
+                setNodes(prev => prev.map(n =>
+                    n.id === configuringPdfNodeId
+                        ? {
+                            ...n,
+                            label: file.name,
+                            config: {
+                                ...n.config,
+                                fileName: file.name,
+                                pdfText: result.text,
+                                pages: result.pages,
+                                info: result.info,
+                                metadata: result.metadata
+                            }
+                        }
+                        : n
+                ));
+            }
+        } catch (error) {
+            console.error('Error parsing PDF:', error);
+            showToast('Failed to parse PDF. Make sure it\'s a valid PDF file.', 'error');
+            setPdfPreviewData(null);
+        } finally {
+            setIsParsingPdf(false);
+        }
+    };
+
+    const closePdfConfig = () => {
+        setConfiguringPdfNodeId(null);
+        setPdfFile(null);
+        setPdfPreviewData(null);
+    };
+
     const openSaveRecordsConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
         if (node && node.type === 'saveRecords') {
@@ -1838,6 +1931,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // Workflow Runner Functions
     const openWorkflowRunner = () => {
         const inputNodes = nodes.filter(n => n.type === 'manualInput');
+        const fileInputNodes = nodes.filter(n => n.type === 'excelInput' || n.type === 'pdfInput');
+        
         const initialInputs: { [nodeId: string]: string } = {};
 
         inputNodes.forEach(node => {
@@ -1892,33 +1987,108 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setIsRunningWorkflow(true);
         setRunnerOutputs({});
 
-        // Update manual input node values
-        setNodes(prev => prev.map(node => {
-            if (node.type === 'manualInput' && runnerInputs[node.id] !== undefined) {
-                return {
-                    ...node,
-                    config: {
-                        ...node.config,
-                        inputVarValue: runnerInputs[node.id]
+        try {
+            // Process file inputs first
+            const fileInputNodes = nodes.filter(n => (n.type === 'excelInput' || n.type === 'pdfInput') && runnerFileInputs[n.id]);
+            
+            for (const node of fileInputNodes) {
+                const file = runnerFileInputs[node.id];
+                if (!file) continue;
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    if (node.type === 'excelInput') {
+                        const res = await fetch(`${API_BASE}/parse-spreadsheet`, {
+                            method: 'POST',
+                            body: formData,
+                            credentials: 'include'
+                        });
+
+                        if (res.ok) {
+                            const result = await res.json();
+                            setNodes(prev => prev.map(n =>
+                                n.id === node.id
+                                    ? {
+                                        ...n,
+                                        label: file.name,
+                                        config: {
+                                            ...n.config,
+                                            fileName: file.name,
+                                            headers: result.headers,
+                                            parsedData: result.data,
+                                            rowCount: result.rowCount
+                                        }
+                                    }
+                                    : n
+                            ));
+                        }
+                    } else if (node.type === 'pdfInput') {
+                        const res = await fetch(`${API_BASE}/parse-pdf`, {
+                            method: 'POST',
+                            body: formData,
+                            credentials: 'include'
+                        });
+
+                        if (res.ok) {
+                            const result = await res.json();
+                            setNodes(prev => prev.map(n =>
+                                n.id === node.id
+                                    ? {
+                                        ...n,
+                                        label: file.name,
+                                        config: {
+                                            ...n.config,
+                                            fileName: file.name,
+                                            pdfText: result.text,
+                                            pages: result.pages,
+                                            info: result.info,
+                                            metadata: result.metadata
+                                        }
+                                    }
+                                    : n
+                            ));
+                        }
                     }
-                };
+                } catch (error) {
+                    console.error('Error processing file:', error);
+                    showToast(`Failed to process ${file.name}`, 'error');
+                }
             }
-            return node;
-        }));
 
-        await new Promise(resolve => setTimeout(resolve, 100));
-        await runWorkflow();
-        await new Promise(resolve => setTimeout(resolve, 500));
+            // Update manual input node values
+            setNodes(prev => prev.map(node => {
+                if (node.type === 'manualInput' && runnerInputs[node.id] !== undefined) {
+                    return {
+                        ...node,
+                        config: {
+                            ...node.config,
+                            inputVarValue: runnerInputs[node.id]
+                        }
+                    };
+                }
+                return node;
+            }));
 
-        const outputNodes = nodes.filter(n => n.type === 'output');
-        const outputs: { [nodeId: string]: any } = {};
+            await new Promise(resolve => setTimeout(resolve, 200));
+            await runWorkflow();
+            await new Promise(resolve => setTimeout(resolve, 500));
 
-        outputNodes.forEach((node) => {
-            outputs[node.id] = node.outputData || null;
-        });
+            const outputNodes = nodes.filter(n => n.type === 'output');
+            const outputs: { [nodeId: string]: any } = {};
 
-        setRunnerOutputs(outputs);
-        setIsRunningWorkflow(false);
+            outputNodes.forEach((node) => {
+                outputs[node.id] = node.outputData || null;
+            });
+
+            setRunnerOutputs(outputs);
+        } catch (error) {
+            console.error('Error running workflow from runner:', error);
+            showToast('Failed to run workflow', 'error');
+        } finally {
+            setIsRunningWorkflow(false);
+        }
     };
 
 
@@ -2434,6 +2604,21 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         result = `Loaded ${nodeData.length} rows from ${node.config.fileName || 'file'}`;
                     } else {
                         result = 'No file loaded - click to upload Excel/CSV file';
+                        nodeData = [];
+                    }
+                    break;
+                case 'pdfInput':
+                    // PDF Input node - output the parsed text
+                    if (node.config?.pdfText) {
+                        nodeData = [{
+                            text: node.config.pdfText,
+                            pages: node.config.pages,
+                            fileName: node.config.fileName,
+                            metadata: node.config.metadata
+                        }];
+                        result = `Loaded PDF: ${node.config.fileName} (${node.config.pages} pages)`;
+                    } else {
+                        result = 'No PDF loaded - click to upload PDF file';
                         nodeData = [];
                     }
                     break;
@@ -3216,6 +3401,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'join': return 'bg-cyan-100 text-cyan-600';
             case 'splitColumns': return 'bg-sky-100 text-sky-600';
             case 'excelInput': return 'bg-emerald-100 text-emerald-600';
+            case 'pdfInput': return 'bg-red-100 text-red-600';
             case 'sendEmail': return 'bg-rose-100 text-rose-600';
             case 'webhook': return 'bg-purple-100 text-purple-600';
             default: return 'bg-slate-100 text-slate-600';
@@ -3949,6 +4135,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openSplitColumnsConfig(node.id);
                                             } else if (node.type === 'excelInput') {
                                                 openExcelConfig(node.id);
+                                            } else if (node.type === 'pdfInput') {
+                                                openPdfConfig(node.id);
                                             }
                                         }}
                                         onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
@@ -5993,6 +6181,110 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             </div>
                         )}
 
+                        {/* PDF Input Configuration Modal */}
+                        {configuringPdfNodeId && (
+                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={closePdfConfig}>
+                                <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                            <FileText className="text-red-600" size={20} />
+                                            PDF Input
+                                        </h3>
+                                        <button
+                                            onClick={closePdfConfig}
+                                            disabled={!pdfFile && !nodes.find(n => n.id === configuringPdfNodeId)?.config?.fileName}
+                                            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                                !pdfFile && !nodes.find(n => n.id === configuringPdfNodeId)?.config?.fileName
+                                                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                                    : 'bg-red-600 text-white hover:bg-red-700'
+                                            }`}
+                                        >
+                                            Done
+                                        </button>
+                                    </div>
+                                    
+                                    {/* File Upload Area */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Upload PDF File
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                type="file"
+                                                accept=".pdf"
+                                                onChange={handlePdfFileChange}
+                                                className="hidden"
+                                                id="pdf-file-input"
+                                                disabled={isParsingPdf}
+                                            />
+                                            <label
+                                                htmlFor="pdf-file-input"
+                                                className={`flex items-center justify-center gap-2 w-full px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
+                                                    isParsingPdf 
+                                                        ? 'bg-slate-50 border-slate-300 cursor-wait'
+                                                        : 'border-red-300 hover:border-red-500 hover:bg-red-50'
+                                                }`}
+                                            >
+                                                {isParsingPdf ? (
+                                                    <>
+                                                        <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                                                        <span className="text-slate-600">Parsing PDF...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Upload className="text-red-500" size={24} />
+                                                        <div className="text-center">
+                                                            <span className="text-slate-600 font-medium">Click to upload</span>
+                                                            <p className="text-xs text-slate-400 mt-1">PDF files supported</p>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {/* Preview Section */}
+                                    {pdfPreviewData && (
+                                        <div className="mb-4">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="block text-sm font-medium text-slate-700">
+                                                    Extracted Text Preview
+                                                </label>
+                                                <span className="text-xs text-slate-500">
+                                                    {pdfPreviewData.pages} pages
+                                                </span>
+                                            </div>
+                                            <div className="border border-slate-200 rounded-lg p-4 max-h-64 overflow-y-auto bg-slate-50">
+                                                <pre className="text-xs text-slate-600 whitespace-pre-wrap font-mono">
+                                                    {pdfPreviewData.text.substring(0, 1000)}
+                                                    {pdfPreviewData.text.length > 1000 && '\n\n... (text truncated for preview)'}
+                                                </pre>
+                                            </div>
+                                            <p className="text-xs text-slate-500 mt-2">
+                                                Full text ({pdfPreviewData.text.length} characters) will be available to the workflow
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Current File Info */}
+                                    {nodes.find(n => n.id === configuringPdfNodeId)?.config?.fileName && !pdfFile && (
+                                        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <FileText className="text-red-600" size={16} />
+                                                <span className="font-medium text-red-800">
+                                                    {nodes.find(n => n.id === configuringPdfNodeId)?.config?.fileName}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-red-600 mt-1">
+                                                {nodes.find(n => n.id === configuringPdfNodeId)?.config?.pages} pages • {nodes.find(n => n.id === configuringPdfNodeId)?.config?.pdfText?.length || 0} characters
+                                            </p>
+                                        </div>
+                                    )}
+
+                                </div>
+                            </div>
+                        )}
+
                         {/* Save Records Configuration Modal */}
                         {configuringSaveNodeId && (
                             <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringSaveNodeId(null)}>
@@ -6476,6 +6768,56 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                     {/* Divider */}
                                     <div className="border-t border-slate-200 my-6"></div>
+
+                                    {/* File Input Form */}
+                                    {nodes.filter(n => n.type === 'excelInput' || n.type === 'pdfInput').length > 0 && (
+                                        <div className="space-y-4 mb-6">
+                                            <h3 className="font-semibold text-slate-700 flex items-center gap-2">
+                                                <Upload size={18} />
+                                                File Inputs
+                                            </h3>
+                                            {nodes.filter(n => n.type === 'excelInput' || n.type === 'pdfInput').map(node => (
+                                                <div key={node.id} className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                        {node.label || (node.type === 'excelInput' ? 'Excel/CSV File' : 'PDF File')}
+                                                    </label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="file"
+                                                            accept={node.type === 'excelInput' ? '.csv,.xlsx,.xls' : '.pdf'}
+                                                            onChange={(e) => {
+                                                                const file = e.target.files?.[0];
+                                                                if (file) {
+                                                                    setRunnerFileInputs(prev => ({
+                                                                        ...prev,
+                                                                        [node.id]: file
+                                                                    }));
+                                                                }
+                                                            }}
+                                                            className="hidden"
+                                                            id={`runner-file-${node.id}`}
+                                                        />
+                                                        <label
+                                                            htmlFor={`runner-file-${node.id}`}
+                                                            className="flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-teal-500 hover:bg-teal-50 transition-all"
+                                                        >
+                                                            {runnerFileInputs[node.id] ? (
+                                                                <>
+                                                                    <CheckCircle className="text-teal-600" size={20} />
+                                                                    <span className="text-slate-700 font-medium">{runnerFileInputs[node.id]?.name}</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Upload className="text-slate-400" size={20} />
+                                                                    <span className="text-slate-600">Click to upload {node.type === 'excelInput' ? 'Excel/CSV' : 'PDF'}</span>
+                                                                </>
+                                                            )}
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
 
                                     {/* Input Form */}
                                     {Object.keys(runnerInputs).length > 0 ? (

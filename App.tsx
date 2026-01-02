@@ -802,8 +802,8 @@ function AuthenticatedApp() {
                     }}
                 />
             )}
-            {/* Hide sidebar when in report editor for more space */}
-            {!location.pathname.match(/^\/reports\/[^/]+$/) && (
+            {/* Hide sidebar when in report editor or workflow editor for more space */}
+            {!location.pathname.match(/^\/reports\/[^/]+$/) && !location.pathname.match(/^\/workflow\/[^/]+$/) && (
                 <Sidebar activeView={currentView} onNavigate={handleNavigate} />
             )}
 
