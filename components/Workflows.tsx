@@ -3710,7 +3710,66 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 </>
             ) : (
                 /* Canvas View */
-                <div data-tutorial="workflow-editor" className="flex flex-1 h-full">
+                <div data-tutorial="workflow-editor" className="flex flex-col flex-1 h-full">
+                    {/* Top Bar */}
+                    <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-sm z-20">
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                            <button
+                                onClick={backToList}
+                                className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg transition-colors text-sm font-medium text-slate-700 flex-shrink-0"
+                            >
+                                <ArrowLeft size={18} />
+                                Back
+                            </button>
+                            <div className="h-6 w-px bg-slate-300 flex-shrink-0"></div>
+                            <input
+                                type="text"
+                                value={workflowName}
+                                onChange={(e) => setWorkflowName(e.target.value)}
+                                className="text-lg font-semibold text-slate-800 bg-transparent border-none focus:outline-none flex-1 min-w-0"
+                                placeholder="Workflow Name"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                                onClick={saveWorkflow}
+                                disabled={isSaving}
+                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                                title="Save"
+                            >
+                                {isSaving ? <span className="animate-spin">⟳</span> : <Save size={18} className="text-slate-700" />}
+                            </button>
+                            <button
+                                onClick={openExecutionHistory}
+                                disabled={!currentWorkflowId}
+                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                                title="History"
+                            >
+                                <History size={18} className="text-slate-700" />
+                            </button>
+                            <button
+                                onClick={runWorkflow}
+                                disabled={isRunning || nodes.length === 0}
+                                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50"
+                            >
+                                <Play size={16} />
+                                {isRunning ? 'Running...' : 'Run'}
+                            </button>
+                            <button
+                                onClick={openWorkflowRunner}
+                                disabled={nodes.length === 0}
+                                className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50"
+                            >
+                                <Share2 size={16} />
+                                Export
+                            </button>
+                            <div className="h-6 w-px bg-slate-300 mx-2"></div>
+                            <ProfileMenu onNavigate={onViewChange} />
+                        </div>
+                    </div>
+
+                    {/* Content Area (Sidebar + Canvas) */}
+                    <div className="flex flex-1 overflow-hidden">
                     {/* Sidebar */}
                     <div data-tutorial="node-palette" className={`${isSidebarCollapsed ? 'w-14' : 'w-72'} bg-slate-50 border-r border-slate-200 flex flex-col shadow-sm z-10 h-full transition-all duration-300`}>
 
@@ -3817,145 +3876,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     </div>
 
                     {/* Canvas */}
-                    <div data-tutorial="workflow-canvas" className="flex-1 relative overflow-hidden bg-slate-50 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px]">
-                        <div className="absolute top-4 left-4 right-8 z-10 flex items-center gap-4">
-                            <div className="flex-1">
-                                <input
-                                    type="text"
-                                    value={workflowName}
-                                    onChange={(e) => setWorkflowName(e.target.value)}
-                                    className="text-2xl font-bold text-slate-800 bg-transparent border-b-2 border-transparent hover:border-slate-300 focus:border-teal-500 focus:outline-none transition-colors"
-                                    placeholder="Workflow Name"
-                                />
-                            </div>
-                            {/* Active Users - Google Drive Style */}
-                            {wsConnected && remoteUsers.length > 0 && (
-                                <div className="flex items-center">
-                                    {/* Remote users avatars */}
-                                    <div className="flex -space-x-2">
-                                        {remoteUsers.slice(0, 5).map((remoteUser) => {
-                                            // Check if this user has a visible cursor
-                                            const hasCursor = Array.from(remoteCursors.values()).some(
-                                                r => r.user.id === remoteUser.user.id && r.cursor && r.cursor.x >= 0
-                                            );
-                                            return (
-                                                <button
-                                                    key={remoteUser.id}
-                                                    className={`relative group focus:outline-none ${hasCursor ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-default opacity-70'}`}
-                                                    onClick={() => hasCursor && goToUserCursor(remoteUser.user.id)}
-                                                    title={hasCursor ? `Click to go to ${remoteUser.user.name}'s cursor` : `${remoteUser.user.name} (cursor not visible)`}
-                                                >
-                                                    {remoteUser.user.profilePhoto ? (
-                                                        <img
-                                                            src={remoteUser.user.profilePhoto.startsWith('http') 
-                                                                ? remoteUser.user.profilePhoto 
-                                                                : `${API_BASE}/files/${remoteUser.user.profilePhoto}`}
-                                                            alt={remoteUser.user.name}
-                                                            className="w-8 h-8 rounded-full border-2 border-white shadow-sm object-cover"
-                                                            style={{ borderColor: remoteUser.user.color }}
-                                                            onError={(e) => {
-                                                                // Fallback to initials if image fails to load
-                                                                e.currentTarget.style.display = 'none';
-                                                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                                                            }}
-                                                        />
-                                                    ) : null}
-                                                    <div
-                                                        className={`w-8 h-8 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-white text-xs font-semibold ${remoteUser.user.profilePhoto ? 'hidden' : ''}`}
-                                                        style={{ backgroundColor: remoteUser.user.color }}
-                                                    >
-                                                        {remoteUser.user.name.charAt(0).toUpperCase()}
-                                                    </div>
-                                                    {/* Cursor visibility indicator */}
-                                                    {hasCursor && (
-                                                        <div 
-                                                            className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white flex items-center justify-center"
-                                                            style={{ backgroundColor: remoteUser.user.color }}
-                                                        >
-                                                            <svg width="8" height="8" viewBox="0 0 24 24" fill="white">
-                                                                <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.48 0 .72-.58.38-.92L6.35 2.88a.5.5 0 0 0-.85.33Z" />
-                                                            </svg>
-                                                        </div>
-                                                    )}
-                                                    {/* Tooltip */}
-                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-                                                        {remoteUser.user.name}
-                                                        {hasCursor && <span className="block text-[10px] text-slate-300">Click to follow</span>}
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                        {remoteUsers.length > 5 && (
-                                            <div className="w-8 h-8 rounded-full border-2 border-white bg-slate-200 shadow-sm flex items-center justify-center text-slate-600 text-xs font-semibold">
-                                                +{remoteUsers.length - 5}
-                                            </div>
-                                        )}
-                                    </div>
-                                    {/* Your indicator */}
-                                    <div className="ml-2 flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 rounded-full shadow-sm">
-                                        <div 
-                                            className="w-2 h-2 rounded-full animate-pulse"
-                                            style={{ backgroundColor: myColor || '#22c55e' }}
-                                        />
-                                        <span className="text-xs text-slate-500">You</span>
-                                    </div>
-                                </div>
-                            )}
-                            <div className="flex gap-1.5">
-                                <button
-                                    onClick={backToList}
-                                    className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-md hover:bg-slate-50 transition-colors text-xs font-medium flex items-center gap-1.5"
-                                >
-                                    <ArrowLeft size={14} />
-                                    Back
-                                </button>
-                                <button
-                                    onClick={saveWorkflow}
-                                    disabled={isSaving}
-                                    className="flex items-center px-2.5 py-1.5 bg-slate-800 border-none text-white rounded-md hover:bg-slate-900 transition-colors shadow-sm text-xs font-medium disabled:opacity-50"
-                                >
-                                    {isSaving ? <span className="animate-spin mr-1">⟳</span> : <Save size={14} className="mr-1" />}
-                                    Save
-                                </button>
-                                <button
-                                    onClick={runWorkflow}
-                                    disabled={isRunning || nodes.length === 0}
-                                    className={`flex items-center px-2.5 py-1.5 rounded-md text-white shadow-sm transition-colors text-xs font-medium ${isRunning || nodes.length === 0
-                                        ? 'bg-slate-300 cursor-not-allowed'
-                                        : 'bg-slate-800 hover:bg-slate-900'
-                                        }`}
-                                >
-                                    <PlayCircle size={14} className="mr-1" />
-                                    {isRunning ? 'Running...' : 'Run'}
-                                </button>
-                                <button
-                                    onClick={openExecutionHistory}
-                                    disabled={!currentWorkflowId}
-                                    className={`flex items-center px-2.5 py-1.5 rounded-md shadow-sm transition-colors text-xs font-medium ${!currentWorkflowId
-                                        ? 'bg-slate-300 cursor-not-allowed text-slate-500'
-                                        : 'bg-violet-600 hover:bg-violet-700 text-white'
-                                        }`}
-                                    title="View execution history"
-                                >
-                                    <Clock size={14} className="mr-1" />
-                                    History
-                                </button>
-                                <button
-                                    onClick={openWorkflowRunner}
-                                    disabled={nodes.length === 0}
-                                    className={`flex items-center px-2.5 py-1.5 rounded-md shadow-sm transition-colors text-xs font-medium ${nodes.length === 0
-                                        ? 'bg-slate-300 cursor-not-allowed text-slate-500'
-                                        : 'bg-teal-600 hover:bg-teal-700 text-white'
-                                        }`}
-                                >
-                                    <Share2 size={14} className="mr-1" />
-                                    Export
-                                </button>
-                                <div className="ml-1.5 border-l border-slate-300 pl-2">
-                                    <ProfileMenu onNavigate={onViewChange} />
-                                </div>
-                            </div>
-                        </div>
+                    <div data-tutorial="workflow-canvas" className="flex-1 flex flex-col relative overflow-hidden bg-slate-50">
+                        {/* Canvas Area */}
+                        <div className="flex-1 relative overflow-hidden bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px]">
 
                         <div
                             ref={canvasRef}
@@ -4719,7 +4642,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </div>
                                 )}
                             </div> {/* Close transform div */}
+                        </div> {/* Close Canvas Area */}
                         </div> {/* Close canvas div */}
+                    </div> {/* Close Content Area (Sidebar + Canvas) */}
 
                         {/* AI Assistant Panel (Right Side) */}
                         {showAiAssistant && (
@@ -7307,13 +7232,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowExecutionHistory(false)}>
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="bg-gradient-to-r from-violet-600 to-violet-700 px-6 py-4 text-white rounded-t-xl shrink-0">
+                        <div className="bg-gradient-to-r from-teal-600 to-teal-700 px-6 py-4 text-white rounded-t-xl shrink-0">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <History size={24} />
                                     <div>
                                         <h3 className="font-bold text-lg">Execution History</h3>
-                                        <p className="text-violet-200 text-sm">View past workflow executions and their results</p>
+                                        <p className="text-teal-200 text-sm">View past workflow executions and their results</p>
                                     </div>
                                 </div>
                                 <button onClick={() => setShowExecutionHistory(false)} className="text-white/80 hover:text-white">
@@ -7329,10 +7254,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <div className="p-3 border-b border-slate-100 bg-slate-50">
                                     <button
                                         onClick={loadExecutionHistory}
-                                        className="w-full px-3 py-2 bg-violet-100 text-violet-700 rounded-lg text-sm font-medium hover:bg-violet-200 transition-colors flex items-center justify-center gap-2"
+                                        className="w-full px-3 py-2 bg-teal-100 text-teal-700 rounded-lg text-sm font-medium hover:bg-teal-200 transition-colors flex items-center justify-center gap-2"
                                     >
                                         {loadingExecutions ? (
-                                            <div className="w-4 h-4 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+                                            <div className="w-4 h-4 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
                                         ) : (
                                             <History size={14} />
                                         )}
@@ -7341,7 +7266,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 </div>
                                 {loadingExecutions ? (
                                     <div className="p-8 text-center text-slate-500">
-                                        <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                                        <div className="w-8 h-8 border-2 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                                         Loading...
                                     </div>
                                 ) : executionHistory.length === 0 ? (
@@ -7356,7 +7281,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             <button
                                                 key={exec.id}
                                                 onClick={() => setSelectedExecution(exec)}
-                                                className={`w-full p-3 text-left hover:bg-slate-50 transition-colors ${selectedExecution?.id === exec.id ? 'bg-violet-50 border-l-2 border-violet-500' : ''}`}
+                                                className={`w-full p-3 text-left hover:bg-slate-50 transition-colors ${selectedExecution?.id === exec.id ? 'bg-teal-50 border-l-2 border-teal-500' : ''}`}
                                             >
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
