@@ -1513,6 +1513,43 @@ app.post('/api/generate', authenticateToken, async (req, res) => {
 // Python Execution Endpoint - Secure Sandbox
 app.post('/api/python/execute', authenticateToken, async (req, res) => {
     const { code, inputData } = req.body;
+    
+    // Check if Lambda is configured
+    const useLambda = process.env.USE_LAMBDA_FOR_PYTHON === 'true' && 
+                     process.env.AWS_ACCESS_KEY_ID && 
+                     process.env.LAMBDA_FUNCTION_NAME;
+    
+    if (useLambda) {
+        // Use AWS Lambda for execution (secure, isolated)
+        try {
+            const { executePythonInLambda } = require('./lambdaService');
+            console.log('[Python] Using AWS Lambda for execution');
+            
+            const result = await executePythonInLambda(code, inputData);
+            
+            if (result.success) {
+                res.json({
+                    success: true,
+                    output: result.output || '',
+                    result: result.result
+                });
+            } else {
+                res.json({
+                    success: false,
+                    error: result.error || 'Execution failed',
+                    traceback: result.traceback
+                });
+            }
+            return;
+        } catch (error) {
+            console.error('[Python Lambda] Execution error:', error);
+            // Fall back to local execution if Lambda fails
+            console.log('[Python] Lambda failed, falling back to local execution');
+        }
+    }
+    
+    // Fallback: Local execution with sandboxing (less secure)
+    console.log('[Python] Using local sandboxed execution');
     const fs = require('fs');
     const path = require('path');
     const { spawn } = require('child_process');
@@ -1561,7 +1598,14 @@ def check_security(code_str):
         'string', 'copy', 'operator', 'numbers', 'time', 'calendar',
         'heapq', 'bisect', 'array', 'enum', 'typing', 'dataclasses',
         'csv', 'hashlib', 'hmac', 'base64', 'binascii', 'struct',
-        'codecs', 'unicodedata', 'difflib', 'textwrap', 'pprint'
+        'codecs', 'unicodedata', 'difflib', 'textwrap', 'pprint',
+        # Data processing libraries (commonly needed)
+        'urllib', 'html', 'xml', 'warnings', 'logging', 'uuid',
+        'pickle', 'shelve', 'sqlite3', 'zlib', 'gzip', 'bz2',
+        # Numeric/Scientific (if installed)
+        'numpy', 'pandas', 'scipy', 'matplotlib', 'seaborn',
+        # Others
+        'io', 'pathlib', 'glob', 'fnmatch', 'linecache', 'shutil'
     }
     
     # Expanded forbidden functions/names

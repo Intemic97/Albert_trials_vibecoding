@@ -11,6 +11,7 @@
     "seed": "node server/seed.js"
   },
   "dependencies": {
+    "@aws-sdk/client-lambda": "^3.958.0",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
