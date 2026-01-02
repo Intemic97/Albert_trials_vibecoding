@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut, Bot } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut, Bot, Smartphone, BarChart3 } from 'lucide-react';
+import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import { API_BASE } from '../config';
@@ -22,7 +23,7 @@ const generateUUID = (): string => {
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'webhook';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook';
     label: string;
     x: number;
     y: number;
@@ -95,6 +96,15 @@ interface WorkflowNode {
         emailSmtpPort?: string;
         emailSmtpUser?: string;
         emailSmtpPass?: string;
+        // For Send SMS nodes:
+        smsTo?: string;
+        smsBody?: string;
+        twilioAccountSid?: string;
+        twilioAuthToken?: string;
+        twilioFromNumber?: string;
+        // For Data Visualization nodes:
+        visualizationPrompt?: string;
+        generatedWidget?: WidgetConfig;
         // Custom node name
         customName?: string;
     };
@@ -116,7 +126,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'webhook';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -144,6 +154,8 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'addField', label: 'Add Field', icon: CheckCircle, description: 'Add a new field to data', category: 'Logic' },
     { type: 'humanApproval', label: 'Human in the Loop', icon: UserCheck, description: 'Wait for user approval to continue', category: 'Logic' },
     { type: 'sendEmail', label: 'Send Email', icon: Mail, description: 'Send an email notification', category: 'Actions' },
+    { type: 'sendSMS', label: 'Send SMS', icon: Smartphone, description: 'Send an SMS text message via Twilio', category: 'Actions' },
+    { type: 'dataVisualization', label: 'Data Visualization', icon: BarChart3, description: 'Generate charts from data using AI', category: 'Actions' },
     { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },
     { type: 'output', label: 'Output', icon: LogOut, description: 'Display workflow output data', category: 'Actions' },
     { type: 'comment', label: 'Comment', icon: MessageSquare, description: 'Add a note or comment', category: 'Other' },
@@ -613,6 +625,22 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [emailSmtpPort, setEmailSmtpPort] = useState<string>('587');
     const [emailSmtpUser, setEmailSmtpUser] = useState<string>('');
     const [emailSmtpPass, setEmailSmtpPass] = useState<string>('');
+
+    // Send SMS Node State
+    const [configuringSMSNodeId, setConfiguringSMSNodeId] = useState<string | null>(null);
+    const [smsTo, setSmsTo] = useState<string>('');
+    const [smsBody, setSmsBody] = useState<string>('');
+    const [twilioAccountSid, setTwilioAccountSid] = useState<string>('');
+    const [twilioAuthToken, setTwilioAuthToken] = useState<string>('');
+    const [twilioFromNumber, setTwilioFromNumber] = useState<string>('');
+    const [showSMSTwilioSettings, setShowSMSTwilioSettings] = useState<boolean>(false);
+
+    // Data Visualization Node State
+    const [configuringVisualizationNodeId, setConfiguringVisualizationNodeId] = useState<string | null>(null);
+    const [visualizationPrompt, setVisualizationPrompt] = useState<string>('');
+    const [generatedWidget, setGeneratedWidget] = useState<WidgetConfig | null>(null);
+    const [isGeneratingWidget, setIsGeneratingWidget] = useState<boolean>(false);
+    const [showWidgetExplanation, setShowWidgetExplanation] = useState<boolean>(false);
     const [showEmailSmtpSettings, setShowEmailSmtpSettings] = useState<boolean>(false);
 
     // ESIOS Node State
@@ -1618,6 +1646,121 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setConfiguringEmailNodeId(null);
     };
 
+    const openSMSConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'sendSMS') {
+            setConfiguringSMSNodeId(nodeId);
+            setSmsTo(node.config?.smsTo || '');
+            setSmsBody(node.config?.smsBody || '');
+            setTwilioAccountSid(node.config?.twilioAccountSid || '');
+            setTwilioAuthToken(node.config?.twilioAuthToken || '');
+            setTwilioFromNumber(node.config?.twilioFromNumber || '');
+        }
+    };
+
+    const saveSMSConfig = () => {
+        if (!configuringSMSNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringSMSNodeId
+                ? {
+                    ...n,
+                    label: smsTo ? `SMS to: ${smsTo.slice(-4)}...` : 'Send SMS',
+                    config: {
+                        ...n.config,
+                        smsTo,
+                        smsBody,
+                        twilioAccountSid: twilioAccountSid || undefined,
+                        twilioAuthToken: twilioAuthToken || undefined,
+                        twilioFromNumber: twilioFromNumber || undefined,
+                    }
+                }
+                : n
+        ));
+        setConfiguringSMSNodeId(null);
+    };
+
+    const openVisualizationConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'dataVisualization') {
+            setConfiguringVisualizationNodeId(nodeId);
+            setVisualizationPrompt(node.config?.visualizationPrompt || '');
+            setGeneratedWidget(node.config?.generatedWidget || null);
+            setShowWidgetExplanation(false);
+        }
+    };
+
+    const generateWidgetFromPrompt = async () => {
+        if (!configuringVisualizationNodeId || !visualizationPrompt.trim()) return;
+
+        // Get input data from parent node
+        const parentConnection = connections.find(c => c.toNodeId === configuringVisualizationNodeId);
+        const parentNode = parentConnection ? nodes.find(n => n.id === parentConnection.fromNodeId) : null;
+        let inputData: any[] = [];
+        
+        if (parentNode) {
+            if (parentNode.type === 'splitColumns' && parentNode.outputData) {
+                inputData = parentConnection.outputType === 'B' 
+                    ? parentNode.outputData.outputB || []
+                    : parentNode.outputData.outputA || [];
+            } else {
+                inputData = parentNode.outputData || parentNode.config?.parsedData || [];
+            }
+        }
+
+        if (!inputData || (Array.isArray(inputData) && inputData.length === 0)) {
+            alert('No input data available. Please run the workflow first to populate data.');
+            return;
+        }
+
+        setIsGeneratingWidget(true);
+        try {
+            const response = await fetch(`${API_BASE}/generate-widget-from-data`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: visualizationPrompt,
+                    data: inputData
+                }),
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to generate widget');
+            }
+
+            const widgetConfig = await response.json();
+            setGeneratedWidget(widgetConfig);
+        } catch (error) {
+            console.error('Error generating widget:', error);
+            alert(`Failed to generate visualization: ${error.message}`);
+        } finally {
+            setIsGeneratingWidget(false);
+        }
+    };
+
+    const saveVisualizationConfig = () => {
+        if (!configuringVisualizationNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringVisualizationNodeId
+                ? {
+                    ...n,
+                    label: generatedWidget?.title || 'Data Visualization',
+                    config: {
+                        ...n.config,
+                        visualizationPrompt,
+                        generatedWidget
+                    }
+                }
+                : n
+        ));
+        setConfiguringVisualizationNodeId(null);
+        setGeneratedWidget(null);
+        setVisualizationPrompt('');
+    };
+
     const openEsiosConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
         if (node && node.type === 'esios') {
@@ -2456,6 +2599,63 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         }
                     } else {
                         result = 'Recipient not configured';
+                    }
+                    break;
+                case 'sendSMS':
+                    if (node.config?.smsTo) {
+                        try {
+                            // Replace variables in SMS fields
+                            const replaceVariables = (text: string, data: any) => {
+                                if (!text || !data) return text;
+                                let result = text;
+                                const record = Array.isArray(data) ? data[0] : data;
+                                if (record && typeof record === 'object') {
+                                    Object.keys(record).forEach(key => {
+                                        const regex = new RegExp(`\\{${key}\\}`, 'g');
+                                        result = result.replace(regex, String(record[key] ?? ''));
+                                    });
+                                }
+                                return result;
+                            };
+
+                            const smsData = {
+                                to: replaceVariables(node.config.smsTo, inputData),
+                                body: replaceVariables(node.config.smsBody || '', inputData),
+                                accountSid: node.config.twilioAccountSid,
+                                authToken: node.config.twilioAuthToken,
+                                fromNumber: node.config.twilioFromNumber
+                            };
+
+                            const response = await fetch(`${API_BASE}/sms/send`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(smsData),
+                                credentials: 'include'
+                            });
+
+                            if (response.ok) {
+                                const data = await response.json();
+                                nodeData = inputData || [{ smsSent: true, to: smsData.to }];
+                                result = `SMS sent to ${smsData.to}`;
+                            } else {
+                                const errorData = await response.json();
+                                throw new Error(errorData.error || 'Failed to send SMS');
+                            }
+                        } catch (error) {
+                            console.error('SMS send error:', error);
+                            result = `Error: ${error.message || 'Failed to send SMS'}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'Phone number not configured';
+                    }
+                    break;
+                case 'dataVisualization':
+                    if (node.config?.generatedWidget) {
+                        nodeData = inputData;
+                        result = `Chart: ${node.config.generatedWidget.title || 'Data Visualization'}`;
+                    } else {
+                        result = 'No visualization configured. Double-click to set up.';
                     }
                     break;
                 case 'esios':
@@ -3500,6 +3700,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'excelInput': return 'bg-emerald-100 text-emerald-600';
             case 'pdfInput': return 'bg-red-100 text-red-600';
             case 'sendEmail': return 'bg-rose-100 text-rose-600';
+            case 'sendSMS': return 'bg-lime-100 text-lime-600';
+            case 'dataVisualization': return 'bg-indigo-100 text-indigo-600';
             case 'webhook': return 'bg-purple-100 text-purple-600';
             default: return 'bg-slate-100 text-slate-600';
         }
@@ -4153,6 +4355,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openMySQLConfig(node.id);
                                             } else if (node.type === 'sendEmail') {
                                                 openEmailConfig(node.id);
+                                            } else if (node.type === 'sendSMS') {
+                                                openSMSConfig(node.id);
+                                            } else if (node.type === 'dataVisualization') {
+                                                openVisualizationConfig(node.id);
                                             } else if (node.type === 'esios') {
                                                 openEsiosConfig(node.id);
                                             } else if (node.type === 'climatiq') {
@@ -5185,6 +5391,313 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 disabled:opacity-50 text-sm font-medium"
                                             >
                                                 Save
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Send SMS Configuration Modal */}
+                        {configuringSMSNodeId && (() => {
+                            // Get input data from parent node for @ mentions
+                            const parentConnection = connections.find(c => c.toNodeId === configuringSMSNodeId);
+                            const parentNode = parentConnection ? nodes.find(n => n.id === parentConnection.fromNodeId) : null;
+                            let inputDataForSMS: any[] = [];
+                            
+                            if (parentNode) {
+                                if (parentNode.type === 'splitColumns' && parentNode.outputData) {
+                                    inputDataForSMS = parentConnection.outputType === 'B' 
+                                        ? parentNode.outputData.outputB || []
+                                        : parentNode.outputData.outputA || [];
+                                } else {
+                                    inputDataForSMS = parentNode.outputData || parentNode.config?.parsedData || [];
+                                }
+                            }
+
+                            return (
+                                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringSMSNodeId(null)}>
+                                    <div className="bg-white rounded-lg shadow-xl p-6 w-[550px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                            <Smartphone className="text-lime-600" size={20} />
+                                            Send SMS
+                                        </h3>
+                                        
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    To (phone number with country code)
+                                                </label>
+                                                <div className="h-16">
+                                                    <PromptInput
+                                                        entities={entities}
+                                                        onGenerate={() => {}}
+                                                        isGenerating={false}
+                                                        initialValue={smsTo}
+                                                        placeholder="+34612345678 — Use @ to mention Input Data"
+                                                        hideButton={true}
+                                                        onChange={(val) => setSmsTo(val)}
+                                                        className="h-full [&_textarea]:!h-10 [&_textarea]:!min-h-0 [&_textarea]:!p-2 [&_textarea]:!text-sm"
+                                                        inputData={inputDataForSMS}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    Message Body
+                                                </label>
+                                                <div className="h-32">
+                                                    <PromptInput
+                                                        entities={entities}
+                                                        onGenerate={() => {}}
+                                                        isGenerating={false}
+                                                        initialValue={smsBody}
+                                                        placeholder="Write your SMS message here...&#10;&#10;Use @ to mention Input Data or entities."
+                                                        hideButton={true}
+                                                        onChange={(val) => setSmsBody(val)}
+                                                        className="h-full"
+                                                        inputData={inputDataForSMS}
+                                                    />
+                                                </div>
+                                                <p className="text-[10px] text-slate-500 mt-1">
+                                                    SMS messages are limited to 160 characters (or 70 with special characters)
+                                                </p>
+                                            </div>
+
+                                            {/* Twilio Settings (collapsible) */}
+                                            <div className="border border-slate-200 rounded-lg">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowSMSTwilioSettings(!showSMSTwilioSettings)}
+                                                    className="w-full px-4 py-2 flex items-center justify-between text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                                >
+                                                    <span>⚙️ Twilio Settings</span>
+                                                    <span>{showSMSTwilioSettings ? '▲' : '▼'}</span>
+                                                </button>
+                                                
+                                                {showSMSTwilioSettings && (
+                                                    <div className="p-4 border-t border-slate-200 space-y-3">
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-slate-600 mb-1">
+                                                                Account SID
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={twilioAccountSid}
+                                                                onChange={(e) => setTwilioAccountSid(e.target.value)}
+                                                                placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                                                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-lime-500"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-slate-600 mb-1">
+                                                                Auth Token
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={twilioAuthToken}
+                                                                onChange={(e) => setTwilioAuthToken(e.target.value)}
+                                                                placeholder="••••••••••••"
+                                                                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-lime-500"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-slate-600 mb-1">
+                                                                From Number (Twilio phone number)
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={twilioFromNumber}
+                                                                onChange={(e) => setTwilioFromNumber(e.target.value)}
+                                                                placeholder="+1234567890"
+                                                                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-lime-500"
+                                                            />
+                                                            <p className="text-[10px] text-slate-500 mt-1">
+                                                                Get your credentials from twilio.com/console
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Feedback Link */}
+                                        <div className="mt-4 pt-2 border-t border-slate-100">
+                                            <button
+                                                onClick={() => openFeedbackPopup('sendSMS', 'Send SMS')}
+                                                className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                            >
+                                                <MessageSquare size={14} />
+                                                What would you like this node to do?
+                                            </button>
+                                        </div>
+
+                                        <div className="flex gap-2 justify-end mt-6">
+                                            <button
+                                                onClick={() => setConfiguringSMSNodeId(null)}
+                                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveSMSConfig}
+                                                disabled={!smsTo.trim()}
+                                                className="px-4 py-2 bg-lime-600 text-white rounded-lg hover:bg-lime-700 disabled:opacity-50 text-sm font-medium"
+                                            >
+                                                Save
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Data Visualization Configuration Modal */}
+                        {configuringVisualizationNodeId && (() => {
+                            // Get input data from parent node
+                            const parentConnection = connections.find(c => c.toNodeId === configuringVisualizationNodeId);
+                            const parentNode = parentConnection ? nodes.find(n => n.id === parentConnection.fromNodeId) : null;
+                            let inputDataForViz: any[] = [];
+                            
+                            if (parentNode) {
+                                if (parentNode.type === 'splitColumns' && parentNode.outputData) {
+                                    inputDataForViz = parentConnection.outputType === 'B' 
+                                        ? parentNode.outputData.outputB || []
+                                        : parentNode.outputData.outputA || [];
+                                } else {
+                                    inputDataForViz = parentNode.outputData || parentNode.config?.parsedData || [];
+                                }
+                            }
+
+                            const hasInputData = inputDataForViz && Array.isArray(inputDataForViz) && inputDataForViz.length > 0;
+                            const dataFields = hasInputData ? Object.keys(inputDataForViz[0] || {}) : [];
+
+                            return (
+                                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => { setConfiguringVisualizationNodeId(null); setGeneratedWidget(null); }}>
+                                    <div className="bg-white rounded-lg shadow-xl p-6 w-[700px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                            <BarChart3 className="text-indigo-600" size={20} />
+                                            Data Visualization
+                                        </h3>
+                                        
+                                        {/* Data Preview */}
+                                        <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-sm font-medium text-slate-700">Input Data Preview</span>
+                                                {hasInputData && (
+                                                    <span className="text-xs text-slate-500">{inputDataForViz.length} records</span>
+                                                )}
+                                            </div>
+                                            {hasInputData ? (
+                                                <div className="text-xs text-slate-600">
+                                                    <span className="font-medium">Fields:</span> {dataFields.join(', ')}
+                                                    <div className="mt-1 p-2 bg-white rounded border border-slate-200 max-h-20 overflow-auto">
+                                                        <pre className="text-[10px]">{JSON.stringify(inputDataForViz.slice(0, 2), null, 2)}</pre>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-amber-600">
+                                                    ⚠️ No input data available. Run the workflow first to populate data from connected nodes.
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Prompt Input */}
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                Describe the visualization you want
+                                            </label>
+                                            <div className="flex gap-2">
+                                                <textarea
+                                                    value={visualizationPrompt}
+                                                    onChange={(e) => setVisualizationPrompt(e.target.value)}
+                                                    placeholder="e.g., 'Show a bar chart of sales by month' or 'Create a pie chart showing the distribution of categories'"
+                                                    className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                                                    rows={3}
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-slate-500 mt-1">
+                                                Available fields: {dataFields.length > 0 ? dataFields.join(', ') : 'Run workflow to see fields'}
+                                            </p>
+                                        </div>
+
+                                        {/* Generate Button */}
+                                        <div className="mb-4">
+                                            <button
+                                                onClick={generateWidgetFromPrompt}
+                                                disabled={!visualizationPrompt.trim() || !hasInputData || isGeneratingWidget}
+                                                className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center justify-center gap-2"
+                                            >
+                                                {isGeneratingWidget ? (
+                                                    <>
+                                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                        Generating...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Sparkles size={16} />
+                                                        Generate Visualization
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+
+                                        {/* Generated Widget Preview */}
+                                        {generatedWidget && (
+                                            <div className="mb-4 border border-indigo-200 rounded-lg overflow-hidden">
+                                                <div className="bg-indigo-50 px-4 py-2 border-b border-indigo-200">
+                                                    <h4 className="font-medium text-indigo-800">{generatedWidget.title}</h4>
+                                                    <p className="text-xs text-indigo-600">{generatedWidget.description}</p>
+                                                </div>
+                                                <div className="p-4 bg-white">
+                                                    <DynamicChart config={generatedWidget} />
+                                                </div>
+                                                
+                                                {/* Explanation Toggle */}
+                                                {generatedWidget.explanation && (
+                                                    <div className="border-t border-indigo-200">
+                                                        <button
+                                                            onClick={() => setShowWidgetExplanation(!showWidgetExplanation)}
+                                                            className="w-full px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 flex items-center justify-between"
+                                                        >
+                                                            <span>How was this created?</span>
+                                                            <span>{showWidgetExplanation ? '▲' : '▼'}</span>
+                                                        </button>
+                                                        {showWidgetExplanation && (
+                                                            <div className="px-4 pb-4 text-xs text-slate-600 whitespace-pre-wrap">
+                                                                {generatedWidget.explanation}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Feedback Link */}
+                                        <div className="mt-4 pt-2 border-t border-slate-100">
+                                            <button
+                                                onClick={() => openFeedbackPopup('dataVisualization', 'Data Visualization')}
+                                                className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                            >
+                                                <MessageSquare size={14} />
+                                                What would you like this node to do?
+                                            </button>
+                                        </div>
+
+                                        <div className="flex gap-2 justify-end mt-6">
+                                            <button
+                                                onClick={() => { setConfiguringVisualizationNodeId(null); setGeneratedWidget(null); }}
+                                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveVisualizationConfig}
+                                                disabled={!generatedWidget}
+                                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
+                                            >
+                                                Save Visualization
                                             </button>
                                         </div>
                                     </div>

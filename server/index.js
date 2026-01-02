@@ -2071,6 +2071,88 @@ app.post('/api/generate-widget', authenticateToken, async (req, res) => {
     }
 });
 
+// Generate Widget from Direct Data (for Workflow nodes)
+app.post('/api/generate-widget-from-data', authenticateToken, async (req, res) => {
+    console.log('Received widget generation request from workflow data');
+    try {
+        const { prompt, data } = req.body;
+        console.log('Widget Prompt:', prompt);
+        console.log('Data records:', Array.isArray(data) ? data.length : 'not an array');
+
+        if (!process.env.OPENAI_API_KEY) {
+            return res.status(500).json({ error: 'OpenAI API Key not configured' });
+        }
+
+        if (!data || (Array.isArray(data) && data.length === 0)) {
+            return res.status(400).json({ error: 'No data provided for visualization' });
+        }
+
+        // Prepare context with data schema and sample
+        const dataArray = Array.isArray(data) ? data : [data];
+        const sampleData = dataArray.slice(0, 10); // First 10 records as sample
+        const fields = Object.keys(dataArray[0] || {});
+        
+        const dataContext = {
+            totalRecords: dataArray.length,
+            fields: fields,
+            sampleRecords: sampleData,
+            fullData: dataArray.slice(0, 100) // Limit to 100 records for processing
+        };
+
+        // Call OpenAI for Widget Config
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const completion = await openai.chat.completions.create({
+            messages: [
+                {
+                    role: "system",
+                    content: `You are a data visualization expert.
+            You have access to the following data:
+            - Total records: ${dataContext.totalRecords}
+            - Available fields: ${fields.join(', ')}
+            - Sample data: ${JSON.stringify(dataContext.sampleRecords, null, 2)}
+            - Full data (up to 100 records): ${JSON.stringify(dataContext.fullData)}
+            
+            Based on the user's prompt, generate a JSON configuration for a chart.
+            IMPORTANT: You must transform/aggregate the provided data as needed to create meaningful visualizations.
+            
+            The JSON structure MUST be:
+            {
+                "type": "bar" | "line" | "pie" | "area",
+                "title": "Chart Title",
+                "description": "Brief description",
+                "explanation": "A detailed explanation of how this chart was prepared. Structure it as two paragraphs separated by a double newline (\\n\\n). First paragraph: A natural language description of the logic and what the chart shows. Second paragraph: Start with 'Technical approach:' followed by how you processed the data.",
+                "data": [ { "name": "Label", "value": 123, ... } ],
+                "xAxisKey": "name",
+                "dataKey": "value" (or array of keys for multiple lines/areas),
+                "colors": ["#hex", ...] (optional custom colors)
+            }
+            
+            CRITICAL RULES:
+            1. The "data" array should contain the TRANSFORMED/AGGREGATED data ready for charting, NOT the raw input data
+            2. For bar/line/area charts, ensure data has proper labels (xAxisKey) and numeric values (dataKey)
+            3. For pie charts, ensure data has "name" field and a numeric value field
+            4. If the user asks for aggregations (sum, count, average, group by), calculate them
+            5. Ensure the data is aggregated or formatted correctly for the chosen chart type
+            6. Return ONLY the valid JSON string, no markdown formatting.`
+                },
+                { role: "user", content: prompt }
+            ],
+            model: "gpt-4o",
+            response_format: { type: "json_object" }
+        });
+
+        const widgetConfig = JSON.parse(completion.choices[0].message.content);
+        console.log('Generated widget config:', widgetConfig.title);
+        res.json(widgetConfig);
+
+    } catch (error) {
+        console.error('Error generating widget from data:', error);
+        res.status(500).json({ error: error.message || 'Failed to generate widget' });
+    }
+});
+
 // AI Workflow Generation Endpoint
 app.post('/api/generate-workflow', authenticateToken, async (req, res) => {
     console.log('Received workflow generation request');
@@ -3154,6 +3236,42 @@ app.post('/api/email/send', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Email send error:', error);
         res.status(500).json({ error: error.message || 'Failed to send email' });
+    }
+});
+
+// Send SMS Endpoint (using Twilio)
+app.post('/api/sms/send', authenticateToken, async (req, res) => {
+    const { to, body, accountSid, authToken, fromNumber } = req.body;
+
+    if (!to) {
+        return res.status(400).json({ error: 'Recipient phone number is required' });
+    }
+
+    if (!accountSid || !authToken || !fromNumber) {
+        return res.status(400).json({ error: 'Twilio credentials are required (Account SID, Auth Token, and From Number)' });
+    }
+
+    try {
+        const twilio = require('twilio');
+        const client = twilio(accountSid, authToken);
+
+        const message = await client.messages.create({
+            body: body || '',
+            from: fromNumber,
+            to: to
+        });
+
+        console.log('SMS sent:', message.sid);
+        res.json({ 
+            success: true, 
+            messageSid: message.sid,
+            status: message.status,
+            to: message.to,
+            from: message.from
+        });
+    } catch (error) {
+        console.error('SMS send error:', error);
+        res.status(500).json({ error: error.message || 'Failed to send SMS' });
     }
 });
 

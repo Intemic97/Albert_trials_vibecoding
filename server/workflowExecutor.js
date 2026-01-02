@@ -218,6 +218,8 @@ class WorkflowExecutor {
             llm: () => this.handleLLM(node, inputData),
             mysql: () => this.handleMySQL(node, inputData),
             sendEmail: () => this.handleSendEmail(node, inputData),
+            sendSMS: () => this.handleSendSMS(node, inputData),
+            dataVisualization: () => this.handleDataVisualization(node, inputData),
             esios: () => this.handleEsios(node, inputData),
             climatiq: () => this.handleClimatiq(node, inputData),
             splitColumns: () => this.handleSplitColumns(node, inputData),
@@ -602,6 +604,51 @@ class WorkflowExecutor {
         } catch (error) {
             throw new Error(`Failed to send email: ${error.message}`);
         }
+    }
+
+    async handleSendSMS(node, inputData) {
+        const config = node.config || {};
+        const { smsTo, smsBody, twilioAccountSid, twilioAuthToken, twilioFromNumber } = config;
+
+        if (!smsTo || !twilioAccountSid || !twilioAuthToken || !twilioFromNumber) {
+            throw new Error('SMS configuration incomplete. Please provide Twilio credentials and phone numbers.');
+        }
+
+        try {
+            const twilio = require('twilio');
+            const client = twilio(twilioAccountSid, twilioAuthToken);
+
+            const message = await client.messages.create({
+                body: smsBody || '',
+                from: twilioFromNumber,
+                to: smsTo
+            });
+
+            return {
+                success: true,
+                message: `SMS sent to ${smsTo}`,
+                outputData: inputData,
+                messageSid: message.sid,
+                status: message.status
+            };
+        } catch (error) {
+            throw new Error(`Failed to send SMS: ${error.message}`);
+        }
+    }
+
+    async handleDataVisualization(node, inputData) {
+        const config = node.config || {};
+        const { generatedWidget, visualizationPrompt } = config;
+
+        // Data visualization nodes don't transform data, they just display it
+        // The visualization config is pre-generated in the frontend
+        return {
+            success: true,
+            message: generatedWidget ? `Visualization: ${generatedWidget.title}` : 'Visualization node (configure in editor)',
+            outputData: inputData,
+            widget: generatedWidget,
+            prompt: visualizationPrompt
+        };
     }
 
     async handleEsios(node, inputData) {
