@@ -2564,7 +2564,7 @@ app.post('/api/webhook/:workflowId', async (req, res) => {
 
         // Execute workflow with webhook data as input
         const executor = new WorkflowExecutor(db);
-        const result = await executor.executeWorkflow(workflowId, { _webhookData: webhookData });
+        const result = await executor.executeWorkflow(workflowId, { _webhookData: webhookData }, workflow.organizationId);
 
         res.json({
             success: true,
@@ -2603,7 +2603,7 @@ app.post('/api/webhook/:workflowId/:token', async (req, res) => {
 
         // Execute workflow with webhook data
         const executor = new WorkflowExecutor(db);
-        const result = await executor.executeWorkflow(workflowId, { _webhookData: webhookData });
+        const result = await executor.executeWorkflow(workflowId, { _webhookData: webhookData }, workflow.organizationId);
 
         res.json({
             success: true,
@@ -2712,8 +2712,14 @@ app.post('/api/workflow/:id/run-public', async (req, res) => {
 
         console.log(`[WorkflowExecutor] Public execution started for workflow ${id}`);
 
+        // Get workflow to retrieve organizationId
+        const workflow = await db.get('SELECT * FROM workflows WHERE id = ?', [id]);
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+
         const executor = new WorkflowExecutor(db);
-        const result = await executor.executeWorkflow(id, inputs || {});
+        const result = await executor.executeWorkflow(id, inputs || {}, workflow.organizationId);
 
         res.json({
             success: true,

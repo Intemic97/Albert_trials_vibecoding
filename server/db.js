@@ -425,6 +425,59 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  // Migration: Add inputs column to workflow_executions table
+  try {
+    await db.exec(`ALTER TABLE workflow_executions ADD COLUMN inputs TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add triggerType column to workflow_executions table if missing
+  try {
+    await db.exec(`ALTER TABLE workflow_executions ADD COLUMN triggerType TEXT DEFAULT 'manual'`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migration: Recreate workflow_executions table to remove userId column if it exists
+  try {
+    // Check if userId column exists
+    const tableInfo = await db.all(`PRAGMA table_info(workflow_executions)`);
+    const hasUserId = tableInfo.some(col => col.name === 'userId');
+    
+    if (hasUserId) {
+      console.log('[Migration] Dropping and recreating workflow_executions table...');
+      
+      // Simply drop and recreate the table (data loss acceptable in development)
+      await db.exec(`DROP TABLE IF EXISTS workflow_executions;`);
+      
+      await db.exec(`
+        CREATE TABLE workflow_executions (
+          id TEXT PRIMARY KEY,
+          workflowId TEXT NOT NULL,
+          organizationId TEXT,
+          status TEXT DEFAULT 'pending',
+          triggerType TEXT DEFAULT 'manual',
+          inputs TEXT,
+          currentNodeId TEXT,
+          nodeResults TEXT,
+          finalOutput TEXT,
+          error TEXT,
+          createdAt TEXT,
+          startedAt TEXT,
+          completedAt TEXT,
+          FOREIGN KEY(workflowId) REFERENCES workflows(id) ON DELETE CASCADE,
+          FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+        );
+      `);
+      
+      console.log('[Migration] workflow_executions table recreated successfully');
+    }
+  } catch (e) {
+    console.error('[Migration] Error recreating workflow_executions:', e.message);
+    // If migration fails, continue anyway
+  }
+
   return db;
 }
 

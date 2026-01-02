@@ -1978,7 +1978,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             });
             if (res.ok) {
                 const data = await res.json();
-                setExecutionHistory(data);
+                // Parse JSON strings for inputs and nodeResults
+                const parsedData = data.map((exec: any) => ({
+                    ...exec,
+                    inputs: exec.inputs ? (typeof exec.inputs === 'string' ? JSON.parse(exec.inputs) : exec.inputs) : null,
+                    nodeResults: exec.nodeResults ? (typeof exec.nodeResults === 'string' ? JSON.parse(exec.nodeResults) : exec.nodeResults) : null
+                }));
+                setExecutionHistory(parsedData);
             }
         } catch (error) {
             console.error('Failed to load execution history:', error);
@@ -2924,32 +2930,69 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (isRunning) return;
         setIsRunning(true);
 
-        // Reset all nodes to idle (and clear join node inputs)
-        setNodes(prev => prev.map(n => ({ 
-            ...n, 
-            status: 'idle' as const, 
-            executionResult: undefined,
-            inputDataA: undefined,
-            inputDataB: undefined
-        })));
+        try {
+            // Save workflow before executing to ensure execution history has latest version
+            await saveWorkflow();
 
-        // Find trigger nodes (nodes with no incoming connections)
-        const triggerNodes = nodes.filter(node =>
-            !connections.some(conn => conn.toNodeId === node.id)
-        );
+            // Reset all nodes to idle (and clear join node inputs)
+            setNodes(prev => prev.map(n => ({ 
+                ...n, 
+                status: 'idle' as const, 
+                executionResult: undefined,
+                inputDataA: undefined,
+                inputDataB: undefined
+            })));
 
-        if (triggerNodes.length === 0) {
-            alert('No trigger nodes found! Add a node without incoming connections.');
+            // Call backend to execute workflow and create execution record (in background)
+            fetch(`${API_BASE}/workflow/${currentWorkflowId}/execute`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ inputs: {} })
+            }).catch(err => {
+                console.error('Background execution error:', err);
+            });
+
+            // Execute locally in frontend for visual feedback
+            // Find trigger nodes (nodes with no incoming connections)
+            const triggerNodes = nodes.filter(node =>
+                !connections.some(conn => conn.toNodeId === node.id)
+            );
+
+            if (triggerNodes.length === 0) {
+                showToast('No trigger nodes found! Add a node without incoming connections.', 'error');
+                setIsRunning(false);
+                return;
+            }
+
+            // Execute all trigger nodes
+            for (const trigger of triggerNodes) {
+                await executeNode(trigger.id);
+            }
+
+            // Check if any nodes failed after execution
+            // Wait a bit for state to update
+            setTimeout(() => {
+                setNodes(currentNodes => {
+                    const hasErrors = currentNodes.some(n => n.status === 'error');
+                    const hasCompleted = currentNodes.some(n => n.status === 'completed');
+                    
+                    if (hasErrors) {
+                        showToast('There are configuration errors in some nodes, check the execution history for details', 'error');
+                    } else if (hasCompleted) {
+                        showToast('Workflow executed successfully!', 'success');
+                    }
+                    
+                    return currentNodes; // Return unchanged
+                });
+            }, 500);
+
+        } catch (error) {
+            console.error('Error executing workflow:', error);
+            showToast(`Failed to execute workflow: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+        } finally {
             setIsRunning(false);
-            return;
         }
-
-        // Execute all trigger nodes
-        for (const trigger of triggerNodes) {
-            await executeNode(trigger.id);
-        }
-
-        setIsRunning(false);
     };
 
     const handleRunNode = async (nodeId: string) => {
@@ -7355,10 +7398,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 <div className="space-y-2">
                                                     {Object.entries(selectedExecution.nodeResults).map(([nodeId, result]: [string, any]) => {
                                                         const node = nodes.find(n => n.id === nodeId);
+                                                        // Try to get node label from multiple sources
+                                                        const nodeLabel = node?.label || result.nodeLabel || result.label || `Node ${nodeId.substring(0, 8)}`;
+                                                        const nodeType = node?.type || result.nodeType || '';
+                                                        
                                                         return (
                                                             <div key={nodeId} className="bg-white p-3 rounded border border-green-100">
                                                                 <div className="flex items-center gap-2 mb-1">
-                                                                    <span className="font-medium text-slate-700">{node?.label || nodeId}</span>
+                                                                    <span className="font-medium text-slate-700">{nodeLabel}</span>
+                                                                    {nodeType && <span className="text-xs text-slate-400">({nodeType})</span>}
                                                                     {result.success && <Check size={14} className="text-green-500" />}
                                                                 </div>
                                                                 {result.message && (
