@@ -5689,6 +5689,47 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             Data Visualization
                                         </h3>
                                         
+                                        {/* Data Preview */}
+                                        {hasInputData && (
+                                            <div className="mb-4 border border-slate-200 rounded-lg overflow-hidden">
+                                                <div className="bg-slate-50 px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+                                                    <span className="text-xs font-medium text-slate-600">
+                                                        📊 Available Data ({inputDataForViz.length} rows, {dataFields.length} columns)
+                                                    </span>
+                                                    <span className="text-xs text-slate-400">Preview</span>
+                                                </div>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-xs">
+                                                        <thead className="bg-slate-100">
+                                                            <tr>
+                                                                {dataFields.map((field, idx) => (
+                                                                    <th key={idx} className="px-3 py-2 text-left font-semibold text-slate-700 whitespace-nowrap border-b border-slate-200">
+                                                                        {field}
+                                                                    </th>
+                                                                ))}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {inputDataForViz.slice(0, 4).map((row: any, rowIdx: number) => (
+                                                                <tr key={rowIdx} className="border-b border-slate-100 hover:bg-slate-50">
+                                                                    {dataFields.map((field, colIdx) => (
+                                                                        <td key={colIdx} className="px-3 py-1.5 text-slate-600 whitespace-nowrap max-w-[120px] truncate">
+                                                                            {row[field] !== undefined && row[field] !== null ? String(row[field]) : '-'}
+                                                                        </td>
+                                                                    ))}
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                {inputDataForViz.length > 4 && (
+                                                    <div className="px-3 py-1.5 bg-slate-50 text-xs text-slate-500 text-center border-t border-slate-200">
+                                                        ... and {inputDataForViz.length - 4} more rows
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {/* Prompt Input with Generate Button */}
                                         <div className="mb-4">
                                             <div className="flex items-center justify-between mb-2">
