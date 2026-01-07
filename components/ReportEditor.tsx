@@ -5,7 +5,7 @@ import {
     ChevronRight, ChevronDown, ChevronLeft, Loader2, X, File, Trash2, CheckCircle2, Circle,
     Save, AlertCircle, User, Calendar, MessageSquare, MoreVertical,
     Edit3, CheckCheck, CornerDownRight, Plus, GripVertical, Clipboard,
-    FlaskConical, Wrench, AlertTriangle, Bot, PanelRightClose, PanelRightOpen
+    FlaskConical, Wrench, AlertTriangle, Bot, PanelRightClose, PanelRightOpen, Download
 } from 'lucide-react';
 import { Entity } from '../types';
 import { PromptInput } from './PromptInput';
@@ -1167,6 +1167,68 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                         <div className="flex gap-6 h-full">
                             {/* Main Content - All Sections */}
                             <div className="flex-1 overflow-y-auto space-y-6" id="preview-scroll-container">
+                                {/* Export Button */}
+                                <div className="max-w-4xl mx-auto flex justify-end">
+                                    <button
+                                        onClick={() => {
+                                            // Create a printable version
+                                            const printContent = document.getElementById('preview-scroll-container');
+                                            if (!printContent) return;
+                                            
+                                            const printWindow = window.open('', '_blank');
+                                            if (!printWindow) return;
+                                            
+                                            printWindow.document.write(`
+                                                <!DOCTYPE html>
+                                                <html>
+                                                <head>
+                                                    <title>${report?.name || 'Report'}</title>
+                                                    <style>
+                                                        body { 
+                                                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                                                            padding: 40px;
+                                                            max-width: 800px;
+                                                            margin: 0 auto;
+                                                            color: #1e293b;
+                                                        }
+                                                        h1 { font-size: 24px; margin-bottom: 8px; }
+                                                        h2 { font-size: 18px; margin-top: 32px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }
+                                                        p { line-height: 1.6; margin-bottom: 12px; }
+                                                        .section { margin-bottom: 24px; page-break-inside: avoid; }
+                                                        .header { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 2px solid #0d9488; }
+                                                        .meta { color: #64748b; font-size: 14px; }
+                                                        @media print {
+                                                            body { padding: 20px; }
+                                                        }
+                                                    </style>
+                                                </head>
+                                                <body>
+                                                    <div class="header">
+                                                        <h1>${report?.name || 'Report'}</h1>
+                                                        <p class="meta">${report?.trail || ''} • Created by ${report?.createdByName || 'Unknown'}</p>
+                                                    </div>
+                                                    ${parentSections.map(parentSection => {
+                                                        const subsections = getSubsections(parentSection.id);
+                                                        const allSections = [parentSection, ...subsections];
+                                                        return allSections.map(section => `
+                                                            <div class="section">
+                                                                <h2>${section.title}</h2>
+                                                                ${section.generatedContent ? `<p>${section.generatedContent.replace(/\n/g, '</p><p>')}</p>` : '<p style="color: #94a3b8; font-style: italic;">No content generated</p>'}
+                                                            </div>
+                                                        `).join('');
+                                                    }).join('')}
+                                                </body>
+                                                </html>
+                                            `);
+                                            printWindow.document.close();
+                                            printWindow.print();
+                                        }}
+                                        className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
+                                    >
+                                        <Download size={16} />
+                                        Export as PDF
+                                    </button>
+                                </div>
                                 <div className="max-w-4xl mx-auto space-y-8">
                                     {parentSections.map((parentSection) => {
                                         const subsections = getSubsections(parentSection.id);
