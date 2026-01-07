@@ -425,6 +425,43 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  // Migration: Add company info columns to organizations table
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN industry TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN employees TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN website TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN linkedinUrl TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN headquarters TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN foundingYear TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN overview TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   // Migration: Add inputs column to workflow_executions table
   try {
     await db.exec(`ALTER TABLE workflow_executions ADD COLUMN inputs TEXT`);

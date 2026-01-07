@@ -578,6 +578,48 @@ app.post('/api/organizations', authenticateToken, async (req, res) => {
 app.put('/api/profile', authenticateToken, updateProfile);
 app.post('/api/auth/onboarding', authenticateToken, completeOnboarding);
 
+// Company information endpoints
+app.get('/api/company', authenticateToken, async (req, res) => {
+    try {
+        const org = await db.get(
+            'SELECT name, industry, employees, website, linkedinUrl, headquarters, foundingYear, overview FROM organizations WHERE id = ?',
+            [req.user.orgId]
+        );
+        if (!org) {
+            return res.status(404).json({ error: 'Organization not found' });
+        }
+        res.json(org);
+    } catch (error) {
+        console.error('Get company info error:', error);
+        res.status(500).json({ error: 'Failed to get company information' });
+    }
+});
+
+app.put('/api/company', authenticateToken, async (req, res) => {
+    const { name, industry, employees, website, linkedinUrl, headquarters, foundingYear, overview } = req.body;
+    
+    try {
+        await db.run(
+            `UPDATE organizations SET 
+                name = COALESCE(?, name),
+                industry = ?,
+                employees = ?,
+                website = ?,
+                linkedinUrl = ?,
+                headquarters = ?,
+                foundingYear = ?,
+                overview = ?
+            WHERE id = ?`,
+            [name, industry, employees, website, linkedinUrl, headquarters, foundingYear, overview, req.user.orgId]
+        );
+        
+        res.json({ message: 'Company information updated successfully' });
+    } catch (error) {
+        console.error('Update company info error:', error);
+        res.status(500).json({ error: 'Failed to update company information' });
+    }
+});
+
 // Admin Routes - Platform-wide admin panel
 app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
     try {

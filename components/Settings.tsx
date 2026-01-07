@@ -528,7 +528,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                         </div>
                                         <div>
                                             <h3 className="font-medium text-slate-800">Company Profile</h3>
-                                            <p className="text-sm text-slate-500">Update your organization details</p>
+                                            <p className="text-sm text-slate-500">Update your organization details. You can use them in Reports for faster document generation</p>
                                         </div>
                                     </div>
                                     <button
