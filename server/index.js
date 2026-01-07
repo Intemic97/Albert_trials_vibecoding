@@ -1510,6 +1510,169 @@ app.delete('/api/records/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// ==================== DATABASE ASSISTANT ENDPOINT ====================
+
+// Database Assistant - Answer questions about the database using AI
+app.post('/api/database/ask', authenticateToken, async (req, res) => {
+    console.log('[Database Assistant] Received question');
+    try {
+        const { question, conversationHistory } = req.body;
+        const orgId = req.user.orgId;
+
+        if (!question) {
+            return res.status(400).json({ error: 'Question is required' });
+        }
+
+        if (!process.env.OPENAI_API_KEY) {
+            return res.status(500).json({ error: 'OpenAI API Key not configured' });
+        }
+
+        // Fetch all entities and their data for this organization
+        const entities = await db.all('SELECT * FROM entities WHERE organizationId = ?', [orgId]);
+        
+        const databaseContext = {};
+        
+        for (const entity of entities) {
+            const properties = await db.all('SELECT * FROM properties WHERE entityId = ?', [entity.id]);
+            const records = await db.all('SELECT * FROM records WHERE entityId = ?', [entity.id]);
+            
+            const recordsWithValues = await Promise.all(records.map(async (record) => {
+                const values = await db.all('SELECT * FROM record_values WHERE recordId = ?', [record.id]);
+                const valuesMap = {};
+                
+                for (const v of values) {
+                    const prop = properties.find(p => p.id === v.propertyId);
+                    const key = prop ? prop.name : v.propertyId;
+                    
+                    // Handle relation values - resolve to display names
+                    if (prop && prop.type === 'relation' && prop.relatedEntityId && v.value) {
+                        try {
+                            const ids = JSON.parse(v.value);
+                            if (Array.isArray(ids) && ids.length > 0) {
+                                const relatedEntity = entities.find(e => e.id === prop.relatedEntityId);
+                                if (relatedEntity) {
+                                    const relatedProps = await db.all('SELECT * FROM properties WHERE entityId = ?', [prop.relatedEntityId]);
+                                    const names = [];
+                                    for (const id of ids) {
+                                        const relatedValues = await db.all('SELECT * FROM record_values WHERE recordId = ?', [id]);
+                                        const nameProp = relatedProps.find(p => p.name.toLowerCase() === 'name' || p.name.toLowerCase() === 'title');
+                                        if (nameProp) {
+                                            const nameVal = relatedValues.find(rv => rv.propertyId === nameProp.id);
+                                            if (nameVal) names.push(nameVal.value);
+                                        }
+                                    }
+                                    valuesMap[key] = names.length > 0 ? names.join(', ') : v.value;
+                                } else {
+                                    valuesMap[key] = v.value;
+                                }
+                            } else {
+                                valuesMap[key] = v.value;
+                            }
+                        } catch {
+                            valuesMap[key] = v.value;
+                        }
+                    } else {
+                        valuesMap[key] = v.value;
+                    }
+                }
+                
+                return valuesMap;
+            }));
+            
+            databaseContext[entity.name] = {
+                description: entity.description,
+                properties: properties.map(p => ({
+                    name: p.name,
+                    type: p.type,
+                    relatedTo: p.relatedEntityId ? entities.find(e => e.id === p.relatedEntityId)?.name : null
+                })),
+                recordCount: records.length,
+                records: recordsWithValues.slice(0, 50) // Limit to prevent token overflow
+            };
+        }
+
+        // Build conversation for OpenAI
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const systemPrompt = `You are a helpful database assistant for Intemic platform. You have access to the user's database and can answer questions about their data.
+
+DATABASE SCHEMA AND DATA:
+${JSON.stringify(databaseContext, null, 2)}
+
+INSTRUCTIONS:
+1. Answer questions about the data clearly and concisely
+2. When counting records, be precise
+3. When asked to find specific data, search through the records
+4. Explain relationships between entities when relevant
+5. If asked about something not in the database, say so politely
+6. Format numbers and lists nicely for readability
+7. If the question is ambiguous, ask for clarification
+8. You can perform calculations, aggregations, and comparisons on the data
+9. Always be helpful and provide context about where the data comes from
+
+RESPONSE FORMAT:
+You must respond in valid JSON format with the following structure:
+{
+  "answer": "Your conversational answer here. Be informative, use bullet points for lists, mention entity/table names when referencing data.",
+  "explanation": "A brief explanation of how you prepared this response. Mention which entities you analyzed, what data you looked at, and your reasoning process. Example: 'I analyzed the @Customers entity (45 records) and counted all entries. I also checked the @Orders entity to understand relationships.'",
+  "entitiesUsed": ["EntityName1", "EntityName2"]
+}
+
+IMPORTANT:
+- The "answer" should be conversational but informative
+- The "explanation" should describe your analysis process in 1-2 sentences
+- Use @EntityName format when mentioning entities in the explanation
+- "entitiesUsed" should list all entity names you analyzed to answer the question
+- Always respond with valid JSON only, no additional text`;
+
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            ...(conversationHistory || []).map(m => ({
+                role: m.role,
+                content: m.content
+            })),
+            { role: 'user', content: question }
+        ];
+
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages,
+            temperature: 0.3,
+            max_tokens: 1500,
+            response_format: { type: "json_object" }
+        });
+
+        const responseText = completion.choices[0]?.message?.content || '{}';
+        let parsedResponse;
+        
+        try {
+            parsedResponse = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('[Database Assistant] Failed to parse JSON response:', parseError);
+            parsedResponse = {
+                answer: responseText,
+                explanation: 'I analyzed your database to answer this question.',
+                entitiesUsed: Object.keys(databaseContext)
+            };
+        }
+
+        console.log('[Database Assistant] Response generated');
+
+        res.json({ 
+            answer: parsedResponse.answer || 'I could not generate a response.',
+            explanation: parsedResponse.explanation || 'I analyzed your database entities to prepare this response.',
+            entitiesUsed: parsedResponse.entitiesUsed || Object.keys(databaseContext),
+            entitiesAnalyzed: Object.keys(databaseContext).length,
+            totalRecords: Object.values(databaseContext).reduce((sum, e) => sum + e.recordCount, 0)
+        });
+
+    } catch (error) {
+        console.error('[Database Assistant] Error:', error);
+        res.status(500).json({ error: 'Failed to process your question. Please try again.' });
+    }
+});
+
 // OpenAI Generation Endpoint
 app.post('/api/generate', authenticateToken, async (req, res) => {
     console.log('Received generation request');

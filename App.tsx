@@ -20,7 +20,8 @@ import { AdminPanel } from './components/AdminPanel';
 import { OnboardingModal } from './components/OnboardingModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Entity, Property, PropertyType } from './types';
-import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X, Code, Paperclip, Download, Loader2 } from 'lucide-react';
+import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X, Code, Paperclip, Download, Loader2, Sparkles } from 'lucide-react';
+import { DatabaseAssistant, AskButton } from './components/DatabaseAssistant';
 import { ProfileMenu } from './components/ProfileMenu';
 import { API_BASE } from './config';
 
@@ -136,6 +137,9 @@ function AuthenticatedApp() {
 
     // File Upload State
     const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
+
+    // Database Assistant State
+    const [showDatabaseAssistant, setShowDatabaseAssistant] = useState(false);
 
     const activeEntity = entities.find(e => e.id === activeEntityId);
 
@@ -947,6 +951,17 @@ function AuthenticatedApp() {
                                                     <span className="font-medium">Create new entity</span>
                                                 </div>
                                             </div>
+
+                                                {/* Ask Button - Only show in list view */}
+                                                {!showDatabaseAssistant && (
+                                                    <AskButton onClick={() => setShowDatabaseAssistant(true)} />
+                                                )}
+                                                
+                                                {/* Database Assistant */}
+                                                <DatabaseAssistant 
+                                                    isOpen={showDatabaseAssistant} 
+                                                    onClose={() => setShowDatabaseAssistant(false)} 
+                                                />
                                 </div>
                             )}
 
