@@ -5602,66 +5602,42 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             Data Visualization
                                         </h3>
                                         
-                                        {/* Data Preview */}
-                                        <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                        {/* Prompt Input with Generate Button */}
+                                        <div className="mb-4">
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="text-sm font-medium text-slate-700">Input Data Preview</span>
-                                                {hasInputData && (
-                                                    <span className="text-xs text-slate-500">{inputDataForViz.length} records</span>
-                                                )}
+                                                <label className="text-sm font-medium text-slate-700">
+                                                    Describe the visualization you want
+                                                </label>
+                                                <button
+                                                    onClick={generateWidgetFromPrompt}
+                                                    disabled={!visualizationPrompt.trim() || !hasInputData || isGeneratingWidget}
+                                                    className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2"
+                                                >
+                                                    {isGeneratingWidget ? (
+                                                        <>
+                                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                            Generating...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Sparkles size={14} />
+                                                            Generate
+                                                        </>
+                                                    )}
+                                                </button>
                                             </div>
-                                            {hasInputData ? (
-                                                <div className="text-xs text-slate-600">
-                                                    <span className="font-medium">Fields:</span> {dataFields.join(', ')}
-                                                    <div className="mt-1 p-2 bg-white rounded border border-slate-200 max-h-20 overflow-auto">
-                                                        <pre className="text-[10px]">{JSON.stringify(inputDataForViz.slice(0, 2), null, 2)}</pre>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <p className="text-xs text-amber-600">
-                                                    ⚠️ No input data available. Run the workflow first to populate data from connected nodes.
+                                            <textarea
+                                                value={visualizationPrompt}
+                                                onChange={(e) => setVisualizationPrompt(e.target.value)}
+                                                placeholder="e.g., 'Show a bar chart of sales by month' or 'Create a pie chart showing the distribution of categories'"
+                                                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                                                rows={3}
+                                            />
+                                            {!hasInputData && (
+                                                <p className="text-xs text-amber-600 mt-1">
+                                                    ⚠️ No input data available. Run the workflow first.
                                                 </p>
                                             )}
-                                        </div>
-
-                                        {/* Prompt Input */}
-                                        <div className="mb-4">
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">
-                                                Describe the visualization you want
-                                            </label>
-                                            <div className="flex gap-2">
-                                                <textarea
-                                                    value={visualizationPrompt}
-                                                    onChange={(e) => setVisualizationPrompt(e.target.value)}
-                                                    placeholder="e.g., 'Show a bar chart of sales by month' or 'Create a pie chart showing the distribution of categories'"
-                                                    className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                                                    rows={3}
-                                                />
-                                            </div>
-                                            <p className="text-[10px] text-slate-500 mt-1">
-                                                Available fields: {dataFields.length > 0 ? dataFields.join(', ') : 'Run workflow to see fields'}
-                                            </p>
-                                        </div>
-
-                                        {/* Generate Button */}
-                                        <div className="mb-4">
-                                            <button
-                                                onClick={generateWidgetFromPrompt}
-                                                disabled={!visualizationPrompt.trim() || !hasInputData || isGeneratingWidget}
-                                                className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center justify-center gap-2"
-                                            >
-                                                {isGeneratingWidget ? (
-                                                    <>
-                                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                                        Generating...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Sparkles size={16} />
-                                                        Generate Visualization
-                                                    </>
-                                                )}
-                                            </button>
                                         </div>
 
                                         {/* Generated Widget Preview */}
@@ -7865,16 +7841,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             </div>
                         </div>
 
-                        <div className="bg-slate-50 rounded-lg p-3 mb-5">
-                            <p className="text-sm text-slate-600">
-                                <span className="font-medium">Workflow:</span> {workflowName || 'Untitled Workflow'}
-                            </p>
-                            <p className="text-xs text-slate-500 mt-1">
-                                {nodes.length} node{nodes.length !== 1 ? 's' : ''} • {connections.length} connection{connections.length !== 1 ? 's' : ''}
-                            </p>
-                        </div>
-
-                        <div className="flex gap-2 justify-end">
+                        <div className="flex gap-2 justify-end mt-5">
                             <button
                                 onClick={() => setShowExitConfirmation(false)}
                                 className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700"

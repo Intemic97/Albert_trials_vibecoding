@@ -7,6 +7,15 @@ const { openDb } = require('./db');
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const SALT_ROUNDS = 10;
 
+// Cookie configuration based on environment
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const COOKIE_OPTIONS = {
+    httpOnly: true,
+    secure: IS_PRODUCTION, // true in production (HTTPS), false in development
+    sameSite: IS_PRODUCTION ? 'none' : 'lax', // 'none' needed for cross-site cookies with HTTPS
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+};
+
 // Initialize Resend - API key should be in environment variable
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -165,12 +174,7 @@ async function login(req, res) {
 
         const token = jwt.sign({ sub: user.id, email: user.email, orgId: userOrg.organizationId, isAdmin: !!user.isAdmin }, JWT_SECRET, { expiresIn: '24h' });
 
-        res.cookie('auth_token', token, {
-            httpOnly: true,
-            secure: false, // Set to true when using HTTPS
-            sameSite: 'lax',
-            maxAge: 24 * 60 * 60 * 1000 // 24 hours
-        });
+        res.cookie('auth_token', token, COOKIE_OPTIONS);
 
         res.json({ message: 'Logged in', user: { id: user.id, name: user.name, email: user.email, orgId: userOrg.organizationId, profilePhoto: user.profilePhoto, companyRole: user.companyRole, isAdmin: !!user.isAdmin, onboardingCompleted: !!user.onboardingCompleted } });
 
@@ -181,7 +185,11 @@ async function login(req, res) {
 }
 
 function logout(req, res) {
-    res.clearCookie('auth_token');
+    res.clearCookie('auth_token', {
+        httpOnly: true,
+        secure: IS_PRODUCTION,
+        sameSite: IS_PRODUCTION ? 'none' : 'lax'
+    });
     res.json({ message: 'Logged out' });
 }
 
@@ -257,12 +265,7 @@ async function switchOrganization(req, res) {
         // Generate new token with updated orgId
         const token = jwt.sign({ sub: userId, email: req.user.email, orgId }, JWT_SECRET, { expiresIn: '24h' });
 
-        res.cookie('auth_token', token, {
-            httpOnly: true,
-            secure: false, // Set to true when using HTTPS
-            sameSite: 'lax',
-            maxAge: 24 * 60 * 60 * 1000 // 24 hours
-        });
+        res.cookie('auth_token', token, COOKIE_OPTIONS);
 
         res.json({ message: 'Switched organization', orgId });
 
@@ -697,12 +700,7 @@ async function registerWithInvitation(req, res) {
             { expiresIn: '24h' }
         );
 
-        res.cookie('auth_token', token_jwt, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 24 * 60 * 60 * 1000
-        });
+        res.cookie('auth_token', token_jwt, COOKIE_OPTIONS);
 
         console.log(`[Auth] User ${email} registered via invitation and joined org ${invitation.organizationId}`);
 
