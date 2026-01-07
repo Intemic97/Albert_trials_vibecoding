@@ -6,7 +6,7 @@ import {
   Workflow,
   Settings,
   FileText,
-  Cpu,
+  Home,
   Layers,
   ChevronRight
 } from 'lucide-react';
@@ -89,13 +89,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <nav className="px-2">
           <SectionLabel label="Company" />
-          <NavItem icon={LayoutDashboard} label="Overview" view="overview" active={activeView === 'overview'} />
+          <NavItem icon={Home} label="Overview" view="overview" active={activeView === 'overview'} />
           <NavItem icon={LayoutDashboard} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
 
           <SectionLabel label="Modeling" />
           <NavItem icon={Workflow} label="Workflows" view="workflows" active={activeView === 'workflows'} />
           <NavItem icon={Database} label="Database" view="database" active={activeView === 'database'} />
-          <NavItem icon={Cpu} label="Reports" view="reports" active={activeView === 'reports'} />
+          <NavItem icon={FileText} label="Reports" view="reports" active={activeView === 'reports'} />
 
         </nav>
       </div>

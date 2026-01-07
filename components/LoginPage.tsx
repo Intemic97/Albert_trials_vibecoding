@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { User, Building2, Mail, Lock, ArrowRight, Loader2, CheckCircle, RefreshCw } from 'lucide-react';
+import { Mail, Loader2, CheckCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { API_BASE } from '../config';
 
 export function LoginPage() {
@@ -13,6 +13,7 @@ export function LoginPage() {
     const [verificationEmail, setVerificationEmail] = useState('');
     const [isResending, setIsResending] = useState(false);
     const [resendSuccess, setResendSuccess] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const [formData, setFormData] = useState({
         email: '',
@@ -99,34 +100,34 @@ export function LoginPage() {
     // Show verification message screen
     if (showVerificationMessage) {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+            <div className="min-h-screen bg-[#dde1e7] flex items-center justify-center p-4">
                 <div className="w-full max-w-md">
-                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
+                    <div className="bg-white rounded-xl p-8 shadow-sm">
                         <div className="flex items-center justify-center mx-auto mb-6">
-                            <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center">
-                                <Mail className="w-8 h-8 text-emerald-400" />
+                            <div className="w-16 h-16 bg-[#1e3a5f]/10 rounded-full flex items-center justify-center">
+                                <Mail className="w-8 h-8 text-[#1e3a5f]" />
                             </div>
                         </div>
                         
-                        <h1 className="text-2xl font-bold text-white mb-2">Check your email</h1>
-                        <p className="text-slate-400 mb-6">
+                        <h1 className="text-2xl font-semibold text-gray-900 text-center mb-2">Check your email</h1>
+                        <p className="text-gray-500 text-center mb-6">
                             We've sent a verification link to<br />
-                            <span className="text-white font-medium">{verificationEmail}</span>
+                            <span className="text-gray-900 font-medium">{verificationEmail}</span>
                         </p>
                         
-                        <p className="text-sm text-slate-500 mb-6">
+                        <p className="text-sm text-gray-400 text-center mb-6">
                             Click the link in the email to verify your account and start using Intemic.
                         </p>
 
                         {resendSuccess && (
-                            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-sm text-emerald-400 mb-4 flex items-center gap-2 justify-center">
+                            <div className="p-3 bg-[#1e3a5f]/10 border border-[#1e3a5f]/20 rounded-lg text-sm text-[#1e3a5f] mb-4 flex items-center gap-2 justify-center">
                                 <CheckCircle className="w-4 h-4" />
                                 Verification email sent!
                             </div>
                         )}
 
                         {error && (
-                            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400 mb-4">
+                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 mb-4">
                                 {error}
                             </div>
                         )}
@@ -134,7 +135,7 @@ export function LoginPage() {
                         <button
                             onClick={handleResendVerification}
                             disabled={isResending}
-                            className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+                            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mb-4"
                         >
                             {isResending ? (
                                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -153,7 +154,7 @@ export function LoginPage() {
                                 setError('');
                                 setResendSuccess(false);
                             }}
-                            className="text-sm text-slate-400 hover:text-white transition-colors"
+                            className="w-full text-sm text-[#1e3a5f] hover:text-[#2d4a6f] transition-colors"
                         >
                             Back to login
                         </button>
@@ -164,103 +165,105 @@ export function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-[#dde1e7] flex items-center justify-center p-4">
             <div className="w-full max-w-md">
-                <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl">
-                    <div className="text-center mb-8">
-                        <div className="flex items-center justify-center mx-auto mb-4">
-                            <img
-                                src="/logo.png"
-                                alt="Intemic"
-                                className="h-10 w-auto object-contain"
-                            />
-                        </div>
-                        <h1 className="text-2xl font-bold text-white mb-2">
-                            {isLogin ? 'Welcome back' : 'Create an organization'}
+                <div className="bg-white rounded-xl p-8 shadow-sm">
+                    {/* Logo */}
+                    <div className="mb-8">
+                        <img
+                            src="/logo.png"
+                            alt="Intemic"
+                            className="h-8 w-auto object-contain"
+                        />
+                    </div>
+
+                    {/* Title */}
+                    <div className="mb-6">
+                        <h1 className="text-xl font-semibold text-gray-900 mb-1">
+                            {isLogin ? 'Sign in to your account' : 'Create your account'}
                         </h1>
-                        <p className="text-slate-400">
-                            {isLogin
-                                ? 'Enter your credentials to access your workspace'
-                                : 'Get started with your own secure workspace'}
+                        <p className="text-sm text-[#1e3a5f]">
+                            {isLogin ? (
+                                <>Don't have an account? <button onClick={() => setIsLogin(false)} className="font-medium hover:underline">Sign up</button></>
+                            ) : (
+                                <>Already have an account? <button onClick={() => setIsLogin(true)} className="font-medium hover:underline">Sign in</button></>
+                            )}
                         </p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    <form onSubmit={handleSubmit} className="space-y-5">
                         {!isLogin && (
                             <>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-slate-300">Full Name</label>
-                                    <div className="relative">
-                                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                                        <input
-                                            type="text"
-                                            required
-                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                                            placeholder="John Doe"
-                                            value={formData.name}
-                                            onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                        />
-                                    </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        className="w-full bg-white border border-gray-200 rounded-lg py-2.5 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
+                                        placeholder="John Doe"
+                                        value={formData.name}
+                                        onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                    />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-slate-300">Organization Name</label>
-                                    <div className="relative">
-                                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                                        <input
-                                            type="text"
-                                            required
-                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                                            placeholder="Acme Inc."
-                                            value={formData.orgName}
-                                            onChange={e => setFormData({ ...formData, orgName: e.target.value })}
-                                        />
-                                    </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Organization Name</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        className="w-full bg-white border border-gray-200 rounded-lg py-2.5 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
+                                        placeholder="Acme Inc."
+                                        value={formData.orgName}
+                                        onChange={e => setFormData({ ...formData, orgName: e.target.value })}
+                                    />
                                 </div>
                             </>
                         )}
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300">Email Address</label>
-                            <div className="relative">
-                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                                <input
-                                    type="email"
-                                    required
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                                    placeholder="name@company.com"
-                                    value={formData.email}
-                                    onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                />
-                            </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+                            <input
+                                type="email"
+                                required
+                                className="w-full bg-white border border-gray-200 rounded-lg py-2.5 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
+                                placeholder="name@company.com"
+                                value={formData.email}
+                                onChange={e => setFormData({ ...formData, email: e.target.value })}
+                            />
                         </div>
 
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <label className="text-sm font-medium text-slate-300">Password</label>
+                        <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="block text-sm font-medium text-gray-700">Password</label>
                                 {isLogin && (
                                     <Link 
                                         to="/forgot-password" 
-                                        className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                                        className="text-xs text-[#1e3a5f] hover:text-[#2d4a6f] transition-colors"
                                     >
                                         Forgot password?
                                     </Link>
                                 )}
                             </div>
                             <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                                 <input
-                                    type="password"
+                                    type={showPassword ? 'text' : 'password'}
                                     required
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                                    className="w-full bg-white border border-gray-200 rounded-lg py-2.5 px-4 pr-10 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
                                     placeholder="••••••••"
                                     value={formData.password}
                                     onChange={e => setFormData({ ...formData, password: e.target.value })}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                >
+                                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                </button>
                             </div>
                         </div>
 
                         {error && (
-                            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
                                 {error}
                             </div>
                         )}
@@ -268,27 +271,15 @@ export function LoginPage() {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {isLoading ? (
                                 <Loader2 className="w-5 h-5 animate-spin" />
                             ) : (
-                                <>
-                                    {isLogin ? 'Sign In' : 'Create Account'}
-                                    <ArrowRight className="w-5 h-5" />
-                                </>
+                                isLogin ? 'Sign in' : 'Create account'
                             )}
                         </button>
                     </form>
-
-                    <div className="mt-6 text-center">
-                        <button
-                            onClick={() => setIsLogin(!isLogin)}
-                            className="text-sm text-slate-400 hover:text-white transition-colors"
-                        >
-                            {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>
