@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Plus, X, Search, Building, BookOpen, ToggleLeft, ToggleRight, Check, Zap, Crown, Sparkles, CreditCard, ExternalLink, Loader2, Building2 } from 'lucide-react';
+import { User, Mail, Plus, X, Search, Building, BookOpen, ToggleLeft, ToggleRight, Check, Zap, Crown, Sparkles, CreditCard, ExternalLink, Loader2, Building2, Link2, Unlink, Copy, CheckCircle, AlertCircle } from 'lucide-react';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import { API_BASE } from '../config';
+
+// Slack icon component
+const SlackIcon = () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+        <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/>
+    </svg>
+);
 
 interface SubscriptionInfo {
     plan: 'free' | 'pro' | 'business';
@@ -43,7 +50,7 @@ interface OrgUser {
 }
 
 export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial }) => {
-    const [activeTab, setActiveTab] = useState<'general' | 'team' | 'billing'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'team' | 'billing' | 'integrations'>('general');
     const [users, setUsers] = useState<OrgUser[]>([]);
     const [isInviting, setIsInviting] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
@@ -51,6 +58,16 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
     const [tutorialEnabled, setTutorialEnabled] = useState(() => {
         return !localStorage.getItem('intemic_tutorial_completed');
     });
+    
+    // Slack Integration State
+    const [slackConnected, setSlackConnected] = useState(false);
+    const [slackTeamName, setSlackTeamName] = useState('');
+    const [slackConnectedAt, setSlackConnectedAt] = useState('');
+    const [slackBotToken, setSlackBotToken] = useState('');
+    const [slackWebhookUrl, setSlackWebhookUrl] = useState('');
+    const [isConnectingSlack, setIsConnectingSlack] = useState(false);
+    const [slackFeedback, setSlackFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+    const [copiedWebhook, setCopiedWebhook] = useState(false);
     
     // Company Information State
     const [companyInfo, setCompanyInfo] = useState({
@@ -264,8 +281,103 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
             fetchUsers();
         } else if (activeTab === 'general') {
             fetchCompanyInfo();
+        } else if (activeTab === 'integrations') {
+            fetchSlackStatus();
+            fetchSlackWebhookInfo();
         }
     }, [activeTab]);
+    
+    // Slack Integration Functions
+    const fetchSlackStatus = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/integrations/slack`, { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                setSlackConnected(data.connected);
+                setSlackTeamName(data.teamName || '');
+                setSlackConnectedAt(data.connectedAt || '');
+            }
+        } catch (error) {
+            console.error('Error fetching Slack status:', error);
+        }
+    };
+    
+    const fetchSlackWebhookInfo = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/integrations/slack/webhook-info`, { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                setSlackWebhookUrl(data.webhookUrl);
+            }
+        } catch (error) {
+            console.error('Error fetching Slack webhook info:', error);
+        }
+    };
+    
+    const connectSlack = async () => {
+        if (!slackBotToken.trim()) {
+            setSlackFeedback({ type: 'error', message: 'Please enter a bot token' });
+            return;
+        }
+        
+        setIsConnectingSlack(true);
+        setSlackFeedback(null);
+        
+        try {
+            const res = await fetch(`${API_BASE}/integrations/slack/connect`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ botToken: slackBotToken })
+            });
+            
+            const data = await res.json();
+            
+            if (res.ok) {
+                setSlackConnected(true);
+                setSlackTeamName(data.teamName);
+                setSlackConnectedAt(new Date().toISOString());
+                setSlackBotToken('');
+                setSlackFeedback({ type: 'success', message: `Connected to ${data.teamName}!` });
+            } else {
+                setSlackFeedback({ type: 'error', message: data.error || 'Failed to connect' });
+            }
+        } catch (error) {
+            console.error('Error connecting Slack:', error);
+            setSlackFeedback({ type: 'error', message: 'Connection failed. Please try again.' });
+        } finally {
+            setIsConnectingSlack(false);
+        }
+    };
+    
+    const disconnectSlack = async () => {
+        if (!confirm('Are you sure you want to disconnect Slack? The Database Assistant will no longer respond to Slack messages.')) {
+            return;
+        }
+        
+        try {
+            const res = await fetch(`${API_BASE}/integrations/slack/disconnect`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+            
+            if (res.ok) {
+                setSlackConnected(false);
+                setSlackTeamName('');
+                setSlackConnectedAt('');
+                setSlackFeedback({ type: 'success', message: 'Slack disconnected successfully' });
+            }
+        } catch (error) {
+            console.error('Error disconnecting Slack:', error);
+            setSlackFeedback({ type: 'error', message: 'Failed to disconnect' });
+        }
+    };
+    
+    const copyWebhookUrl = () => {
+        navigator.clipboard.writeText(slackWebhookUrl);
+        setCopiedWebhook(true);
+        setTimeout(() => setCopiedWebhook(false), 2000);
+    };
     
     const fetchCompanyInfo = async () => {
         try {
@@ -372,7 +484,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                     <h1 className="text-2xl font-bold text-slate-800 mb-6">Settings</h1>
 
                     <div className="flex gap-1 bg-slate-200/50 p-1 rounded-xl w-fit mb-8">
-                        {['General', 'Team', 'Billing'].map((tab) => (
+                        {['General', 'Team', 'Billing', 'Integrations'].map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab.toLowerCase() as any)}
@@ -838,6 +950,191 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                     <path fillRule="evenodd" clipRule="evenodd" d="M14.14 2.3L9.82 3.24L9.8 17.76C9.8 20.48 11.78 22.5 14.48 22.5C15.96 22.5 17.04 22.24 17.64 21.92V18.06C17.06 18.3 14.12 19.14 14.12 16.42V10.36H17.64V6.28H14.12L14.14 2.3Z" fill="#635BFF"/>
                                     <path fillRule="evenodd" clipRule="evenodd" d="M4.42 10.96C4.42 10.24 5 9.94 5.96 9.94C7.36 9.94 9.14 10.38 10.54 11.14V6.96C9 6.32 7.48 6.06 5.96 6.06C2.38 6.06 0 7.96 0 10.96C0 15.62 6.4 14.86 6.4 16.88C6.4 17.74 5.68 18.04 4.66 18.04C3.12 18.04 1.14 17.42 0 16.54V20.76C1.44 21.44 2.9 21.72 4.66 21.72C8.32 21.72 10.84 19.86 10.84 16.84C10.82 11.78 4.42 12.7 4.42 10.96Z" fill="#635BFF"/>
                                 </svg>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'integrations' && (
+                        <div className="space-y-6">
+                            {/* Header */}
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-lg font-semibold text-slate-800">Integrations</h2>
+                                    <p className="text-slate-500 text-sm">Connect external services to enhance your workspace.</p>
+                                </div>
+                            </div>
+
+                            {/* Slack Feedback */}
+                            {slackFeedback && (
+                                <div className={`p-4 rounded-lg flex items-center gap-2 ${
+                                    slackFeedback.type === 'success' 
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                                        : 'bg-red-50 text-red-700 border border-red-200'
+                                }`}>
+                                    {slackFeedback.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+                                    {slackFeedback.message}
+                                </div>
+                            )}
+
+                            {/* Slack Integration Card */}
+                            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                                <div className="p-6">
+                                    <div className="flex items-start gap-4">
+                                        {/* Slack Logo */}
+                                        <div className="w-12 h-12 bg-gradient-to-br from-[#E01E5A] via-[#ECB22E] to-[#2EB67D] rounded-xl flex items-center justify-center text-white shadow-lg">
+                                            <SlackIcon />
+                                        </div>
+                                        
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-lg font-semibold text-slate-800">Slack</h3>
+                                                {slackConnected && (
+                                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full flex items-center gap-1">
+                                                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
+                                                        Connected
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-slate-500 mt-1">
+                                                Query your database directly from Slack. Mention the app or send a DM to ask questions about your data.
+                                            </p>
+
+                                            {slackConnected ? (
+                                                <div className="mt-4 space-y-4">
+                                                    {/* Connected Status */}
+                                                    <div className="bg-slate-50 rounded-lg p-4">
+                                                        <div className="flex items-center justify-between">
+                                                            <div>
+                                                                <p className="text-sm font-medium text-slate-700">
+                                                                    Connected to <span className="text-slate-900">{slackTeamName}</span>
+                                                                </p>
+                                                                {slackConnectedAt && (
+                                                                    <p className="text-xs text-slate-500 mt-0.5">
+                                                                        Since {new Date(slackConnectedAt).toLocaleDateString()}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            <button
+                                                                onClick={disconnectSlack}
+                                                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            >
+                                                                <Unlink size={14} />
+                                                                Disconnect
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Usage Instructions */}
+                                                    <div className="bg-teal-50 border border-teal-100 rounded-lg p-4">
+                                                        <h4 className="text-sm font-medium text-teal-800 mb-2">How to use</h4>
+                                                        <ul className="text-sm text-teal-700 space-y-1">
+                                                            <li>• Mention the app: <code className="bg-teal-100 px-1 rounded">@YourApp how many customers do we have?</code></li>
+                                                            <li>• Or send a direct message to the app</li>
+                                                            <li>• The Database Assistant will analyze your data and respond</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="mt-4 space-y-4">
+                                                    {/* Setup Instructions */}
+                                                    <div className="bg-slate-50 rounded-lg p-4">
+                                                        <h4 className="text-sm font-semibold text-slate-700 mb-3">Setup Instructions</h4>
+                                                        <ol className="text-sm text-slate-600 space-y-2">
+                                                            <li className="flex gap-2">
+                                                                <span className="flex-shrink-0 w-5 h-5 bg-slate-200 rounded-full flex items-center justify-center text-xs font-medium">1</span>
+                                                                <span>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">api.slack.com/apps</a> and create a new app</span>
+                                                            </li>
+                                                            <li className="flex gap-2">
+                                                                <span className="flex-shrink-0 w-5 h-5 bg-slate-200 rounded-full flex items-center justify-center text-xs font-medium">2</span>
+                                                                <span>In <strong>OAuth & Permissions</strong>, add scopes: <code className="bg-slate-200 px-1 rounded text-xs">chat:write</code>, <code className="bg-slate-200 px-1 rounded text-xs">app_mentions:read</code>, <code className="bg-slate-200 px-1 rounded text-xs">im:history</code></span>
+                                                            </li>
+                                                            <li className="flex gap-2">
+                                                                <span className="flex-shrink-0 w-5 h-5 bg-slate-200 rounded-full flex items-center justify-center text-xs font-medium">3</span>
+                                                                <span>Install the app and copy the <strong>Bot User OAuth Token</strong></span>
+                                                            </li>
+                                                            <li className="flex gap-2">
+                                                                <span className="flex-shrink-0 w-5 h-5 bg-slate-200 rounded-full flex items-center justify-center text-xs font-medium">4</span>
+                                                                <span>In <strong>Event Subscriptions</strong>, enable events and set the Request URL (below)</span>
+                                                            </li>
+                                                            <li className="flex gap-2">
+                                                                <span className="flex-shrink-0 w-5 h-5 bg-slate-200 rounded-full flex items-center justify-center text-xs font-medium">5</span>
+                                                                <span>Subscribe to events: <code className="bg-slate-200 px-1 rounded text-xs">app_mention</code>, <code className="bg-slate-200 px-1 rounded text-xs">message.im</code></span>
+                                                            </li>
+                                                        </ol>
+                                                    </div>
+
+                                                    {/* Webhook URL */}
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                                            Request URL (for Event Subscriptions)
+                                                        </label>
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                type="text"
+                                                                readOnly
+                                                                value={slackWebhookUrl}
+                                                                className="flex-1 px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-700 font-mono"
+                                                            />
+                                                            <button
+                                                                onClick={copyWebhookUrl}
+                                                                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition-colors flex items-center gap-1.5"
+                                                            >
+                                                                {copiedWebhook ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} className="text-slate-500" />}
+                                                            </button>
+                                                        </div>
+                                                        <p className="mt-1 text-xs text-amber-600">
+                                                            Note: For local development, use ngrok to expose your server.
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Bot Token Input */}
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                                            Bot User OAuth Token
+                                                        </label>
+                                                        <input
+                                                            type="password"
+                                                            value={slackBotToken}
+                                                            onChange={(e) => setSlackBotToken(e.target.value)}
+                                                            placeholder="xoxb-..."
+                                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+                                                        />
+                                                    </div>
+
+                                                    {/* Connect Button */}
+                                                    <button
+                                                        onClick={connectSlack}
+                                                        disabled={isConnectingSlack || !slackBotToken.trim()}
+                                                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    >
+                                                        {isConnectingSlack ? (
+                                                            <>
+                                                                <Loader2 size={16} className="animate-spin" />
+                                                                Connecting...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Link2 size={16} />
+                                                                Connect Slack
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* More integrations coming soon */}
+                            <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-8 text-center">
+                                <div className="w-12 h-12 bg-slate-200 rounded-xl mx-auto flex items-center justify-center mb-3">
+                                    <Sparkles size={24} className="text-slate-400" />
+                                </div>
+                                <h3 className="text-slate-700 font-medium mb-1">More integrations coming soon</h3>
+                                <p className="text-sm text-slate-500">
+                                    We're working on integrations with more tools. Stay tuned!
+                                </p>
                             </div>
                         </div>
                     )}

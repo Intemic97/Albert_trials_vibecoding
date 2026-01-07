@@ -515,6 +515,28 @@ async function initDb() {
     // If migration fails, continue anyway
   }
 
+  // Migration: Add Slack integration columns to organizations table
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN slackBotToken TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN slackTeamId TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN slackTeamName TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN slackConnectedAt TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   return db;
 }
 

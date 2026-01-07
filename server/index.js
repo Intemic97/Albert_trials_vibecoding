@@ -5287,3 +5287,302 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), asyn
 
     res.json({ received: true });
 });
+
+// ==================== SLACK DATABASE ASSISTANT INTEGRATION ====================
+
+// Helper function to send messages to Slack
+async function sendSlackMessage(token, channel, text, threadTs = null) {
+    const response = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            channel,
+            text,
+            thread_ts: threadTs,
+            unfurl_links: false,
+            unfurl_media: false
+        })
+    });
+
+    const data = await response.json();
+    if (!data.ok) {
+        console.error('[Slack] Failed to send message:', data.error);
+        throw new Error(`Slack API error: ${data.error}`);
+    }
+    return data;
+}
+
+// Get Slack integration status for an organization
+app.get('/api/integrations/slack', authenticateToken, async (req, res) => {
+    try {
+        const org = await db.get(
+            'SELECT slackBotToken, slackTeamId, slackTeamName, slackConnectedAt FROM organizations WHERE id = ?',
+            [req.user.orgId]
+        );
+
+        if (!org || !org.slackBotToken) {
+            return res.json({ connected: false });
+        }
+
+        res.json({
+            connected: true,
+            teamName: org.slackTeamName,
+            teamId: org.slackTeamId,
+            connectedAt: org.slackConnectedAt
+        });
+    } catch (error) {
+        console.error('[Slack Integration] Error fetching status:', error);
+        res.status(500).json({ error: 'Failed to fetch Slack integration status' });
+    }
+});
+
+// Connect Slack to organization
+app.post('/api/integrations/slack/connect', authenticateToken, async (req, res) => {
+    try {
+        const { botToken } = req.body;
+
+        if (!botToken || !botToken.startsWith('xoxb-')) {
+            return res.status(400).json({ error: 'Invalid bot token. It should start with xoxb-' });
+        }
+
+        // Verify the token by calling Slack API
+        const authResponse = await fetch('https://slack.com/api/auth.test', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${botToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const authData = await authResponse.json();
+
+        if (!authData.ok) {
+            return res.status(400).json({ error: `Invalid token: ${authData.error}` });
+        }
+
+        // Save the token and team info
+        await db.run(`
+            UPDATE organizations 
+            SET slackBotToken = ?, slackTeamId = ?, slackTeamName = ?, slackConnectedAt = ?
+            WHERE id = ?
+        `, [botToken, authData.team_id, authData.team, new Date().toISOString(), req.user.orgId]);
+
+        console.log(`[Slack Integration] Connected org ${req.user.orgId} to team ${authData.team}`);
+
+        res.json({
+            success: true,
+            teamName: authData.team,
+            teamId: authData.team_id
+        });
+    } catch (error) {
+        console.error('[Slack Integration] Error connecting:', error);
+        res.status(500).json({ error: 'Failed to connect Slack' });
+    }
+});
+
+// Disconnect Slack from organization
+app.post('/api/integrations/slack/disconnect', authenticateToken, async (req, res) => {
+    try {
+        await db.run(`
+            UPDATE organizations 
+            SET slackBotToken = NULL, slackTeamId = NULL, slackTeamName = NULL, slackConnectedAt = NULL
+            WHERE id = ?
+        `, [req.user.orgId]);
+
+        console.log(`[Slack Integration] Disconnected org ${req.user.orgId}`);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Slack Integration] Error disconnecting:', error);
+        res.status(500).json({ error: 'Failed to disconnect Slack' });
+    }
+});
+
+// Get the Slack webhook URL for setup
+app.get('/api/integrations/slack/webhook-info', authenticateToken, async (req, res) => {
+    const baseUrl = process.env.API_URL || 'http://localhost:3001';
+    res.json({
+        webhookUrl: `${baseUrl}/api/slack/database-assistant`,
+        instructions: [
+            "1. Go to api.slack.com/apps and create a new app",
+            "2. In 'OAuth & Permissions', add these Bot Token Scopes: chat:write, app_mentions:read, im:history",
+            "3. Install the app to your workspace and copy the Bot User OAuth Token",
+            "4. Paste the token above and click Connect",
+            "5. In 'Event Subscriptions', enable events and set the Request URL to:",
+            `   ${baseUrl}/api/slack/database-assistant`,
+            "6. Subscribe to bot events: app_mention, message.im",
+            "7. Reinstall the app if prompted"
+        ]
+    });
+});
+
+// Slack Events endpoint - receives messages and queries the Database Assistant (MULTI-TENANT)
+app.post('/api/slack/database-assistant', async (req, res) => {
+    const slackEvent = req.body;
+
+    // Slack URL verification challenge
+    if (slackEvent.challenge) {
+        console.log('[Slack DB Assistant] Responding to URL verification challenge');
+        return res.status(200).json({ challenge: slackEvent.challenge });
+    }
+
+    // Acknowledge immediately to prevent Slack retries (3 second timeout)
+    res.status(200).json({ ok: true });
+
+    // Process the event asynchronously
+    try {
+        const event = slackEvent.event;
+        const teamId = slackEvent.team_id;
+        
+        // Only process messages (not bot messages or message changes)
+        if (!event || event.bot_id || event.subtype) {
+            console.log('[Slack DB Assistant] Ignoring non-user message');
+            return;
+        }
+
+        // Check for app_mention or direct message
+        const isAppMention = event.type === 'app_mention';
+        const isDirectMessage = event.channel_type === 'im';
+        
+        if (!isAppMention && !isDirectMessage) {
+            console.log('[Slack DB Assistant] Not a mention or DM, ignoring');
+            return;
+        }
+
+        // Find the organization by Slack team_id (MULTI-TENANT)
+        const org = await db.get(
+            'SELECT id, slackBotToken FROM organizations WHERE slackTeamId = ?',
+            [teamId]
+        );
+
+        if (!org || !org.slackBotToken) {
+            console.error(`[Slack DB Assistant] No organization found for team ${teamId}`);
+            return;
+        }
+
+        const slackBotToken = org.slackBotToken;
+        const orgId = org.id;
+
+        // Extract the question (remove the @mention if present)
+        let question = event.text || '';
+        question = question.replace(/<@[A-Z0-9]+>/g, '').trim();
+
+        if (!question) {
+            console.log('[Slack DB Assistant] No question text found');
+            return;
+        }
+
+        console.log(`[Slack DB Assistant] Processing question for org ${orgId}: "${question}"`);
+
+        // Check OpenAI is configured
+        if (!process.env.OPENAI_API_KEY) {
+            await sendSlackMessage(slackBotToken, event.channel,
+                "❌ AI service is not configured. Please contact your administrator.",
+                event.ts
+            );
+            return;
+        }
+
+        // Fetch database context for the organization
+        const entities = await db.all('SELECT * FROM entities WHERE organizationId = ?', [orgId]);
+        
+        if (entities.length === 0) {
+            await sendSlackMessage(slackBotToken, event.channel,
+                "📭 No database entities found. Please set up your database first in Intemic.",
+                event.ts
+            );
+            return;
+        }
+
+        const databaseContext = {};
+        
+        for (const entity of entities) {
+            const properties = await db.all('SELECT * FROM properties WHERE entityId = ?', [entity.id]);
+            const records = await db.all('SELECT * FROM records WHERE entityId = ?', [entity.id]);
+            
+            const recordsWithValues = await Promise.all(records.map(async (record) => {
+                const values = await db.all('SELECT * FROM record_values WHERE recordId = ?', [record.id]);
+                const valuesMap = {};
+                
+                for (const v of values) {
+                    const prop = properties.find(p => p.id === v.propertyId);
+                    const key = prop ? prop.name : v.propertyId;
+                    valuesMap[key] = v.value;
+                }
+                
+                return valuesMap;
+            }));
+            
+            databaseContext[entity.name] = {
+                description: entity.description,
+                properties: properties.map(p => ({
+                    name: p.name,
+                    type: p.type
+                })),
+                recordCount: records.length,
+                records: recordsWithValues.slice(0, 50)
+            };
+        }
+
+        // Call OpenAI to answer the question
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const systemPrompt = `You are a helpful database assistant for Intemic platform, responding via Slack.
+
+DATABASE SCHEMA AND DATA:
+${JSON.stringify(databaseContext, null, 2)}
+
+INSTRUCTIONS:
+1. Answer questions about the data clearly and concisely
+2. When counting records, be precise
+3. Format your response for Slack (use *bold*, _italic_, bullet points with •)
+4. Keep responses concise but informative (Slack has character limits)
+5. If the question is unclear, ask for clarification
+6. Be friendly and helpful
+
+RESPONSE FORMAT:
+- Use Slack markdown: *bold*, _italic_, \`code\`
+- Use bullet points with • for lists
+- Keep it under 2000 characters
+- Be conversational`;
+
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: question }
+            ],
+            temperature: 0.3,
+            max_tokens: 800
+        });
+
+        const answer = completion.choices[0]?.message?.content || 'Sorry, I could not process your question.';
+
+        // Send the response back to Slack
+        await sendSlackMessage(slackBotToken, event.channel, answer, event.ts);
+        console.log('[Slack DB Assistant] Response sent successfully');
+
+    } catch (error) {
+        console.error('[Slack DB Assistant] Error:', error);
+        
+        // Try to send error message if we have the token
+        try {
+            const teamId = req.body.team_id;
+            if (teamId) {
+                const org = await db.get('SELECT slackBotToken FROM organizations WHERE slackTeamId = ?', [teamId]);
+                if (org?.slackBotToken && req.body.event?.channel) {
+                    await sendSlackMessage(org.slackBotToken, req.body.event.channel,
+                        "❌ Sorry, I encountered an error processing your question. Please try again.",
+                        req.body.event.ts
+                    );
+                }
+            }
+        } catch (e) {
+            console.error('[Slack DB Assistant] Failed to send error message:', e);
+        }
+    }
+});
