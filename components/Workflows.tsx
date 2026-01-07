@@ -70,7 +70,10 @@ interface WorkflowNode {
         fileName?: string;
         headers?: string[];
         parsedData?: any[];
+        previewData?: any[];  // Preview for GCS-stored data
         rowCount?: number;
+        gcsPath?: string;     // GCS path for cloud-stored data
+        useGCS?: boolean;     // Whether data is stored in GCS
         // For PDF input nodes:
         pdfText?: string;
         pages?: number;
@@ -1269,8 +1272,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         const node = nodes.find(n => n.id === nodeId);
         if (node && node.type === 'excelInput') {
             setConfiguringExcelNodeId(nodeId);
-            // If the node already has parsed data, show preview
-            if (node.config?.parsedData) {
+            // If the node already has data (GCS or inline), show preview
+            if (node.config?.useGCS && node.config?.previewData) {
+                // GCS data - use preview
+                setExcelPreviewData({
+                    headers: node.config.headers || [],
+                    data: node.config.previewData.slice(0, 5),
+                    rowCount: node.config.rowCount || node.config.previewData.length
+                });
+            } else if (node.config?.parsedData) {
+                // Inline data
                 setExcelPreviewData({
                     headers: node.config.headers || [],
                     data: node.config.parsedData.slice(0, 5),
@@ -1293,41 +1304,112 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         try {
             const formData = new FormData();
             formData.append('file', file);
+            
+            // If we have a workflow and node, try to use GCS for large files
+            if (currentWorkflowId && configuringExcelNodeId) {
+                formData.append('workflowId', currentWorkflowId);
+                formData.append('nodeId', configuringExcelNodeId);
+                
+                const res = await fetch(`${API_BASE}/upload-spreadsheet-gcs`, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'include'
+                });
 
-            const res = await fetch(`${API_BASE}/parse-spreadsheet`, {
-                method: 'POST',
-                body: formData,
-                credentials: 'include'
-            });
+                if (!res.ok) {
+                    throw new Error('Failed to parse file');
+                }
 
-            if (!res.ok) {
-                throw new Error('Failed to parse file');
-            }
+                const result = await res.json();
+                
+                if (result.useGCS) {
+                    // Data stored in GCS - save reference only
+                    setExcelPreviewData({
+                        headers: result.headers,
+                        data: result.previewData.slice(0, 5),
+                        rowCount: result.totalRows
+                    });
 
-            const result = await res.json();
-            setExcelPreviewData({
-                headers: result.headers,
-                data: result.data.slice(0, 5), // Show first 5 rows as preview
-                rowCount: result.rowCount
-            });
-
-            // Save parsed data to node config
-            if (configuringExcelNodeId) {
-                setNodes(prev => prev.map(n =>
-                    n.id === configuringExcelNodeId
-                        ? {
-                            ...n,
-                            label: file.name,
-                            config: {
-                                ...n.config,
-                                fileName: file.name,
-                                headers: result.headers,
-                                parsedData: result.data,
-                                rowCount: result.rowCount
+                    setNodes(prev => prev.map(n =>
+                        n.id === configuringExcelNodeId
+                            ? {
+                                ...n,
+                                label: file.name,
+                                config: {
+                                    ...n.config,
+                                    fileName: result.fileName,
+                                    headers: result.headers,
+                                    gcsPath: result.gcsPath,
+                                    previewData: result.previewData,
+                                    rowCount: result.totalRows,
+                                    useGCS: true
+                                }
                             }
-                        }
-                        : n
-                ));
+                            : n
+                    ));
+                    
+                    showToast(`Uploaded ${result.totalRows} rows to cloud storage`, 'success');
+                } else {
+                    // Small file - data inline
+                    setExcelPreviewData({
+                        headers: result.headers,
+                        data: result.data.slice(0, 5),
+                        rowCount: result.rowCount
+                    });
+
+                    setNodes(prev => prev.map(n =>
+                        n.id === configuringExcelNodeId
+                            ? {
+                                ...n,
+                                label: file.name,
+                                config: {
+                                    ...n.config,
+                                    fileName: result.fileName,
+                                    headers: result.headers,
+                                    parsedData: result.data,
+                                    rowCount: result.rowCount,
+                                    useGCS: false
+                                }
+                            }
+                            : n
+                    ));
+                }
+            } else {
+                // Fallback to old endpoint if no workflow context
+                const res = await fetch(`${API_BASE}/parse-spreadsheet`, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'include'
+                });
+
+                if (!res.ok) {
+                    throw new Error('Failed to parse file');
+                }
+
+                const result = await res.json();
+                setExcelPreviewData({
+                    headers: result.headers,
+                    data: result.data.slice(0, 5),
+                    rowCount: result.rowCount
+                });
+
+                if (configuringExcelNodeId) {
+                    setNodes(prev => prev.map(n =>
+                        n.id === configuringExcelNodeId
+                            ? {
+                                ...n,
+                                label: file.name,
+                                config: {
+                                    ...n.config,
+                                    fileName: file.name,
+                                    headers: result.headers,
+                                    parsedData: result.data,
+                                    rowCount: result.rowCount
+                                }
+                            }
+                            : n
+                    ));
+                }
             }
         } catch (error) {
             console.error('Error parsing file:', error);
@@ -2738,7 +2820,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     break;
                 case 'excelInput':
                     // Excel/CSV Input node - output the parsed data
-                    if (node.config?.parsedData && Array.isArray(node.config.parsedData)) {
+                    if (node.config?.useGCS && node.config?.gcsPath) {
+                        // Data stored in GCS - use preview for visual display, full data loaded at execution
+                        nodeData = node.config.previewData || [];
+                        const totalRows = node.config.rowCount || nodeData.length;
+                        result = `Loaded ${totalRows} rows from ${node.config.fileName || 'cloud'} (cloud storage)`;
+                    } else if (node.config?.parsedData && Array.isArray(node.config.parsedData)) {
                         nodeData = node.config.parsedData;
                         result = `Loaded ${nodeData.length} rows from ${node.config.fileName || 'file'}`;
                     } else {
@@ -6070,29 +6157,43 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 } else {
                                                     displayData = dataViewTab === 'input' ? node.inputData : node.outputData;
                                                 }
+                                                
+                                                const MAX_PREVIEW_ROWS = 500;
+                                                const totalRows = displayData?.length || 0;
+                                                const limitedData = displayData?.slice(0, MAX_PREVIEW_ROWS) || [];
+                                                const isLimited = totalRows > MAX_PREVIEW_ROWS;
+                                                
                                                 return displayData && displayData.length > 0 ? (
-                                                    <table className="w-full text-sm">
-                                                        <thead className="bg-slate-100 sticky top-0">
-                                                            <tr>
-                                                                {Object.keys(displayData[0]).map(key => (
-                                                                    <th key={key} className="px-4 py-2 text-left font-semibold text-slate-700 border-b">
-                                                                        {key}
-                                                                    </th>
-                                                                ))}
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {displayData.map((record: any, idx: number) => (
-                                                                <tr key={idx} className="border-b hover:bg-slate-50">
-                                                                    {Object.values(record).map((value: any, vidx: number) => (
-                                                                        <td key={vidx} className="px-4 py-2">
-                                                                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                                                                        </td>
+                                                    <>
+                                                        {isLimited && (
+                                                            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 rounded-lg mb-3 text-sm flex items-center gap-2">
+                                                                <span>⚠️</span>
+                                                                <span>Showing first {MAX_PREVIEW_ROWS} of {totalRows.toLocaleString()} rows for performance</span>
+                                                            </div>
+                                                        )}
+                                                        <table className="w-full text-sm">
+                                                            <thead className="bg-slate-100 sticky top-0">
+                                                                <tr>
+                                                                    {Object.keys(displayData[0]).map(key => (
+                                                                        <th key={key} className="px-4 py-2 text-left font-semibold text-slate-700 border-b">
+                                                                            {key}
+                                                                        </th>
                                                                     ))}
                                                                 </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
+                                                            </thead>
+                                                            <tbody>
+                                                                {limitedData.map((record: any, idx: number) => (
+                                                                    <tr key={idx} className="border-b hover:bg-slate-50">
+                                                                        {Object.values(record).map((value: any, vidx: number) => (
+                                                                            <td key={vidx} className="px-4 py-2">
+                                                                                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                                                            </td>
+                                                                        ))}
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </>
                                                 ) : (
                                                     <p className="text-slate-500 text-center py-8">No data available</p>
                                                 );

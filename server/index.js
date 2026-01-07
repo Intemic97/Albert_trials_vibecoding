@@ -9,6 +9,7 @@ const XLSX = require('xlsx');
 const { WebSocketServer } = require('ws');
 const { initDb, openDb } = require('./db');
 const { WorkflowExecutor } = require('./workflowExecutor');
+const { gcsService } = require('./gcsService');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 // Stripe configuration
@@ -491,8 +492,8 @@ app.use(cors({
 // Stripe webhook needs raw body - must be before express.json()
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 
-// JSON parser for all other routes
-app.use(express.json());
+// JSON parser for all other routes - increased limit for large workflows with embedded data
+app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
 
 let db;
@@ -879,6 +880,193 @@ function parseCSVLine(line) {
     result.push(current.trim().replace(/^"|"$/g, ''));
     return result;
 }
+
+// ==================== GCS ENDPOINTS ====================
+
+// Upload spreadsheet data to GCS (for large files)
+app.post('/api/upload-spreadsheet-gcs', authenticateToken, upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const { workflowId, nodeId } = req.body;
+        if (!workflowId || !nodeId) {
+            return res.status(400).json({ error: 'workflowId and nodeId are required' });
+        }
+
+        const filePath = path.join(uploadsDir, req.file.filename);
+        const ext = path.extname(req.file.originalname).toLowerCase();
+
+        let data = [];
+        let headers = [];
+
+        // Parse the file
+        if (ext === '.csv') {
+            const fileContent = fs.readFileSync(filePath, 'utf-8');
+            const lines = fileContent.split('\n').filter(line => line.trim());
+            
+            if (lines.length > 0) {
+                headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+                
+                for (let i = 1; i < lines.length; i++) {
+                    const values = parseCSVLine(lines[i]);
+                    if (values.length > 0) {
+                        const row = {};
+                        headers.forEach((header, idx) => {
+                            row[header] = values[idx] || '';
+                        });
+                        data.push(row);
+                    }
+                }
+            }
+        } else if (ext === '.xlsx' || ext === '.xls') {
+            const workbook = XLSX.readFile(filePath);
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            
+            if (jsonData.length > 0) {
+                headers = jsonData[0].map(h => String(h || '').trim());
+                
+                for (let i = 1; i < jsonData.length; i++) {
+                    const rowData = jsonData[i];
+                    if (rowData && rowData.some(cell => cell !== null && cell !== undefined && cell !== '')) {
+                        const row = {};
+                        headers.forEach((header, idx) => {
+                            const value = rowData[idx];
+                            row[header] = value !== null && value !== undefined ? String(value) : '';
+                        });
+                        data.push(row);
+                    }
+                }
+            }
+        } else {
+            fs.unlinkSync(filePath);
+            return res.status(400).json({ error: 'Unsupported file format. Please upload .csv, .xlsx, or .xls files.' });
+        }
+
+        // Clean up uploaded file
+        fs.unlinkSync(filePath);
+
+        // Check if GCS is available
+        const gcsAvailable = await gcsService.init();
+        
+        if (gcsAvailable && data.length > 50) {
+            // Upload full data to GCS
+            const uploadResult = await gcsService.uploadWorkflowData(
+                workflowId,
+                nodeId,
+                data,
+                req.file.originalname
+            );
+
+            if (uploadResult.success) {
+                // Return preview (first 100 rows) + GCS reference
+                const previewData = data.slice(0, 100);
+                
+                res.json({
+                    success: true,
+                    useGCS: true,
+                    gcsPath: uploadResult.gcsPath,
+                    headers,
+                    previewData,
+                    totalRows: data.length,
+                    previewRows: previewData.length,
+                    fileName: req.file.originalname,
+                    message: `Uploaded ${data.length} rows to cloud storage`
+                });
+                return;
+            } else {
+                console.warn('[GCS] Upload failed, falling back to inline:', uploadResult.error);
+            }
+        }
+
+        // Fallback: return all data inline (for small files or GCS unavailable)
+        res.json({
+            success: true,
+            useGCS: false,
+            headers,
+            data,
+            rowCount: data.length,
+            fileName: req.file.originalname
+        });
+
+    } catch (error) {
+        console.error('Error uploading spreadsheet:', error);
+        res.status(500).json({ error: 'Failed to upload spreadsheet: ' + error.message });
+    }
+});
+
+// Download data from GCS
+app.get('/api/gcs-data/:gcsPath(*)', authenticateToken, async (req, res) => {
+    try {
+        const { gcsPath } = req.params;
+        
+        if (!gcsPath) {
+            return res.status(400).json({ error: 'gcsPath is required' });
+        }
+
+        const gcsAvailable = await gcsService.init();
+        if (!gcsAvailable) {
+            return res.status(503).json({ error: 'Cloud storage not available' });
+        }
+
+        const result = await gcsService.downloadWorkflowData(gcsPath);
+        
+        if (!result.success) {
+            return res.status(404).json({ error: result.error });
+        }
+
+        res.json({
+            success: true,
+            data: result.data,
+            rowCount: result.rowCount
+        });
+
+    } catch (error) {
+        console.error('Error downloading from GCS:', error);
+        res.status(500).json({ error: 'Failed to download data: ' + error.message });
+    }
+});
+
+// Delete GCS data for a workflow
+app.delete('/api/gcs-workflow/:workflowId', authenticateToken, async (req, res) => {
+    try {
+        const { workflowId } = req.params;
+        
+        const gcsAvailable = await gcsService.init();
+        if (!gcsAvailable) {
+            return res.json({ success: true, message: 'GCS not configured' });
+        }
+
+        const result = await gcsService.deleteWorkflowFolder(workflowId);
+        
+        res.json({
+            success: true,
+            deletedCount: result.deletedCount || 0
+        });
+
+    } catch (error) {
+        console.error('Error deleting GCS data:', error);
+        res.status(500).json({ error: 'Failed to delete data: ' + error.message });
+    }
+});
+
+// Check GCS status
+app.get('/api/gcs-status', authenticateToken, async (req, res) => {
+    try {
+        const gcsAvailable = await gcsService.init();
+        res.json({
+            available: gcsAvailable,
+            bucket: gcsAvailable ? gcsService.bucketName : null
+        });
+    } catch (error) {
+        res.json({ available: false, error: error.message });
+    }
+});
+
+// ==================== END GCS ENDPOINTS ====================
 
 // Helper function to extract text from files
 async function extractFileContent(filename) {

@@ -4,6 +4,7 @@
  */
 
 const crypto = require('crypto');
+const { gcsService } = require('./gcsService');
 
 // Generate unique ID
 const generateId = () => crypto.randomBytes(8).toString('hex');
@@ -210,6 +211,8 @@ class WorkflowExecutor {
             manualInput: () => this.handleManualInput(node, inputData),
             output: () => this.handleOutput(node, inputData),
             fetchData: () => this.handleFetchData(node, inputData),
+            excelInput: () => this.handleExcelInput(node, inputData),
+            pdfInput: () => this.handlePdfInput(node, inputData),
             saveRecords: () => this.handleSaveRecords(node, inputData),
             addField: () => this.handleAddField(node, inputData),
             condition: () => this.handleCondition(node, inputData),
@@ -303,6 +306,66 @@ class WorkflowExecutor {
             outputData: data,
             recordCount: data.length
         };
+    }
+
+    async handleExcelInput(node, inputData) {
+        const config = node.config || {};
+        
+        // Check if data is stored in GCS
+        if (config.gcsPath) {
+            console.log(`[ExcelInput] Loading data from GCS: ${config.gcsPath}`);
+            
+            const gcsAvailable = await gcsService.init();
+            if (!gcsAvailable) {
+                throw new Error('Cloud storage not available');
+            }
+
+            const result = await gcsService.downloadWorkflowData(config.gcsPath);
+            
+            if (!result.success) {
+                throw new Error(`Failed to load data from cloud: ${result.error}`);
+            }
+
+            return {
+                success: true,
+                message: `Loaded ${result.rowCount} rows from ${config.fileName || 'cloud storage'}`,
+                outputData: result.data,
+                rowCount: result.rowCount,
+                source: 'gcs'
+            };
+        }
+
+        // Fallback: use inline parsedData
+        if (config.parsedData && Array.isArray(config.parsedData)) {
+            return {
+                success: true,
+                message: `Loaded ${config.parsedData.length} rows from ${config.fileName || 'file'}`,
+                outputData: config.parsedData,
+                rowCount: config.parsedData.length,
+                source: 'inline'
+            };
+        }
+
+        // No data available
+        throw new Error('No data configured for Excel/CSV node. Please upload a file.');
+    }
+
+    async handlePdfInput(node, inputData) {
+        const config = node.config || {};
+        
+        if (config.parsedText) {
+            return {
+                success: true,
+                message: `Loaded PDF: ${config.fileName || 'file'} (${config.pages || '?'} pages)`,
+                outputData: {
+                    text: config.parsedText,
+                    fileName: config.fileName,
+                    pages: config.pages
+                }
+            };
+        }
+
+        throw new Error('No PDF data configured. Please upload a PDF file.');
     }
 
     async handleSaveRecords(node, inputData) {
