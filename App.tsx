@@ -56,6 +56,9 @@ function AuthenticatedApp() {
     
     // Tutorial state
     const [showTutorial, setShowTutorial] = useState(false);
+    
+    // Track if onboarding was pending to detect when it completes
+    const wasOnboardingPendingRef = React.useRef<boolean>(false);
 
     // Get current view from URL path
     const getCurrentView = () => {
@@ -93,6 +96,27 @@ function AuthenticatedApp() {
         }
         previousUserIdRef.current = user?.id;
     }, [user?.id, navigate]);
+
+    // Detect when onboarding completes and show tutorial
+    useEffect(() => {
+        if (user && !user.onboardingCompleted) {
+            // User is in onboarding state, mark it
+            wasOnboardingPendingRef.current = true;
+        } else if (user && user.onboardingCompleted && wasOnboardingPendingRef.current) {
+            // Onboarding just completed - reset the ref and trigger post-onboarding actions
+            wasOnboardingPendingRef.current = false;
+            
+            // Reload entities after onboarding completes
+            fetchEntities();
+            
+            // Show tutorial if user hasn't seen it yet
+            const hasSeenTutorial = localStorage.getItem('intemic_tutorial_completed');
+            if (!hasSeenTutorial) {
+                // Small delay to let the UI settle after onboarding modal closes
+                setTimeout(() => setShowTutorial(true), 500);
+            }
+        }
+    }, [user?.onboardingCompleted]);
 
     // New Property State
     const [isAddingProp, setIsAddingProp] = useState(false);
@@ -780,13 +804,8 @@ function AuthenticatedApp() {
         <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
             {showOnboarding && (
                 <OnboardingModal onComplete={() => {
-                    // Reload data after onboarding completes
-                    fetchEntities();
-                    // Show tutorial if user hasn't seen it
-                    const hasSeenTutorial = localStorage.getItem('intemic_tutorial_completed');
-                    if (!hasSeenTutorial) {
-                        setTimeout(() => setShowTutorial(true), 500);
-                    }
+                    // Post-onboarding actions (fetchEntities + tutorial) are handled by 
+                    // the useEffect that watches user.onboardingCompleted to avoid race conditions
                 }} />
             )}
             
