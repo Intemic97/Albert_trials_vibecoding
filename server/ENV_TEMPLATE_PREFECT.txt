@@ -1,0 +1,9 @@
+# Prefect Service Configuration (Optional)
+# Add these to your server/.env file to enable background workflow execution
+
+# Prefect Worker Service URL (Python/FastAPI microservice)
+PREFECT_SERVICE_URL=http://localhost:8000
+
+# If Prefect service is not available, workflows will execute locally (synchronously)
+# When Prefect service is running, workflows execute in background and user can close browser
+

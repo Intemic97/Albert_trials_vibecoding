@@ -10,6 +10,7 @@ const { WebSocketServer } = require('ws');
 const { initDb, openDb } = require('./db');
 const { WorkflowExecutor } = require('./workflowExecutor');
 const { gcsService } = require('./gcsService');
+const { prefectClient } = require('./prefectClient');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 // Stripe configuration
@@ -3258,9 +3259,36 @@ app.post('/api/workflow/:id/run-public', async (req, res) => {
 app.post('/api/workflow/:id/execute', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const { inputs } = req.body;
+        const { inputs, usePrefect } = req.body;
 
-        console.log(`[WorkflowExecutor] Authenticated execution started for workflow ${id}`);
+        // Check if we should use Prefect service (background execution)
+        const shouldUsePrefect = usePrefect !== false; // Default to true
+
+        if (shouldUsePrefect) {
+            console.log(`[WorkflowExecutor] Delegating workflow ${id} to Prefect service (background mode)`);
+            
+            try {
+                // Delegate to Prefect microservice for background execution
+                const result = await prefectClient.executeWorkflow(id, inputs || {}, req.user.orgId);
+
+                return res.json({
+                    success: true,
+                    executionId: result.executionId,
+                    status: result.status,
+                    message: result.message || 'Workflow execution started in background',
+                    usingPrefect: true,
+                    backgroundExecution: true
+                });
+
+            } catch (prefectError) {
+                console.warn('[WorkflowExecutor] Prefect service unavailable, falling back to local execution');
+                console.warn('[WorkflowExecutor] Error:', prefectError.message);
+                // Fall through to local execution
+            }
+        }
+
+        // Local execution (synchronous, blocks until complete)
+        console.log(`[WorkflowExecutor] Local execution for workflow ${id}`);
 
         const executor = new WorkflowExecutor(db);
         const result = await executor.executeWorkflow(id, inputs || {}, req.user.orgId);
@@ -3269,7 +3297,9 @@ app.post('/api/workflow/:id/execute', authenticateToken, async (req, res) => {
             success: true,
             executionId: result.executionId,
             status: result.status,
-            result: result.results
+            result: result.results,
+            usingPrefect: false,
+            backgroundExecution: false
         });
     } catch (error) {
         console.error('Error executing workflow:', error);
@@ -3304,7 +3334,7 @@ app.post('/api/workflow/:id/execute-node', authenticateToken, async (req, res) =
     }
 });
 
-// Get execution status
+// Get execution status (works for both local and Prefect executions)
 app.get('/api/workflow/execution/:execId', authenticateToken, async (req, res) => {
     try {
         const { execId } = req.params;
@@ -3319,6 +3349,19 @@ app.get('/api/workflow/execution/:execId', authenticateToken, async (req, res) =
         execution.nodeResults = execution.nodeResults ? JSON.parse(execution.nodeResults) : null;
         execution.finalOutput = execution.finalOutput ? JSON.parse(execution.finalOutput) : null;
 
+        // If using Prefect, try to get additional progress info
+        if (execution.status === 'running' || execution.status === 'pending') {
+            try {
+                const prefectStatus = await prefectClient.getExecutionStatus(execId);
+                if (prefectStatus.progress) {
+                    execution.progress = prefectStatus.progress;
+                }
+            } catch (e) {
+                // Prefect service might not be available, that's ok
+                console.log('[API] Could not fetch Prefect status:', e.message);
+            }
+        }
+
         res.json(execution);
     } catch (error) {
         console.error('Error fetching execution:', error);
@@ -3326,7 +3369,7 @@ app.get('/api/workflow/execution/:execId', authenticateToken, async (req, res) =
     }
 });
 
-// Get execution logs
+// Get execution logs (works for both local and Prefect executions)
 app.get('/api/workflow/execution/:execId/logs', authenticateToken, async (req, res) => {
     try {
         const { execId } = req.params;
@@ -3345,6 +3388,27 @@ app.get('/api/workflow/execution/:execId/logs', authenticateToken, async (req, r
     } catch (error) {
         console.error('Error fetching execution logs:', error);
         res.status(500).json({ error: 'Failed to fetch logs' });
+    }
+});
+
+// Check Prefect service health
+app.get('/api/prefect/health', authenticateToken, async (req, res) => {
+    try {
+        const isAvailable = await prefectClient.isAvailable();
+        
+        res.json({
+            available: isAvailable,
+            serviceUrl: process.env.PREFECT_SERVICE_URL || 'http://localhost:8000',
+            message: isAvailable 
+                ? 'Prefect service is running - background execution enabled' 
+                : 'Prefect service is not available - using local execution only'
+        });
+    } catch (error) {
+        res.json({
+            available: false,
+            error: error.message,
+            message: 'Prefect service is not available - using local execution only'
+        });
     }
 });
 
