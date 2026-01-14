@@ -79,6 +79,34 @@ class PrefectClient {
     }
 
     /**
+     * Execute a single node (for testing/debugging)
+     */
+    async executeNode(nodeData) {
+        try {
+            console.log(`[PrefectClient] Executing single node: ${nodeData.nodeId}`);
+            
+            const response = await this.makeRequest('/api/nodes/execute', {
+                method: 'POST',
+                body: {
+                    workflowId: nodeData.workflowId,
+                    nodeId: nodeData.nodeId,
+                    nodeType: nodeData.nodeType,
+                    node: nodeData.node,
+                    inputData: nodeData.inputData || {}
+                }
+            });
+
+            console.log(`[PrefectClient] Single node execution completed: ${nodeData.nodeId}`);
+
+            return response;
+
+        } catch (error) {
+            console.error('[PrefectClient] Error executing single node:', error.message);
+            throw new Error(`Prefect service error: ${error.message}`);
+        }
+    }
+
+    /**
      * Check if Prefect service is available
      */
     async isAvailable() {

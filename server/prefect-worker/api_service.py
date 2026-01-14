@@ -14,6 +14,8 @@ import uvicorn
 
 from database import Database
 from flows.workflow_flow import execute_workflow_flow
+from flows.workflow_flow_optimized import workflow_flow_optimized
+from tasks.node_handlers import NODE_HANDLERS
 import config
 
 
@@ -39,6 +41,16 @@ class ExecuteWorkflowRequest(BaseModel):
     workflowId: str
     inputs: Optional[Dict] = {}
     organizationId: Optional[str] = None
+    mode: Optional[str] = "optimized"  # "optimized" or "legacy"
+
+
+class ExecuteNodeRequest(BaseModel):
+    """Request model for single node execution"""
+    workflowId: str
+    nodeId: str
+    nodeType: str
+    node: Dict
+    inputData: Optional[Dict] = {}
 
 
 class ExecutionStatusResponse(BaseModel):
@@ -107,7 +119,8 @@ async def execute_workflow(request: ExecuteWorkflowRequest, background_tasks: Ba
             workflow_id=request.workflowId,
             execution_id=execution_id,
             inputs=request.inputs,
-            organization_id=request.organizationId
+            organization_id=request.organizationId,
+            mode=request.mode or "optimized"
         )
         
         return {
@@ -130,7 +143,8 @@ async def execute_workflow_background(
     workflow_id: str,
     execution_id: str,
     inputs: Dict,
-    organization_id: Optional[str]
+    organization_id: Optional[str],
+    mode: str = "optimized"
 ):
     """
     Background task that executes the workflow using Prefect
@@ -138,15 +152,29 @@ async def execute_workflow_background(
     This runs independently - user can close browser and it continues
     """
     try:
-        print(f"🔄 Starting background execution for {execution_id}")
+        print(f"🔄 Starting background execution for {execution_id} (mode: {mode})")
         
-        # Execute workflow using Prefect flow
-        result = await execute_workflow_flow(
-            workflow_id=workflow_id,
-            execution_id=execution_id,
-            inputs=inputs,
-            organization_id=organization_id
-        )
+        # Load workflow data
+        db = Database()
+        workflow = await db.get_workflow(workflow_id)
+        workflow_data = workflow.get('data', {})
+        
+        # Execute workflow using optimized or legacy flow
+        if mode == "optimized":
+            result = await workflow_flow_optimized(
+                workflow_id=workflow_id,
+                execution_id=execution_id,
+                workflow_data=workflow_data,
+                inputs=inputs
+            )
+        else:
+            # Legacy mode (sequential execution)
+            result = await execute_workflow_flow(
+                workflow_id=workflow_id,
+                execution_id=execution_id,
+                inputs=inputs,
+                organization_id=organization_id
+            )
         
         print(f"✅ Background execution completed: {execution_id}")
         
@@ -156,6 +184,63 @@ async def execute_workflow_background(
         # Update execution to failed
         db = Database()
         await db.update_execution(execution_id, status="failed", error=str(e))
+
+
+@app.post("/api/nodes/execute")
+async def execute_single_node(request: ExecuteNodeRequest):
+    """
+    Execute a single node (for testing/debugging)
+    
+    This endpoint:
+    1. Executes only the specified node
+    2. Does NOT use Prefect Flow/DAG
+    3. Returns result immediately
+    4. Useful for testing node configuration
+    """
+    try:
+        print(f"🔧 Executing single node: {request.nodeId} ({request.nodeType})")
+        
+        # Get handler for this node type
+        handler = NODE_HANDLERS.get(request.nodeType)
+        
+        if not handler:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"No handler found for node type: {request.nodeType}"
+            )
+        
+        # Execute handler directly
+        result = await handler(
+            node=request.node,
+            input_data=request.inputData,
+            execution_context={
+                'mode': 'single_node',
+                'workflow_id': request.workflowId,
+                'node_id': request.nodeId
+            }
+        )
+        
+        print(f"✅ Single node execution completed: {request.nodeId}")
+        
+        return {
+            "success": True,
+            "nodeId": request.nodeId,
+            "nodeType": request.nodeType,
+            "output": result,
+            "message": "Node executed successfully"
+        }
+        
+    except Exception as e:
+        error_msg = str(e)
+        print(f"❌ Single node execution failed: {request.nodeId} - {error_msg}")
+        
+        return {
+            "success": False,
+            "nodeId": request.nodeId,
+            "nodeType": request.nodeType,
+            "error": error_msg,
+            "message": "Node execution failed"
+        }
 
 
 @app.get("/api/executions/{execution_id}")

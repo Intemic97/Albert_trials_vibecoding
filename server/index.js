@@ -3311,7 +3311,7 @@ app.post('/api/workflow/:id/execute', authenticateToken, async (req, res) => {
 app.post('/api/workflow/:id/execute-node', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const { nodeId, inputData, recursive } = req.body;
+        const { nodeId, nodeType, node, inputData, recursive } = req.body;
 
         if (!nodeId) {
             return res.status(400).json({ error: 'nodeId is required' });
@@ -3319,6 +3319,36 @@ app.post('/api/workflow/:id/execute-node', authenticateToken, async (req, res) =
 
         console.log(`[WorkflowExecutor] Single node execution: ${nodeId} (recursive: ${recursive})`);
 
+        // Try to use Prefect service if available
+        const prefectAvailable = await prefectClient.isAvailable();
+        
+        if (prefectAvailable && !recursive) {
+            // Use Prefect for single node execution (optimized)
+            try {
+                const result = await prefectClient.executeNode({
+                    workflowId: id,
+                    nodeId: nodeId,
+                    nodeType: nodeType,
+                    node: node,
+                    inputData: inputData || {}
+                });
+
+                console.log('[Prefect] Single node execution completed via Prefect');
+
+                return res.json({
+                    success: result.success,
+                    nodeId: result.nodeId,
+                    output: result.output,
+                    error: result.error,
+                    mode: 'prefect'
+                });
+            } catch (prefectError) {
+                console.warn('[Prefect] Failed to execute via Prefect, falling back to local:', prefectError.message);
+                // Fall through to local execution
+            }
+        }
+
+        // Fallback: Use local WorkflowExecutor
         const executor = new WorkflowExecutor(db);
         const result = await executor.executeSingleNode(id, nodeId, inputData, recursive || false);
 
@@ -3326,7 +3356,8 @@ app.post('/api/workflow/:id/execute-node', authenticateToken, async (req, res) =
             success: true,
             executionId: result.executionId,
             nodeId: result.nodeId,
-            result: result.result
+            result: result.result,
+            mode: 'local'
         });
     } catch (error) {
         console.error('Error executing node:', error);
