@@ -1674,6 +1674,108 @@ IMPORTANT:
     }
 });
 
+// ==================== COPILOT CHAT MANAGEMENT ====================
+
+// Get all chats for the current user
+app.get('/api/copilot/chats', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const orgId = req.user.orgId;
+
+        const chats = await db.all(
+            'SELECT * FROM copilot_chats WHERE userId = ? AND organizationId = ? ORDER BY updatedAt DESC',
+            [userId, orgId]
+        );
+
+        // Parse messages JSON for each chat
+        const parsedChats = chats.map(chat => ({
+            ...chat,
+            messages: JSON.parse(chat.messages || '[]')
+        }));
+
+        res.json({ chats: parsedChats });
+    } catch (error) {
+        console.error('[Copilot] Error loading chats:', error);
+        res.status(500).json({ error: 'Failed to load chats' });
+    }
+});
+
+// Create a new chat
+app.post('/api/copilot/chats', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const orgId = req.user.orgId;
+        const { id, title, messages, createdAt, updatedAt } = req.body;
+
+        await db.run(
+            `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [id, userId, orgId, title, JSON.stringify(messages), createdAt, updatedAt]
+        );
+
+        res.json({ success: true, chatId: id });
+    } catch (error) {
+        console.error('[Copilot] Error creating chat:', error);
+        res.status(500).json({ error: 'Failed to create chat' });
+    }
+});
+
+// Update a chat
+app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const orgId = req.user.orgId;
+        const { chatId } = req.params;
+        const { title, messages, updatedAt } = req.body;
+
+        // Verify ownership
+        const chat = await db.get(
+            'SELECT * FROM copilot_chats WHERE id = ? AND userId = ? AND organizationId = ?',
+            [chatId, userId, orgId]
+        );
+
+        if (!chat) {
+            return res.status(404).json({ error: 'Chat not found' });
+        }
+
+        await db.run(
+            `UPDATE copilot_chats SET title = ?, messages = ?, updatedAt = ? WHERE id = ?`,
+            [title, JSON.stringify(messages), updatedAt, chatId]
+        );
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Copilot] Error updating chat:', error);
+        res.status(500).json({ error: 'Failed to update chat' });
+    }
+});
+
+// Delete a chat
+app.delete('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const orgId = req.user.orgId;
+        const { chatId } = req.params;
+
+        // Verify ownership
+        const chat = await db.get(
+            'SELECT * FROM copilot_chats WHERE id = ? AND userId = ? AND organizationId = ?',
+            [chatId, userId, orgId]
+        );
+
+        if (!chat) {
+            return res.status(404).json({ error: 'Chat not found' });
+        }
+
+        await db.run('DELETE FROM copilot_chats WHERE id = ?', [chatId]);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Copilot] Error deleting chat:', error);
+        res.status(500).json({ error: 'Failed to delete chat' });
+    }
+});
+
 // OpenAI Generation Endpoint
 app.post('/api/generate', authenticateToken, async (req, res) => {
     console.log('Received generation request');

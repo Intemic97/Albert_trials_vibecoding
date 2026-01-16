@@ -8,7 +8,8 @@ import {
   FileText,
   Home,
   Layers,
-  ChevronRight
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -23,6 +24,7 @@ const viewToRoute: Record<string, string> = {
   'workflows': '/workflows',
   'database': '/database',
   'reports': '/reports',
+  'copilots': '/copilots',
   'settings': '/settings',
   'admin': '/admin',
 };
@@ -94,8 +96,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
 
           <SectionLabel label="Modeling" />
           <NavItem icon={Workflow} label="Workflows" view="workflows" active={activeView === 'workflows'} />
-          <NavItem icon={Database} label="Database" view="database" active={activeView === 'database'} />
+          <NavItem icon={Database} label="Knowledge Base" view="database" active={activeView === 'database'} />
           <NavItem icon={FileText} label="Reports" view="reports" active={activeView === 'reports'} />
+          <NavItem icon={Sparkles} label="Copilots" view="copilots" active={activeView === 'copilots'} />
 
         </nav>
       </div>

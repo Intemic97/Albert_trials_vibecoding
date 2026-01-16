@@ -537,6 +537,21 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  // Create copilot_chats table for storing chat history
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS copilot_chats (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      organizationId TEXT NOT NULL,
+      title TEXT NOT NULL,
+      messages TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+    );
+  `);
+
   return db;
 }
 

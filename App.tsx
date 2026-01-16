@@ -21,7 +21,7 @@ import { OnboardingModal } from './components/OnboardingModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Entity, Property, PropertyType } from './types';
 import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X, Code, Paperclip, Download, Loader2, Sparkles } from 'lucide-react';
-import { DatabaseAssistant, AskButton } from './components/DatabaseAssistant';
+import { Copilots } from './components/Copilots';
 import { ProfileMenu } from './components/ProfileMenu';
 import { API_BASE } from './config';
 
@@ -67,6 +67,7 @@ function AuthenticatedApp() {
         if (path.startsWith('/workflow')) return 'workflows';
         if (path.startsWith('/database')) return 'database';
         if (path.startsWith('/reports')) return 'reports';
+        if (path.startsWith('/copilots')) return 'copilots';
         if (path.startsWith('/settings')) return 'settings';
         if (path.startsWith('/admin')) return 'admin';
         return 'overview';
@@ -82,6 +83,7 @@ function AuthenticatedApp() {
             'workflows': '/workflows',
             'database': '/database',
             'reports': '/reports',
+            'copilots': '/copilots',
             'settings': '/settings',
             'admin': '/admin',
         };
@@ -161,9 +163,6 @@ function AuthenticatedApp() {
 
     // File Upload State
     const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
-
-    // Database Assistant State
-    const [showDatabaseAssistant, setShowDatabaseAssistant] = useState(false);
 
     const activeEntity = entities.find(e => e.id === activeEntityId);
 
@@ -825,8 +824,8 @@ function AuthenticatedApp() {
                     }}
                 />
             )}
-            {/* Hide sidebar when in report editor or workflow editor for more space */}
-            {!location.pathname.match(/^\/reports\/[^/]+$/) && !location.pathname.match(/^\/workflow\/[^/]+$/) && (
+            {/* Hide sidebar when in report editor, workflow editor, or copilots for more space */}
+            {!location.pathname.match(/^\/reports\/[^/]+$/) && !location.pathname.match(/^\/workflow\/[^/]+$/) && !location.pathname.match(/^\/copilots/) && (
                 <Sidebar activeView={currentView} onNavigate={handleNavigate} />
             )}
 
@@ -862,6 +861,9 @@ function AuthenticatedApp() {
                     } />
                     <Route path="/reports/:reportId" element={
                         <ReportEditor entities={entities} companyInfo={undefined} onViewChange={handleNavigate} />
+                    } />
+                    <Route path="/copilots" element={
+                        <Copilots />
                     } />
                     <Route path="/settings" element={
                         <Settings onViewChange={handleNavigate} onShowTutorial={() => setShowTutorial(true)} />
@@ -971,16 +973,6 @@ function AuthenticatedApp() {
                                                 </div>
                                             </div>
 
-                                                {/* Ask Button - Only show in list view */}
-                                                {!showDatabaseAssistant && (
-                                                    <AskButton onClick={() => setShowDatabaseAssistant(true)} />
-                                                )}
-                                                
-                                                {/* Database Assistant */}
-                                                <DatabaseAssistant 
-                                                    isOpen={showDatabaseAssistant} 
-                                                    onClose={() => setShowDatabaseAssistant(false)} 
-                                                />
                                 </div>
                             )}
 
