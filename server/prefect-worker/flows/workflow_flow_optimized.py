@@ -11,7 +11,7 @@ from prefect.futures import PrefectFuture
 import aiosqlite
 
 from tasks.node_handlers import NODE_HANDLERS
-from database import get_db_connection
+from database import Database
 from config import DATABASE_PATH
 
 

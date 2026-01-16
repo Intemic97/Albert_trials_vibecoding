@@ -3,8 +3,15 @@ Start the Workflow Orchestration Service
 
 This script starts the FastAPI service that receives workflow execution requests
 """
+import sys
+import io
 import uvicorn
 import config
+
+# Fix encoding for Windows console
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 if __name__ == "__main__":
     print("=" * 60)
