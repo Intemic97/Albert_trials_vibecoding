@@ -8,7 +8,7 @@ from prefect import task
 import config
 
 @task(name="trigger_node", retries=0)
-async def handle_trigger(node: Dict, input_data: Optional[Dict] = None) -> Dict:
+async def handle_trigger(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
     """Handle trigger node - initiates workflow"""
     return {
         "success": True,
@@ -17,7 +17,7 @@ async def handle_trigger(node: Dict, input_data: Optional[Dict] = None) -> Dict:
     }
 
 @task(name="manual_input_node", retries=0)
-async def handle_manual_input(node: Dict, input_data: Optional[Dict] = None) -> Dict:
+async def handle_manual_input(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
     """Handle manual input node - provides static values"""
     config_data = node.get("config", {})
     var_name = config_data.get("inputVarName") or config_data.get("variableName", "input")
@@ -30,7 +30,7 @@ async def handle_manual_input(node: Dict, input_data: Optional[Dict] = None) -> 
     }
 
 @task(name="output_node", retries=0)
-async def handle_output(node: Dict, input_data: Optional[Dict] = None) -> Dict:
+async def handle_output(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
     """Handle output node - marks final output"""
     return {
         "success": True,
@@ -40,7 +40,7 @@ async def handle_output(node: Dict, input_data: Optional[Dict] = None) -> Dict:
     }
 
 @task(name="http_request", retries=2)
-async def handle_http(node: Dict, input_data: Optional[Dict] = None) -> Dict:
+async def handle_http(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
     """Handle HTTP request node"""
     config_data = node.get("config", {})
     url = config_data.get("httpUrl")
@@ -76,7 +76,7 @@ async def handle_http(node: Dict, input_data: Optional[Dict] = None) -> Dict:
         }
 
 @task(name="llm_call", retries=2)
-async def handle_llm(node: Dict, input_data: Optional[Dict] = None) -> Dict:
+async def handle_llm(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
     """Handle LLM/OpenAI node"""
     config_data = node.get("config", {})
     prompt = config_data.get("llmPrompt") or config_data.get("prompt")
@@ -119,7 +119,7 @@ async def handle_llm(node: Dict, input_data: Optional[Dict] = None) -> Dict:
         }
 
 @task(name="condition_check", retries=0)
-async def handle_condition(node: Dict, input_data: Optional[Dict] = None) -> Dict:
+async def handle_condition(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
     """Handle condition/branching node"""
     config_data = node.get("config", {})
     field = config_data.get("conditionField")
@@ -171,7 +171,7 @@ async def handle_condition(node: Dict, input_data: Optional[Dict] = None) -> Dic
     }
 
 @task(name="add_field", retries=0)
-async def handle_add_field(node: Dict, input_data: Optional[Dict] = None) -> Dict:
+async def handle_add_field(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
     """Handle add field transformation"""
     config_data = node.get("config", {})
     field_name = config_data.get("fieldName", "newField")
@@ -197,7 +197,7 @@ async def handle_add_field(node: Dict, input_data: Optional[Dict] = None) -> Dic
     }
 
 @task(name="join_data", retries=0)
-async def handle_join(node: Dict, input_data: Optional[Dict] = None) -> Dict:
+async def handle_join(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
     """Handle data join node"""
     config_data = node.get("config", {})
     strategy = config_data.get("joinStrategy", "concat")
@@ -223,7 +223,7 @@ async def handle_join(node: Dict, input_data: Optional[Dict] = None) -> Dict:
     }
 
 @task(name="webhook_receive", retries=0)
-async def handle_webhook(node: Dict, input_data: Optional[Dict] = None) -> Dict:
+async def handle_webhook(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
     """Handle webhook node - receives external data"""
     webhook_data = input_data or node.get("config", {}).get("webhookData", {})
     
@@ -237,13 +237,171 @@ async def handle_webhook(node: Dict, input_data: Optional[Dict] = None) -> Dict:
     }
 
 @task(name="comment_node", retries=0)
-async def handle_comment(node: Dict, input_data: Optional[Dict] = None) -> Dict:
+async def handle_comment(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
     """Handle comment node - no operation"""
     return {
         "success": True,
         "message": "Comment node (no action)",
         "outputData": input_data
     }
+
+@task(name="python_execution", retries=1)
+async def handle_python(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
+    """
+    Handle Python code execution node
+    Executes Python code with input data and returns the result
+    """
+    import subprocess
+    import tempfile
+    import base64
+    import platform
+    
+    config_data = node.get("config", {})
+    code = config_data.get("code", "")
+    
+    if not code:
+        raise ValueError("No Python code provided")
+    
+    try:
+        # Encode code to base64 to avoid injection
+        code_base64 = base64.b64encode(code.encode('utf-8')).decode('utf-8')
+        
+        # Create wrapper code with security restrictions
+        wrapper_code = f'''
+import sys
+import json
+import base64
+import signal
+
+# Timeout handler
+def timeout_handler(signum, frame):
+    raise TimeoutError("Execution timed out (30s limit)")
+
+# Set timeout (Unix only)
+if hasattr(signal, 'alarm'):
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(30)
+
+try:
+    # Decode user code
+    user_code = base64.b64decode("{code_base64}").decode('utf-8')
+    
+    # Create restricted globals
+    restricted_globals = {{
+        '__builtins__': {{
+            'abs': abs, 'all': all, 'any': any, 'bool': bool, 'dict': dict,
+            'enumerate': enumerate, 'filter': filter, 'float': float, 'int': int,
+            'isinstance': isinstance, 'len': len, 'list': list, 'map': map,
+            'max': max, 'min': min, 'print': print, 'range': range, 'reversed': reversed,
+            'round': round, 'set': set, 'sorted': sorted, 'str': str, 'sum': sum,
+            'tuple': tuple, 'type': type, 'zip': zip,
+        }},
+        'json': json,
+        'math': __import__('math'),
+        're': __import__('re'),
+        'datetime': __import__('datetime'),
+        'collections': __import__('collections'),
+        'itertools': __import__('itertools'),
+    }}
+    restricted_locals = {{}}
+    
+    # Execute user code in restricted environment
+    exec(user_code, restricted_globals, restricted_locals)
+    
+    # Read input from stdin
+    input_data = json.load(sys.stdin)
+    
+    # Execute user function (must be named 'process')
+    if 'process' in restricted_locals:
+        result = restricted_locals['process'](input_data)
+        print(json.dumps({{"success": True, "result": result}}))
+    else:
+        print(json.dumps({{"error": "Function 'process(data)' not found. Please define: def process(data): ..."}}))
+
+except TimeoutError as e:
+    print(json.dumps({{"error": str(e)}}))
+except MemoryError:
+    print(json.dumps({{"error": "Memory limit exceeded"}}))
+except Exception as e:
+    import traceback
+    print(json.dumps({{"error": f"Runtime Error: {{str(e)}}", "traceback": traceback.format_exc()}}))
+finally:
+    # Cancel alarm
+    if hasattr(signal, 'alarm'):
+        try:
+            signal.alarm(0)
+        except:
+            pass
+'''
+        
+        # Write to temp file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(wrapper_code)
+            temp_file = f.name
+        
+        try:
+            # Determine Python command
+            python_cmd = 'py' if platform.system() == 'Windows' else 'python3'
+            
+            # Execute Python script
+            process = subprocess.Popen(
+                [python_cmd, temp_file],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            # Send input data with timeout
+            input_json = json.dumps(input_data or {})
+            stdout, stderr = process.communicate(input=input_json, timeout=35)
+            
+            # Parse output
+            if stdout:
+                try:
+                    result = json.loads(stdout.strip())
+                    
+                    if "error" in result:
+                        return {
+                            "success": False,
+                            "message": f"Python execution failed: {result['error']}",
+                            "error": result.get("error"),
+                            "traceback": result.get("traceback"),
+                            "outputData": input_data  # Pass through input on error
+                        }
+                    
+                    return {
+                        "success": True,
+                        "message": "Python code executed successfully",
+                        "outputData": result.get("result", {}),
+                        "pythonResult": result.get("result")
+                    }
+                except json.JSONDecodeError:
+                    # Output is not JSON, treat as string
+                    return {
+                        "success": True,
+                        "message": "Python code executed (non-JSON output)",
+                        "outputData": {"output": stdout.strip()},
+                        "rawOutput": stdout.strip()
+                    }
+            
+            if stderr:
+                raise ValueError(f"Python execution error: {stderr}")
+            
+            raise ValueError("No output from Python execution")
+            
+        finally:
+            # Clean up temp file
+            import os
+            try:
+                os.unlink(temp_file)
+            except:
+                pass
+    
+    except subprocess.TimeoutExpired:
+        raise ValueError("Python execution timed out (30s limit)")
+    except Exception as e:
+        raise ValueError(f"Python execution failed: {str(e)}")
 
 # Export all handlers
 NODE_HANDLERS = {
@@ -257,5 +415,6 @@ NODE_HANDLERS = {
     "join": handle_join,
     "webhook": handle_webhook,
     "comment": handle_comment,
+    "python": handle_python,
 }
 
