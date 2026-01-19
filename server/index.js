@@ -4385,17 +4385,24 @@ app.get('/api/reports/:id', authenticateToken, async (req, res) => {
             ORDER BY uploadedAt DESC
         `, [id]);
         
+        // Create a map of template_section.id -> report_section.id (or template_section.id if no report_section exists)
+        const templateToReportIdMap = {};
+        templateSections.forEach(ts => {
+            const rs = reportSections.find(r => r.templateSectionId === ts.id);
+            templateToReportIdMap[ts.id] = rs?.id || ts.id;
+        });
+        
         // Merge template sections with report sections
         const sections = templateSections.map(ts => {
             const rs = reportSections.find(r => r.templateSectionId === ts.id);
             return {
-                id: rs?.id || ts.id, // Use report_section.id if exists, otherwise template_section.id
+                id: templateToReportIdMap[ts.id], // Use mapped ID
                 templateSectionId: ts.id,
                 title: ts.title,
                 content: ts.content,
                 generationRules: ts.generationRules,
                 sortOrder: ts.sortOrder,
-                parentId: ts.parentId,
+                parentId: ts.parentId ? templateToReportIdMap[ts.parentId] : null, // Map parentId too!
                 generatedContent: rs?.content || null,
                 userPrompt: rs?.userPrompt || null,
                 sectionStatus: rs?.status || 'empty',
