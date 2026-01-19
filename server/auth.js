@@ -262,8 +262,16 @@ async function switchOrganization(req, res) {
             return res.status(403).json({ error: 'User does not belong to this organization' });
         }
 
-        // Generate new token with updated orgId
-        const token = jwt.sign({ sub: userId, email: req.user.email, orgId }, JWT_SECRET, { expiresIn: '24h' });
+        // Get user's admin status to preserve it in the new token
+        const user = await db.get('SELECT isAdmin FROM users WHERE id = ?', [userId]);
+
+        // Generate new token with updated orgId and preserve isAdmin
+        const token = jwt.sign({ 
+            sub: userId, 
+            email: req.user.email, 
+            orgId, 
+            isAdmin: !!user?.isAdmin 
+        }, JWT_SECRET, { expiresIn: '24h' });
 
         res.cookie('auth_token', token, COOKIE_OPTIONS);
 

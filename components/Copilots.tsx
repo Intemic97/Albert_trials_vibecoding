@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Sparkles, Info, Bot, User, Plus, Trash2, MessageSquare, ArrowLeft, Menu, X } from 'lucide-react';
+import { Send, Loader2, Info, Bot, User, Plus, Trash2, MessageSquare, ArrowLeft, Menu, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../config';
 
@@ -276,7 +276,7 @@ export const Copilots: React.FC = () => {
     const examplePrompts = [
         "How many customers do we have?",
         "Show me products with price over 100",
-        "List all recent orders",
+        "List all recent production orders",
         "What are my top selling products?",
         "Show me customer demographics"
     ];
@@ -295,9 +295,8 @@ export const Copilots: React.FC = () => {
                     </button>
                     <div className="h-6 w-px bg-slate-200"></div>
                     <div className="flex items-center gap-2">
-                        <Sparkles size={20} className="text-teal-600" />
                         <h1 className="text-lg font-semibold text-slate-900">
-                            {currentChat?.title || 'Database Copilot'}
+                            {currentChat?.title || 'New Chat'}
                         </h1>
                     </div>
                 </div>
@@ -324,7 +323,7 @@ export const Copilots: React.FC = () => {
                         </div>
                         <button
                             onClick={createNewChat}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors font-medium"
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
                         >
                             <Plus size={18} />
                             New Chat
