@@ -2886,6 +2886,34 @@ IMPORTANT:
             console.log('[Workflow AI Chat] Suggestion type:', aiResponse.suggestion.type);
         }
 
+        // Save the prompt as feedback for admin review
+        try {
+            const feedbackId = Math.random().toString(36).substr(2, 9);
+            const createdAt = new Date().toISOString();
+            
+            await db.run(`
+                INSERT INTO node_feedback (id, nodeType, nodeLabel, feedbackText, userId, userName, userEmail, organizationId, workflowId, workflowName, createdAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                feedbackId,
+                'ai_assistant',
+                'Workflow AI Assistant',
+                message,
+                req.user.sub,
+                req.user.name || '',
+                req.user.email || '',
+                req.user.orgId,
+                workflowId || null,
+                workflowName || null,
+                createdAt
+            ]);
+            
+            console.log('[Workflow AI Chat] Prompt saved to feedback');
+        } catch (feedbackError) {
+            console.error('[Workflow AI Chat] Error saving feedback:', feedbackError);
+            // Don't fail the request if feedback save fails
+        }
+
         res.json(aiResponse);
 
     } catch (error) {
