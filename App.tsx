@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
+import { TopNav } from './components/TopNav';
 import { EntityCard } from './components/EntityCard';
 import { Reporting } from './components/Reporting';
 import { ReportEditor } from './components/ReportEditor';
@@ -14,15 +15,18 @@ import { AcceptInvite } from './components/AcceptInvite';
 import { ForgotPassword } from './components/ForgotPassword';
 import { ResetPassword } from './components/ResetPassword';
 import { InteractiveTutorial } from './components/InteractiveTutorial';
+import { ReportBugModal } from './components/ReportBugModal';
 import { Settings } from './components/Settings';
 import { SharedDashboard } from './components/SharedDashboard';
 import { AdminPanel } from './components/AdminPanel';
 import { OnboardingModal } from './components/OnboardingModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Entity, Property, PropertyType } from './types';
-import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X, Code, Paperclip, Download, Loader2, Sparkles } from 'lucide-react';
+import { Plus, Search, Filter, ArrowLeft, Trash2, Link as LinkIcon, Type, Hash, Pencil, X, Code, Paperclip, Download, Loader2, Sparkles } from 'lucide-react';
 import { Copilots } from './components/Copilots';
-import { ProfileMenu } from './components/ProfileMenu';
+import { LogsAndAlerts } from './components/LogsAndAlerts';
+import { Connections } from './components/Connections';
+import { Documentation } from './components/Documentation';
 import { API_BASE } from './config';
 
 export default function App() {
@@ -56,6 +60,16 @@ function AuthenticatedApp() {
     
     // Tutorial state
     const [showTutorial, setShowTutorial] = useState(false);
+    const [showReportBug, setShowReportBug] = useState(false);
+    
+    // Listen for report bug event from Sidebar
+    React.useEffect(() => {
+        const handleShowReportBug = () => {
+            setShowReportBug(true);
+        };
+        window.addEventListener('showReportBug', handleShowReportBug);
+        return () => window.removeEventListener('showReportBug', handleShowReportBug);
+    }, []);
     
     // Track if onboarding was pending to detect when it completes
     const wasOnboardingPendingRef = React.useRef<boolean>(false);
@@ -68,12 +82,19 @@ function AuthenticatedApp() {
         if (path.startsWith('/database')) return 'database';
         if (path.startsWith('/reports')) return 'reports';
         if (path.startsWith('/copilots')) return 'copilots';
+        if (path.startsWith('/logs')) return 'logs';
+        if (path.startsWith('/connections')) return 'connections';
+        if (path.startsWith('/documentation')) return 'documentation';
         if (path.startsWith('/settings')) return 'settings';
         if (path.startsWith('/admin')) return 'admin';
         return 'overview';
     };
 
     const currentView = getCurrentView();
+    const hideSidebarForRoutes = location.pathname.match(/^\/reports\/[^/]+$/) ||
+        location.pathname.match(/^\/workflow\/[^/]+$/) ||
+        location.pathname.match(/^\/copilots/) ||
+        location.pathname.match(/^\/documentation/);
 
     // Navigation helper that maps view names to routes
     const handleNavigate = (view: string) => {
@@ -84,6 +105,8 @@ function AuthenticatedApp() {
             'database': '/database',
             'reports': '/reports',
             'copilots': '/copilots',
+            'logs': '/logs',
+            'documentation': '/documentation',
             'settings': '/settings',
             'admin': '/admin',
         };
@@ -199,6 +222,16 @@ function AuthenticatedApp() {
 
     // Entity Search State
     const [entitySearchQuery, setEntitySearchQuery] = useState('');
+
+    useEffect(() => {
+        if (location.pathname.startsWith('/database')) {
+            const params = new URLSearchParams(location.search);
+            const query = params.get('q');
+            if (query !== null) {
+                setEntitySearchQuery(query);
+            }
+        }
+    }, [location.pathname, location.search]);
 
     // Fetch Entities on Mount
     useEffect(() => {
@@ -800,7 +833,7 @@ function AuthenticatedApp() {
     const showOnboarding = user && !user.onboardingCompleted;
 
     return (
-        <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+        <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 text-[15px]">
             {showOnboarding && (
                 <OnboardingModal onComplete={() => {
                     // Post-onboarding actions (fetchEntities + tutorial) are handled by 
@@ -824,12 +857,26 @@ function AuthenticatedApp() {
                     }}
                 />
             )}
-            {/* Hide sidebar when in report editor, workflow editor, or copilots for more space */}
-            {!location.pathname.match(/^\/reports\/[^/]+$/) && !location.pathname.match(/^\/workflow\/[^/]+$/) && !location.pathname.match(/^\/copilots/) && (
-                <Sidebar activeView={currentView} onNavigate={handleNavigate} />
+            
+            <ReportBugModal 
+                isOpen={showReportBug} 
+                onClose={() => setShowReportBug(false)} 
+            />
+            
+            {/* Hide sidebar when in report editor, workflow editor, workflows, or copilots for more space */}
+            {!hideSidebarForRoutes && (
+                <Sidebar 
+                    activeView={currentView} 
+                    onNavigate={handleNavigate}
+                    onShowTutorial={() => setShowTutorial(true)}
+                />
             )}
 
-            <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
+            <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+                {!hideSidebarForRoutes && (
+                    <TopNav activeView={currentView} />
+                )}
+                <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
                 <Routes>
                     <Route path="/" element={<Navigate to="/overview" replace />} />
                     <Route path="/overview" element={
@@ -865,6 +912,15 @@ function AuthenticatedApp() {
                     <Route path="/copilots" element={
                         <Copilots />
                     } />
+                    <Route path="/logs" element={
+                        <LogsAndAlerts />
+                    } />
+                    <Route path="/connections" element={
+                        <Connections />
+                    } />
+                    <Route path="/documentation" element={
+                        <Documentation />
+                    } />
                     <Route path="/settings" element={
                         <Settings onViewChange={handleNavigate} onShowTutorial={() => setShowTutorial(true)} />
                     } />
@@ -884,23 +940,20 @@ function AuthenticatedApp() {
                                         <ArrowLeft size={20} />
                                     </button>
                                     <div>
-                                        <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                            <Database size={20} className="text-teal-600" />
+                                        <h1 className="text-lg font-semibold text-slate-900">
                                             {activeEntity.name}
                                         </h1>
-                                        <p className="text-xs text-slate-500">Managing structure properties</p>
+                                        <p className="text-[11px] text-slate-500">Managing structure properties</p>
                                     </div>
                                 </div>
                             ) : (
                                 <div>
-                                    <h1 className="text-2xl font-bold text-slate-800">Your database</h1>
-                                    <p className="text-sm text-slate-500">View and manage your different entities</p>
+                                    <h1 className="text-lg font-semibold text-slate-900">Your database</h1>
+                                    <p className="text-[11px] text-slate-500">View and manage your different entities</p>
                                 </div>
                             )}
 
-                            <div className="flex items-center space-x-4">
-                                <ProfileMenu onNavigate={handleNavigate} />
-                            </div>
+                            <div />
                         </header>
 
                         {/* Content Area */}
@@ -919,24 +972,24 @@ function AuthenticatedApp() {
                                                 </div>
                                                 <div className="flex space-x-3">
                                                     <div className="relative">
-                                                        <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                                                        <Search className="absolute left-3 top-2 text-slate-400" size={14} />
                                                         <input
                                                             type="text"
                                                             placeholder="Search entities..."
                                                             value={entitySearchQuery}
                                                             onChange={(e) => setEntitySearchQuery(e.target.value)}
-                                                            className="pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent w-64 shadow-sm"
+                                                            className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 w-60"
                                                         />
                                                     </div>
-                                                    <button className="flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm transition-colors">
-                                                        <Filter size={16} className="mr-2" />
+                                                    <button className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                                                        <Filter size={14} className="mr-2" />
                                                         Filter
                                                     </button>
                                                     <button
                                                         onClick={() => setIsCreatingEntity(true)}
-                                                        className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-md transition-colors"
+                                                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-colors"
                                                     >
-                                                        <Plus size={16} className="mr-2" />
+                                                        <Plus size={14} className="mr-2" />
                                                         Create Entity
                                                     </button>
                                                 </div>
@@ -1331,44 +1384,46 @@ function AuthenticatedApp() {
                         {/* Create Entity Modal */}
                         {isCreatingEntity && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-                                <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
-                                    <h2 className="text-xl font-bold text-slate-800 mb-4">Create New Entity</h2>
+                                <div className="bg-white rounded-lg border border-slate-200 shadow-lg w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden">
+                                    <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/50">
+                                        <h2 className="text-sm font-semibold text-slate-900">Create New Entity</h2>
+                                    </div>
 
-                                    <div className="space-y-4">
+                                    <div className="p-5 space-y-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">Entity Name</label>
+                                            <label className="block text-xs font-medium text-slate-600 mb-1">Entity Name</label>
                                             <input
                                                 autoFocus
                                                 type="text"
                                                 value={newEntityName}
                                                 onChange={(e) => setNewEntityName(e.target.value)}
                                                 placeholder="e.g. Products"
-                                                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-slate-300 focus:outline-none"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                                            <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
                                             <textarea
                                                 value={newEntityDescription}
                                                 onChange={(e) => setNewEntityDescription(e.target.value)}
                                                 placeholder="Describe what this entity represents..."
                                                 rows={3}
-                                                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none resize-none"
+                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-slate-300 focus:outline-none resize-none"
                                             />
                                         </div>
                                     </div>
 
-                                    <div className="flex justify-end space-x-3 mt-6">
+                                    <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-200 bg-slate-50/50">
                                         <button
                                             onClick={() => setIsCreatingEntity(false)}
-                                            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
+                                            className="px-3 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={handleCreateEntity}
                                             disabled={!newEntityName.trim()}
-                                            className="px-4 py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            className="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                         >
                                             Create Entity
                                         </button>
@@ -1397,7 +1452,7 @@ function AuthenticatedApp() {
                                                                 const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
                                                                 setNewRecordValues({ ...newRecordValues, [prop.id]: selectedOptions });
                                                             }}
-                                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none min-h-[100px]"
+                                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-300 focus:border-slate-300 focus:outline-none min-h-[100px] appearance-none cursor-pointer hover:border-slate-300 transition-colors"
                                                         >
                                                             {relatedInfo?.records.map(rec => (
                                                                 <option key={rec.id} value={rec.id}>
@@ -1620,7 +1675,8 @@ function AuthenticatedApp() {
                     </div>
                     } />
                 </Routes>
-            </main>
+                </main>
+            </div>
         </div>
     );
 }

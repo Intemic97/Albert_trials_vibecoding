@@ -1223,7 +1223,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                             printWindow.document.close();
                                             printWindow.print();
                                         }}
-                                        className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
+                                        className="flex items-center gap-2 px-3 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-medium"
                                     >
                                         <Download size={16} />
                                         Export as PDF
@@ -1681,7 +1681,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     onClick={() => handleAcceptSuggestion(pendingSuggestion.messageId)}
-                                                    className="px-4 py-2 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium shadow-sm"
+                                                    className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
                                                 >
                                                     <Check size={16} />
                                                     Accept
@@ -2860,7 +2860,7 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                     <button
                         onClick={handleSubmit}
                         disabled={isSaving}
-                        className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                        className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
                         {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                         Save Changes

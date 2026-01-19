@@ -74,10 +74,10 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
 
     const getColorClasses = (color: string) => {
         const colors: Record<string, { bg: string; icon: string; border: string; ring: string }> = {
-            blue: { bg: 'bg-blue-100', icon: 'text-blue-600', border: 'border-blue-200', ring: 'ring-blue-500' },
-            purple: { bg: 'bg-purple-100', icon: 'text-purple-600', border: 'border-purple-200', ring: 'ring-purple-500' },
-            teal: { bg: 'bg-teal-100', icon: 'text-teal-600', border: 'border-teal-200', ring: 'ring-teal-500' },
-            orange: { bg: 'bg-orange-100', icon: 'text-orange-600', border: 'border-orange-200', ring: 'ring-orange-500' }
+            blue: { bg: 'bg-slate-50', icon: 'text-slate-900', border: 'border-slate-200', ring: 'ring-slate-300' },
+            purple: { bg: 'bg-slate-50', icon: 'text-slate-900', border: 'border-slate-200', ring: 'ring-slate-300' },
+            teal: { bg: 'bg-slate-50', icon: 'text-slate-900', border: 'border-slate-200', ring: 'ring-slate-300' },
+            orange: { bg: 'bg-slate-50', icon: 'text-slate-900', border: 'border-slate-200', ring: 'ring-slate-300' }
         };
         return colors[color] || colors.blue;
     };
@@ -86,27 +86,22 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
     const Icon = currentQuestion.icon;
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-300">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-lg overflow-hidden">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-8 text-white rounded-t-2xl">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-white/20 rounded-lg backdrop-blur">
-                            <Sparkles size={24} />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-bold">Welcome to Intemic!</h1>
-                            <p className="text-slate-300 text-sm">Hi {user?.name}, let's get to know you</p>
-                        </div>
+                <div className="px-6 py-5 text-slate-900 border-b border-slate-200 bg-white">
+                    <div>
+                        <h1 className="text-lg font-semibold">Welcome to Intemic</h1>
+                        <p className="text-slate-500 text-xs">Hi {user?.name}, let's get to know you</p>
                     </div>
                     
                     {/* Progress bar */}
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mt-4">
                         {questions.map((_, i) => (
                             <div 
                                 key={i}
                                 className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                                    i <= step ? 'bg-white' : 'bg-white/30'
+                                    i <= step ? 'bg-slate-900' : 'bg-slate-200'
                                 }`}
                             />
                         ))}
@@ -116,14 +111,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                 {/* Content */}
                 <div className="p-6">
                     <div className="mb-6">
-                        <div className={`inline-flex items-center gap-2 px-3 py-1.5 ${colors.bg} rounded-full mb-4`}>
-                            <Icon size={16} className={colors.icon} />
-                            <span className={`text-sm font-medium ${colors.icon}`}>
+                        <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-slate-50 rounded-md mb-3 border border-slate-200">
+                            <Icon size={14} className="text-slate-600" />
+                            <span className="text-xs font-medium text-slate-600">
                                 Question {step + 1} of {questions.length}
                             </span>
                         </div>
                         
-                        <h2 className="text-xl font-semibold text-slate-800 mb-2">
+                        <h2 className="text-base font-semibold text-slate-900 mb-2 tracking-tight">
                             {currentQuestion.title}
                         </h2>
                     </div>
@@ -133,7 +128,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                         value={formData[currentQuestion.key as keyof typeof formData]}
                         onChange={(e) => handleInputChange(e.target.value)}
                         placeholder={currentQuestion.placeholder}
-                        className={`w-full px-4 py-3 border-2 ${colors.border} rounded-xl focus:outline-none focus:ring-2 ${colors.ring} focus:border-transparent transition-all text-slate-800 placeholder:text-slate-400`}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 transition-all bg-white text-slate-900 placeholder:text-slate-400 text-sm"
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && canProceed) {
                                 handleNext();
@@ -142,7 +137,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                         autoFocus
                     />
 
-                    <p className="text-xs text-slate-400 mt-2 italic">
+                    <p className="text-[11px] text-slate-400 mt-2 italic">
                         {currentQuestion.placeholder}
                     </p>
                 </div>
@@ -151,7 +146,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                 <div className="px-6 pb-6 flex justify-between items-center">
                     <button
                         onClick={() => step > 0 && setStep(step - 1)}
-                        className={`text-sm text-slate-500 hover:text-slate-700 transition-colors ${
+                        className={`text-xs text-slate-500 hover:text-slate-700 transition-colors ${
                             step === 0 ? 'invisible' : ''
                         }`}
                     >
@@ -161,7 +156,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                     <button
                         onClick={handleNext}
                         disabled={!canProceed || isSubmitting}
-                        className={`flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-xl font-medium hover:from-slate-600 hover:to-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-slate-500/25`}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {isSubmitting ? (
                             <>

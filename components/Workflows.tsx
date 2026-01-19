@@ -1,6 +1,7 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut, Bot, Smartphone, BarChart3 } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut, Bot, Smartphone, BarChart3, User, Calendar, ChevronRight } from 'lucide-react';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
@@ -108,6 +109,15 @@ interface WorkflowNode {
         // For Data Visualization nodes:
         visualizationPrompt?: string;
         generatedWidget?: WidgetConfig;
+        // For SAP Fetch nodes:
+        sapConnectionName?: string;
+        sapAuthType?: string;
+        sapClientId?: string;
+        sapClientSecret?: string;
+        sapTokenUrl?: string;
+        sapBaseApiUrl?: string;
+        sapServicePath?: string;
+        sapEntity?: string;
         // Custom node name
         customName?: string;
     };
@@ -129,7 +139,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook' | 'sapFetch';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -146,6 +156,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'saveRecords', label: 'Save to Database', icon: Database, description: 'Create or update records', category: 'Data' },
     { type: 'http', label: 'HTTP Request', icon: Globe, description: 'Fetch data from an external API', category: 'Data' },
     { type: 'mysql', label: 'MySQL', icon: Database, description: 'Query data from MySQL database', category: 'Data' },
+    { type: 'sapFetch', label: 'SAP S/4HANA', icon: Database, description: 'Read data from SAP S/4HANA OData API', category: 'Data' },
     { type: 'esios', label: 'Energy Prices', icon: Zap, description: 'Fetch prices from Red Eléctrica', category: 'Data' },
     { type: 'climatiq', label: 'Emission Factors', icon: Leaf, description: 'Search CO2 emission factors', category: 'Data' },
     { type: 'manualInput', label: 'Manual Data Input', icon: Edit, description: 'Define a variable with a value', category: 'Data' },
@@ -619,6 +630,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [mysqlPassword, setMysqlPassword] = useState<string>('');
     const [mysqlQuery, setMysqlQuery] = useState<string>('SELECT * FROM ');
 
+    // SAP Fetch Node State
+    const [configuringSAPNodeId, setConfiguringSAPNodeId] = useState<string | null>(null);
+    const [sapConnectionName, setSapConnectionName] = useState<string>('SAP_Production');
+    const [sapAuthType, setSapAuthType] = useState<string>('OAuth2_Client_Credentials');
+    const [sapClientId, setSapClientId] = useState<string>('');
+    const [sapClientSecret, setSapClientSecret] = useState<string>('');
+    const [sapTokenUrl, setSapTokenUrl] = useState<string>('');
+    const [sapBaseApiUrl, setSapBaseApiUrl] = useState<string>('');
+    const [sapServicePath, setSapServicePath] = useState<string>('/sap/opu/odata/sap/');
+    const [sapEntity, setSapEntity] = useState<string>('');
+
     // Send Email Node State
     const [configuringEmailNodeId, setConfiguringEmailNodeId] = useState<string | null>(null);
     const [emailTo, setEmailTo] = useState<string>('');
@@ -675,6 +697,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [isPanning, setIsPanning] = useState(false);
     const [panStart, setPanStart] = useState({ x: 0, y: 0 });
     const canvasRef = useRef<HTMLDivElement>(null);
+    const sidebarRef = useRef<HTMLDivElement>(null);
+    const sidebarScrollRef = useRef<HTMLDivElement>(null);
+    const contentAreaRef = useRef<HTMLDivElement>(null);
     const [highlightedUserId, setHighlightedUserId] = useState<string | null>(null);
 
     // Workflow Runner State
@@ -990,6 +1015,50 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     useEffect(() => {
         fetchWorkflows();
     }, []);
+    
+    // Debug: Measure heights when canvas view is active
+    useEffect(() => {
+        if (currentView !== 'canvas') return;
+        
+        const measureHeights = () => {
+            // #region agent log
+            const root = document.querySelector('[data-tutorial="workflows-content"]');
+            const editor = document.querySelector('[data-tutorial="workflow-editor"]');
+            const topBar = editor?.querySelector('div:first-child');
+            const contentArea = contentAreaRef.current;
+            const sidebar = sidebarRef.current;
+            const scrollArea = sidebarScrollRef.current;
+            
+            const measurements = {
+                viewportHeight: window.innerHeight,
+                rootHeight: root?.getBoundingClientRect().height || 0,
+                rootComputedHeight: root ? window.getComputedStyle(root).height : 'none',
+                editorHeight: editor?.getBoundingClientRect().height || 0,
+                editorComputedHeight: editor ? window.getComputedStyle(editor).height : 'none',
+                topBarHeight: topBar?.getBoundingClientRect().height || 0,
+                contentAreaHeight: contentArea?.getBoundingClientRect().height || 0,
+                contentAreaComputedHeight: contentArea ? window.getComputedStyle(contentArea).height : 'none',
+                sidebarHeight: sidebar?.getBoundingClientRect().height || 0,
+                sidebarScrollHeight: sidebar?.scrollHeight || 0,
+                sidebarComputedHeight: sidebar ? window.getComputedStyle(sidebar).height : 'none',
+                scrollAreaHeight: scrollArea?.getBoundingClientRect().height || 0,
+                scrollAreaScrollHeight: scrollArea?.scrollHeight || 0,
+                scrollAreaComputedHeight: scrollArea ? window.getComputedStyle(scrollArea).height : 'none',
+            };
+            
+            fetch('http://127.0.0.1:7243/ingest/fd608484-a148-4cb0-9431-b6404421dcde',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Workflows.tsx:1020',message:'Height measurements',data:measurements,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D,E'})}).catch(()=>{});
+            // #endregion
+        };
+        
+        // Measure after a short delay to allow DOM to settle
+        const timeoutId = setTimeout(measureHeights, 100);
+        window.addEventListener('resize', measureHeights);
+        
+        return () => {
+            clearTimeout(timeoutId);
+            window.removeEventListener('resize', measureHeights);
+        };
+    }, [currentView, isSidebarCollapsed]);
     
     // Sync URL with component state
     useEffect(() => {
@@ -1642,6 +1711,46 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 : n
         ));
         setConfiguringHttpNodeId(null);
+    };
+
+    // SAP Node Functions
+    const openSAPConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'sapFetch') {
+            setConfiguringSAPNodeId(nodeId);
+            setSapConnectionName(node.config?.sapConnectionName || 'SAP_Production');
+            setSapAuthType(node.config?.sapAuthType || 'OAuth2_Client_Credentials');
+            setSapClientId(node.config?.sapClientId || '');
+            setSapClientSecret(node.config?.sapClientSecret || '');
+            setSapTokenUrl(node.config?.sapTokenUrl || '');
+            setSapBaseApiUrl(node.config?.sapBaseApiUrl || '');
+            setSapServicePath(node.config?.sapServicePath || '/sap/opu/odata/sap/');
+            setSapEntity(node.config?.sapEntity || '');
+        }
+    };
+
+    const saveSAPConfig = () => {
+        if (!configuringSAPNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringSAPNodeId
+                ? {
+                    ...n,
+                    config: {
+                        ...n.config,
+                        sapConnectionName,
+                        sapAuthType,
+                        sapClientId,
+                        sapClientSecret,
+                        sapTokenUrl,
+                        sapBaseApiUrl,
+                        sapServicePath,
+                        sapEntity
+                    }
+                }
+                : n
+        ));
+        setConfiguringSAPNodeId(null);
     };
 
     // Webhook Node Functions
@@ -2650,6 +2759,27 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         }
                     } else {
                         result = 'Query not configured';
+                    }
+                    break;
+                case 'sapFetch':
+                    if (node.config?.sapEntity && node.config?.sapBaseApiUrl) {
+                        try {
+                            // TODO: Implement SAP OData API call when backend endpoint is ready
+                            // For now, return a placeholder message
+                            result = `SAP S/4HANA configured: ${node.config.sapEntity}`;
+                            nodeData = [{
+                                _note: 'SAP S/4HANA integration pending backend implementation',
+                                connection: node.config.sapConnectionName,
+                                entity: node.config.sapEntity,
+                                servicePath: node.config.sapServicePath
+                            }];
+                        } catch (error) {
+                            console.error('SAP fetch error:', error);
+                            result = `Error: ${error.message || 'Failed to fetch from SAP'}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'SAP connection not configured';
                     }
                     break;
                 case 'sendEmail':
@@ -3788,30 +3918,31 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // Get icon background color for node type
     const getNodeIconBg = (type: string) => {
         switch (type) {
-            case 'trigger': return 'bg-purple-100 text-purple-600';
-            case 'action': return 'bg-blue-100 text-blue-600';
-            case 'condition': return 'bg-amber-100 text-amber-600';
-            case 'fetchData': return 'bg-teal-100 text-teal-600';
-            case 'humanApproval': return 'bg-orange-100 text-orange-600';
-            case 'addField': return 'bg-indigo-100 text-indigo-600';
-            case 'saveRecords': return 'bg-emerald-100 text-emerald-600';
-            case 'llm': return 'bg-violet-100 text-violet-600';
-            case 'python': return 'bg-sky-100 text-sky-600';
-            case 'manualInput': return 'bg-pink-100 text-pink-600';
-            case 'output': return 'bg-indigo-100 text-indigo-600';
-            case 'http': return 'bg-cyan-100 text-cyan-600';
-            case 'mysql': return 'bg-blue-100 text-blue-600';
-            case 'esios': return 'bg-yellow-100 text-yellow-600';
-            case 'climatiq': return 'bg-green-100 text-green-600';
-            case 'join': return 'bg-cyan-100 text-cyan-600';
-            case 'splitColumns': return 'bg-sky-100 text-sky-600';
-            case 'excelInput': return 'bg-emerald-100 text-emerald-600';
-            case 'pdfInput': return 'bg-red-100 text-red-600';
-            case 'sendEmail': return 'bg-rose-100 text-rose-600';
-            case 'sendSMS': return 'bg-lime-100 text-lime-600';
-            case 'dataVisualization': return 'bg-indigo-100 text-indigo-600';
-            case 'webhook': return 'bg-purple-100 text-purple-600';
-            default: return 'bg-slate-100 text-slate-600';
+            case 'trigger': return 'bg-cyan-100 text-cyan-700';
+            case 'action': return 'bg-blue-100 text-blue-700';
+            case 'condition': return 'bg-slate-100 text-slate-700';
+            case 'fetchData': return 'bg-indigo-100 text-indigo-700';
+            case 'humanApproval': return 'bg-sky-100 text-sky-700';
+            case 'addField': return 'bg-indigo-100 text-indigo-700';
+            case 'saveRecords': return 'bg-blue-100 text-blue-700';
+            case 'llm': return 'bg-slate-100 text-slate-700';
+            case 'python': return 'bg-sky-100 text-sky-700';
+            case 'manualInput': return 'bg-indigo-100 text-indigo-700';
+            case 'output': return 'bg-indigo-100 text-indigo-700';
+            case 'http': return 'bg-cyan-100 text-cyan-700';
+            case 'mysql': return 'bg-blue-100 text-blue-700';
+            case 'sapFetch': return 'bg-indigo-100 text-indigo-700';
+            case 'esios': return 'bg-cyan-100 text-cyan-700';
+            case 'climatiq': return 'bg-sky-100 text-sky-700';
+            case 'join': return 'bg-cyan-100 text-cyan-700';
+            case 'splitColumns': return 'bg-sky-100 text-sky-700';
+            case 'excelInput': return 'bg-indigo-100 text-indigo-700';
+            case 'pdfInput': return 'bg-indigo-100 text-indigo-700';
+            case 'sendEmail': return 'bg-blue-100 text-blue-700';
+            case 'sendSMS': return 'bg-blue-100 text-blue-700';
+            case 'dataVisualization': return 'bg-indigo-100 text-indigo-700';
+            case 'webhook': return 'bg-cyan-100 text-cyan-700';
+            default: return 'bg-slate-100 text-slate-700';
         }
     };
 
@@ -3827,15 +3958,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     );
 
     return (
-        <div className="flex flex-col h-full bg-slate-50" data-tutorial="workflows-content">
+        <div className="flex flex-col bg-slate-50" data-tutorial="workflows-content" style={{ height: '100%', maxHeight: '100vh', overflow: 'hidden' }}>
             {currentView === 'list' ? (
                 /* Workflows List View */
                 <>
                     {/* Top Header */}
-                    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
+                    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
                         <div>
-                            <h1 className="text-2xl font-bold text-slate-800">Workflows</h1>
-                            <p className="text-sm text-slate-500">Manage and execute your automation workflows</p>
+                            <h1 className="text-lg font-semibold text-slate-900">Workflows</h1>
+                            <p className="text-[11px] text-slate-500">Manage and execute your automation workflows</p>
                         </div>
                         <div className="flex items-center space-x-4">
                             <ProfileMenu onNavigate={onViewChange} />
@@ -3854,7 +3985,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         placeholder="Search workflows..."
                                         value={workflowSearchQuery}
                                         onChange={(e) => setWorkflowSearchQuery(e.target.value)}
-                                        className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 w-80"
+                                        className="pl-10 pr-4 py-2 bg-white text-slate-800 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 w-80 placeholder:text-slate-400"
                                     />
                                 </div>
                                 <p className="text-sm text-slate-500">
@@ -3885,46 +4016,57 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <div
                                 key={workflow.id}
                                 onClick={() => openWorkflow(workflow.id)}
-                                className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-lg transition-all duration-200 cursor-pointer group relative flex flex-col justify-between min-h-[200px]"
+                                className="bg-white rounded-xl border-2 border-slate-200 p-6 hover:border-[#256A65] hover:shadow-lg transition-all duration-200 cursor-pointer group relative flex flex-col justify-between min-h-[200px]"
                             >
-                                <div>
-                                    <div className="flex justify-between items-start mb-4">
-                                        <h3 className="text-lg font-semibold text-slate-800 group-hover:text-teal-600 transition-colors">
-                                            {workflow.name}
-                                        </h3>
-                                        <div className="flex space-x-1">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    deleteWorkflow(workflow.id);
-                                                }}
-                                                className="text-slate-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-colors"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
+                                <div className="flex-1">
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                            <div className="p-2.5 bg-slate-50 rounded-lg flex-shrink-0 group-hover:bg-slate-100 transition-colors">
+                                                <Workflow size={18} className="text-slate-600" />
+                                            </div>
+                                            <h3 className="text-base font-semibold text-slate-900 group-hover:text-slate-700 transition-colors truncate flex-1">
+                                                {workflow.name}
+                                            </h3>
                                         </div>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                deleteWorkflow(workflow.id);
+                                            }}
+                                            className="text-slate-300 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
                                     </div>
 
-                                    <div className="space-y-1.5 mt-4">
-                                        <p className="text-xs text-slate-400">
-                                            Creator: <span className="text-slate-600 font-medium">{workflow.createdByName || 'Unknown'}</span>
-                                        </p>
-                                        <p className="text-xs text-slate-400">
-                                            Created: <span className="text-slate-600">{workflow.createdAt ? new Date(workflow.createdAt).toLocaleDateString() : 'Unknown'}</span>
-                                        </p>
-                                        <p className="text-xs text-slate-400">
-                                            Last edited: <span className="text-slate-600">{workflow.updatedAt ? new Date(workflow.updatedAt).toLocaleDateString() : 'Never'}</span>
-                                            {workflow.lastEditedByName && (
-                                                <span className="text-slate-500"> by <span className="text-slate-600 font-medium">{workflow.lastEditedByName}</span></span>
-                                            )}
-                                        </p>
+                                    <div className="space-y-2 mt-5 pt-4 border-t border-slate-100">
+                                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                                            <User size={12} className="text-slate-400 flex-shrink-0" />
+                                            <span className="text-slate-600">{workflow.createdByName || 'Unknown'}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                                            <Calendar size={12} className="text-slate-400 flex-shrink-0" />
+                                            <span className="text-slate-600">{workflow.createdAt ? new Date(workflow.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Unknown'}</span>
+                                        </div>
+                                        {workflow.updatedAt && (
+                                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                                                <Clock size={12} className="text-slate-400 flex-shrink-0" />
+                                                <span className="text-slate-600">
+                                                    Edited {workflow.updatedAt ? new Date(workflow.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Never'}
+                                                    {workflow.lastEditedByName && (
+                                                        <span className="text-slate-400"> by {workflow.lastEditedByName}</span>
+                                                    )}
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
-                                <div className="flex justify-end mt-4">
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-700 border border-teal-100 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        Edit
-                                    </span>
+                                <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-100">
+                                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                                        <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <span className="opacity-0 group-hover:opacity-100 transition-opacity font-medium text-slate-600">Open workflow</span>
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -3951,9 +4093,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 </>
             ) : (
                 /* Canvas View */
-                <div data-tutorial="workflow-editor" className="flex flex-col flex-1 h-full">
+                <div data-tutorial="workflow-editor" className="flex flex-col min-h-0 overflow-hidden" style={{ height: '100%', maxHeight: '100%' }}>
                     {/* Top Bar */}
-                    <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-sm z-20">
+                    <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-sm z-20 shrink-0">
                         <div className="flex items-center gap-4 flex-1 min-w-0">
                             <button
                                 onClick={backToList}
@@ -4010,13 +4152,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     </div>
 
                     {/* Content Area (Sidebar + Canvas) */}
-                    <div className="flex flex-1 overflow-hidden">
+                    <div ref={contentAreaRef} className="flex flex-1 min-h-0 overflow-hidden" style={{ height: '100%', maxHeight: '100%' }}>
                     {/* Sidebar */}
-                    <div data-tutorial="node-palette" className={`${isSidebarCollapsed ? 'w-14' : 'w-72'} bg-slate-50 border-r border-slate-200 flex flex-col shadow-sm z-10 h-full transition-all duration-300`}>
+                    <div ref={sidebarRef} data-tutorial="node-palette" className={`${isSidebarCollapsed ? 'w-14' : 'w-72'} bg-slate-50 border-r border-slate-200 flex flex-col shadow-sm z-10 transition-all duration-300 overflow-hidden`} style={{ height: '100%', maxHeight: '100%' }}>
 
                         {!isSidebarCollapsed ? (
                             <>
-                                <div className="p-4 border-b border-slate-200 bg-white">
+                                <div className="p-4 border-b border-slate-200 bg-white shrink-0">
                                     <div className="flex items-center justify-between mb-1">
                                         <h2 className="text-lg font-bold text-slate-800">Components</h2>
                                         <button
@@ -4058,24 +4200,24 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </div>
                                 </div>
 
-                                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+                                <div ref={sidebarScrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50 custom-scrollbar" style={{ minHeight: 0, height: 0, flex: '1 1 0%' }}>
                                     {filteredItems.map((item) => (
                                         <div
                                             key={item.label}
                                             draggable
                                             onDragStart={(e) => handleDragStart(e, item)}
-                                            className="flex items-start p-3 bg-white border border-slate-200 rounded-xl shadow-sm cursor-grab hover:border-teal-500 hover:shadow-md transition-all group"
+                                            className="flex items-start p-2.5 bg-white border border-slate-200 rounded-lg shadow-sm cursor-grab hover:border-teal-500 hover:shadow-md transition-all group"
                                         >
-                                            <div className={`p-2 rounded-lg mr-3 ${item.category === 'Triggers' ? 'bg-purple-100 text-purple-600' :
-                                                item.category === 'Data' ? 'bg-teal-100 text-teal-600' :
-                                                    item.category === 'Logic' ? 'bg-amber-100 text-amber-600' :
-                                                        'bg-blue-100 text-blue-600'
+                                            <div className={`p-1.5 rounded-md mr-2.5 flex-shrink-0 ${item.category === 'Triggers' ? 'bg-cyan-50 text-cyan-700 border border-cyan-200' :
+                                                item.category === 'Data' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
+                                                    item.category === 'Logic' ? 'bg-slate-100 text-slate-700 border border-slate-300' :
+                                                        'bg-blue-50 text-blue-700 border border-blue-200'
                                                 }`}>
-                                                <item.icon size={20} />
+                                                <item.icon size={16} />
                                             </div>
-                                            <div>
-                                                <h3 className="text-sm font-semibold text-slate-800 group-hover:text-teal-700 transition-colors">{item.label}</h3>
-                                                <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
+                                            <div className="min-w-0 flex-1">
+                                                <h3 className="text-xs font-semibold text-slate-800 group-hover:text-teal-700 transition-colors leading-tight">{item.label}</h3>
+                                                <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">{item.description}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -4093,21 +4235,21 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <ChevronsRight size={18} />
                                     </button>
                                 </div>
-                                <div className="flex-1 overflow-y-auto py-3 space-y-2">
+                                <div className="flex-1 overflow-y-auto py-2 space-y-1.5 custom-scrollbar" style={{ minHeight: 0, height: 0, flex: '1 1 0%' }}>
                                     {filteredItems.map((item) => (
                                         <div
                                             key={item.label}
                                             draggable
                                             onDragStart={(e) => handleDragStart(e, item)}
-                                            className="mx-2 p-2 bg-white border border-slate-200 rounded-lg shadow-sm cursor-grab hover:border-teal-500 hover:shadow-md transition-all group flex items-center justify-center"
+                                            className="mx-2 p-1.5 bg-white border border-slate-200 rounded-md shadow-sm cursor-grab hover:border-teal-500 hover:shadow-md transition-all group flex items-center justify-center"
                                             title={item.label}
                                         >
-                                            <div className={`p-1.5 rounded-md ${item.category === 'Triggers' ? 'bg-purple-100 text-purple-600' :
-                                                item.category === 'Data' ? 'bg-teal-100 text-teal-600' :
-                                                    item.category === 'Logic' ? 'bg-amber-100 text-amber-600' :
-                                                        'bg-blue-100 text-blue-600'
+                                            <div className={`p-1 rounded ${item.category === 'Triggers' ? 'bg-cyan-100 text-cyan-700' :
+                                                item.category === 'Data' ? 'bg-indigo-100 text-indigo-700' :
+                                                    item.category === 'Logic' ? 'bg-slate-100 text-slate-700' :
+                                                        'bg-blue-100 text-blue-700'
                                                 }`}>
-                                                <item.icon size={18} />
+                                                <item.icon size={16} />
                                             </div>
                                         </div>
                                     ))}
@@ -4119,7 +4261,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     {/* Canvas */}
                     <div data-tutorial="workflow-canvas" className="flex-1 flex flex-col relative overflow-hidden bg-slate-50">
                         {/* Canvas Area */}
-                        <div className="flex-1 relative overflow-hidden bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px]">
+                        <div className="flex-1 relative overflow-hidden" style={{ 
+                            backgroundImage: 'radial-gradient(circle, #cbd5e1 1.5px, transparent 1.5px)',
+                            backgroundSize: '20px 20px',
+                            backgroundPosition: '0 0',
+                            backgroundColor: '#f8fafc'
+                        }}>
 
                         <div
                             ref={canvasRef}
@@ -4156,14 +4303,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 // Hide cursor when leaving canvas
                                 sendCursorPosition(-100, -100, -100, -100);
                             }}
-                            className="w-full h-full relative bg-slate-100"
+                            className="w-full h-full relative"
                             style={{ 
-                                cursor: isPanning ? 'grabbing' : 'default',
-                                backgroundImage: `
-                                    linear-gradient(to right, #e2e8f0 1px, transparent 1px),
-                                    linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)
-                                `,
-                                backgroundSize: '20px 20px'
+                                cursor: isPanning ? 'grabbing' : 'default'
                             }}
                         >
                             {/* Remote Cursors */}
@@ -4461,6 +4603,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openWebhookConfig(node.id);
                                             } else if (node.type === 'mysql') {
                                                 openMySQLConfig(node.id);
+                                            } else if (node.type === 'sapFetch') {
+                                                openSAPConfig(node.id);
                                             } else if (node.type === 'sendEmail') {
                                                 openEmailConfig(node.id);
                                             } else if (node.type === 'sendSMS') {
@@ -5313,6 +5457,163 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             onClick={saveMySQLConfig}
                                             disabled={!mysqlQuery.trim()}
                                             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+                                        >
+                                            Save
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* SAP Fetch Configuration Modal */}
+                        {configuringSAPNodeId && (
+                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringSAPNodeId(null)}>
+                                <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                    <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                                        <Database className="text-indigo-600" size={20} />
+                                        SAP S/4HANA
+                                    </h3>
+                                    <p className="text-sm text-slate-500 mb-4">Read data from SAP S/4HANA OData API</p>
+                                    
+                                    <div className="space-y-4">
+                                        {/* Connection Settings */}
+                                        <div className="border-b border-slate-200 pb-3">
+                                            <h4 className="text-sm font-semibold text-slate-700 mb-3">Connection</h4>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    Connection Name
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={sapConnectionName}
+                                                    onChange={(e) => setSapConnectionName(e.target.value)}
+                                                    placeholder="SAP_Production"
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Authentication */}
+                                        <div className="border-b border-slate-200 pb-3">
+                                            <h4 className="text-sm font-semibold text-slate-700 mb-3">Authentication</h4>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Auth Type
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={sapAuthType}
+                                                        onChange={(e) => setSapAuthType(e.target.value)}
+                                                        placeholder="OAuth2_Client_Credentials"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Client ID
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={sapClientId}
+                                                        onChange={(e) => setSapClientId(e.target.value)}
+                                                        placeholder="sb-83f9a9..."
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Client Secret
+                                                    </label>
+                                                    <input
+                                                        type="password"
+                                                        value={sapClientSecret}
+                                                        onChange={(e) => setSapClientSecret(e.target.value)}
+                                                        placeholder="********"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Token URL
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={sapTokenUrl}
+                                                        onChange={(e) => setSapTokenUrl(e.target.value)}
+                                                        placeholder="https://company.authentication.eu10.hana.ondemand.com/oauth/token"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* API Configuration */}
+                                        <div>
+                                            <h4 className="text-sm font-semibold text-slate-700 mb-3">API Configuration</h4>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Base API URL
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={sapBaseApiUrl}
+                                                        onChange={(e) => setSapBaseApiUrl(e.target.value)}
+                                                        placeholder="https://company-api.s4hana.ondemand.com"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Service Path
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={sapServicePath}
+                                                        onChange={(e) => setSapServicePath(e.target.value)}
+                                                        placeholder="/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Entity
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={sapEntity}
+                                                        onChange={(e) => setSapEntity(e.target.value)}
+                                                        placeholder="A_ProductionOrder"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Feedback Link */}
+                                    <div className="mt-4 pt-2 border-t border-slate-100">
+                                        <button
+                                            onClick={() => openFeedbackPopup('sapFetch', 'SAP S/4HANA')}
+                                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                        >
+                                            <MessageSquare size={14} />
+                                            What would you like this node to do?
+                                        </button>
+                                    </div>
+
+                                    <div className="flex gap-2 justify-end mt-6">
+                                        <button
+                                            onClick={() => setConfiguringSAPNodeId(null)}
+                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveSAPConfig}
+                                            disabled={!sapBaseApiUrl.trim() || !sapEntity.trim()}
+                                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
                                         >
                                             Save
                                         </button>
@@ -7971,35 +8272,39 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             {/* Exit Confirmation Modal */}
             {showExitConfirmation && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70]" onClick={() => setShowExitConfirmation(false)}>
-                    <div className="bg-white rounded-xl shadow-2xl p-6 w-[420px] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
-                                <AlertCircle size={24} className="text-amber-600" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-slate-800">Unsaved Changes</h3>
-                                <p className="text-sm text-slate-500">Do you want to save your workflow before leaving?</p>
+                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-[70] p-4" onClick={() => setShowExitConfirmation(false)}>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-[#256A65]/5 to-transparent">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
+                                    <AlertCircle size={20} className="text-amber-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="text-base font-semibold text-slate-900">Unsaved Changes</h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">Do you want to save your workflow before leaving?</p>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="flex gap-2 justify-end mt-5">
+                        {/* Actions */}
+                        <div className="px-6 py-4 flex gap-2 justify-end">
                             <button
                                 onClick={() => setShowExitConfirmation(false)}
-                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700"
+                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={confirmExitWithoutSaving}
-                                className="px-4 py-2 border border-red-200 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm font-medium"
+                                className="px-4 py-2 border border-red-200 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm font-medium transition-colors"
                             >
                                 Don't Save
                             </button>
                             <button
                                 onClick={confirmExitWithSaving}
                                 disabled={isSaving}
-                                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium flex items-center gap-2"
+                                className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2 transition-colors"
                             >
                                 {isSaving ? (
                                     <>

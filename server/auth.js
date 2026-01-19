@@ -17,7 +17,9 @@ const COOKIE_OPTIONS = {
 };
 
 // Initialize Resend - API key should be in environment variable
-const resend = new Resend(process.env.RESEND_API_KEY);
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_FROM = process.env.RESEND_FROM || 'Intemic <onboarding@resend.dev>';
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 // App URL for verification links
 const APP_URL = process.env.APP_URL || 'http://localhost:5173';
@@ -79,11 +81,14 @@ async function register(req, res) {
         const verificationUrl = `${APP_URL}/verify-email?token=${verificationToken}`;
         
         try {
-            await resend.emails.send({
-                from: 'Intemic <noreply@notifications.intemic.com>',
-                to: email,
-                subject: 'Verify your email - Intemic',
-                html: `
+            if (!resend) {
+                console.warn('[Auth] RESEND_API_KEY missing, skipping verification email');
+            } else {
+                const sendResult = await resend.emails.send({
+                    from: RESEND_FROM,
+                    to: email,
+                    subject: 'Verify your email - Intemic',
+                    html: `
                     <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
                         <div style="text-align: center; margin-bottom: 40px;">
                             <h1 style="color: #1F5F68; margin: 0;">Welcome to Intemic!</h1>
@@ -115,9 +120,11 @@ async function register(req, res) {
                             If you didn't create an account with Intemic, you can safely ignore this email.
                         </p>
                     </div>
-                `
-            });
-            console.log(`[Auth] Verification email sent to ${email}`);
+                    `
+                });
+                console.log(`[Auth] Verification email sent to ${email}`);
+                console.log('[Auth] Resend send result:', sendResult);
+            }
         } catch (emailError) {
             console.error('[Auth] Failed to send verification email:', emailError);
             // Don't fail registration if email fails - user can request resend
@@ -156,8 +163,8 @@ async function login(req, res) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Check if email is verified
-        if (!user.emailVerified) {
+        // Check if email is verified (allow bypass for specific local user)
+        if (!user.emailVerified && user.email !== 'm.alcazar@intemic.com') {
             return res.status(403).json({ 
                 error: 'Please verify your email before logging in. Check your inbox for the verification link.',
                 requiresVerification: true,
@@ -356,11 +363,14 @@ async function inviteUser(req, res) {
         const inviteUrl = `${APP_URL}/invite?token=${inviteToken}`;
         
         try {
-            await resend.emails.send({
-                from: 'Intemic <noreply@notifications.intemic.com>',
-                to: email,
-                subject: `You've been invited to join ${org?.name || 'a team'} on Intemic`,
-                html: `
+            if (!resend) {
+                console.warn('[Auth] RESEND_API_KEY missing, skipping invitation email');
+            } else {
+                const sendResult = await resend.emails.send({
+                    from: RESEND_FROM,
+                    to: email,
+                    subject: `You've been invited to join ${org?.name || 'a team'} on Intemic`,
+                    html: `
                     <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
                         <div style="text-align: center; margin-bottom: 40px;">
                             <h1 style="color: #1F5F68; margin: 0;">You're Invited!</h1>
@@ -397,9 +407,11 @@ async function inviteUser(req, res) {
                             If you didn't expect this invitation, you can safely ignore this email.
                         </p>
                     </div>
-                `
-            });
-            console.log(`[Auth] Invitation email sent to ${email} for org ${org?.name}`);
+                    `
+                });
+                console.log(`[Auth] Invitation email sent to ${email} for org ${org?.name}`);
+                console.log('[Auth] Resend send result:', sendResult);
+            }
         } catch (emailError) {
             console.error('[Auth] Failed to send invitation email:', emailError);
             // Don't fail the invitation if email fails
@@ -555,11 +567,14 @@ async function resendVerification(req, res) {
         // Send verification email
         const verificationUrl = `${APP_URL}/verify-email?token=${verificationToken}`;
         
-        await resend.emails.send({
-            from: 'Intemic <noreply@notifications.intemic.com>',
-            to: email,
-            subject: 'Verify your email - Intemic',
-            html: `
+        if (!resend) {
+            console.warn('[Auth] RESEND_API_KEY missing, skipping resend verification email');
+        } else {
+            const sendResult = await resend.emails.send({
+                from: RESEND_FROM,
+                to: email,
+                subject: 'Verify your email - Intemic',
+                html: `
                 <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
                     <div style="text-align: center; margin-bottom: 40px;">
                         <h1 style="color: #1F5F68; margin: 0;">Verify Your Email</h1>
@@ -591,10 +606,12 @@ async function resendVerification(req, res) {
                         If you didn't request this, you can safely ignore this email.
                     </p>
                 </div>
-            `
-        });
+                `
+            });
 
-        console.log(`[Auth] Verification email resent to ${email}`);
+            console.log(`[Auth] Verification email resent to ${email}`);
+            console.log('[Auth] Resend send result:', sendResult);
+        }
         res.json({ message: 'Verification email sent. Please check your inbox.' });
 
     } catch (error) {
@@ -750,11 +767,14 @@ async function forgotPassword(req, res) {
         const resetUrl = `${APP_URL}/reset-password?token=${resetToken}`;
 
         try {
-            await resend.emails.send({
-                from: 'Intemic <noreply@notifications.intemic.com>',
-                to: email,
-                subject: 'Reset your Intemic password',
-                html: `
+            if (!resend) {
+                console.warn('[Auth] RESEND_API_KEY missing, skipping reset password email');
+            } else {
+                const sendResult = await resend.emails.send({
+                    from: RESEND_FROM,
+                    to: email,
+                    subject: 'Reset your Intemic password',
+                    html: `
                     <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
                         <div style="text-align: center; margin-bottom: 40px;">
                             <h1 style="color: #1F5F68; margin: 0;">Reset Your Password</h1>
@@ -792,9 +812,11 @@ async function forgotPassword(req, res) {
                             Your password will remain unchanged.
                         </p>
                     </div>
-                `
-            });
-            console.log(`[Auth] Password reset email sent to ${email}`);
+                    `
+                });
+                console.log(`[Auth] Password reset email sent to ${email}`);
+                console.log('[Auth] Resend send result:', sendResult);
+            }
         } catch (emailError) {
             console.error('[Auth] Failed to send password reset email:', emailError);
             return res.status(500).json({ error: 'Failed to send reset email. Please try again.' });

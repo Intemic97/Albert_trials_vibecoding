@@ -27,7 +27,7 @@ const { register, login, logout, authenticateToken, getMe, getOrganizations, swi
 
 const app = express();
 const server = http.createServer(app);
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 // ==================== WEBSOCKET SETUP ====================
 const wss = new WebSocketServer({ server, path: '/ws' });
@@ -1517,7 +1517,7 @@ app.delete('/api/records/:id', authenticateToken, async (req, res) => {
 app.post('/api/database/ask', authenticateToken, async (req, res) => {
     console.log('[Database Assistant] Received question');
     try {
-        const { question, conversationHistory } = req.body;
+        const { question, conversationHistory, chatId, instructions, allowedEntities } = req.body;
         const orgId = req.user.orgId;
 
         if (!question) {
@@ -1528,8 +1528,35 @@ app.post('/api/database/ask', authenticateToken, async (req, res) => {
             return res.status(500).json({ error: 'OpenAI API Key not configured' });
         }
 
-        // Fetch all entities and their data for this organization
-        const entities = await db.all('SELECT * FROM entities WHERE organizationId = ?', [orgId]);
+        // If chatId is provided, try to load chat configuration
+        let chatInstructions = instructions;
+        let chatAllowedEntities = allowedEntities;
+        if (chatId) {
+            try {
+                const chat = await db.get(
+                    'SELECT instructions, allowedEntities FROM copilot_chats WHERE id = ? AND organizationId = ?',
+                    [chatId, orgId]
+                );
+                if (chat) {
+                    chatInstructions = chatInstructions || chat.instructions;
+                    chatAllowedEntities = chatAllowedEntities || (chat.allowedEntities ? JSON.parse(chat.allowedEntities) : null);
+                }
+            } catch (e) {
+                console.log('[Database Assistant] Could not load chat config:', e.message);
+            }
+        }
+
+        // Fetch entities - filter by allowedEntities if specified
+        let entitiesQuery = 'SELECT * FROM entities WHERE organizationId = ?';
+        let entitiesParams = [orgId];
+        
+        if (chatAllowedEntities && Array.isArray(chatAllowedEntities) && chatAllowedEntities.length > 0) {
+            const placeholders = chatAllowedEntities.map(() => '?').join(',');
+            entitiesQuery += ` AND id IN (${placeholders})`;
+            entitiesParams = [orgId, ...chatAllowedEntities];
+        }
+        
+        const entities = await db.all(entitiesQuery, entitiesParams);
         
         const databaseContext = {};
         
@@ -1596,10 +1623,16 @@ app.post('/api/database/ask', authenticateToken, async (req, res) => {
         const OpenAI = require('openai');
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+        // Build custom instructions
+        const customInstructions = chatInstructions 
+            ? `\n\nCUSTOM INSTRUCTIONS FOR THIS COPILOT:\n${chatInstructions}\n\nFollow these instructions when answering questions.`
+            : '';
+
         const systemPrompt = `You are a helpful database assistant for Intemic platform. You have access to the user's database and can answer questions about their data.
 
 DATABASE SCHEMA AND DATA:
 ${JSON.stringify(databaseContext, null, 2)}
+${customInstructions}
 
 INSTRUCTIONS:
 1. Answer questions about the data clearly and concisely
@@ -1611,6 +1644,7 @@ INSTRUCTIONS:
 7. If the question is ambiguous, ask for clarification
 8. You can perform calculations, aggregations, and comparisons on the data
 9. Always be helpful and provide context about where the data comes from
+${chatInstructions ? '10. Follow the custom instructions provided above for this specific copilot.' : ''}
 
 RESPONSE FORMAT:
 You must respond in valid JSON format with the following structure:
@@ -1690,7 +1724,9 @@ app.get('/api/copilot/chats', authenticateToken, async (req, res) => {
         // Parse messages JSON for each chat
         const parsedChats = chats.map(chat => ({
             ...chat,
-            messages: JSON.parse(chat.messages || '[]')
+            messages: JSON.parse(chat.messages || '[]'),
+            instructions: chat.instructions || null,
+            allowedEntities: chat.allowedEntities ? JSON.parse(chat.allowedEntities) : null
         }));
 
         res.json({ chats: parsedChats });
@@ -1707,10 +1743,22 @@ app.post('/api/copilot/chats', authenticateToken, async (req, res) => {
         const orgId = req.user.orgId;
         const { id, title, messages, createdAt, updatedAt } = req.body;
 
+        const { instructions, allowedEntities } = req.body;
+        
         await db.run(
-            `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, createdAt, updatedAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [id, userId, orgId, title, JSON.stringify(messages), createdAt, updatedAt]
+            `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, instructions, allowedEntities, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id, 
+                userId, 
+                orgId, 
+                title, 
+                JSON.stringify(messages), 
+                instructions || null,
+                allowedEntities ? JSON.stringify(allowedEntities) : null,
+                createdAt, 
+                updatedAt
+            ]
         );
 
         res.json({ success: true, chatId: id });
@@ -1738,9 +1786,18 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Chat not found' });
         }
 
+        const { instructions, allowedEntities } = req.body;
+        
         await db.run(
-            `UPDATE copilot_chats SET title = ?, messages = ?, updatedAt = ? WHERE id = ?`,
-            [title, JSON.stringify(messages), updatedAt, chatId]
+            `UPDATE copilot_chats SET title = ?, messages = ?, instructions = ?, allowedEntities = ?, updatedAt = ? WHERE id = ?`,
+            [
+                title, 
+                JSON.stringify(messages), 
+                instructions || null,
+                allowedEntities ? JSON.stringify(allowedEntities) : null,
+                updatedAt, 
+                chatId
+            ]
         );
 
         res.json({ success: true });
@@ -3571,6 +3628,138 @@ app.get('/api/workflow/:id/executions', async (req, res) => {
     } catch (error) {
         console.error('Error fetching executions:', error);
         res.status(500).json({ error: 'Failed to fetch executions' });
+    }
+});
+
+// Overview statistics endpoint
+app.get('/api/overview/stats', authenticateToken, async (req, res) => {
+    try {
+        const orgId = req.user.orgId;
+        
+        // Get workflow count
+        const workflowCount = await db.get(
+            'SELECT COUNT(*) as count FROM workflows WHERE organizationId = ?',
+            [orgId]
+        );
+        
+        // Get total executions count (events triggered)
+        const executionsCount = await db.get(
+            'SELECT COUNT(*) as count FROM workflow_executions WHERE workflowId IN (SELECT id FROM workflows WHERE organizationId = ?)',
+            [orgId]
+        );
+        
+        // Get executions from last 7 days for chart
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        const dailyExecutions = await db.all(`
+            SELECT 
+                DATE(createdAt) as date,
+                COUNT(*) as count
+            FROM workflow_executions 
+            WHERE workflowId IN (SELECT id FROM workflows WHERE organizationId = ?)
+                AND createdAt >= ?
+            GROUP BY DATE(createdAt)
+            ORDER BY date ASC
+        `, [orgId, sevenDaysAgo.toISOString()]);
+        
+        // Get recent workflows with execution counts
+        let recentWorkflowsRaw = [];
+        try {
+            recentWorkflowsRaw = await db.all(`
+                SELECT 
+                    w.id,
+                    w.name,
+                    w.updatedAt,
+                    COALESCE(COUNT(e.id), 0) as executionCount,
+                    MAX(e.createdAt) as lastExecutionAt,
+                    COALESCE(SUM(CASE WHEN e.status = 'running' THEN 1 ELSE 0 END), 0) as runningCount,
+                    COALESCE(SUM(CASE WHEN e.status = 'completed' THEN 1 ELSE 0 END), 0) as completedCount,
+                    COALESCE(SUM(CASE WHEN e.status = 'failed' THEN 1 ELSE 0 END), 0) as failedCount
+                FROM workflows w
+                LEFT JOIN workflow_executions e ON w.id = e.workflowId
+                WHERE w.organizationId = ?
+                GROUP BY w.id, w.name, w.updatedAt
+                ORDER BY COALESCE(MAX(e.createdAt), w.updatedAt) DESC
+                LIMIT 10
+            `, [orgId]);
+        } catch (error) {
+            console.error('[Overview Stats] Error fetching workflows:', error);
+            // If query fails, try simpler query without joins
+            try {
+                recentWorkflowsRaw = await db.all(`
+                    SELECT 
+                        id,
+                        name,
+                        updatedAt
+                    FROM workflows 
+                    WHERE organizationId = ?
+                    ORDER BY updatedAt DESC
+                    LIMIT 10
+                `, [orgId]);
+                // Add default values
+                recentWorkflowsRaw = recentWorkflowsRaw.map(w => ({
+                    ...w,
+                    executionCount: 0,
+                    lastExecutionAt: null,
+                    runningCount: 0,
+                    completedCount: 0,
+                    failedCount: 0
+                }));
+            } catch (e) {
+                console.error('[Overview Stats] Error with fallback query:', e);
+                recentWorkflowsRaw = [];
+            }
+        }
+        
+        console.log('[Overview Stats] Found workflows:', recentWorkflowsRaw.length);
+        
+        // Calculate percentage changes (comparing last 7 days vs previous 7 days)
+        const fourteenDaysAgo = new Date();
+        fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+        
+        const recentExecutions = await db.get(`
+            SELECT COUNT(*) as count FROM workflow_executions 
+            WHERE workflowId IN (SELECT id FROM workflows WHERE organizationId = ?)
+                AND createdAt >= ? AND createdAt < ?
+        `, [orgId, sevenDaysAgo.toISOString(), new Date().toISOString()]);
+        
+        const previousExecutions = await db.get(`
+            SELECT COUNT(*) as count FROM workflow_executions 
+            WHERE workflowId IN (SELECT id FROM workflows WHERE organizationId = ?)
+                AND createdAt >= ? AND createdAt < ?
+        `, [orgId, fourteenDaysAgo.toISOString(), sevenDaysAgo.toISOString()]);
+        
+        const eventsChange = previousExecutions.count > 0 
+            ? ((recentExecutions.count - previousExecutions.count) / previousExecutions.count * 100).toFixed(1)
+            : recentExecutions.count > 0 ? '100.0' : '0.0';
+        
+        res.json({
+            activeWorkflows: workflowCount?.count || 0,
+            eventsTriggered: executionsCount?.count || 0,
+            eventsChange: parseFloat(eventsChange) || 0,
+            dailyExecutions: (dailyExecutions || []).map(row => ({
+                date: row.date,
+                count: row.count
+            })),
+            recentWorkflows: (recentWorkflowsRaw || []).map(w => ({
+                id: w.id,
+                name: w.name,
+                executionCount: w.executionCount || 0,
+                lastExecutionAt: w.lastExecutionAt || null,
+                status: w.runningCount > 0 ? 'running' : (w.failedCount > 0 ? 'error' : (w.completedCount > 0 ? 'paused' : 'paused'))
+            }))
+        });
+    } catch (error) {
+        console.error('Error fetching overview stats:', error);
+        // Return empty stats instead of error to prevent UI issues
+        res.json({
+            activeWorkflows: 0,
+            eventsTriggered: 0,
+            eventsChange: 0,
+            dailyExecutions: [],
+            recentWorkflows: []
+        });
     }
 });
 

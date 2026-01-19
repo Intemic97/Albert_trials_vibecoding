@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Sparkles, Info, Bot, User, Plus, Trash2, MessageSquare, ArrowLeft, Menu, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Send, Loader2, Info, Bot, User, Plus, Trash2, MessageSquare, ArrowLeft, Menu, X, Sparkles, Database, Check, XCircle, ChevronsLeft } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { API_BASE } from '../config';
+import { Entity } from '../types';
 
 interface Message {
     id: string;
@@ -19,23 +20,53 @@ interface Chat {
     messages: Message[];
     createdAt: Date;
     updatedAt: Date;
+    instructions?: string;
+    allowedEntities?: string[];
 }
 
 export const Copilots: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const [chats, setChats] = useState<Chat[]>([]);
     const [activeChat, setActiveChat] = useState<string | null>(null);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [expandedExplanations, setExpandedExplanations] = useState<Set<string>>(new Set());
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [editingTitle, setEditingTitle] = useState('');
+    const [showCopilotModal, setShowCopilotModal] = useState(false);
+    const [copilotName, setCopilotName] = useState('');
+    const [copilotInstructions, setCopilotInstructions] = useState('');
+    const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
+    const [availableEntities, setAvailableEntities] = useState<Entity[]>([]);
+    const [isLoadingEntities, setIsLoadingEntities] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const titleInputRef = useRef<HTMLInputElement>(null);
 
     // Load chats from backend on mount
     useEffect(() => {
         loadChats();
+        loadEntities();
     }, []);
+
+    const loadEntities = async () => {
+        try {
+            setIsLoadingEntities(true);
+            const response = await fetch(`${API_BASE}/entities`, {
+                credentials: 'include'
+            });
+            if (response.ok) {
+                const entities = await response.json();
+                setAvailableEntities(entities);
+            }
+        } catch (error) {
+            console.error('Error loading entities:', error);
+        } finally {
+            setIsLoadingEntities(false);
+        }
+    };
 
     // Auto-scroll to bottom when messages change
     useEffect(() => {
@@ -49,6 +80,12 @@ export const Copilots: React.FC = () => {
         }
     }, [activeChat]);
 
+    useEffect(() => {
+        if (isEditingTitle) {
+            setTimeout(() => titleInputRef.current?.focus(), 0);
+        }
+    }, [isEditingTitle]);
+
     const loadChats = async () => {
         try {
             const response = await fetch(`${API_BASE}/copilot/chats`, {
@@ -60,6 +97,8 @@ export const Copilots: React.FC = () => {
                     ...chat,
                     createdAt: new Date(chat.createdAt),
                     updatedAt: new Date(chat.updatedAt),
+                    instructions: chat.instructions || undefined,
+                    allowedEntities: chat.allowedEntities || [],
                     messages: chat.messages.map((msg: any) => ({
                         ...msg,
                         timestamp: new Date(msg.timestamp)
@@ -94,25 +133,45 @@ export const Copilots: React.FC = () => {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify(chat)
+                body: JSON.stringify({
+                    title: chat.title,
+                    messages: chat.messages,
+                    updatedAt: chat.updatedAt.toISOString(),
+                    instructions: chat.instructions,
+                    allowedEntities: chat.allowedEntities
+                })
             });
         } catch (error) {
             console.error('Error saving chat:', error);
         }
     };
 
-    const createNewChat = async () => {
+    const handleCreateCopilot = () => {
+        setCopilotName('');
+        setCopilotInstructions('');
+        setSelectedEntities([]);
+        setShowCopilotModal(true);
+    };
+
+    const createNewChat = async (name?: string, instructions?: string, entities?: string[]) => {
+        const defaultInstructions = instructions || "You are a helpful database assistant. Help users navigate through their entities, find records, and answer questions about relationships between tables.";
+        const welcomeMessage = instructions 
+            ? `Hello! I'm ${name || 'your Copilot'}. ${instructions}\n\nWhat would you like to know?`
+            : "Good afternoon! I'm your Database Copilot. I can help you navigate through your entities, find records, and answer questions about relationships between your tables. What would you like to know?";
+
         const newChat: Chat = {
             id: Date.now().toString(),
-            title: 'New Chat',
+            title: name || 'New Copilot',
             messages: [{
                 id: '1',
                 role: 'assistant',
-                content: "Good afternoon! I'm your Database Copilot. I can help you navigate through your entities, find records, and answer questions about relationships between your tables. What would you like to know?",
+                content: welcomeMessage,
                 timestamp: new Date()
             }],
             createdAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
+            instructions: defaultInstructions,
+            allowedEntities: entities || []
         };
 
         // Always update local state immediately so the input becomes enabled
@@ -131,6 +190,26 @@ export const Copilots: React.FC = () => {
             console.error('Error saving chat to backend:', error);
             // Chat is already in local state, so user can continue
         }
+    };
+
+    const handleSaveCopilot = () => {
+        if (!copilotName.trim()) {
+            alert('Please enter a name for your copilot');
+            return;
+        }
+        createNewChat(copilotName.trim(), copilotInstructions.trim() || undefined, selectedEntities);
+        setShowCopilotModal(false);
+        setCopilotName('');
+        setCopilotInstructions('');
+        setSelectedEntities([]);
+    };
+
+    const toggleEntitySelection = (entityId: string) => {
+        setSelectedEntities(prev => 
+            prev.includes(entityId) 
+                ? prev.filter(id => id !== entityId)
+                : [...prev, entityId]
+        );
     };
 
     const deleteChat = async (chatId: string) => {
@@ -215,7 +294,10 @@ export const Copilots: React.FC = () => {
                     conversationHistory: currentChat.messages.slice(-6).map(m => ({
                         role: m.role,
                         content: m.content
-                    }))
+                    })),
+                    chatId: currentChat.id,
+                    instructions: currentChat.instructions,
+                    allowedEntities: currentChat.allowedEntities
                 })
             });
 
@@ -281,24 +363,75 @@ export const Copilots: React.FC = () => {
         "Show me customer demographics"
     ];
 
+    const chatQuery = new URLSearchParams(location.search).get('q')?.toLowerCase() || '';
+    const chatIdParam = new URLSearchParams(location.search).get('chatId');
+    const filteredChats = chatQuery
+        ? chats.filter(chat => chat.title.toLowerCase().includes(chatQuery))
+        : chats;
+
+    useEffect(() => {
+        if (chatIdParam && chats.some(chat => chat.id === chatIdParam)) {
+            setActiveChat(chatIdParam);
+        }
+    }, [chatIdParam, chats]);
+
+    const saveChatTitle = async () => {
+        if (!currentChat) return;
+        const nextTitle = editingTitle.trim();
+        if (!nextTitle) {
+            setIsEditingTitle(false);
+            return;
+        }
+        const updatedChat = { ...currentChat, title: nextTitle, updatedAt: new Date() };
+        setChats(prev => prev.map(c => c.id === currentChat.id ? updatedChat : c));
+        setIsEditingTitle(false);
+        await saveChat(updatedChat);
+    };
+
     return (
         <div className="h-screen flex flex-col bg-white">
             {/* Top Bar */}
-            <div className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shadow-sm shrink-0">
+            <div className="h-12 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => navigate('/overview')}
-                        className="flex items-center gap-2 px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="flex items-center gap-2 px-2 py-1.5 text-slate-600 hover:bg-slate-100 rounded-md transition-colors text-sm"
                     >
-                        <ArrowLeft size={20} />
+                        <ArrowLeft size={14} />
                         <span className="font-medium">Back</span>
                     </button>
                     <div className="h-6 w-px bg-slate-200"></div>
                     <div className="flex items-center gap-2">
-                        <Sparkles size={20} className="text-teal-600" />
-                        <h1 className="text-lg font-semibold text-slate-900">
-                            {currentChat?.title || 'Database Copilot'}
-                        </h1>
+                        {isEditingTitle ? (
+                            <input
+                                ref={titleInputRef}
+                                value={editingTitle}
+                                onChange={(e) => setEditingTitle(e.target.value)}
+                                onBlur={saveChatTitle}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        saveChatTitle();
+                                    }
+                                    if (e.key === 'Escape') {
+                                        setIsEditingTitle(false);
+                                    }
+                                }}
+                                className="px-2 py-1 border border-slate-200 rounded-md text-sm bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-300 selection:bg-slate-200 selection:text-slate-800"
+                            />
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (!currentChat) return;
+                                    setEditingTitle(currentChat.title || 'New Chat');
+                                    setIsEditingTitle(true);
+                                }}
+                                className="text-sm font-semibold text-slate-800 hover:text-slate-700 active:text-slate-700 focus:outline-none transition-colors bg-transparent active:bg-transparent appearance-none"
+                            >
+                                {currentChat?.title || 'Database Copilot'}
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -314,26 +447,26 @@ export const Copilots: React.FC = () => {
                     {/* Sidebar Header */}
                     <div className="p-4 border-b border-slate-200 shrink-0">
                         <div className="flex items-center justify-between mb-3">
-                            <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Chats</h2>
+                            <h2 className="text-base font-semibold text-slate-700 uppercase tracking-wider">Your Copilots</h2>
                             <button
                                 onClick={() => setIsSidebarOpen(false)}
                                 className="p-1 hover:bg-slate-200 rounded transition-colors"
                             >
-                                <X size={16} className="text-slate-500" />
+                                <ChevronsLeft size={16} className="text-slate-500" />
                             </button>
                         </div>
                         <button
-                            onClick={createNewChat}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors font-medium"
+                            onClick={handleCreateCopilot}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg transition-all duration-200 text-sm font-medium shadow-sm hover:shadow-md"
                         >
-                            <Plus size={18} />
-                            New Chat
+                            <Sparkles size={16} />
+                            New Copilot
                         </button>
                     </div>
 
                     {/* Chat List */}
                     <div className="flex-1 overflow-y-auto p-3 space-y-1">
-                        {chats.map(chat => (
+                        {filteredChats.map(chat => (
                             <div
                                 key={chat.id}
                                 className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${
@@ -383,12 +516,12 @@ export const Copilots: React.FC = () => {
                             <div className="h-full flex flex-col items-center justify-center px-6">
                                 <div className="max-w-3xl w-full space-y-8">
                                     {/* Greeting */}
-                                    <div className="text-center space-y-2">
-                                        <h2 className="text-3xl font-bold text-slate-900">
-                                            Good afternoon, how can I help you today?
+                                    <div className="text-center space-y-3">
+                                        <h2 className="text-2xl font-semibold text-slate-900 leading-tight">
+                                            Ask me anything about your data.
                                         </h2>
-                                        <p className="text-slate-500">
-                                            I'm your Database Copilot. Ask me anything about your data.
+                                        <p className="text-sm text-slate-600 font-normal">
+                                            Try a quick prompt below or write your own question.
                                         </p>
                                     </div>
 
@@ -402,29 +535,29 @@ export const Copilots: React.FC = () => {
                                                 onKeyDown={handleKeyDown}
                                                 placeholder="Ask about your data..."
                                                 rows={1}
-                                                className="w-full px-6 py-4 pr-16 bg-white border-2 border-slate-200 rounded-2xl text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-slate-400 resize-none shadow-lg transition-all"
-                                                style={{ minHeight: '60px', maxHeight: '200px' }}
+                                                className="w-full px-5 py-4 pr-14 bg-white border border-slate-200 rounded-xl text-[15px] focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 resize-none transition-all"
+                                                style={{ minHeight: '64px', maxHeight: '200px' }}
                                                 disabled={isLoading}
                                             />
                                             <button
                                                 type="submit"
                                                 disabled={!input.trim() || isLoading}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 p-3 bg-gradient-to-br from-teal-600 to-teal-700 text-white rounded-xl hover:from-teal-700 hover:to-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg disabled:shadow-none"
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                             >
-                                                <Send size={20} />
+                                                <Send size={18} />
                                             </button>
                                         </form>
                                     </div>
 
                                     {/* Example Prompts */}
-                                    <div className="space-y-3">
-                                        <p className="text-sm text-slate-500 text-center">Try asking:</p>
-                                        <div className="flex flex-wrap gap-2 justify-center">
+                                    <div className="space-y-4">
+                                        <p className="text-sm text-slate-600 text-center font-normal">Try asking:</p>
+                                        <div className="flex flex-wrap gap-3 justify-center">
                                             {examplePrompts.slice(0, 5).map((prompt, idx) => (
                                                 <button
                                                     key={idx}
                                                     onClick={() => setInput(prompt)}
-                                                    className="px-4 py-2 bg-white border border-slate-200 hover:border-teal-300 hover:bg-teal-50 rounded-full text-sm text-slate-700 transition-all shadow-sm hover:shadow"
+                                                    className="px-4 py-2.5 bg-slate-50 border border-slate-200 hover:border-slate-300 hover:bg-white rounded-lg text-sm text-slate-700 font-normal transition-all shadow-sm hover:shadow"
                                                 >
                                                     {prompt}
                                                 </button>
@@ -569,7 +702,7 @@ export const Copilots: React.FC = () => {
                                 <button
                                     type="submit"
                                     disabled={!input.trim() || isLoading}
-                                    className="absolute right-3 bottom-3 p-3 bg-gradient-to-br from-teal-600 to-teal-700 text-white rounded-xl hover:from-teal-700 hover:to-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg disabled:shadow-none"
+                                    className="absolute right-3 bottom-3 p-2.5 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                 >
                                     <Send size={18} />
                                 </button>
@@ -584,6 +717,169 @@ export const Copilots: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {/* New Copilot Configuration Modal */}
+            {showCopilotModal && (
+                <div 
+                    className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" 
+                    onClick={() => setShowCopilotModal(false)}
+                >
+                    <div 
+                        className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-[#256A65]/5 to-transparent">
+                            <div className="flex items-center gap-3 mb-1">
+                                <div className="w-10 h-10 rounded-lg bg-[#256A65] flex items-center justify-center">
+                                    <Sparkles size={20} className="text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-slate-900">Create New Copilot</h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">Configure your AI assistant with custom instructions and data access</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                            {/* Name */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Copilot Name <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={copilotName}
+                                    onChange={(e) => setCopilotName(e.target.value)}
+                                    placeholder="e.g., Sales Assistant, Customer Support Bot"
+                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-slate-400"
+                                    autoFocus
+                                />
+                            </div>
+
+                            {/* Instructions */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Instructions
+                                </label>
+                                <textarea
+                                    value={copilotInstructions}
+                                    onChange={(e) => setCopilotInstructions(e.target.value)}
+                                    placeholder="Define how your copilot should behave. For example: 'You are a sales assistant focused on customer data. Always provide concise answers and cite specific records when possible. Focus on revenue and customer metrics.'"
+                                    rows={5}
+                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-slate-400 resize-none"
+                                />
+                                <p className="text-xs text-slate-500 mt-2">
+                                    Describe the copilot's role, tone, and focus areas. Mention which datasets it should prioritize.
+                                </p>
+                            </div>
+
+                            {/* Entity Selection */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Available Datasets
+                                </label>
+                                <p className="text-xs text-slate-500 mb-3">
+                                    Select which entities this copilot can access. Leave empty to allow access to all entities.
+                                </p>
+                                
+                                {isLoadingEntities ? (
+                                    <div className="flex items-center justify-center py-8">
+                                        <Loader2 size={20} className="animate-spin text-slate-400" />
+                                    </div>
+                                ) : availableEntities.length === 0 ? (
+                                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-500 text-center">
+                                        No entities available. Create entities in Knowledge Base first.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2 max-h-64 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-slate-50/50">
+                                        {availableEntities.map((entity) => (
+                                            <button
+                                                key={entity.id}
+                                                onClick={() => toggleEntitySelection(entity.id)}
+                                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all text-left ${
+                                                    selectedEntities.includes(entity.id)
+                                                        ? 'bg-[#256A65]/10 border-[#256A65] text-slate-900'
+                                                        : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
+                                                }`}
+                                            >
+                                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                                                    selectedEntities.includes(entity.id)
+                                                        ? 'bg-[#256A65] border-[#256A65]'
+                                                        : 'border-slate-300'
+                                                }`}>
+                                                    {selectedEntities.includes(entity.id) && (
+                                                        <Check size={12} className="text-white" />
+                                                    )}
+                                                </div>
+                                                <Database size={16} className={`flex-shrink-0 ${
+                                                    selectedEntities.includes(entity.id) ? 'text-[#256A65]' : 'text-slate-400'
+                                                }`} />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`text-sm font-medium truncate ${
+                                                        selectedEntities.includes(entity.id) ? 'text-slate-900' : 'text-slate-700'
+                                                    }`}>
+                                                        {entity.name}
+                                                    </p>
+                                                    {entity.description && (
+                                                        <p className="text-xs text-slate-500 truncate mt-0.5">
+                                                            {entity.description}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <span className="text-xs text-slate-400 flex-shrink-0">
+                                                    {entity.properties?.length || 0} fields
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                
+                                {selectedEntities.length > 0 && (
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {selectedEntities.map(entityId => {
+                                            const entity = availableEntities.find(e => e.id === entityId);
+                                            return entity ? (
+                                                <span
+                                                    key={entityId}
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#256A65]/10 text-[#256A65] rounded-lg text-xs font-medium"
+                                                >
+                                                    {entity.name}
+                                                    <button
+                                                        onClick={() => toggleEntitySelection(entityId)}
+                                                        className="hover:bg-[#256A65]/20 rounded-full p-0.5"
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                </span>
+                                            ) : null;
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/50 flex items-center justify-end gap-3">
+                            <button
+                                onClick={() => setShowCopilotModal(false)}
+                                className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-white transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSaveCopilot}
+                                disabled={!copilotName.trim()}
+                                className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors flex items-center gap-2"
+                            >
+                                <Sparkles size={14} />
+                                Create Copilot
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -298,7 +298,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
                     onChange={handleInput}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
-                    className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-lg resize-none focus:outline-none focus:bg-white transition-colors text-slate-800 leading-relaxed"
+                    className="w-full h-32 p-4 bg-white border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 transition-colors text-slate-700 leading-relaxed placeholder:text-slate-400"
                 />
 
                 {/* Suggestion Popover */}
@@ -361,7 +361,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
                     <button
                         onClick={handleSubmit}
                         disabled={isGenerating || !prompt.trim()}
-                        className="flex items-center px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center px-4 py-2 bg-[rgb(91,121,128)] hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {isGenerating ? (
                             <>

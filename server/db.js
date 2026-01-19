@@ -545,12 +545,27 @@ async function initDb() {
       organizationId TEXT NOT NULL,
       title TEXT NOT NULL,
       messages TEXT NOT NULL,
+      instructions TEXT,
+      allowedEntities TEXT,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
       FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
     );
   `);
+
+  // Add new columns if they don't exist
+  try {
+    await db.exec(`ALTER TABLE copilot_chats ADD COLUMN instructions TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  try {
+    await db.exec(`ALTER TABLE copilot_chats ADD COLUMN allowedEntities TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
 
   return db;
 }

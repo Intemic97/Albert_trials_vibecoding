@@ -22,6 +22,19 @@ export function LoginPage() {
         orgName: ''
     });
 
+    const parseResponse = async (res: Response) => {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            try {
+                return await res.json();
+            } catch (error) {
+                return { error: 'Respuesta JSON invalida del servidor.' };
+            }
+        }
+        const text = await res.text();
+        return text ? { error: text } : { error: 'Respuesta vacia del servidor.' };
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
@@ -41,7 +54,7 @@ export function LoginPage() {
                 credentials: 'include'
             });
 
-            const data = await res.json();
+            const data = await parseResponse(res);
 
             if (!res.ok) {
                 // Check if this is a verification required error
@@ -83,7 +96,7 @@ export function LoginPage() {
                 credentials: 'include'
             });
 
-            const data = await res.json();
+            const data = await parseResponse(res);
 
             if (!res.ok) {
                 throw new Error(data.error || 'Failed to resend verification email');
@@ -171,7 +184,7 @@ export function LoginPage() {
                     {/* Logo */}
                     <div className="mb-8">
                         <img
-                            src="/logo.png"
+                            src="/logo.svg"
                             alt="Intemic"
                             className="h-8 w-auto object-contain"
                         />
