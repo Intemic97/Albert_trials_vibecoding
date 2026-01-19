@@ -23,7 +23,7 @@ const generateUUID = (): string => {
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook' | 'sapFetch';
     label: string;
     x: number;
     y: number;
@@ -108,6 +108,15 @@ interface WorkflowNode {
         // For Data Visualization nodes:
         visualizationPrompt?: string;
         generatedWidget?: WidgetConfig;
+        // For SAP Fetch nodes:
+        sapConnectionName?: string;
+        sapAuthType?: string;
+        sapClientId?: string;
+        sapClientSecret?: string;
+        sapTokenUrl?: string;
+        sapBaseApiUrl?: string;
+        sapServicePath?: string;
+        sapEntity?: string;
         // Custom node name
         customName?: string;
     };
@@ -129,7 +138,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook' | 'sapFetch';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -146,6 +155,7 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'saveRecords', label: 'Save to Database', icon: Database, description: 'Create or update records', category: 'Data' },
     { type: 'http', label: 'HTTP Request', icon: Globe, description: 'Fetch data from an external API', category: 'Data' },
     { type: 'mysql', label: 'MySQL', icon: Database, description: 'Query data from MySQL database', category: 'Data' },
+    { type: 'sapFetch', label: 'SAP S/4HANA', icon: Database, description: 'Read data from SAP S/4HANA OData API', category: 'Data' },
     { type: 'esios', label: 'Energy Prices', icon: Zap, description: 'Fetch prices from Red Eléctrica', category: 'Data' },
     { type: 'climatiq', label: 'Emission Factors', icon: Leaf, description: 'Search CO2 emission factors', category: 'Data' },
     { type: 'manualInput', label: 'Manual Data Input', icon: Edit, description: 'Define a variable with a value', category: 'Data' },
@@ -618,6 +628,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [mysqlUsername, setMysqlUsername] = useState<string>('');
     const [mysqlPassword, setMysqlPassword] = useState<string>('');
     const [mysqlQuery, setMysqlQuery] = useState<string>('SELECT * FROM ');
+
+    // SAP Fetch Node State
+    const [configuringSAPNodeId, setConfiguringSAPNodeId] = useState<string | null>(null);
+    const [sapConnectionName, setSapConnectionName] = useState<string>('SAP_Production');
+    const [sapAuthType, setSapAuthType] = useState<string>('OAuth2_Client_Credentials');
+    const [sapClientId, setSapClientId] = useState<string>('');
+    const [sapClientSecret, setSapClientSecret] = useState<string>('');
+    const [sapTokenUrl, setSapTokenUrl] = useState<string>('');
+    const [sapBaseApiUrl, setSapBaseApiUrl] = useState<string>('');
+    const [sapServicePath, setSapServicePath] = useState<string>('/sap/opu/odata/sap/');
+    const [sapEntity, setSapEntity] = useState<string>('');
 
     // Send Email Node State
     const [configuringEmailNodeId, setConfiguringEmailNodeId] = useState<string | null>(null);
@@ -1644,6 +1665,46 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setConfiguringHttpNodeId(null);
     };
 
+    // SAP Node Functions
+    const openSAPConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'sapFetch') {
+            setConfiguringSAPNodeId(nodeId);
+            setSapConnectionName(node.config?.sapConnectionName || 'SAP_Production');
+            setSapAuthType(node.config?.sapAuthType || 'OAuth2_Client_Credentials');
+            setSapClientId(node.config?.sapClientId || '');
+            setSapClientSecret(node.config?.sapClientSecret || '');
+            setSapTokenUrl(node.config?.sapTokenUrl || '');
+            setSapBaseApiUrl(node.config?.sapBaseApiUrl || '');
+            setSapServicePath(node.config?.sapServicePath || '/sap/opu/odata/sap/');
+            setSapEntity(node.config?.sapEntity || '');
+        }
+    };
+
+    const saveSAPConfig = () => {
+        if (!configuringSAPNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringSAPNodeId
+                ? {
+                    ...n,
+                    config: {
+                        ...n.config,
+                        sapConnectionName,
+                        sapAuthType,
+                        sapClientId,
+                        sapClientSecret,
+                        sapTokenUrl,
+                        sapBaseApiUrl,
+                        sapServicePath,
+                        sapEntity
+                    }
+                }
+                : n
+        ));
+        setConfiguringSAPNodeId(null);
+    };
+
     // Webhook Node Functions
     const openWebhookConfig = async (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
@@ -2650,6 +2711,27 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         }
                     } else {
                         result = 'Query not configured';
+                    }
+                    break;
+                case 'sapFetch':
+                    if (node.config?.sapEntity && node.config?.sapBaseApiUrl) {
+                        try {
+                            // TODO: Implement SAP OData API call when backend endpoint is ready
+                            // For now, return a placeholder message
+                            result = `SAP S/4HANA configured: ${node.config.sapEntity}`;
+                            nodeData = [{
+                                _note: 'SAP S/4HANA integration pending backend implementation',
+                                connection: node.config.sapConnectionName,
+                                entity: node.config.sapEntity,
+                                servicePath: node.config.sapServicePath
+                            }];
+                        } catch (error) {
+                            console.error('SAP fetch error:', error);
+                            result = `Error: ${error.message || 'Failed to fetch from SAP'}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'SAP connection not configured';
                     }
                     break;
                 case 'sendEmail':
@@ -3801,6 +3883,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'output': return 'bg-indigo-100 text-indigo-600';
             case 'http': return 'bg-cyan-100 text-cyan-600';
             case 'mysql': return 'bg-blue-100 text-blue-600';
+            case 'sapFetch': return 'bg-indigo-100 text-indigo-600';
             case 'esios': return 'bg-yellow-100 text-yellow-600';
             case 'climatiq': return 'bg-green-100 text-green-600';
             case 'join': return 'bg-cyan-100 text-cyan-600';
@@ -4461,6 +4544,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openWebhookConfig(node.id);
                                             } else if (node.type === 'mysql') {
                                                 openMySQLConfig(node.id);
+                                            } else if (node.type === 'sapFetch') {
+                                                openSAPConfig(node.id);
                                             } else if (node.type === 'sendEmail') {
                                                 openEmailConfig(node.id);
                                             } else if (node.type === 'sendSMS') {
@@ -5313,6 +5398,163 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             onClick={saveMySQLConfig}
                                             disabled={!mysqlQuery.trim()}
                                             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+                                        >
+                                            Save
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* SAP Fetch Configuration Modal */}
+                        {configuringSAPNodeId && (
+                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringSAPNodeId(null)}>
+                                <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                    <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                                        <Database className="text-indigo-600" size={20} />
+                                        SAP S/4HANA
+                                    </h3>
+                                    <p className="text-sm text-slate-500 mb-4">Read data from SAP S/4HANA OData API</p>
+                                    
+                                    <div className="space-y-4">
+                                        {/* Connection Settings */}
+                                        <div className="border-b border-slate-200 pb-3">
+                                            <h4 className="text-sm font-semibold text-slate-700 mb-3">Connection</h4>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    Connection Name
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={sapConnectionName}
+                                                    onChange={(e) => setSapConnectionName(e.target.value)}
+                                                    placeholder="SAP_Production"
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Authentication */}
+                                        <div className="border-b border-slate-200 pb-3">
+                                            <h4 className="text-sm font-semibold text-slate-700 mb-3">Authentication</h4>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Auth Type
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={sapAuthType}
+                                                        onChange={(e) => setSapAuthType(e.target.value)}
+                                                        placeholder="OAuth2_Client_Credentials"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Client ID
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={sapClientId}
+                                                        onChange={(e) => setSapClientId(e.target.value)}
+                                                        placeholder="sb-83f9a9..."
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Client Secret
+                                                    </label>
+                                                    <input
+                                                        type="password"
+                                                        value={sapClientSecret}
+                                                        onChange={(e) => setSapClientSecret(e.target.value)}
+                                                        placeholder="********"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Token URL
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={sapTokenUrl}
+                                                        onChange={(e) => setSapTokenUrl(e.target.value)}
+                                                        placeholder="https://company.authentication.eu10.hana.ondemand.com/oauth/token"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* API Configuration */}
+                                        <div>
+                                            <h4 className="text-sm font-semibold text-slate-700 mb-3">API Configuration</h4>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Base API URL
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={sapBaseApiUrl}
+                                                        onChange={(e) => setSapBaseApiUrl(e.target.value)}
+                                                        placeholder="https://company-api.s4hana.ondemand.com"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Service Path
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={sapServicePath}
+                                                        onChange={(e) => setSapServicePath(e.target.value)}
+                                                        placeholder="/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Entity
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={sapEntity}
+                                                        onChange={(e) => setSapEntity(e.target.value)}
+                                                        placeholder="A_ProductionOrder"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Feedback Link */}
+                                    <div className="mt-4 pt-2 border-t border-slate-100">
+                                        <button
+                                            onClick={() => openFeedbackPopup('sapFetch', 'SAP S/4HANA')}
+                                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                        >
+                                            <MessageSquare size={14} />
+                                            What would you like this node to do?
+                                        </button>
+                                    </div>
+
+                                    <div className="flex gap-2 justify-end mt-6">
+                                        <button
+                                            onClick={() => setConfiguringSAPNodeId(null)}
+                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveSAPConfig}
+                                            disabled={!sapBaseApiUrl.trim() || !sapEntity.trim()}
+                                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
                                         >
                                             Save
                                         </button>
