@@ -427,7 +427,7 @@ export const Copilots: React.FC = () => {
                                     setEditingTitle(currentChat.title || 'New Chat');
                                     setIsEditingTitle(true);
                                 }}
-                                className="text-sm font-semibold text-slate-800 hover:text-slate-700 active:text-slate-700 focus:outline-none transition-colors bg-transparent active:bg-transparent appearance-none"
+                                className="text-sm font-normal text-slate-800 hover:text-slate-700 active:text-slate-700 focus:outline-none transition-colors bg-transparent active:bg-transparent appearance-none"
                             >
                                 {currentChat?.title || 'Database Copilot'}
                             </button>
@@ -447,7 +447,7 @@ export const Copilots: React.FC = () => {
                     {/* Sidebar Header */}
                     <div className="p-4 border-b border-slate-200 shrink-0">
                         <div className="flex items-center justify-between mb-3">
-                            <h2 className="text-base font-semibold text-slate-700 uppercase tracking-wider">Your Copilots</h2>
+                            <h2 className="text-base font-normal text-slate-700 uppercase tracking-wider" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Your Copilots</h2>
                             <button
                                 onClick={() => setIsSidebarOpen(false)}
                                 className="p-1 hover:bg-slate-200 rounded transition-colors"
@@ -517,7 +517,7 @@ export const Copilots: React.FC = () => {
                                 <div className="max-w-3xl w-full space-y-8">
                                     {/* Greeting */}
                                     <div className="text-center space-y-3">
-                                        <h2 className="text-2xl font-semibold text-slate-900 leading-tight">
+                                        <h2 className="text-2xl font-normal text-slate-900 leading-tight" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                                             Ask me anything about your data.
                                         </h2>
                                         <p className="text-sm text-slate-600 font-normal">
@@ -594,7 +594,7 @@ export const Copilots: React.FC = () => {
                                                 {/* Show query results if any */}
                                                 {message.data && Array.isArray(message.data) && message.data.length > 0 && (
                                                     <div className="mt-4 pt-4 border-t border-slate-200">
-                                                        <p className="text-xs font-semibold text-slate-600 mb-3 uppercase tracking-wide">
+                                                        <p className="text-xs font-normal text-slate-600 mb-3 uppercase tracking-wide">
                                                             Found {message.data.length} result{message.data.length > 1 ? 's' : ''}
                                                         </p>
                                                         <div className="space-y-2 max-h-80 overflow-y-auto">
@@ -638,7 +638,7 @@ export const Copilots: React.FC = () => {
                                                                         <span className="text-slate-600 font-medium">Entities analyzed: </span>
                                                                         {message.entitiesUsed.map((entity, idx) => (
                                                                             <span key={entity}>
-                                                                                <span className="text-teal-700 font-semibold">@{entity}</span>
+                                                                                <span className="text-teal-700 font-normal">@{entity}</span>
                                                                                 {idx < message.entitiesUsed!.length - 1 && ', '}
                                                                             </span>
                                                                         ))}
@@ -735,7 +735,7 @@ export const Copilots: React.FC = () => {
                                     <Sparkles size={20} className="text-white" />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-semibold text-slate-900">Create New Copilot</h3>
+                                    <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Create New Copilot</h3>
                                     <p className="text-xs text-slate-500 mt-0.5">Configure your AI assistant with custom instructions and data access</p>
                                 </div>
                             </div>

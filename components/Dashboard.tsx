@@ -100,7 +100,7 @@ const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSav
                 </button>
             </div>
 
-            <h3 className="text-base font-semibold text-slate-900 mb-1">{widget.title}</h3>
+            <h3 className="text-base font-normal text-slate-900 mb-1">{widget.title}</h3>
             <p className="text-xs text-slate-500 mb-3">{widget.description}</p>
 
             <DynamicChart config={widget} />
@@ -525,7 +525,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     {/* Top Header */}
                     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
                         <div>
-                            <h1 className="text-lg font-semibold text-slate-900">Dashboards</h1>
+                            <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Dashboards</h1>
                             <p className="text-[11px] text-slate-500">Create and manage your data visualizations</p>
                         </div>
                         <div />
@@ -565,7 +565,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                 <div
                                     key={dashboard.id}
                                     onClick={() => selectDashboard(dashboard.id)}
-                                    className="bg-white rounded-xl border-2 border-slate-200 p-5 transition-all duration-200 cursor-pointer group relative flex flex-col justify-between min-h-[200px] overflow-hidden"
+                                    className="bg-white border border-slate-200 rounded-lg p-5 cursor-pointer group relative flex flex-col justify-between min-h-[200px] overflow-hidden"
                                 >
                                     <div className="flex-1">
                                         <div className="flex items-start justify-between mb-4">
@@ -575,7 +575,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2">
-                                                        <h3 className="text-base font-semibold text-slate-900 group-hover:text-slate-700 transition-colors truncate">
+                                                        <h3 className="text-base font-normal text-slate-900 group-hover:text-slate-700 transition-colors truncate" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                                                             {dashboard.name}
                                                         </h3>
                                                         {dashboard.isPublic === 1 && (
@@ -629,10 +629,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                             {/* Create New Card */}
                             <div
                                 onClick={handleCreateDashboard}
-                                className="border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center min-h-[200px] text-slate-400 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50/50 transition-all duration-300 cursor-pointer group"
+                                className="border border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center min-h-[200px] text-slate-400 cursor-pointer group"
                             >
-                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center mb-4 group-hover:from-blue-100 group-hover:to-blue-50 transition-all">
-                                    <Plus size={24} className="text-slate-400 group-hover:text-blue-600" />
+                                <div className="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center mb-4">
+                                    <Plus size={24} className="text-slate-400" />
                                 </div>
                                 <span className="font-medium text-sm">Create new dashboard</span>
                             </div>
@@ -703,7 +703,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                         onChange={e => setEditingTitle(e.target.value)}
                                         onBlur={handleSaveTitle}
                                         onKeyDown={e => e.key === 'Enter' && handleSaveTitle()}
-                                        className="text-base font-semibold text-slate-900 bg-transparent border-b border-slate-300 focus:border-slate-400 focus:outline-none w-full"
+                                        className="text-base font-normal text-slate-900 bg-transparent border-b border-slate-300 focus:border-slate-400 focus:outline-none w-full"
                                         autoFocus
                                     />
                                 ) : (
@@ -712,7 +712,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                             setEditingTitle(selectedDashboard.name);
                                             setIsEditingTitle(true);
                                         }}
-                                        className="text-base font-semibold text-slate-900 cursor-pointer hover:text-slate-700 transition-colors"
+                                        className="text-base font-normal text-slate-900 cursor-pointer hover:text-slate-700 transition-colors"
                                         title="Click to edit"
                                     >
                                         {selectedDashboard.name}
@@ -782,7 +782,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                     {/* Generated Widgets Section */}
                                     {generatedWidgets.length > 0 && (
                                 <div ref={generatedWidgetsRef} className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
-                                    <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                                    <h3 className="text-base font-normal text-slate-900 flex items-center gap-2">
                                         <Sparkles size={14} className="text-slate-500" />
                                         New Widgets
                                         <span className="text-xs font-normal text-slate-500">(click + to save)</span>
@@ -806,7 +806,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                     {savedWidgets.length === 0 && generatedWidgets.length === 0 && (
                                 <div className="bg-white rounded-lg border border-slate-200 p-10 text-center">
                                     <Database className="mx-auto text-slate-300 mb-3" size={40} />
-                                    <h3 className="text-base font-semibold text-slate-700 mb-2">No widgets yet</h3>
+                                    <h3 className="text-base font-normal text-slate-700 mb-2">No widgets yet</h3>
                                     <p className="text-xs text-slate-500 max-w-md mx-auto">
                                         Use the prompt below to create custom charts and visualizations from your data.
                                     </p>
@@ -824,7 +824,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             {showShareModal && (
                 <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setShowShareModal(false)}>
                     <div className="bg-white rounded-lg border border-slate-200 shadow-xl p-6 w-[450px]" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <h3 className="text-lg font-normal text-slate-800 mb-4 flex items-center gap-2">
                             <Share2 size={20} className="text-teal-600" />
                             Share Dashboard
                         </h3>

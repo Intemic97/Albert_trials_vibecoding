@@ -468,7 +468,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
                 <div>
-                    <h1 className="text-lg font-semibold text-slate-900 tracking-tight">Settings</h1>
+                    <h1 className="text-lg font-normal text-slate-900 tracking-tight">Settings</h1>
                     <p className="text-[11px] text-slate-500 font-light">Manage organization and preferences</p>
                 </div>
                 <div />
@@ -476,7 +476,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
 
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                 <div className="max-w-5xl mx-auto">
-                    <h1 className="text-lg font-semibold text-slate-900 mb-5">Settings</h1>
+                    <h1 className="text-lg font-normal text-slate-900 mb-5">Settings</h1>
 
                     <div className="flex gap-0.5 bg-slate-50 p-0.5 rounded-lg w-fit mb-6 border border-slate-200">
                         {['General', 'Team', 'Billing', 'Integrations'].map((tab) => (
@@ -497,7 +497,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                         <div className="space-y-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-lg font-semibold text-slate-800">Team Members</h2>
+                                    <h2 className="text-lg font-normal text-slate-800">Team Members</h2>
                                     <p className="text-slate-500 text-sm">Manage who has access to this organization.</p>
                                 </div>
                                 <button
@@ -520,10 +520,10 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-50/50 border-b border-slate-100">
                                         <tr>
-                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">User</th>
-                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Role</th>
-                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Email</th>
-                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                                            <th className="px-6 py-4 text-xs font-normal text-slate-500 uppercase tracking-wider">User</th>
+                                            <th className="px-6 py-4 text-xs font-normal text-slate-500 uppercase tracking-wider">Role</th>
+                                            <th className="px-6 py-4 text-xs font-normal text-slate-500 uppercase tracking-wider">Email</th>
+                                            <th className="px-6 py-4 text-xs font-normal text-slate-500 uppercase tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -568,7 +568,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                     {activeTab === 'general' && (
                         <div className="space-y-6">
                             <div className="mb-5">
-                                <h2 className="text-base font-semibold text-slate-900 tracking-tight mb-0.5">Preferences</h2>
+                                <h2 className="text-base font-normal text-slate-900 tracking-tight mb-0.5">Preferences</h2>
                                 <p className="text-xs text-slate-500 font-light">Customize your experience.</p>
                             </div>
 
@@ -614,7 +614,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
 
                             {/* Company Information Section */}
                             <div className="mt-8 mb-5">
-                                <h2 className="text-base font-semibold text-slate-900 tracking-tight mb-0.5">Company Information</h2>
+                                <h2 className="text-base font-normal text-slate-900 tracking-tight mb-0.5">Company Information</h2>
                                 <p className="text-xs text-slate-500 font-light">Manage your company's core information.</p>
                             </div>
 
@@ -744,7 +744,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                             {/* Header */}
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-lg font-semibold text-slate-800">Planes y Facturación</h2>
+                                    <h2 className="text-lg font-normal text-slate-800">Planes y Facturación</h2>
                                     <p className="text-slate-500 text-sm">Elige el plan que mejor se adapte a tus necesidades.</p>
                                 </div>
                                 {subscription?.hasStripeCustomer && (
@@ -786,7 +786,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             </div>
                                             <div>
                                                 <p className="text-sm text-slate-500">Plan actual</p>
-                                                <p className="font-semibold text-slate-800 capitalize">
+                                                <p className="font-normal text-slate-800 capitalize">
                                                     {pricingPlans.find(p => p.id === subscription.plan)?.name || 'Gratuito'}
                                                 </p>
                                             </div>
@@ -855,7 +855,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                             {plan.icon}
                                                         </div>
                                                         <div>
-                                                            <h3 className="text-base font-semibold text-slate-900">{plan.name}</h3>
+                                                            <h3 className="text-base font-normal text-slate-900">{plan.name}</h3>
                                                             <p className="text-xs text-slate-500">{plan.description}</p>
                                                         </div>
                                                     </div>
@@ -863,7 +863,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                     {/* Price */}
                                                     <div className="mb-6">
                                                         <div className="flex items-baseline gap-1">
-                                                            <span className="text-3xl font-semibold text-slate-900">{plan.price}</span>
+                                                            <span className="text-3xl font-normal text-slate-900">{plan.price}</span>
                                                             <span className="text-slate-500 font-medium">{plan.period}</span>
                                                         </div>
                                                     </div>
@@ -943,7 +943,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                             {/* Header */}
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-lg font-semibold text-slate-800">Integrations</h2>
+                                    <h2 className="text-lg font-normal text-slate-800">Integrations</h2>
                                     <p className="text-slate-500 text-sm">Connect external services to enhance your workspace.</p>
                                 </div>
                             </div>
@@ -971,7 +971,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                         
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2">
-                                                <h3 className="text-lg font-semibold text-slate-800">Slack</h3>
+                                                <h3 className="text-lg font-normal text-slate-800">Slack</h3>
                                                 {slackConnected && (
                                                     <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full flex items-center gap-1">
                                                         <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
@@ -1022,7 +1022,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                 <div className="mt-4 space-y-4">
                                                     {/* Setup Instructions */}
                                                     <div className="bg-slate-50 rounded-lg p-4">
-                                                        <h4 className="text-sm font-semibold text-slate-700 mb-3">Setup Instructions</h4>
+                                                        <h4 className="text-sm font-normal text-slate-700 mb-3">Setup Instructions</h4>
                                                         <ol className="text-sm text-slate-600 space-y-2">
                                                             <li className="flex gap-2">
                                                                 <span className="flex-shrink-0 w-5 h-5 bg-slate-200 rounded-full flex items-center justify-center text-xs font-medium">1</span>
@@ -1129,7 +1129,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                     <div className="fixed inset-0 bg-[#256A65]/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-md overflow-hidden">
                             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                                <h3 className="font-semibold text-slate-800">Invite Team Member</h3>
+                                <h3 className="font-normal text-slate-800">Invite Team Member</h3>
                                 <button onClick={() => setIsInviting(false)} className="text-slate-400 hover:text-slate-600">
                                     <X size={20} />
                                 </button>

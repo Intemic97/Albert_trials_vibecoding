@@ -91,7 +91,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                 {/* Header */}
                 <div className="px-6 py-5 text-slate-900 border-b border-slate-200 bg-white">
                     <div>
-                        <h1 className="text-lg font-semibold">Welcome to Intemic</h1>
+                        <h1 className="text-lg font-normal">Welcome to Intemic</h1>
                         <p className="text-slate-500 text-xs">Hi {user?.name}, let's get to know you</p>
                     </div>
                     
@@ -118,7 +118,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                             </span>
                         </div>
                         
-                        <h2 className="text-base font-semibold text-slate-900 mb-2 tracking-tight">
+                        <h2 className="text-base font-normal text-slate-900 mb-2 tracking-tight">
                             {currentQuestion.title}
                         </h2>
                     </div>

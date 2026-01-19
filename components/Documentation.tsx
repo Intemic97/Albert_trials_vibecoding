@@ -156,7 +156,7 @@ export const Documentation: React.FC = () => {
                     <div className="flex items-center gap-3">
                         <BookOpen size={20} className="text-slate-600" />
                         <div>
-                            <h1 className="text-lg font-semibold text-slate-900">Documentation</h1>
+                            <h1 className="text-lg font-normal text-slate-900">Documentation</h1>
                         </div>
                     </div>
                 </div>
@@ -220,14 +220,14 @@ export const Documentation: React.FC = () => {
                             {/* Getting Started */}
                             <section id="getting-started" className="mb-16">
                                 <div className="mb-8">
-                                    <h1 className="text-3xl font-bold text-slate-900 mb-3">Getting Started</h1>
+                                    <h1 className="text-3xl font-normal text-slate-900 mb-3">Getting Started</h1>
                                     <p className="text-lg text-slate-600 leading-relaxed">
                                         Welcome to Intemic Platform. This guide will help you get up and running quickly.
                                     </p>
                                 </div>
 
                                 <div id="getting-started-overview" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Overview</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Overview</h2>
                                     <p className="text-slate-700 mb-4 leading-relaxed">
                                         Intemic Platform is a comprehensive data modeling and workflow automation platform. 
                                         It allows you to:
@@ -241,7 +241,7 @@ export const Documentation: React.FC = () => {
                                 </div>
 
                                 <div id="getting-started-quick-start" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Quick Start</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Quick Start</h2>
                                     <div className="bg-slate-900 rounded-lg p-4 mb-4 overflow-x-auto">
                                         <pre className="text-sm text-slate-100">
                                             <code>{`# Install dependencies
@@ -260,7 +260,7 @@ npm run dev`}</code>
                                 </div>
 
                                 <div id="getting-started-first-workflow" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Your First Workflow</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Your First Workflow</h2>
                                     <ol className="list-decimal pl-6 space-y-3 text-slate-700">
                                         <li>Navigate to <strong>Workflows</strong> in the sidebar</li>
                                         <li>Click <strong>Create Workflow</strong></li>
@@ -274,13 +274,13 @@ npm run dev`}</code>
 
                             {/* Installation */}
                             <section id="installation" className="mb-16">
-                                <h1 className="text-3xl font-bold text-slate-900 mb-3">Installation</h1>
+                                <h1 className="text-3xl font-normal text-slate-900 mb-3">Installation</h1>
                                 <p className="text-lg text-slate-600 mb-8 leading-relaxed">
                                     Set up Intemic Platform on your local machine or server.
                                 </p>
 
                                 <div id="installation-requirements" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Requirements</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Requirements</h2>
                                     <ul className="list-disc pl-6 space-y-2 text-slate-700">
                                         <li>Node.js 18+ and npm</li>
                                         <li>Python 3.8+ (for Prefect workflows)</li>
@@ -289,7 +289,7 @@ npm run dev`}</code>
                                 </div>
 
                                 <div id="installation-local-setup" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Local Setup</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Local Setup</h2>
                                     <div className="bg-slate-900 rounded-lg p-4 mb-4 overflow-x-auto">
                                         <pre className="text-sm text-slate-100">
                                             <code>{`# Clone the repository
@@ -309,7 +309,7 @@ cp ENV_TEMPLATE.txt server/.env
                                 </div>
 
                                 <div id="installation-environment" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Environment Variables</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Environment Variables</h2>
                                     <p className="text-slate-700 mb-4">Key environment variables in <code className="px-1.5 py-0.5 bg-slate-100 rounded text-sm">server/.env</code>:</p>
                                     <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-4">
                                         <pre className="text-sm text-slate-700">
@@ -324,27 +324,27 @@ DATABASE_URL=./data.db`}</code>
 
                             {/* Data Modeling */}
                             <section id="data-modeling" className="mb-16">
-                                <h1 className="text-3xl font-bold text-slate-900 mb-3">Data Modeling</h1>
+                                <h1 className="text-3xl font-normal text-slate-900 mb-3">Data Modeling</h1>
                                 <p className="text-lg text-slate-600 mb-8 leading-relaxed">
                                     Define your data structure with entities, properties, and relationships.
                                 </p>
 
                                 <div id="data-modeling-entities" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Entities</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Entities</h2>
                                     <p className="text-slate-700 mb-4">
                                         Entities represent your core data structures. Create entities in the <strong>Knowledge Base</strong> section.
                                     </p>
                                 </div>
 
                                 <div id="data-modeling-properties" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Properties</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Properties</h2>
                                     <p className="text-slate-700 mb-4">
                                         Each entity can have multiple properties with different types: text, number, date, relation, etc.
                                     </p>
                                 </div>
 
                                 <div id="data-modeling-relationships" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Relationships</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Relationships</h2>
                                     <p className="text-slate-700 mb-4">
                                         Connect entities using relation properties to build a relational data model.
                                     </p>
@@ -353,20 +353,20 @@ DATABASE_URL=./data.db`}</code>
 
                             {/* Workflows */}
                             <section id="workflows" className="mb-16">
-                                <h1 className="text-3xl font-bold text-slate-900 mb-3">Workflows</h1>
+                                <h1 className="text-3xl font-normal text-slate-900 mb-3">Workflows</h1>
                                 <p className="text-lg text-slate-600 mb-8 leading-relaxed">
                                     Build automated workflows with a visual, drag-and-drop interface.
                                 </p>
 
                                 <div id="workflows-creating-workflows" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Creating Workflows</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Creating Workflows</h2>
                                     <p className="text-slate-700 mb-4">
                                         Workflows are composed of nodes connected together. Each node performs a specific action or transformation.
                                     </p>
                                 </div>
 
                                 <div id="workflows-nodes" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Nodes & Components</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Nodes & Components</h2>
                                     <p className="text-slate-700 mb-4">Available node types:</p>
                                     <ul className="list-disc pl-6 space-y-2 text-slate-700">
                                         <li><strong>Triggers:</strong> Manual, Schedule, Webhook</li>
@@ -377,7 +377,7 @@ DATABASE_URL=./data.db`}</code>
                                 </div>
 
                                 <div id="workflows-execution" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Execution & Testing</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Execution & Testing</h2>
                                     <p className="text-slate-700 mb-4">
                                         Test workflows using the <strong>Run</strong> button. View execution history and logs in the <strong>Executions</strong> section.
                                     </p>
@@ -386,27 +386,27 @@ DATABASE_URL=./data.db`}</code>
 
                             {/* Copilots */}
                             <section id="copilots" className="mb-16">
-                                <h1 className="text-3xl font-bold text-slate-900 mb-3">Copilots</h1>
+                                <h1 className="text-3xl font-normal text-slate-900 mb-3">Copilots</h1>
                                 <p className="text-lg text-slate-600 mb-8 leading-relaxed">
                                     Create AI assistants with custom instructions and controlled data access.
                                 </p>
 
                                 <div id="copilots-creating-copilots" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Creating Copilots</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Creating Copilots</h2>
                                     <p className="text-slate-700 mb-4">
                                         Click <strong>New Copilot</strong> in the Copilots section to create a new AI assistant.
                                     </p>
                                 </div>
 
                                 <div id="copilots-instructions" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Custom Instructions</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Custom Instructions</h2>
                                     <p className="text-slate-700 mb-4">
                                         Define how your copilot should behave by providing custom instructions. This helps tailor the AI's responses to your specific use case.
                                     </p>
                                 </div>
 
                                 <div id="copilots-data-access" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Data Access Control</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Data Access Control</h2>
                                     <p className="text-slate-700 mb-4">
                                         Select which entities (datasets) each copilot can access. This ensures data security and prevents unauthorized access.
                                     </p>
@@ -415,13 +415,13 @@ DATABASE_URL=./data.db`}</code>
 
                             {/* Connections */}
                             <section id="connections" className="mb-16">
-                                <h1 className="text-3xl font-bold text-slate-900 mb-3">Connections</h1>
+                                <h1 className="text-3xl font-normal text-slate-900 mb-3">Connections</h1>
                                 <p className="text-lg text-slate-600 mb-8 leading-relaxed">
                                     Connect to external data sources and services.
                                 </p>
 
                                 <div id="connections-available-connections" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Available Connections</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Available Connections</h2>
                                     <p className="text-slate-700 mb-4">Supported connections:</p>
                                     <ul className="list-disc pl-6 space-y-2 text-slate-700">
                                         <li>SAP</li>
@@ -436,14 +436,14 @@ DATABASE_URL=./data.db`}</code>
                                 </div>
 
                                 <div id="connections-configuring" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Configuring Connections</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Configuring Connections</h2>
                                     <p className="text-slate-700 mb-4">
                                         Navigate to <strong>Connections</strong> and click on a connection type to configure credentials.
                                     </p>
                                 </div>
 
                                 <div id="connections-testing" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Testing Connections</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Testing Connections</h2>
                                     <p className="text-slate-700 mb-4">
                                         After configuration, test your connection to ensure it's working correctly.
                                     </p>
@@ -452,20 +452,20 @@ DATABASE_URL=./data.db`}</code>
 
                             {/* API Reference */}
                             <section id="api" className="mb-16">
-                                <h1 className="text-3xl font-bold text-slate-900 mb-3">API Reference</h1>
+                                <h1 className="text-3xl font-normal text-slate-900 mb-3">API Reference</h1>
                                 <p className="text-lg text-slate-600 mb-8 leading-relaxed">
                                     RESTful API endpoints for programmatic access.
                                 </p>
 
                                 <div id="api-authentication" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Authentication</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Authentication</h2>
                                     <p className="text-slate-700 mb-4">
                                         All API requests require authentication via cookies or JWT tokens.
                                     </p>
                                 </div>
 
                                 <div id="api-endpoints" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Endpoints</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Endpoints</h2>
                                     <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-4">
                                         <div className="mb-3">
                                             <code className="text-xs font-mono bg-slate-900 text-green-400 px-2 py-1 rounded">GET</code>
@@ -483,7 +483,7 @@ DATABASE_URL=./data.db`}</code>
                                 </div>
 
                                 <div id="api-examples" className="mb-12">
-                                    <h2 className="text-2xl font-semibold text-slate-900 mb-4 mt-8">Examples</h2>
+                                    <h2 className="text-2xl font-normal text-slate-900 mb-4 mt-8">Examples</h2>
                                     <div className="bg-slate-900 rounded-lg p-4 mb-4 overflow-x-auto">
                                         <pre className="text-sm text-slate-100">
                                             <code>{`// Fetch workflows
@@ -499,22 +499,22 @@ fetch('/api/workflows', {
 
                             {/* FAQ */}
                             <section id="faq" className="mb-16">
-                                <h1 className="text-3xl font-bold text-slate-900 mb-3">FAQ</h1>
+                                <h1 className="text-3xl font-normal text-slate-900 mb-3">FAQ</h1>
                                 <div className="space-y-6">
                                     <div>
-                                        <h3 className="text-lg font-semibold text-slate-900 mb-2">How do I create my first workflow?</h3>
+                                        <h3 className="text-lg font-normal text-slate-900 mb-2">How do I create my first workflow?</h3>
                                         <p className="text-slate-700">
                                             Navigate to Workflows, click "Create Workflow", and drag nodes from the Components panel onto the canvas.
                                         </p>
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-semibold text-slate-900 mb-2">Can I use custom Python code in workflows?</h3>
+                                        <h3 className="text-lg font-normal text-slate-900 mb-2">Can I use custom Python code in workflows?</h3>
                                         <p className="text-slate-700">
                                             Yes, use the Python node to execute custom Python scripts within your workflows.
                                         </p>
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-semibold text-slate-900 mb-2">How do copilots access data?</h3>
+                                        <h3 className="text-lg font-normal text-slate-900 mb-2">How do copilots access data?</h3>
                                         <p className="text-slate-700">
                                             When creating a copilot, you can specify which entities it can access. The copilot will only see data from those selected entities.
                                         </p>
@@ -524,10 +524,10 @@ fetch('/api/workflows', {
 
                             {/* Changelog */}
                             <section id="changelog" className="mb-16">
-                                <h1 className="text-3xl font-bold text-slate-900 mb-3">Changelog</h1>
+                                <h1 className="text-3xl font-normal text-slate-900 mb-3">Changelog</h1>
                                 <div className="space-y-6">
                                     <div className="border-l-2 border-slate-200 pl-4">
-                                        <h3 className="text-lg font-semibold text-slate-900 mb-1">v1.0.0 - January 2026</h3>
+                                        <h3 className="text-lg font-normal text-slate-900 mb-1">v1.0.0 - January 2026</h3>
                                         <ul className="list-disc pl-5 space-y-1 text-slate-700">
                                             <li>Initial release</li>
                                             <li>Data modeling with entities and relationships</li>

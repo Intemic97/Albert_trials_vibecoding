@@ -525,7 +525,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                 {/* Header */}
                 <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-20 shrink-0">
                     <div className="flex items-center gap-3">
-                        <h1 className="text-lg font-semibold text-slate-900">Overview</h1>
+                        <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Overview</h1>
                     </div>
                     <div />
                 </header>
@@ -545,7 +545,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-20 shrink-0">
                 <div className="flex items-center gap-3">
-                    <h1 className="text-lg font-semibold text-slate-900">Overview</h1>
+                    <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Overview</h1>
                 </div>
                 <div />
             </header>
@@ -565,7 +565,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                 </div>
                                 <div className="mt-4">
                                     <p className="text-xs text-slate-500 mb-1">Active Workflows</p>
-                                    <p className="text-2xl font-semibold text-slate-900">
+                                    <p className="text-2xl font-normal text-slate-900">
                                         {isLoadingStats ? '...' : (overviewStats?.activeWorkflows || 0)}
                                     </p>
                                 </div>
@@ -590,7 +590,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                 </div>
                                 <div className="mt-4">
                                     <p className="text-xs text-slate-500 mb-1">Events Triggered</p>
-                                    <p className="text-2xl font-semibold text-slate-900">
+                                    <p className="text-2xl font-normal text-slate-900">
                                         {isLoadingStats ? '...' : (overviewStats?.eventsTriggered || 0).toLocaleString()}
                                     </p>
                                 </div>
@@ -605,7 +605,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                 </div>
                                 <div className="mt-4">
                                     <p className="text-xs text-slate-500 mb-1">Copilot Sessions</p>
-                                    <p className="text-2xl font-semibold text-slate-900">—</p>
+                                    <p className="text-2xl font-normal text-slate-900">—</p>
                                 </div>
                             </div>
                         </div>
@@ -614,7 +614,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                     <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div className="lg:col-span-2 bg-white border border-slate-200 rounded-lg p-4">
                             <div className="flex items-center justify-between mb-3">
-                                <h2 className="text-base font-semibold text-slate-900">Overview</h2>
+                                <h2 className="text-base font-normal text-slate-900">Overview</h2>
                                 <div className="flex items-center gap-3 text-xs text-slate-500">
                                     <div className="flex items-center gap-1">
                                         <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
@@ -631,7 +631,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
 
                         <div className="bg-white border border-slate-200 rounded-lg p-4">
                             <div className="flex items-center justify-between mb-3">
-                                <h2 className="text-base font-semibold text-slate-900">Your Copilots</h2>
+                                <h2 className="text-base font-normal text-slate-900">Your Copilots</h2>
                                 <button 
                                     onClick={() => navigate('/copilots')}
                                     className="text-xs text-slate-500 hover:text-slate-700"
@@ -649,7 +649,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                                 <Sparkles size={16} className="text-indigo-600" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-semibold text-slate-900 truncate">{copilot.title}</p>
+                                                <p className="text-sm font-normal text-slate-900 truncate">{copilot.title}</p>
                                                 <p className="text-xs text-slate-500 truncate">{copilot.messageCount || 0} messages</p>
                                                 <p className="text-xs text-slate-400 mt-1">{formatTimeAgo(copilot.updatedAt)}</p>
                                             </div>
@@ -681,7 +681,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
 
                     <section className="bg-white border border-slate-200 rounded-lg">
                         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-                            <h2 className="text-base font-semibold text-slate-900">Workflows</h2>
+                            <h2 className="text-base font-normal text-slate-900">Workflows</h2>
                             <button 
                                 onClick={() => navigate('/logs')}
                                 className="text-xs text-slate-500 hover:text-slate-700 transition-colors"
@@ -760,7 +760,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                 <Hash size={20} className="text-teal-600" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-slate-800">
+                                <h3 className="text-lg font-normal text-slate-800">
                                     {editingKpi ? 'Edit KPI' : 'New KPI'}
                                 </h3>
                                 <p className="text-sm text-slate-500">Configure a company metric</p>

@@ -220,7 +220,7 @@ export const Connections: React.FC = () => {
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
                 <div>
-                    <h1 className="text-lg font-semibold text-slate-900">Connections</h1>
+                    <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Connections</h1>
                     <p className="text-[11px] text-slate-500">Manage your data source integrations</p>
                 </div>
                 <div />
@@ -298,7 +298,7 @@ export const Connections: React.FC = () => {
                                                 )}
                                             </div>
                                             <div>
-                                                <h3 className="text-base font-semibold text-slate-900">
+                                                <h3 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                                                     {connection.name}
                                                 </h3>
                                                 <span className={`inline-block px-2 py-0.5 rounded-md border text-xs font-medium mt-1 ${getCategoryColor(connection.category)}`}>
@@ -370,7 +370,7 @@ export const Connections: React.FC = () => {
                     <div className="bg-white rounded-lg border border-slate-200 shadow-xl p-6 w-[500px] max-w-[90vw]" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-6">
                             <div>
-                                <h3 className="text-base font-semibold text-slate-900">
+                                <h3 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                                     Connect to {selectedConnection.name}
                                 </h3>
                                 <p className="text-xs text-slate-500 mt-1">

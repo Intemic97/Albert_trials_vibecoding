@@ -310,7 +310,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
                             left: mention.left
                         }}
                     >
-                        <div className="bg-slate-50 px-3 py-2 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        <div className="bg-slate-50 px-3 py-2 border-b border-slate-100 text-xs font-normal text-slate-500 uppercase tracking-wider">
                             {mention.type === 'entity' ? (inputData && inputData.length > 0 ? 'Data Sources' : 'Entities') : `Properties of ${mention.entityContext?.name}`}
                         </div>
                         <div className="max-h-48 overflow-y-auto">

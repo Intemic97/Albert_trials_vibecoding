@@ -80,6 +80,8 @@ function AuthenticatedApp() {
         if (path.startsWith('/dashboard')) return 'dashboard';
         if (path.startsWith('/workflow')) return 'workflows';
         if (path.startsWith('/database')) return 'database';
+        if (path.startsWith('/templates')) return 'templates';
+        if (path.startsWith('/documents')) return 'documents';
         if (path.startsWith('/reports')) return 'reports';
         if (path.startsWith('/copilots')) return 'copilots';
         if (path.startsWith('/logs')) return 'logs';
@@ -91,7 +93,7 @@ function AuthenticatedApp() {
     };
 
     const currentView = getCurrentView();
-    const hideSidebarForRoutes = location.pathname.match(/^\/reports\/[^/]+$/) ||
+    const hideSidebarForRoutes = location.pathname.match(/^\/documents\/[^/]+$/) ||
         location.pathname.match(/^\/workflow\/[^/]+$/) ||
         location.pathname.match(/^\/copilots/) ||
         location.pathname.match(/^\/documentation/);
@@ -903,10 +905,16 @@ function AuthenticatedApp() {
                     <Route path="/workflow/:workflowId" element={
                         <Workflows entities={entities} onViewChange={handleNavigate} />
                     } />
-                    <Route path="/reports" element={
-                        <Reporting entities={entities} companyInfo={undefined} onViewChange={handleNavigate} />
+                    <Route path="/templates" element={
+                        <Reporting entities={entities} companyInfo={undefined} onViewChange={handleNavigate} view="templates" />
                     } />
-                    <Route path="/reports/:reportId" element={
+                    <Route path="/documents" element={
+                        <Reporting entities={entities} companyInfo={undefined} onViewChange={handleNavigate} view="documents" />
+                    } />
+                    <Route path="/reports" element={
+                        <Reporting entities={entities} companyInfo={undefined} onViewChange={handleNavigate} view="reports" />
+                    } />
+                    <Route path="/documents/:reportId" element={
                         <ReportEditor entities={entities} companyInfo={undefined} onViewChange={handleNavigate} />
                     } />
                     <Route path="/copilots" element={
@@ -940,7 +948,7 @@ function AuthenticatedApp() {
                                         <ArrowLeft size={20} />
                                     </button>
                                     <div>
-                                        <h1 className="text-lg font-semibold text-slate-900">
+                                        <h1 className="text-lg font-normal text-slate-900">
                                             {activeEntity.name}
                                         </h1>
                                         <p className="text-[11px] text-slate-500">Managing structure properties</p>
@@ -948,7 +956,7 @@ function AuthenticatedApp() {
                                 </div>
                             ) : (
                                 <div>
-                                    <h1 className="text-lg font-semibold text-slate-900">Your database</h1>
+                                    <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Your database</h1>
                                     <p className="text-[11px] text-slate-500">View and manage your different entities</p>
                                 </div>
                             )}
@@ -1060,14 +1068,14 @@ function AuthenticatedApp() {
                                         <>
                                             {/* Overview Panel */}
                                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                                <h2 className="text-lg font-semibold text-slate-800 mb-4">Structure Overview</h2>
+                                                <h2 className="text-lg font-normal text-slate-800 mb-4">Structure Overview</h2>
                                                 <div className="grid grid-cols-2 gap-6">
                                                     <div>
-                                                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Description</label>
+                                                        <label className="block text-xs font-normal text-slate-500 uppercase tracking-wide mb-1">Description</label>
                                                         <p className="text-slate-700">{activeEntity.description || 'No description provided.'}</p>
                                                     </div>
                                                     <div>
-                                                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Metadata</label>
+                                                        <label className="block text-xs font-normal text-slate-500 uppercase tracking-wide mb-1">Metadata</label>
                                                         <div className="text-sm text-slate-600 space-y-1">
                                                             <p>Created by: <span className="font-medium text-slate-800">{activeEntity.author}</span></p>
                                                             <p>Last modified: <span className="font-medium text-slate-800">{activeEntity.lastEdited}</span></p>
@@ -1080,7 +1088,7 @@ function AuthenticatedApp() {
                                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                                                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                                                     <div>
-                                                        <h2 className="text-lg font-semibold text-slate-800">Properties</h2>
+                                                        <h2 className="text-lg font-normal text-slate-800">Properties</h2>
                                                         <p className="text-sm text-slate-500">Define the data structure for this entity.</p>
                                                     </div>
                                                     <button
@@ -1105,9 +1113,9 @@ function AuthenticatedApp() {
                                                                         {renderIconForType(prop.type)}
                                                                     </div>
                                                                     <div>
-                                                                        <h3 className="text-sm font-bold text-slate-800">{prop.name}</h3>
+                                                                        <h3 className="text-sm font-normal text-slate-800">{prop.name}</h3>
                                                                         <p className="text-xs text-slate-500 flex items-center mt-0.5">
-                                                                            <span className="uppercase tracking-wider font-semibold mr-2">{prop.type}</span>
+                                                                            <span className="uppercase tracking-wider font-normal mr-2">{prop.type}</span>
                                                                             {prop.type === 'relation' && (
                                                                                 <span className="bg-teal-100 text-teal-800 px-1.5 rounded text-[10px]">
                                                                                     → {getRelatedEntityName(prop.relatedEntityId)}
@@ -1138,10 +1146,10 @@ function AuthenticatedApp() {
                                                 {/* Add Property Form Area */}
                                                 {isAddingProp && (
                                                     <div className="p-6 bg-slate-50 border-t border-slate-200 animate-in fade-in slide-in-from-top-4 duration-200">
-                                                        <h3 className="text-sm font-bold text-slate-800 mb-4">New Property</h3>
+                                                        <h3 className="text-sm font-normal text-slate-800 mb-4">New Property</h3>
                                                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                                                             <div className="md:col-span-4">
-                                                                <label className="block text-xs font-semibold text-slate-500 mb-1">Name</label>
+                                                                <label className="block text-xs font-normal text-slate-500 mb-1">Name</label>
                                                                 <input
                                                                     autoFocus
                                                                     type="text"
@@ -1152,7 +1160,7 @@ function AuthenticatedApp() {
                                                                 />
                                                             </div>
                                                             <div className="md:col-span-3">
-                                                                <label className="block text-xs font-semibold text-slate-500 mb-1">Type</label>
+                                                                <label className="block text-xs font-normal text-slate-500 mb-1">Type</label>
                                                                 <select
                                                                     value={newPropType}
                                                                     onChange={(e) => setNewPropType(e.target.value as PropertyType)}
@@ -1168,7 +1176,7 @@ function AuthenticatedApp() {
 
                                                             {newPropType === 'relation' && (
                                                                 <div className="md:col-span-3">
-                                                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Related Structure</label>
+                                                                    <label className="block text-xs font-normal text-slate-500 mb-1">Related Structure</label>
                                                                     <select
                                                                         value={newPropRelationId}
                                                                         onChange={(e) => setNewPropRelationId(e.target.value)}
@@ -1211,7 +1219,7 @@ function AuthenticatedApp() {
                                         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                                             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                                                 <div>
-                                                    <h2 className="text-lg font-semibold text-slate-800">Data Records</h2>
+                                                    <h2 className="text-lg font-normal text-slate-800">Data Records</h2>
                                                     <p className="text-sm text-slate-500">Manage the actual data for this entity.</p>
                                                 </div>
                                                 <div className="relative group/addrecord">
@@ -1241,13 +1249,13 @@ function AuthenticatedApp() {
                                                     <thead>
                                                         <tr className="bg-slate-50 border-b border-slate-200">
                                                             {activeEntity.properties.map(prop => (
-                                                                <th key={prop.id} className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                                                <th key={prop.id} className="px-6 py-3 text-xs font-normal text-slate-500 uppercase tracking-wider">
                                                                     {prop.name}
                                                                 </th>
                                                             ))}
                                                             {/* Incoming Relations Headers */}
                                                             {Object.values(incomingData).map(({ sourceEntity, sourceProperty }) => (
-                                                                <th key={sourceProperty.id} className="px-6 py-3 text-xs font-semibold text-teal-600 uppercase tracking-wider bg-teal-50/50">
+                                                                <th key={sourceProperty.id} className="px-6 py-3 text-xs font-normal text-teal-600 uppercase tracking-wider bg-teal-50/50">
                                                                     {sourceEntity.name} ({sourceProperty.name})
                                                                 </th>
                                                             ))}
@@ -1331,10 +1339,10 @@ function AuthenticatedApp() {
                             <div className="absolute inset-y-0 right-0 w-96 bg-white shadow-2xl border-l border-slate-200 z-50 flex flex-col">
                                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                                     <div>
-                                        <h2 className="text-lg font-bold text-slate-800">
+                                        <h2 className="text-lg font-normal text-slate-800">
                                             {getRecordDisplayName(selectedRecord, selectedRecordEntity)}
                                         </h2>
-                                        <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mt-1">
+                                        <p className="text-xs text-slate-500 uppercase tracking-wider font-normal mt-1">
                                             {selectedRecordEntity.name}
                                         </p>
                                     </div>
@@ -1359,7 +1367,7 @@ function AuthenticatedApp() {
                                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                                     {selectedRecordEntity.properties.map(prop => (
                                         <div key={prop.id}>
-                                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                                            <label className="block text-xs font-normal text-slate-500 uppercase tracking-wide mb-1">
                                                 {prop.name}
                                             </label>
                                             <div className="text-sm text-slate-800 bg-slate-50 p-3 rounded-lg border border-slate-100">
@@ -1372,7 +1380,7 @@ function AuthenticatedApp() {
                                         </div>
                                     ))}
                                     <div className="pt-4 border-t border-slate-100">
-                                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                                        <label className="block text-xs font-normal text-slate-400 uppercase tracking-wide mb-1">
                                             Record ID
                                         </label>
                                         <p className="text-xs font-mono text-slate-400">{selectedRecord.id}</p>
@@ -1386,7 +1394,7 @@ function AuthenticatedApp() {
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
                                 <div className="bg-white rounded-lg border border-slate-200 shadow-lg w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden">
                                     <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/50">
-                                        <h2 className="text-sm font-semibold text-slate-900">Create New Entity</h2>
+                                        <h2 className="text-sm font-normal text-slate-900">Create New Entity</h2>
                                     </div>
 
                                     <div className="p-5 space-y-4">
@@ -1436,7 +1444,7 @@ function AuthenticatedApp() {
                         {isAddingRecord && currentSchema && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
                                 <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
-                                    <h2 className="text-xl font-bold text-slate-800 mb-4">{editingRecordId ? 'Edit Record' : 'Add New Record'}</h2>
+                                    <h2 className="text-xl font-normal text-slate-800 mb-4">{editingRecordId ? 'Edit Record' : 'Add New Record'}</h2>
 
                                     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                                         {currentSchema.properties.map(prop => {
@@ -1554,7 +1562,7 @@ function AuthenticatedApp() {
                                         {Object.keys(incomingData).length > 0 && (
                                             <>
                                                 <div className="border-t border-slate-200 pt-4 mt-4">
-                                                    <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-3">
+                                                    <p className="text-xs font-normal text-indigo-600 uppercase tracking-wide mb-3">
                                                         Incoming Relations
                                                     </p>
                                                 </div>
@@ -1610,7 +1618,7 @@ function AuthenticatedApp() {
                         {editingIncomingRelation && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
                                 <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
-                                    <h2 className="text-xl font-bold text-slate-800 mb-2">
+                                    <h2 className="text-xl font-normal text-slate-800 mb-2">
                                         Edit Relation
                                     </h2>
                                     <p className="text-sm text-slate-500 mb-4">

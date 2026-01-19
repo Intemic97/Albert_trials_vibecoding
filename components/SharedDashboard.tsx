@@ -28,7 +28,7 @@ const WidgetCard: React.FC<{ widget: WidgetConfig }> = ({ widget }) => {
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold text-slate-800 mb-1">{widget.title}</h3>
+            <h3 className="text-lg font-normal text-slate-800 mb-1">{widget.title}</h3>
             <p className="text-xs text-slate-500 mb-4">{widget.description}</p>
 
             <DynamicChart config={widget} />
@@ -100,7 +100,7 @@ export const SharedDashboard: React.FC<SharedDashboardProps> = ({ shareToken }) 
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
                 <div className="text-center max-w-md">
                     <LayoutDashboard className="mx-auto text-slate-300 mb-4" size={48} />
-                    <h1 className="text-xl font-bold text-slate-800 mb-2">Dashboard Unavailable</h1>
+                    <h1 className="text-xl font-normal text-slate-800 mb-2">Dashboard Unavailable</h1>
                     <p className="text-slate-600">{error}</p>
                 </div>
             </div>
@@ -116,7 +116,7 @@ export const SharedDashboard: React.FC<SharedDashboardProps> = ({ shareToken }) 
                 <div className="flex items-center gap-3">
                     <LayoutDashboard className="text-teal-600" size={24} />
                     <div>
-                        <h1 className="text-xl font-bold text-slate-800">{data.dashboard.name}</h1>
+                        <h1 className="text-xl font-normal text-slate-800">{data.dashboard.name}</h1>
                         {data.dashboard.description && (
                             <p className="text-xs text-slate-500">{data.dashboard.description}</p>
                         )}
@@ -139,7 +139,7 @@ export const SharedDashboard: React.FC<SharedDashboardProps> = ({ shareToken }) 
                     ) : (
                         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
                             <Database className="mx-auto text-slate-300 mb-4" size={48} />
-                            <h3 className="text-lg font-semibold text-slate-600 mb-2">No widgets</h3>
+                            <h3 className="text-lg font-normal text-slate-600 mb-2">No widgets</h3>
                             <p className="text-sm text-slate-500">
                                 This dashboard doesn't have any widgets yet.
                             </p>

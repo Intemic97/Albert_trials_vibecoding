@@ -122,7 +122,7 @@ export function LoginPage() {
                             </div>
                         </div>
                         
-                        <h1 className="text-2xl font-semibold text-gray-900 text-center mb-2">Check your email</h1>
+                        <h1 className="text-2xl font-normal text-gray-900 text-center mb-2">Check your email</h1>
                         <p className="text-gray-500 text-center mb-6">
                             We've sent a verification link to<br />
                             <span className="text-gray-900 font-medium">{verificationEmail}</span>
@@ -192,7 +192,7 @@ export function LoginPage() {
 
                     {/* Title */}
                     <div className="mb-6">
-                        <h1 className="text-xl font-semibold text-gray-900 mb-1">
+                        <h1 className="text-xl font-normal text-gray-900 mb-1">
                             {isLogin ? 'Sign in to your account' : 'Create your account'}
                         </h1>
                         <p className="text-sm text-[#1e3a5f]">

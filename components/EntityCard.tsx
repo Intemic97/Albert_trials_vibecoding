@@ -12,7 +12,7 @@ export const EntityCard: React.FC<EntityCardProps> = ({ entity, onClick, onDelet
   return (
     <div
       onClick={() => onClick(entity)}
-      className="bg-white rounded-xl border-2 border-slate-200 p-5 transition-all duration-200 cursor-pointer group relative flex flex-col justify-between min-h-[200px] overflow-hidden hover:border-[#256A65]"
+      className="bg-white border border-slate-200 rounded-lg p-5 cursor-pointer group relative flex flex-col justify-between min-h-[200px] overflow-hidden"
     >
       <div className="flex-1">
         <div className="flex items-start justify-between mb-4">
@@ -21,7 +21,7 @@ export const EntityCard: React.FC<EntityCardProps> = ({ entity, onClick, onDelet
               <Database size={18} className="text-slate-600" />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="text-base font-semibold text-slate-900 group-hover:text-slate-700 transition-colors truncate">
+              <h3 className="text-base font-normal text-slate-900 group-hover:text-slate-700 transition-colors truncate" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                 {entity.name}
               </h3>
             </div>

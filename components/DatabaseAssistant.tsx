@@ -130,7 +130,7 @@ export const DatabaseAssistant: React.FC<DatabaseAssistantProps> = ({ isOpen, on
                             <Sparkles size={18} className="text-amber-300" />
                         </div>
                         <div>
-                            <h3 className="font-semibold text-sm">Database Assistant</h3>
+                            <h3 className="font-normal text-sm">Database Assistant</h3>
                             {!isMinimized && (
                                 <p className="text-xs text-slate-300">Ask questions about your data</p>
                             )}

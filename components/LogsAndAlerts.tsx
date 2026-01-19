@@ -298,7 +298,7 @@ export const LogsAndAlerts: React.FC = () => {
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
                 <div>
-                    <h1 className="text-lg font-semibold text-slate-900">Executions</h1>
+                    <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Executions</h1>
                     <p className="text-[11px] text-slate-500">Monitor workflow executions and system alerts</p>
                 </div>
                 <button
@@ -385,7 +385,7 @@ export const LogsAndAlerts: React.FC = () => {
                     {(typeFilter === 'all' || typeFilter === 'executions') && (
                         <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
                             <div className="px-6 py-4 border-b border-slate-200 bg-white">
-                                <h2 className="text-base font-semibold text-slate-900">
+                                <h2 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                                     Workflow Executions ({filteredExecutions.length})
                                 </h2>
                             </div>
@@ -458,7 +458,7 @@ export const LogsAndAlerts: React.FC = () => {
                                                         
                                                         {logs.length > 0 ? (
                                                             <div className="space-y-2">
-                                                                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
+                                                                <p className="text-xs font-normal text-slate-600 uppercase tracking-wide mb-2">
                                                                     Execution Logs ({logs.length})
                                                                 </p>
                                                                 {logs.map((log) => (
@@ -507,7 +507,7 @@ export const LogsAndAlerts: React.FC = () => {
                     {(typeFilter === 'all' || typeFilter === 'alerts') && (
                         <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
                             <div className="px-6 py-4 border-b border-slate-200 bg-white">
-                                <h2 className="text-base font-semibold text-slate-900">
+                                <h2 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                                     Alerts ({filteredAlerts.length})
                                 </h2>
                             </div>
@@ -540,7 +540,7 @@ export const LogsAndAlerts: React.FC = () => {
                                                     {alertIcons[alert.type]}
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 mb-1">
-                                                            <p className="text-sm font-semibold text-slate-900">{alert.title}</p>
+                                                            <p className="text-sm font-normal text-slate-900">{alert.title}</p>
                                                             {alert.workflowName && (
                                                                 <span className="text-xs text-slate-500">• {alert.workflowName}</span>
                                                             )}

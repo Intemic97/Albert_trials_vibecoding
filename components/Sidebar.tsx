@@ -16,7 +16,11 @@ import {
   Plug,
   HelpCircle,
   BookOpen,
-  Bug
+  Bug,
+  ChevronDown,
+  ChevronUp,
+  FileCheck,
+  Clipboard
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -31,6 +35,8 @@ const viewToRoute: Record<string, string> = {
   'dashboard': '/dashboard',
   'workflows': '/workflows',
   'database': '/database',
+  'templates': '/templates',
+  'documents': '/documents',
   'reports': '/reports',
   'copilots': '/copilots',
   'logs': '/logs',
@@ -53,6 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
     entities: Array<{ id: string; name: string }>;
   }>({ workflows: [], chats: [], entities: [] });
   const [showResults, setShowResults] = useState(false);
+  const [showHelpDropdown, setShowHelpDropdown] = useState(false);
   const currentOrg = organizations.find(org => org.id === user?.orgId);
 
   useEffect(() => {
@@ -121,7 +128,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
       clearTimeout(timeoutId);
     };
   }, [searchQuery]);
-  const NavItem = ({ icon: Icon, label, view, active = false, onClick }: { icon: any, label: string, view?: string, active?: boolean, onClick?: () => void }) => {
+  const NavItem = ({ icon: Icon, label, view, active = false, onClick, onNavigate }: { icon: any, label: string, view?: string, active?: boolean, onClick?: () => void, onNavigate?: () => void }) => {
     const route = view ? viewToRoute[view] || `/${view}` : '#';
     
     const baseClasses = "flex items-center px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 w-full text-left group";
@@ -152,11 +159,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
       );
     }
 
+    const handleClick = () => {
+      if (onNavigate) {
+        onNavigate();
+      }
+    };
+
     return (
       <Link
         to={route}
         data-tutorial={`nav-${view}`}
         className={`${baseClasses} ${activeClasses}`}
+        onClick={handleClick}
       >
         <Icon size={16} className={`mr-3 transition-colors ${active ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600'}`} />
         <span>{label}</span>
@@ -215,7 +229,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
               <div className="max-h-64 overflow-y-auto">
                 {searchResults.workflows.length > 0 && (
                   <div className="py-1.5">
-                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Workflows</div>
+                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-400 font-normal">Workflows</div>
                     {searchResults.workflows.map(item => (
                       <button
                         key={item.id}
@@ -234,7 +248,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
 
                 {searchResults.chats.length > 0 && (
                   <div className="py-1.5 border-t border-slate-100">
-                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Chats</div>
+                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-400 font-normal">Chats</div>
                     {searchResults.chats.map(item => (
                       <button
                         key={item.id}
@@ -253,7 +267,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
 
                 {searchResults.entities.length > 0 && (
                   <div className="py-1.5 border-t border-slate-100">
-                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Knowledge Base</div>
+                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-400 font-normal">Knowledge Base</div>
                     {searchResults.entities.map(item => (
                       <button
                         key={item.id}
@@ -292,8 +306,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
           <div className="space-y-0.5">
             <NavItem icon={Workflow} label="Workflows" view="workflows" active={activeView === 'workflows'} />
             <NavItem icon={Database} label="Knowledge Base" view="database" active={activeView === 'database'} />
-            <NavItem icon={FileText} label="Reports" view="reports" active={activeView === 'reports'} />
             <NavItem icon={Sparkles} label="Copilots" view="copilots" active={activeView === 'copilots'} />
+          </div>
+
+          <SectionLabel label="Reports" />
+          <div className="space-y-0.5">
+            <NavItem icon={FileText} label="Templates" view="templates" active={activeView === 'templates'} />
+            <NavItem icon={FileCheck} label="Documents" view="documents" active={activeView === 'documents'} />
+            <NavItem icon={Clipboard} label="Reports" view="reports" active={activeView === 'reports'} />
           </div>
 
           <SectionLabel label="Operations" />
@@ -302,39 +322,61 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
             <NavItem icon={Plug} label="Connections" view="connections" active={activeView === 'connections'} />
           </div>
 
-          <SectionLabel label="Help" />
-          <div className="space-y-0.5">
-            <NavItem 
-              icon={HelpCircle} 
-              label="Quickstart" 
-              onClick={() => {
-                if (onShowTutorial) {
-                  onShowTutorial();
-                } else {
-                  // Fallback: dispatch event
-                  window.dispatchEvent(new CustomEvent('showTutorial'));
-                }
-              }} 
-            />
-            <NavItem 
-              icon={BookOpen} 
-              label="Documentation" 
-              view="documentation"
-              active={activeView === 'documentation'}
-            />
-            <NavItem 
-              icon={Bug} 
-              label="Report a Bug" 
-              onClick={() => {
-                window.dispatchEvent(new CustomEvent('showReportBug'));
-              }} 
-            />
-          </div>
         </nav>
       </div>
 
       {/* Footer */}
       <div className="px-3 py-3 border-t border-slate-100 bg-slate-50/30">
+        {/* Help Dropdown */}
+        <div className="mb-2">
+          <button
+            onClick={() => setShowHelpDropdown(!showHelpDropdown)}
+            className="flex items-center justify-between w-full px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-slate-600 hover:bg-slate-50 hover:text-slate-900 group"
+          >
+            <div className="flex items-center">
+              <HelpCircle size={16} className="mr-3 text-slate-400 group-hover:text-slate-600 transition-colors" />
+              <span>Help</span>
+            </div>
+            {showHelpDropdown ? (
+              <ChevronUp size={16} className="text-slate-400" />
+            ) : (
+              <ChevronDown size={16} className="text-slate-400" />
+            )}
+          </button>
+          {showHelpDropdown && (
+            <div className="ml-4 mt-1 space-y-0.5 border-l border-slate-200 pl-3">
+              <NavItem 
+                icon={HelpCircle} 
+                label="Quickstart" 
+                onClick={() => {
+                  setShowHelpDropdown(false);
+                  if (onShowTutorial) {
+                    onShowTutorial();
+                  } else {
+                    window.dispatchEvent(new CustomEvent('showTutorial'));
+                  }
+                }} 
+              />
+              <div onClick={() => setShowHelpDropdown(false)}>
+                <NavItem 
+                  icon={BookOpen} 
+                  label="Documentation" 
+                  view="documentation"
+                  active={activeView === 'documentation'}
+                />
+              </div>
+              <NavItem 
+                icon={Bug} 
+                label="Report a Bug" 
+                onClick={() => {
+                  setShowHelpDropdown(false);
+                  window.dispatchEvent(new CustomEvent('showReportBug'));
+                }} 
+              />
+            </div>
+          )}
+        </div>
+        
         <div className="mb-2">
           <NavItem icon={Settings} label="Settings" view="settings" active={activeView === 'settings'} />
         </div>
@@ -346,7 +388,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
             <>
               <UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="md" />
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-slate-900 truncate">{user?.name || 'User'}</div>
+                <div className="text-sm font-normal text-slate-900 truncate">{user?.name || 'User'}</div>
                 {currentOrg && (
                   <div className="text-xs text-slate-500 truncate">
                     {currentOrg.name}

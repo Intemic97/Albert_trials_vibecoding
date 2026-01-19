@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut, Bot, Smartphone, BarChart3, User, Calendar, ChevronRight } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut, Bot, Smartphone, BarChart3, User, Calendar, ChevronRight, ChevronDown, ChevronUp, Plus, Folder, Shield, Terminal } from 'lucide-react';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
@@ -568,6 +568,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['Recents']));
 
     // LLM Node State
     const [configuringLLMNodeId, setConfiguringLLMNodeId] = useState<string | null>(null);
@@ -747,6 +748,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [isGeneratingWorkflow, setIsGeneratingWorkflow] = useState<boolean>(false);
     const [aiGeneratedWorkflow, setAiGeneratedWorkflow] = useState<{ nodes: any[], connections: any[] } | null>(null);
     const [showAiConfirmDialog, setShowAiConfirmDialog] = useState<boolean>(false);
+    
+    // Quick Connect Component Search State
+    const [showComponentSearch, setShowComponentSearch] = useState<boolean>(false);
+    const [connectingFromNodeId, setConnectingFromNodeId] = useState<string | null>(null);
+    const [componentSearchQuery, setComponentSearchQuery] = useState<string>('');
 
     // Templates Modal State
     const [showTemplatesModal, setShowTemplatesModal] = useState<boolean>(false);
@@ -3840,6 +3846,49 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         sendNodeDelete(id);
     };
 
+    // Quick connect component function
+    const handleQuickConnect = (componentType: string) => {
+        if (!connectingFromNodeId) return;
+        
+        const fromNode = nodes.find(n => n.id === connectingFromNodeId);
+        if (!fromNode) return;
+
+        // Find the component item
+        const componentItem = DRAGGABLE_ITEMS.find(item => item.type === componentType);
+        if (!componentItem) return;
+
+        // Calculate position for new node (to the right of the source node)
+        const newNodeX = fromNode.x + 300; // 300px to the right
+        const newNodeY = fromNode.y;
+
+        // Create new node
+        const newNode: WorkflowNode = {
+            id: generateUUID(),
+            type: componentItem.type as any,
+            label: componentItem.label,
+            x: newNodeX,
+            y: newNodeY
+        };
+
+        // Add node
+        setNodes(prev => [...prev, newNode]);
+        sendNodeAdd(newNode);
+
+        // Create connection
+        const newConnection: Connection = {
+            id: generateUUID(),
+            fromNodeId: connectingFromNodeId,
+            toNodeId: newNode.id
+        };
+        setConnections(prev => [...prev, newConnection]);
+        sendConnectionAdd(newConnection);
+
+        // Close modal
+        setShowComponentSearch(false);
+        setConnectingFromNodeId(null);
+        setComponentSearchQuery('');
+    };
+
     const [dragConnectionStart, setDragConnectionStart] = useState<{ nodeId: string, outputType?: 'true' | 'false' | 'A' | 'B', x: number, y: number } | null>(null);
     const [dragConnectionCurrent, setDragConnectionCurrent] = useState<{ x: number, y: number } | null>(null);
 
@@ -3899,14 +3948,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     };
 
     const getNodeColor = (type: string, status?: string) => {
-        if (status === 'running') return 'bg-yellow-100 border-yellow-400 text-yellow-900 animate-pulse';
-        if (status === 'completed') return 'bg-green-100 border-green-400 text-green-900';
-        if (status === 'error') return 'bg-red-100 border-red-400 text-red-900';
-        if (status === 'waiting') return 'bg-orange-100 border-orange-400 text-orange-900 animate-pulse';
+        if (status === 'running') return 'bg-white border border-yellow-400/60 text-slate-900 shadow-sm';
+        if (status === 'completed') return 'bg-white border border-[#256A65]/60 text-slate-900 shadow-sm';
+        if (status === 'error') return 'bg-white border border-red-400/60 text-slate-900 shadow-sm';
+        if (status === 'waiting') return 'bg-white border border-orange-400/60 text-slate-900 shadow-sm';
 
         // Idle/not executed nodes are white
-        if (type === 'comment') return 'bg-amber-50 border-amber-200 text-amber-900';
-        return 'bg-white border-slate-300 text-slate-700 hover:border-slate-400 hover:shadow-md transition-all';
+        if (type === 'comment') return 'bg-amber-50 border border-amber-300/60 text-amber-900';
+        return 'bg-white border border-slate-300 text-slate-700';
     };
 
     // Get icon for node type (matches sidebar icons)
@@ -3918,31 +3967,31 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // Get icon background color for node type
     const getNodeIconBg = (type: string) => {
         switch (type) {
-            case 'trigger': return 'bg-cyan-100 text-cyan-700';
-            case 'action': return 'bg-blue-100 text-blue-700';
-            case 'condition': return 'bg-slate-100 text-slate-700';
-            case 'fetchData': return 'bg-indigo-100 text-indigo-700';
-            case 'humanApproval': return 'bg-sky-100 text-sky-700';
-            case 'addField': return 'bg-indigo-100 text-indigo-700';
-            case 'saveRecords': return 'bg-blue-100 text-blue-700';
-            case 'llm': return 'bg-slate-100 text-slate-700';
-            case 'python': return 'bg-sky-100 text-sky-700';
-            case 'manualInput': return 'bg-indigo-100 text-indigo-700';
-            case 'output': return 'bg-indigo-100 text-indigo-700';
-            case 'http': return 'bg-cyan-100 text-cyan-700';
-            case 'mysql': return 'bg-blue-100 text-blue-700';
-            case 'sapFetch': return 'bg-indigo-100 text-indigo-700';
-            case 'esios': return 'bg-cyan-100 text-cyan-700';
-            case 'climatiq': return 'bg-sky-100 text-sky-700';
-            case 'join': return 'bg-cyan-100 text-cyan-700';
-            case 'splitColumns': return 'bg-sky-100 text-sky-700';
-            case 'excelInput': return 'bg-indigo-100 text-indigo-700';
-            case 'pdfInput': return 'bg-indigo-100 text-indigo-700';
-            case 'sendEmail': return 'bg-blue-100 text-blue-700';
-            case 'sendSMS': return 'bg-blue-100 text-blue-700';
-            case 'dataVisualization': return 'bg-indigo-100 text-indigo-700';
-            case 'webhook': return 'bg-cyan-100 text-cyan-700';
-            default: return 'bg-slate-100 text-slate-700';
+            case 'trigger': return 'bg-gradient-to-br from-cyan-50 to-cyan-100 text-cyan-700 border border-cyan-200';
+            case 'action': return 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 border border-blue-200';
+            case 'condition': return 'bg-gradient-to-br from-slate-50 to-slate-100 text-slate-700 border border-slate-200';
+            case 'fetchData': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
+            case 'humanApproval': return 'bg-gradient-to-br from-sky-50 to-sky-100 text-sky-700 border border-sky-200';
+            case 'addField': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
+            case 'saveRecords': return 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 border border-blue-200';
+            case 'llm': return 'bg-gradient-to-br from-slate-50 to-slate-100 text-slate-700 border border-slate-200';
+            case 'python': return 'bg-gradient-to-br from-sky-50 to-sky-100 text-sky-700 border border-sky-200';
+            case 'manualInput': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
+            case 'output': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
+            case 'http': return 'bg-gradient-to-br from-cyan-50 to-cyan-100 text-cyan-700 border border-cyan-200';
+            case 'mysql': return 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 border border-blue-200';
+            case 'sapFetch': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
+            case 'esios': return 'bg-gradient-to-br from-cyan-50 to-cyan-100 text-cyan-700 border border-cyan-200';
+            case 'climatiq': return 'bg-gradient-to-br from-sky-50 to-sky-100 text-sky-700 border border-sky-200';
+            case 'join': return 'bg-gradient-to-br from-cyan-50 to-cyan-100 text-cyan-700 border border-cyan-200';
+            case 'splitColumns': return 'bg-gradient-to-br from-sky-50 to-sky-100 text-sky-700 border border-sky-200';
+            case 'excelInput': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
+            case 'pdfInput': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
+            case 'sendEmail': return 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 border border-blue-200';
+            case 'sendSMS': return 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 border border-blue-200';
+            case 'dataVisualization': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
+            case 'webhook': return 'bg-gradient-to-br from-cyan-50 to-cyan-100 text-cyan-700 border border-cyan-200';
+            default: return 'bg-gradient-to-br from-slate-50 to-slate-100 text-slate-700 border border-slate-200';
         }
     };
 
@@ -3965,7 +4014,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     {/* Top Header */}
                     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
                         <div>
-                            <h1 className="text-lg font-semibold text-slate-900">Workflows</h1>
+                            <h1 className="text-lg font-normal text-slate-900">Workflows</h1>
                             <p className="text-[11px] text-slate-500">Manage and execute your automation workflows</p>
                         </div>
                         <div className="flex items-center space-x-4">
@@ -3985,7 +4034,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         placeholder="Search workflows..."
                                         value={workflowSearchQuery}
                                         onChange={(e) => setWorkflowSearchQuery(e.target.value)}
-                                        className="pl-10 pr-4 py-2 bg-white text-slate-800 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 w-80 placeholder:text-slate-400"
+                                        className="pl-10 pr-4 py-2 bg-white text-slate-800 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] w-80 placeholder:text-slate-400"
                                     />
                                 </div>
                                 <p className="text-sm text-slate-500">
@@ -4016,7 +4065,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <div
                                 key={workflow.id}
                                 onClick={() => openWorkflow(workflow.id)}
-                                className="bg-white rounded-xl border-2 border-slate-200 p-6 hover:border-[#256A65] hover:shadow-lg transition-all duration-200 cursor-pointer group relative flex flex-col justify-between min-h-[200px]"
+                                className="bg-white border border-slate-200 rounded-lg p-5 cursor-pointer group relative flex flex-col justify-between min-h-[200px]"
                             >
                                 <div className="flex-1">
                                     <div className="flex items-start justify-between mb-4">
@@ -4024,7 +4073,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             <div className="p-2.5 bg-slate-50 rounded-lg flex-shrink-0 group-hover:bg-slate-100 transition-colors">
                                                 <Workflow size={18} className="text-slate-600" />
                                             </div>
-                                            <h3 className="text-base font-semibold text-slate-900 group-hover:text-slate-700 transition-colors truncate flex-1">
+                                            <h3 className="text-base font-normal text-slate-900 group-hover:text-slate-700 transition-colors truncate flex-1">
                                                 {workflow.name}
                                             </h3>
                                         </div>
@@ -4075,9 +4124,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         <div
                             data-tutorial="create-workflow"
                             onClick={createNewWorkflow}
-                            className="border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center min-h-[200px] text-slate-400 hover:border-teal-500 hover:text-teal-600 hover:bg-teal-50 transition-all cursor-pointer group"
+                            className="border border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center min-h-[200px] text-slate-400 cursor-pointer group"
                         >
-                            <div className="p-4 bg-slate-100 rounded-full mb-3 group-hover:bg-white">
+                            <div className="p-4 bg-slate-100 rounded-full mb-3">
                                 <Workflow size={24} />
                             </div>
                             <span className="font-medium">Create new workflow</span>
@@ -4099,7 +4148,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         <div className="flex items-center gap-4 flex-1 min-w-0">
                             <button
                                 onClick={backToList}
-                                className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg transition-colors text-sm font-medium text-slate-700 flex-shrink-0"
+                                className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg transition-colors text-sm font-medium text-slate-600 flex-shrink-0"
                             >
                                 <ArrowLeft size={18} />
                                 Back
@@ -4109,7 +4158,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 type="text"
                                 value={workflowName}
                                 onChange={(e) => setWorkflowName(e.target.value)}
-                                className="text-lg font-semibold text-slate-800 bg-transparent border-none focus:outline-none flex-1 min-w-0"
+                                className="text-lg font-normal text-slate-700 bg-transparent border-none focus:outline-none flex-1 min-w-0"
                                 placeholder="Workflow Name"
                             />
                         </div>
@@ -4120,7 +4169,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
                                 title="Save"
                             >
-                                {isSaving ? <span className="animate-spin">⟳</span> : <Save size={18} className="text-slate-700" />}
+                                {isSaving ? <span className="animate-spin">⟳</span> : <Save size={18} className="text-slate-600" />}
                             </button>
                             <button
                                 onClick={openExecutionHistory}
@@ -4128,12 +4177,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
                                 title="History"
                             >
-                                <History size={18} className="text-slate-700" />
+                                <History size={18} className="text-slate-600" />
                             </button>
                             <button
                                 onClick={runWorkflow}
                                 disabled={isRunning || nodes.length === 0}
-                                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50"
+                                className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50"
                             >
                                 <Play size={16} />
                                 {isRunning ? 'Running...' : 'Run'}
@@ -4141,7 +4190,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <button
                                 onClick={openWorkflowRunner}
                                 disabled={nodes.length === 0}
-                                className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50"
+                                className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50"
                             >
                                 <Share2 size={16} />
                                 Export
@@ -4159,68 +4208,137 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         {!isSidebarCollapsed ? (
                             <>
                                 <div className="p-4 border-b border-slate-200 bg-white shrink-0">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <h2 className="text-lg font-bold text-slate-800">Components</h2>
+                                    {/* Header */}
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h2 className="text-sm font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Components</h2>
                                         <button
                                             onClick={() => setIsSidebarCollapsed(true)}
                                             className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
                                             title="Collapse panel"
                                         >
-                                            <ChevronsLeft size={18} />
+                                            <ChevronsLeft size={16} />
                                         </button>
                                     </div>
-                                    <p className="text-xs text-slate-500 mb-4">Drag & Drop</p>
 
                                     {/* Search */}
-                                    <div className="relative mb-4">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                    <div className="relative mb-3">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                                         <input
                                             type="text"
-                                            placeholder="Search..."
+                                            placeholder="Search"
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                                            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-slate-400"
                                         />
-                                    </div>
-
-                                    {/* Categories */}
-                                    <div className="flex flex-wrap gap-2 pb-2">
-                                        {['All', 'Triggers', 'Data', 'Logic', 'Actions', 'Other'].map(cat => (
-                                            <button
-                                                key={cat}
-                                                onClick={() => setSelectedCategory(cat)}
-                                                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${selectedCategory === cat
-                                                    ? 'bg-teal-100 text-teal-700 border border-teal-200'
-                                                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                                                    }`}
-                                            >
-                                                {cat}
-                                            </button>
-                                        ))}
                                     </div>
                                 </div>
 
-                                <div ref={sidebarScrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50 custom-scrollbar" style={{ minHeight: 0, height: 0, flex: '1 1 0%' }}>
-                                    {filteredItems.map((item) => (
-                                        <div
-                                            key={item.label}
-                                            draggable
-                                            onDragStart={(e) => handleDragStart(e, item)}
-                                            className="flex items-start p-2.5 bg-white border border-slate-200 rounded-lg shadow-sm cursor-grab hover:border-teal-500 hover:shadow-md transition-all group"
-                                        >
-                                            <div className={`p-1.5 rounded-md mr-2.5 flex-shrink-0 ${item.category === 'Triggers' ? 'bg-cyan-50 text-cyan-700 border border-cyan-200' :
-                                                item.category === 'Data' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
-                                                    item.category === 'Logic' ? 'bg-slate-100 text-slate-700 border border-slate-300' :
-                                                        'bg-blue-50 text-blue-700 border border-blue-200'
-                                                }`}>
-                                                <item.icon size={16} />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <h3 className="text-xs font-semibold text-slate-800 group-hover:text-teal-700 transition-colors leading-tight">{item.label}</h3>
-                                                <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">{item.description}</p>
-                                            </div>
-                                        </div>
-                                    ))}
+                                <div ref={sidebarScrollRef} className="flex-1 overflow-y-auto bg-white custom-scrollbar" style={{ minHeight: 0, height: 0, flex: '1 1 0%' }}>
+                                    {/* Folder Structure */}
+                                    {(() => {
+                                        // Organize items into folders
+                                        const folderStructure: { [key: string]: { icon: React.ElementType, items: DraggableItem[] } } = {
+                                            'Recents': { icon: Clock, items: [] },
+                                            'Control Flow': { icon: GitMerge, items: DRAGGABLE_ITEMS.filter(i => ['condition', 'join', 'splitColumns'].includes(i.type)) },
+                                            'Data and Variables': { icon: Database, items: DRAGGABLE_ITEMS.filter(i => ['fetchData', 'manualInput', 'saveRecords', 'esios', 'climatiq'].includes(i.type)) },
+                                            'String Operations': { icon: MessageSquare, items: [] },
+                                            'Date and Time': { icon: Calendar, items: [] },
+                                            'Output and Logging': { icon: LogOut, items: DRAGGABLE_ITEMS.filter(i => ['output', 'comment', 'dataVisualization'].includes(i.type)) },
+                                            'File & Folder Operations': { icon: FolderOpen, items: DRAGGABLE_ITEMS.filter(i => ['pdfInput'].includes(i.type)) },
+                                            'Excel / Spreadsheet': { icon: FileSpreadsheet, items: DRAGGABLE_ITEMS.filter(i => ['excelInput'].includes(i.type)) },
+                                            'CSV': { icon: FileSpreadsheet, items: [] },
+                                            'Database': { icon: Database, items: DRAGGABLE_ITEMS.filter(i => ['mysql', 'sapFetch'].includes(i.type)) },
+                                            'Web and API': { icon: Globe, items: DRAGGABLE_ITEMS.filter(i => ['http', 'webhook'].includes(i.type)) },
+                                            'Email': { icon: Mail, items: DRAGGABLE_ITEMS.filter(i => ['sendEmail', 'sendSMS'].includes(i.type)) },
+                                            'FTP/SFTP': { icon: FolderOpen, items: [] },
+                                            'Security': { icon: Shield, items: [] },
+                                            'Code Block': { icon: Code, items: DRAGGABLE_ITEMS.filter(i => ['python', 'llm'].includes(i.type)) },
+                                            'Exception Handling': { icon: AlertCircle, items: [] },
+                                            'Advanced Logic': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['humanApproval', 'addField', 'action'].includes(i.type)) },
+                                        };
+
+                                        // Add triggers to Recents (as example)
+                                        folderStructure['Recents'].items = DRAGGABLE_ITEMS.filter(i => ['trigger', 'webhook'].includes(i.type));
+                                        
+                                        // Filter folders based on search and remove empty folders
+                                        const visibleFolders = Object.entries(folderStructure).filter(([folderName, folder]) => {
+                                            // Always show Recents even if empty
+                                            if (folderName === 'Recents') return true;
+                                            
+                                            // Remove empty folders when not searching
+                                            if (searchQuery === '' && folder.items.length === 0) return false;
+                                            
+                                            // When searching, show if folder name or items match
+                                            if (searchQuery !== '') {
+                                                const folderMatches = folderName.toLowerCase().includes(searchQuery.toLowerCase());
+                                                const itemsMatch = folder.items.some(item => 
+                                                    item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                    item.description.toLowerCase().includes(searchQuery.toLowerCase())
+                                                );
+                                                return folderMatches || itemsMatch;
+                                            }
+                                            
+                                            return true;
+                                        });
+
+                                        return visibleFolders.map(([folderName, folder]) => {
+                                            const isExpanded = expandedFolders.has(folderName);
+                                            const filteredFolderItems = folder.items.filter(item => {
+                                                if (searchQuery === '') return true;
+                                                return item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                    item.description.toLowerCase().includes(searchQuery.toLowerCase());
+                                            });
+
+                                            // Don't show folder if it has no items (except Recents)
+                                            if (folderName !== 'Recents' && filteredFolderItems.length === 0 && searchQuery === '') return null;
+                                            if (filteredFolderItems.length === 0 && searchQuery !== '') return null;
+
+                                            return (
+                                                <div key={folderName} className="border-b border-slate-100">
+                                                    {/* Folder Header */}
+                                                    <button
+                                                        onClick={() => {
+                                                            const newExpanded = new Set(expandedFolders);
+                                                            if (isExpanded) {
+                                                                newExpanded.delete(folderName);
+                                                            } else {
+                                                                newExpanded.add(folderName);
+                                                            }
+                                                            setExpandedFolders(newExpanded);
+                                                        }}
+                                                        className="w-full flex items-center justify-between px-4 py-2 hover:bg-slate-50 transition-colors text-left"
+                                                    >
+                                                        <div className="flex items-center gap-2.5">
+                                                            <folder.icon size={14} className="text-slate-600 flex-shrink-0" />
+                                                            <span className="text-xs font-medium text-slate-900">{folderName}</span>
+                                                        </div>
+                                                        {isExpanded ? (
+                                                            <ChevronDown size={12} className="text-slate-400 flex-shrink-0" />
+                                                        ) : (
+                                                            <ChevronRight size={12} className="text-slate-400 flex-shrink-0" />
+                                                        )}
+                                                    </button>
+
+                                                    {/* Folder Items */}
+                                                    {isExpanded && filteredFolderItems.length > 0 && (
+                                                        <div className="pb-1">
+                                                            {filteredFolderItems.map((item) => (
+                                                                <div
+                                                                    key={item.label}
+                                                                    draggable
+                                                                    onDragStart={(e) => handleDragStart(e, item)}
+                                                                    className="flex items-center gap-2.5 px-4 py-1.5 pl-8 hover:bg-slate-50 cursor-grab transition-colors group"
+                                                                >
+                                                                    <item.icon size={13} className="text-slate-600 flex-shrink-0" />
+                                                                    <span className="text-xs text-slate-700 group-hover:text-slate-900 transition-colors">{item.label}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        });
+                                    })()}
                                 </div>
                             </>
                         ) : (
@@ -4241,7 +4359,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             key={item.label}
                                             draggable
                                             onDragStart={(e) => handleDragStart(e, item)}
-                                            className="mx-2 p-1.5 bg-white border border-slate-200 rounded-md shadow-sm cursor-grab hover:border-teal-500 hover:shadow-md transition-all group flex items-center justify-center"
+                                            className="mx-2 p-1.5 bg-white border border-slate-200 rounded-md shadow-sm cursor-grab group flex items-center justify-center"
                                             title={item.label}
                                         >
                                             <div className={`p-1 rounded ${item.category === 'Triggers' ? 'bg-cyan-100 text-cyan-700' :
@@ -4262,10 +4380,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     <div data-tutorial="workflow-canvas" className="flex-1 flex flex-col relative overflow-hidden bg-slate-50">
                         {/* Canvas Area */}
                         <div className="flex-1 relative overflow-hidden" style={{ 
-                            backgroundImage: 'radial-gradient(circle, #cbd5e1 1.5px, transparent 1.5px)',
-                            backgroundSize: '20px 20px',
-                            backgroundPosition: '0 0',
-                            backgroundColor: '#f8fafc'
+                            background: 'radial-gradient(ellipse at center, #fafbfc 0%, #f8fafc 100%)'
                         }}>
 
                         <div
@@ -4376,7 +4491,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             })}
                             
                             {/* Canvas Controls - Centered at Bottom */}
-                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-white rounded-full shadow-lg border border-slate-200 px-4 py-2">
+                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-white rounded-full shadow-sm border border-slate-200 px-4 py-2">
                                 {/* AI Assistant Button */}
                                 <button
                                     onClick={() => setShowAiAssistant(true)}
@@ -4395,11 +4510,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                                     title="Zoom Out"
                                 >
-                                    <ZoomOut size={18} className="text-slate-700" />
+                                    <ZoomOut size={18} className="text-slate-600" />
                                 </button>
                                 
                                 {/* Zoom Level */}
-                                <div className="px-3 py-1 text-sm font-medium text-slate-700 min-w-[60px] text-center">
+                                <div className="px-3 py-1 text-sm font-medium text-slate-600 min-w-[60px] text-center">
                                     {Math.round(canvasZoom * 100)}%
                                 </div>
                                 
@@ -4409,7 +4524,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                                     title="Zoom In"
                                 >
-                                    <ZoomIn size={18} className="text-slate-700" />
+                                    <ZoomIn size={18} className="text-slate-600" />
                                 </button>
                                 
                                 <div className="w-px h-6 bg-slate-300"></div>
@@ -4420,7 +4535,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                                     title="Fit view to screen"
                                 >
-                                    <Maximize2 size={18} className="text-slate-700" />
+                                    <Maximize2 size={18} className="text-slate-600" />
                                 </button>
                             </div>
 
@@ -4491,12 +4606,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         const c2x = x2 - Math.abs(x2 - x1) / 2;
                                         const c2y = y2;
 
-                                        // Color based on outputType: green for true, red for false, blue for A, purple for B, teal for default
+                                        // Color based on outputType: green for true, red for false, blue for A, purple for B, branding color for default
                                         const strokeColor = conn.outputType === 'true' ? '#10b981'
                                             : conn.outputType === 'false' ? '#ef4444'
                                             : conn.outputType === 'A' ? '#3b82f6'
                                             : conn.outputType === 'B' ? '#a855f7'
-                                                : '#0d9488';
+                                                : '#256A65';
                                         
                                         // Use different arrowhead colors
                                         const arrowId = conn.outputType === 'true' ? 'arrow-green'
@@ -4505,69 +4620,57 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             : conn.outputType === 'B' ? 'arrow-purple'
                                                 : 'workflow-arrowhead';
 
+                                        const pathId = `connection-path-${conn.id}`;
+                                        
                                         return (
-                                            <path
-                                                key={conn.id}
-                                                d={`M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`}
-                                                stroke={strokeColor}
-                                                strokeWidth="2"
-                                                fill="none"
-                                                markerEnd={`url(#${arrowId})`}
-                                            />
+                                            <g key={conn.id}>
+                                                {/* Shadow/glow effect */}
+                                                <path
+                                                    d={`M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`}
+                                                    stroke={strokeColor}
+                                                    strokeWidth="4"
+                                                    fill="none"
+                                                    opacity="0.2"
+                                                />
+                                                {/* Main line */}
+                                                <path
+                                                    id={pathId}
+                                                    d={`M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`}
+                                                    stroke={strokeColor}
+                                                    strokeWidth="3"
+                                                    fill="none"
+                                                    style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }}
+                                                />
+                                                {/* End point circle (replaces arrow) - same size as connector circles (w-4 h-4 = 16px, so r=8) */}
+                                                <circle
+                                                    cx={x2}
+                                                    cy={y2}
+                                                    r="8"
+                                                    fill={strokeColor}
+                                                    stroke="white"
+                                                    strokeWidth="2"
+                                                />
+                                                {/* Animated ball when running */}
+                                                {isRunning && (
+                                                    <circle
+                                                        r="6"
+                                                        fill={strokeColor}
+                                                        stroke="white"
+                                                        strokeWidth="2"
+                                                        style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}
+                                                    >
+                                                        <animateMotion
+                                                            dur="1.5s"
+                                                            repeatCount="indefinite"
+                                                            path={`M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`}
+                                                        />
+                                                    </circle>
+                                                )}
+                                            </g>
                                         );
                                     })}
-                                    {/* Arrow marker definitions */}
+                                    {/* Marker definitions removed - using circles instead of arrows */}
                                     <defs>
-                                        <marker
-                                            id="workflow-arrowhead"
-                                            markerWidth="6"
-                                            markerHeight="6"
-                                            refX="5"
-                                            refY="3"
-                                            orient="auto"
-                                        >
-                                            <polygon points="0 0, 6 3, 0 6" fill="#0d9488" />
-                                        </marker>
-                                        <marker
-                                            id="arrow-green"
-                                            markerWidth="6"
-                                            markerHeight="6"
-                                            refX="5"
-                                            refY="3"
-                                            orient="auto"
-                                        >
-                                            <polygon points="0 0, 6 3, 0 6" fill="#10b981" />
-                                        </marker>
-                                        <marker
-                                            id="arrow-red"
-                                            markerWidth="6"
-                                            markerHeight="6"
-                                            refX="5"
-                                            refY="3"
-                                            orient="auto"
-                                        >
-                                            <polygon points="0 0, 6 3, 0 6" fill="#ef4444" />
-                                        </marker>
-                                        <marker
-                                            id="arrow-blue"
-                                            markerWidth="6"
-                                            markerHeight="6"
-                                            refX="5"
-                                            refY="3"
-                                            orient="auto"
-                                        >
-                                            <polygon points="0 0, 6 3, 0 6" fill="#3b82f6" />
-                                        </marker>
-                                        <marker
-                                            id="arrow-purple"
-                                            markerWidth="6"
-                                            markerHeight="6"
-                                            refX="5"
-                                            refY="3"
-                                            orient="auto"
-                                        >
-                                            <polygon points="0 0, 6 3, 0 6" fill="#a855f7" />
-                                        </marker>
                                     </defs>
                                 </svg>
 
@@ -4638,7 +4741,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             // Fixed height for nodes with dual connectors to ensure consistent positioning
                                             ...(node.type === 'condition' || node.type === 'join' || node.type === 'splitColumns' ? { minHeight: '112px' } : {})
                                         }}
-                                        className={`flex flex-col p-3 rounded-lg border-2 shadow-md hover:shadow-xl w-48 group relative transition-shadow duration-200 select-none ${getNodeColor(node.type, node.status)}`}
+                                        className={`flex flex-col p-4 rounded-xl border shadow-sm w-48 group relative select-none backdrop-blur-sm ${draggingNodeId === node.id ? '' : 'transition-all duration-300'} ${getNodeColor(node.type, node.status)} ${node.status === 'completed' ? 'ring-2 ring-[#256A65]/30' : ''}`}
                                     >
                                         {/* Hover Action Buttons - Above Node */}
                                         <div 
@@ -4650,7 +4753,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     e.stopPropagation();
                                                     handleRunNode(node.id);
                                                 }}
-                                                className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-teal-600 transition-all"
+                                                className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-[#256A65] transition-all"
                                                 title="Run Node"
                                             >
                                                 <Play size={12} fill="currentColor" />
@@ -4685,7 +4788,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             /* Comment Node Special Layout */
                                             <div className="flex flex-col">
                                                 <div className="flex items-center gap-2 mb-2">
-                                                    <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                                                    <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs font-normal">
                                                         A
                                                     </div>
                                                     <span className="text-xs text-slate-500">Comment</span>
@@ -4708,7 +4811,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         ) : (
                                             /* Regular Node Layout */
                                             <>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2.5">
                                                     {/* Node Icon */}
                                                     {node.type === 'humanApproval' && node.config?.assignedUserId ? (
                                                         <div className="flex-shrink-0">
@@ -4719,15 +4822,31 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             />
                                                         </div>
                                                     ) : (
-                                                        <div className={`p-1.5 rounded-lg flex-shrink-0 ${getNodeIconBg(node.type)}`}>
-                                                            {React.createElement(getNodeIcon(node.type), { size: 16 })}
+                                                        <div className={`p-2 rounded-lg flex-shrink-0 shadow-sm transition-transform group-hover:scale-110 ${getNodeIconBg(node.type)}`}>
+                                                            {React.createElement(getNodeIcon(node.type), { size: 18 })}
                                                         </div>
                                                     )}
-                                                    <div className="flex-1 font-medium text-sm truncate" title={node.label}>{node.label}</div>
-                                                    {node.status === 'completed' && <Check size={16} className="text-green-600 flex-shrink-0 ml-1" />}
-                                                    {node.status === 'error' && <XCircle size={16} className="text-red-600 flex-shrink-0 ml-1" />}
-                                                    {node.status === 'running' && <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin ml-1" />}
-                                                    {node.status === 'waiting' && <UserCheck size={16} className="text-orange-600 flex-shrink-0 ml-1 animate-pulse" />}
+                                                    <div className="flex-1 font-normal text-sm truncate text-slate-900" title={node.label}>{node.label}</div>
+                                                    {node.status === 'completed' && (
+                                                        <div className="flex-shrink-0 p-1 bg-[#256A65]/10 rounded-full">
+                                                            <Check size={14} className="text-[#256A65]" />
+                                                        </div>
+                                                    )}
+                                                    {node.status === 'error' && (
+                                                        <div className="flex-shrink-0 p-1 bg-red-100 rounded-full">
+                                                            <XCircle size={14} className="text-red-600" />
+                                                        </div>
+                                                    )}
+                                                    {node.status === 'running' && (
+                                                        <div className="flex-shrink-0 p-1 bg-yellow-100 rounded-full">
+                                                            <div className="w-3 h-3 border-2 border-yellow-600 border-t-transparent rounded-full animate-spin" />
+                                                        </div>
+                                                    )}
+                                                    {node.status === 'waiting' && (
+                                                        <div className="flex-shrink-0 p-1 bg-orange-100 rounded-full">
+                                                            <UserCheck size={14} className="text-orange-600 animate-pulse" />
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {node.executionResult && (
@@ -4749,7 +4868,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     e.stopPropagation();
                                                                     handleApproval(true);
                                                                 }}
-                                                                className="flex-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-md transition-colors flex items-center justify-center gap-1"
+                                                                className="flex-1 px-3 py-1.5 bg-[#256A65] hover:bg-[#1e554f] text-white text-xs font-normal rounded-md transition-colors flex items-center justify-center gap-1"
                                                             >
                                                                 <Check size={14} />
                                                                 Accept
@@ -4759,7 +4878,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     e.stopPropagation();
                                                                     handleApproval(false);
                                                                 }}
-                                                                className="flex-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-md transition-colors flex items-center justify-center gap-1"
+                                                                className="flex-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-normal rounded-md transition-colors flex items-center justify-center gap-1"
                                                             >
                                                                 <X size={14} />
                                                                 Reject
@@ -4771,10 +4890,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         )}
 
                                         {node.type === 'fetchData' && node.config?.entityName && (
-                                            <div className="mt-2 text-xs font-medium text-teal-700">
+                                            <div className="mt-2 text-xs font-medium text-[#256A65]">
                                                 Entity: {node.config.entityName}
                                                 {node.data && (
-                                                    <span className="ml-2 text-green-600">({node.data.length} records)</span>
+                                                    <span className="ml-2 text-[#256A65]">({node.data.length} records)</span>
                                                 )}
                                             </div>
                                         )}
@@ -4785,7 +4904,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     ? `${node.config?.joinType === 'outer' ? 'Outer' : 'Inner'} Join: ${node.config?.joinKey || 'key not set'}`
                                                     : 'Strategy: Concatenate'}
                                                 {node.inputDataA && node.inputDataB && (
-                                                    <span className="ml-2 text-green-600">✓ Ready</span>
+                                                    <span className="ml-2 text-[#256A65]">✓ Ready</span>
                                                 )}
                                                 {(node.inputDataA || node.inputDataB) && !(node.inputDataA && node.inputDataB) && (
                                                     <span className="ml-2 text-amber-600">⏳ {node.inputDataA ? 'B' : 'A'}</span>
@@ -4832,11 +4951,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 {(node.config?.columnsOutputA?.length || 0) > 0 || (node.config?.columnsOutputB?.length || 0) > 0 ? (
                                                     <div className="flex flex-col gap-0.5">
                                                         <div className="flex items-center gap-1">
-                                                            <span className="text-blue-600 font-bold">A:</span>
+                                                            <span className="text-blue-600 font-normal">A:</span>
                                                             <span>{node.config?.columnsOutputA?.length || 0} cols</span>
                                                         </div>
                                                         <div className="flex items-center gap-1">
-                                                            <span className="text-purple-600 font-bold">B:</span>
+                                                            <span className="text-purple-600 font-normal">B:</span>
                                                             <span>{node.config?.columnsOutputB?.length || 0} cols</span>
                                                         </div>
                                                     </div>
@@ -4871,55 +4990,72 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     // Condition nodes have TWO output connectors: TRUE and FALSE
                                                     <>
                                                         {/* TRUE output - top right (green) - fixed position */}
-                                                        <div
-                                                            onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'true')}
-                                                            onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
-                                                            className={`connector-point absolute -right-1.5 w-3 h-3 bg-green-100 border-2 rounded-full hover:border-green-500 hover:bg-green-200 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'true' ? 'border-green-500 scale-150 bg-green-300' : 'border-green-400'}`}
-                                                            style={{ top: '28px', transform: 'translateY(-50%)' }}
-                                                            title="TRUE path"
-                                                        />
-                                                        <span className="absolute -right-6 text-[9px] font-bold text-green-600" style={{ top: '28px', transform: 'translateY(-50%)' }}>✓</span>
+                                                        <div className="absolute -right-2 group/connector" style={{ top: '28px', transform: 'translateY(-50%)' }}>
+                                                            {/* Larger hit area */}
+                                                            <div className="absolute inset-0 -m-2 cursor-crosshair" 
+                                                                onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'true')}
+                                                                onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                            />
+                                                            {/* Visible connector point */}
+                                                            <div className={`w-4 h-4 bg-green-50 border-2 rounded-full transition-all shadow-sm ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'true' ? 'border-green-500 scale-125 bg-green-100 shadow-md' : 'border-green-400 group-hover/connector:border-green-500 group-hover/connector:bg-green-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="TRUE path" />
+                                                        </div>
+                                                        <span className="absolute -right-6 text-[9px] font-normal text-[#256A65]" style={{ top: '28px', transform: 'translateY(-50%)' }}>✓</span>
 
                                                         {/* FALSE output - bottom right (red) - fixed position */}
-                                                        <div
-                                                            onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'false')}
-                                                            onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
-                                                            className={`connector-point absolute -right-1.5 w-3 h-3 bg-red-100 border-2 rounded-full hover:border-red-500 hover:bg-red-200 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'false' ? 'border-red-500 scale-150 bg-red-300' : 'border-red-400'}`}
-                                                            style={{ bottom: '28px', transform: 'translateY(50%)' }}
-                                                            title="FALSE path"
-                                                        />
-                                                        <span className="absolute -right-6 text-[9px] font-bold text-red-600" style={{ bottom: '28px', transform: 'translateY(50%)' }}>✗</span>
+                                                        <div className="absolute -right-2 group/connector" style={{ bottom: '28px', transform: 'translateY(50%)' }}>
+                                                            {/* Larger hit area */}
+                                                            <div className="absolute inset-0 -m-2 cursor-crosshair" 
+                                                                onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'false')}
+                                                                onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                            />
+                                                            {/* Visible connector point */}
+                                                            <div className={`w-4 h-4 bg-red-50 border-2 rounded-full transition-all shadow-sm ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'false' ? 'border-red-500 scale-125 bg-red-100 shadow-md' : 'border-red-400 group-hover/connector:border-red-500 group-hover/connector:bg-red-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="FALSE path" />
+                                                        </div>
+                                                        <span className="absolute -right-6 text-[9px] font-normal text-red-600" style={{ bottom: '28px', transform: 'translateY(50%)' }}>✗</span>
                                                     </>
                                                 ) : node.type === 'splitColumns' ? (
                                                     // Split Columns nodes have TWO output connectors: A and B
                                                     <>
                                                         {/* Output A - top right (blue) - fixed position */}
-                                                        <div
-                                                            onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'A')}
-                                                            onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
-                                                            className={`connector-point absolute -right-1.5 w-3 h-3 bg-blue-100 border-2 rounded-full hover:border-blue-500 hover:bg-blue-200 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'A' ? 'border-blue-500 scale-150 bg-blue-300' : 'border-blue-400'}`}
-                                                            style={{ top: '28px', transform: 'translateY(-50%)' }}
-                                                            title="Output A"
-                                                        />
-                                                        <span className="absolute -right-6 text-[9px] font-bold text-blue-600" style={{ top: '28px', transform: 'translateY(-50%)' }}>A</span>
+                                                        <div className="absolute -right-2 group/connector" style={{ top: '28px', transform: 'translateY(-50%)' }}>
+                                                            {/* Larger hit area */}
+                                                            <div className="absolute inset-0 -m-2 cursor-crosshair" 
+                                                                onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'A')}
+                                                                onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                            />
+                                                            {/* Visible connector point */}
+                                                            <div className={`w-4 h-4 bg-blue-50 border-2 rounded-full transition-all shadow-sm ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'A' ? 'border-blue-500 scale-125 bg-blue-100 shadow-md' : 'border-blue-400 group-hover/connector:border-blue-500 group-hover/connector:bg-blue-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="Output A" />
+                                                        </div>
+                                                        <span className="absolute -right-6 text-[9px] font-normal text-blue-600" style={{ top: '28px', transform: 'translateY(-50%)' }}>A</span>
 
                                                         {/* Output B - bottom right (purple) - fixed position */}
-                                                        <div
-                                                            onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'B')}
-                                                            onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
-                                                            className={`connector-point absolute -right-1.5 w-3 h-3 bg-purple-100 border-2 rounded-full hover:border-purple-500 hover:bg-purple-200 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'B' ? 'border-purple-500 scale-150 bg-purple-300' : 'border-purple-400'}`}
-                                                            style={{ bottom: '28px', transform: 'translateY(50%)' }}
-                                                            title="Output B"
-                                                        />
-                                                        <span className="absolute -right-6 text-[9px] font-bold text-purple-600" style={{ bottom: '28px', transform: 'translateY(50%)' }}>B</span>
+                                                        <div className="absolute -right-2 group/connector" style={{ bottom: '28px', transform: 'translateY(50%)' }}>
+                                                            {/* Larger hit area */}
+                                                            <div className="absolute inset-0 -m-2 cursor-crosshair" 
+                                                                onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'B')}
+                                                                onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                            />
+                                                            {/* Visible connector point */}
+                                                            <div className={`w-4 h-4 bg-purple-50 border-2 rounded-full transition-all shadow-sm ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'B' ? 'border-purple-500 scale-125 bg-purple-100 shadow-md' : 'border-purple-400 group-hover/connector:border-purple-500 group-hover/connector:bg-purple-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="Output B" />
+                                                        </div>
+                                                        <span className="absolute -right-6 text-[9px] font-normal text-purple-600" style={{ bottom: '28px', transform: 'translateY(50%)' }}>B</span>
                                                     </>
                                                 ) : (
                                                     // Regular nodes have ONE output connector
-                                                    <div
-                                                        onMouseDown={(e) => handleConnectorMouseDown(e, node.id)}
-                                                        onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
-                                                        className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all ${dragConnectionStart?.nodeId === node.id ? 'border-teal-500 scale-150' : 'border-slate-400'}`}
-                                                    />
+                                                    <div 
+                                                        className="absolute -right-2 top-1/2 -translate-y-1/2 group/connector cursor-crosshair z-10"
+                                                        onMouseDown={(e) => {
+                                                            e.stopPropagation();
+                                                            handleConnectorMouseDown(e, node.id);
+                                                        }}
+                                                        onMouseUp={(e) => {
+                                                            e.stopPropagation();
+                                                            handleConnectorMouseUp(e, node.id);
+                                                        }}
+                                                    >
+                                                        {/* Visible connector point */}
+                                                        <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm ${dragConnectionStart?.nodeId === node.id ? 'border-[#256A65] scale-125 bg-[#256A65]/10 shadow-md' : 'border-slate-400 group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} />
+                                                    </div>
                                                 )}
                                                 
                                                 {/* Input connector(s) - all nodes except triggers */}
@@ -4928,27 +5064,54 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         // Join nodes have TWO input connectors: A and B - fixed positions
                                                         <>
                                                             {/* Input A - top left */}
-                                                            <div
-                                                                onMouseUp={(e) => handleConnectorMouseUp(e, node.id, 'A')}
-                                                                className={`connector-point absolute -left-1.5 w-3 h-3 bg-white border-2 rounded-full hover:border-cyan-500 cursor-crosshair transition-all border-slate-400`}
-                                                                style={{ top: '28px', transform: 'translateY(-50%)' }}
-                                                                title="Input A"
-                                                            />
+                                                            <div className="absolute -left-2 group/connector" style={{ top: '28px', transform: 'translateY(-50%)' }}>
+                                                                {/* Larger hit area */}
+                                                                <div className="absolute inset-0 -m-2 cursor-crosshair" 
+                                                                    onMouseUp={(e) => handleConnectorMouseUp(e, node.id, 'A')}
+                                                                />
+                                                                {/* Visible connector point */}
+                                                                <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm border-slate-400 group-hover/connector:border-cyan-500 group-hover/connector:bg-cyan-50 group-hover/connector:scale-110 group-hover/connector:shadow-md`} title="Input A" />
+                                                            </div>
                                                             {/* Input B - bottom left */}
-                                                            <div
-                                                                onMouseUp={(e) => handleConnectorMouseUp(e, node.id, 'B')}
-                                                                className={`connector-point absolute -left-1.5 w-3 h-3 bg-white border-2 rounded-full hover:border-cyan-500 cursor-crosshair transition-all border-slate-400`}
-                                                                style={{ bottom: '28px', transform: 'translateY(50%)' }}
-                                                                title="Input B"
-                                                            />
+                                                            <div className="absolute -left-2 group/connector" style={{ bottom: '28px', transform: 'translateY(50%)' }}>
+                                                                {/* Larger hit area */}
+                                                                <div className="absolute inset-0 -m-2 cursor-crosshair" 
+                                                                    onMouseUp={(e) => handleConnectorMouseUp(e, node.id, 'B')}
+                                                                />
+                                                                {/* Visible connector point */}
+                                                                <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm border-slate-400 group-hover/connector:border-cyan-500 group-hover/connector:bg-cyan-50 group-hover/connector:scale-110 group-hover/connector:shadow-md`} title="Input B" />
+                                                            </div>
                                                         </>
                                                     ) : (
                                                         // Regular nodes have ONE input connector
-                                                        <div
-                                                            onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
-                                                            className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 rounded-full hover:border-teal-500 cursor-crosshair transition-all border-slate-400`}
-                                                        />
+                                                        <div className="absolute -left-2 top-1/2 -translate-y-1/2 group/connector">
+                                                            {/* Larger hit area */}
+                                                            <div className="absolute inset-0 -m-2 cursor-crosshair" 
+                                                                onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                            />
+                                                            {/* Visible connector point */}
+                                                            <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm border-slate-400 group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md`} />
+                                                        </div>
                                                     )
+                                                )}
+                                                
+                                                {/* Quick Connect Button - Right Side */}
+                                                {node.type !== 'comment' && (
+                                                    <button
+                                                        onMouseDown={(e) => {
+                                                            e.stopPropagation();
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setConnectingFromNodeId(node.id);
+                                                            setShowComponentSearch(true);
+                                                            setComponentSearchQuery('');
+                                                        }}
+                                                        className="absolute -right-14 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border-2 border-slate-300 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:border-[#256A65] hover:bg-[#256A65]/10 hover:scale-110 shadow-sm z-20"
+                                                        title="Quick connect component"
+                                                    >
+                                                        <Plus size={14} className="text-slate-600 group-hover:text-[#256A65]" />
+                                                    </button>
                                                 )}
                                             </>
                                         )}
@@ -4982,7 +5145,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         : dragConnectionStart.outputType === 'false' ? '#ef4444'
                                         : dragConnectionStart.outputType === 'A' ? '#3b82f6'
                                         : dragConnectionStart.outputType === 'B' ? '#a855f7'
-                                            : '#0d9488';
+                                            : '#256A65';
                                     
                                     return (
                                     <svg
@@ -4997,34 +5160,66 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         }}
                                     >
                                         <defs>
-                                            <marker
-                                                id="temp-arrowhead"
-                                                markerWidth="10"
-                                                markerHeight="7"
-                                                refX="9"
-                                                refY="3.5"
-                                                orient="auto"
-                                            >
-                                                <polygon points="0 0, 10 3.5, 0 7" fill={strokeColor} />
-                                            </marker>
                                         </defs>
+                                        {/* Shadow/glow */}
                                         <path
                                             d={`M ${startX} ${startY} C ${startX + 50} ${startY}, ${dragConnectionCurrent.x - 50} ${dragConnectionCurrent.y}, ${dragConnectionCurrent.x} ${dragConnectionCurrent.y}`}
                                             stroke={strokeColor}
-                                            strokeWidth="2"
+                                            strokeWidth="4"
                                             fill="none"
                                             strokeDasharray="5,5"
-                                            markerEnd="url(#temp-arrowhead)"
+                                            opacity="0.2"
+                                        />
+                                        {/* Main line */}
+                                        <path
+                                            d={`M ${startX} ${startY} C ${startX + 50} ${startY}, ${dragConnectionCurrent.x - 50} ${dragConnectionCurrent.y}, ${dragConnectionCurrent.x} ${dragConnectionCurrent.y}`}
+                                            stroke={strokeColor}
+                                            strokeWidth="3"
+                                            fill="none"
+                                            strokeDasharray="5,5"
+                                            style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }}
+                                        />
+                                        {/* End point circle (replaces arrow) */}
+                                        <circle
+                                            cx={dragConnectionCurrent.x}
+                                            cy={dragConnectionCurrent.y}
+                                            r="8"
+                                            fill={strokeColor}
+                                            stroke="white"
+                                            strokeWidth="2"
                                         />
                                     </svg>
                                     );
                                 })()}
 
                                 {nodes.length === 0 && (
-                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                        <div className="text-center text-slate-400">
-                                            <Workflow size={48} className="mx-auto mb-4 opacity-50" />
-                                            <p className="text-lg font-medium">Drag components here</p>
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
+                                        <div className="text-center max-w-md px-6">
+                                            <div className="mb-6">
+                                                <Workflow size={64} className="mx-auto mb-4 text-slate-300" />
+                                                <h3 className="text-xl font-normal text-slate-700 mb-2">Start building your workflow</h3>
+                                                <p className="text-sm text-slate-500 mb-6">
+                                                    Drag components from the sidebar or create your workflow with AI
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                                                <button
+                                                    onClick={() => setShowAiAssistant(true)}
+                                                    className="flex items-center justify-center gap-2 px-6 py-3 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] transition-colors font-medium shadow-sm"
+                                                >
+                                                    <Sparkles size={18} />
+                                                    Create with AI
+                                                </button>
+                                                <div className="flex items-center gap-2 text-sm text-slate-400">
+                                                    <span className="h-px w-8 bg-slate-300"></span>
+                                                    <span>or</span>
+                                                    <span className="h-px w-8 bg-slate-300"></span>
+                                                </div>
+                                                <div className="text-xs text-slate-500 flex items-center justify-center gap-1">
+                                                    <span>Drag components</span>
+                                                    <ChevronRight size={14} className="text-slate-400" />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -5041,7 +5236,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <div className="flex items-center gap-3">
                                     <Sparkles size={24} />
                                     <div>
-                                        <h3 className="font-bold text-lg">AI Workflow Assistant</h3>
+                                        <h3 className="font-normal text-lg">AI Workflow Assistant</h3>
                                         <p className="text-sm text-slate-300">Ask me about your workflow</p>
                                     </div>
                                 </div>
@@ -5083,7 +5278,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-300">
                                                             <div className="flex items-center gap-2 mb-2">
                                                                 <Workflow size={16} className="text-slate-600" />
-                                                                <span className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                                                                <span className="text-xs font-normal text-slate-700 uppercase tracking-wide">
                                                                     Workflow Suggestion
                                                                 </span>
                                                             </div>
@@ -5095,7 +5290,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 <div className="flex gap-2">
                                                                     <button
                                                                         onClick={handleAcceptWorkflowSuggestion}
-                                                                        className="flex-1 px-3 py-1.5 bg-teal-600 text-white rounded text-xs font-medium hover:bg-teal-700 transition-colors flex items-center justify-center gap-1"
+                                                                        className="flex-1 px-3 py-1.5 bg-[#256A65] text-white rounded text-xs font-medium hover:bg-[#1e554f] transition-colors flex items-center justify-center gap-1"
                                                                     >
                                                                         <Check size={14} />
                                                                         Accept
@@ -5111,7 +5306,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             )}
                                                             
                                                             {message.workflowSuggestion.status === 'accepted' && (
-                                                                <div className="flex items-center gap-2 text-teal-700 text-xs font-medium">
+                                                                <div className="flex items-center gap-2 text-[#256A65] text-xs font-medium">
                                                                     <CheckCircle size={14} />
                                                                     <span>Applied to workflow</span>
                                                                 </div>
@@ -5170,111 +5365,173 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                         {/* Configuration Modal */}
                         {configuringNodeId && (
-                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringNodeId(null)}>
-                                <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-slate-800 mb-4">Configure Fetch Data</h3>
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                                            Select Entity
-                                        </label>
-                                        <select
-                                            value={selectedEntityId}
-                                            onChange={(e) => setSelectedEntityId(e.target.value)}
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        >
-                                            <option value="">Choose entity...</option>
-                                            {entities.map(entity => (
-                                                <option key={entity.id} value={entity.id}>{entity.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    {/* Feedback Link */}
-                                    <div className="mb-4 pt-2 border-t border-slate-100">
-                                        <button
-                                            onClick={() => openFeedbackPopup('fetchData', 'Fetch Data')}
-                                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
-                                        >
-                                            <MessageSquare size={14} />
-                                            What would you like this node to do?
-                                        </button>
-                                    </div>
-                                    <div className="flex gap-2 justify-end">
+                            <>
+                                {/* Backdrop */}
+                                <div className="fixed inset-0 bg-black/20 z-50" onClick={() => setConfiguringNodeId(null)} />
+                                {/* Side Panel */}
+                                <div className="fixed top-16 right-0 h-[calc(100vh-4rem)] w-[400px] bg-white shadow-[0_0_20px_rgba(0,0,0,0.1)] z-50 flex flex-col">
+                                    {/* Header */}
+                                    <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 rounded-lg bg-slate-50">
+                                                <Database size={18} className="text-slate-600" />
+                                            </div>
+                                            <h3 className="text-sm font-normal text-slate-900">Configure Fetch Data</h3>
+                                        </div>
                                         <button
                                             onClick={() => setConfiguringNodeId(null)}
-                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                                        >
+                                            <X size={18} className="text-slate-600" />
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Content - Scrollable */}
+                                    <div className="flex-1 overflow-y-auto px-6 py-4">
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                Select Entity
+                                            </label>
+                                            <select
+                                                value={selectedEntityId}
+                                                onChange={(e) => setSelectedEntityId(e.target.value)}
+                                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent text-sm"
+                                            >
+                                                <option value="">Choose entity...</option>
+                                                {entities.map(entity => (
+                                                    <option key={entity.id} value={entity.id}>{entity.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        {/* Feedback Link */}
+                                        <div className="mb-4 pt-2 border-t border-slate-100">
+                                            <button
+                                                onClick={() => openFeedbackPopup('fetchData', 'Fetch Data')}
+                                                className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1 transition-colors"
+                                            >
+                                                <MessageSquare size={14} />
+                                                What would you like this node to do?
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Actions */}
+                                    <div className="px-6 py-4 flex gap-2 justify-end border-t border-slate-200 shrink-0">
+                                        <button
+                                            onClick={() => setConfiguringNodeId(null)}
+                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700 transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveNodeConfig}
                                             disabled={!selectedEntityId}
-                                            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium"
+                                            className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
                                         >
                                             Save
                                         </button>
                                     </div>
                                 </div>
-                            </div>
+                            </>
                         )}
 
                         {/* HTTP Configuration Modal */}
                         {configuringHttpNodeId && (
-                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringHttpNodeId(null)}>
-                                <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-slate-800 mb-4">Configure HTTP Request</h3>
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                                            URL
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={httpUrl}
-                                            onChange={(e) => setHttpUrl(e.target.value)}
-                                            placeholder="https://api.example.com/data"
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        />
-                                        <p className="text-xs text-slate-500 mt-1">
-                                            Enter the full URL to fetch data from (GET request).
-                                        </p>
-                                    </div>
-                                    {/* Feedback Link */}
-                                    <div className="mb-4 pt-2 border-t border-slate-100">
-                                        <button
-                                            onClick={() => openFeedbackPopup('http', 'HTTP Request')}
-                                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
-                                        >
-                                            <MessageSquare size={14} />
-                                            What would you like this node to do?
-                                        </button>
-                                    </div>
-                                    <div className="flex gap-2 justify-end">
+                            <>
+                                {/* Backdrop */}
+                                <div className="fixed inset-0 bg-black/20 z-50" onClick={() => setConfiguringHttpNodeId(null)} />
+                                {/* Side Panel */}
+                                <div className="fixed top-16 right-0 h-[calc(100vh-4rem)] w-[400px] bg-white shadow-[0_0_20px_rgba(0,0,0,0.1)] z-50 flex flex-col">
+                                    {/* Header */}
+                                    <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 rounded-lg bg-slate-50">
+                                                <Globe size={18} className="text-slate-600" />
+                                            </div>
+                                            <h3 className="text-sm font-normal text-slate-900">Configure HTTP Request</h3>
+                                        </div>
                                         <button
                                             onClick={() => setConfiguringHttpNodeId(null)}
-                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                                        >
+                                            <X size={18} className="text-slate-600" />
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Content - Scrollable */}
+                                    <div className="flex-1 overflow-y-auto px-6 py-4">
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                URL
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={httpUrl}
+                                                onChange={(e) => setHttpUrl(e.target.value)}
+                                                placeholder="https://api.example.com/data"
+                                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent text-sm"
+                                            />
+                                            <p className="text-xs text-slate-500 mt-1">
+                                                Enter the full URL to fetch data from (GET request).
+                                            </p>
+                                        </div>
+                                        {/* Feedback Link */}
+                                        <div className="mb-4 pt-2 border-t border-slate-100">
+                                            <button
+                                                onClick={() => openFeedbackPopup('http', 'HTTP Request')}
+                                                className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1 transition-colors"
+                                            >
+                                                <MessageSquare size={14} />
+                                                What would you like this node to do?
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Actions */}
+                                    <div className="px-6 py-4 flex gap-2 justify-end border-t border-slate-200 shrink-0">
+                                        <button
+                                            onClick={() => setConfiguringHttpNodeId(null)}
+                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700 transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveHttpConfig}
                                             disabled={!httpUrl.trim()}
-                                            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium"
+                                            className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
                                         >
                                             Save
                                         </button>
                                     </div>
                                 </div>
-                            </div>
+                            </>
                         )}
 
                         {/* Webhook Configuration Modal */}
                         {configuringWebhookNodeId && (
-                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={closeWebhookConfig}>
-                                <div className="bg-white rounded-lg shadow-xl p-6 w-[500px]" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                        <Globe className="text-purple-600" size={20} />
-                                        Webhook Configuration
-                                    </h3>
-                                    <div className="space-y-4">
+                            <>
+                                {/* Backdrop */}
+                                <div className="fixed inset-0 bg-black/20 z-50" onClick={closeWebhookConfig} />
+                                {/* Side Panel */}
+                                <div className="fixed top-16 right-0 h-[calc(100vh-4rem)] w-[400px] bg-white shadow-[0_0_20px_rgba(0,0,0,0.1)] z-50 flex flex-col">
+                                    {/* Header */}
+                                    <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 rounded-lg bg-slate-50">
+                                                <Globe size={18} className="text-slate-600" />
+                                            </div>
+                                            <h3 className="text-sm font-normal text-slate-900">Webhook Configuration</h3>
+                                        </div>
+                                        <button
+                                            onClick={closeWebhookConfig}
+                                            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                                        >
+                                            <X size={18} className="text-slate-600" />
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Content - Scrollable */}
+                                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                                         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                                             <p className="text-sm text-purple-800 mb-2 font-medium">
                                                 Your Webhook URL
@@ -5332,35 +5589,52 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                         <div className="text-xs text-slate-500">
                                             <p className="font-medium mb-1">Example cURL:</p>
-                                            <pre className="bg-slate-800 text-green-400 p-2 rounded overflow-x-auto">
+                                            <pre className="bg-slate-800 text-[#256A65] p-2 rounded overflow-x-auto">
 {`curl -X POST ${webhookUrl} \\
   -H "Content-Type: application/json" \\
   -d '{"key": "value"}'`}
                                             </pre>
                                         </div>
                                     </div>
-                                    <div className="flex gap-2 justify-end mt-4">
+                                    
+                                    {/* Actions */}
+                                    <div className="px-6 py-4 flex gap-2 justify-end border-t border-slate-200 shrink-0">
                                         <button
                                             onClick={closeWebhookConfig}
-                                            className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-medium"
+                                            className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] text-sm font-medium transition-colors"
                                         >
                                             Close
                                         </button>
                                     </div>
                                 </div>
-                            </div>
+                            </>
                         )}
 
                         {/* MySQL Configuration Modal */}
                         {configuringMySQLNodeId && (
-                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringMySQLNodeId(null)}>
-                                <div className="bg-white rounded-lg shadow-xl p-6 w-[450px]" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                        <Database className="text-blue-600" size={20} />
-                                        MySQL
-                                        <span className="text-sm font-normal text-slate-500">MySQL</span>
-                                    </h3>
-                                    <div className="space-y-4">
+                            <>
+                                {/* Backdrop */}
+                                <div className="fixed inset-0 bg-black/20 z-50" onClick={() => setConfiguringMySQLNodeId(null)} />
+                                {/* Side Panel */}
+                                <div className="fixed top-16 right-0 h-[calc(100vh-4rem)] w-[400px] bg-white shadow-[0_0_20px_rgba(0,0,0,0.1)] z-50 flex flex-col">
+                                    {/* Header */}
+                                    <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 rounded-lg bg-slate-50">
+                                                <Database size={18} className="text-slate-600" />
+                                            </div>
+                                            <h3 className="text-sm font-normal text-slate-900">MySQL</h3>
+                                        </div>
+                                        <button
+                                            onClick={() => setConfiguringMySQLNodeId(null)}
+                                            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                                        >
+                                            <X size={18} className="text-slate-600" />
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Content - Scrollable */}
+                                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-1">
                                                 Host
@@ -5370,7 +5644,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 value={mysqlHost}
                                                 onChange={(e) => setMysqlHost(e.target.value)}
                                                 placeholder="localhost"
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent text-sm"
                                             />
                                         </div>
                                         <div className="grid grid-cols-2 gap-3">
@@ -5383,7 +5657,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     value={mysqlPort}
                                                     onChange={(e) => setMysqlPort(e.target.value)}
                                                     placeholder="3306"
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent text-sm"
                                                 />
                                             </div>
                                             <div>
@@ -5395,7 +5669,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     value={mysqlDatabase}
                                                     onChange={(e) => setMysqlDatabase(e.target.value)}
                                                     placeholder="mydb"
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent text-sm"
                                                 />
                                             </div>
                                         </div>
@@ -5408,7 +5682,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 value={mysqlUsername}
                                                 onChange={(e) => setMysqlUsername(e.target.value)}
                                                 placeholder="root"
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent text-sm"
                                             />
                                         </div>
                                         <div>
@@ -5420,7 +5694,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 value={mysqlPassword}
                                                 onChange={(e) => setMysqlPassword(e.target.value)}
                                                 placeholder="••••••"
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent text-sm"
                                             />
                                         </div>
                                         <div>
@@ -5432,44 +5706,46 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 onChange={(e) => setMysqlQuery(e.target.value)}
                                                 placeholder="SELECT * FROM users"
                                                 rows={3}
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent font-mono text-sm"
                                             />
                                         </div>
+                                        {/* Feedback Link */}
+                                        <div className="pt-2 border-t border-slate-100">
+                                            <button
+                                                onClick={() => openFeedbackPopup('mysql', 'MySQL')}
+                                                className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1 transition-colors"
+                                            >
+                                                <MessageSquare size={14} />
+                                                What would you like this node to do?
+                                            </button>
+                                        </div>
                                     </div>
-                                    {/* Feedback Link */}
-                                    <div className="mt-4 pt-2 border-t border-slate-100">
-                                        <button
-                                            onClick={() => openFeedbackPopup('mysql', 'MySQL')}
-                                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
-                                        >
-                                            <MessageSquare size={14} />
-                                            What would you like this node to do?
-                                        </button>
-                                    </div>
-                                    <div className="flex gap-2 justify-end mt-6">
+                                    
+                                    {/* Actions */}
+                                    <div className="px-6 py-4 flex gap-2 justify-end border-t border-slate-200 shrink-0">
                                         <button
                                             onClick={() => setConfiguringMySQLNodeId(null)}
-                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700 transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveMySQLConfig}
                                             disabled={!mysqlQuery.trim()}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+                                            className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
                                         >
                                             Save
                                         </button>
                                     </div>
                                 </div>
-                            </div>
+                            </>
                         )}
 
                         {/* SAP Fetch Configuration Modal */}
                         {configuringSAPNodeId && (
-                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringSAPNodeId(null)}>
-                                <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                            <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringSAPNodeId(null)}>
+                                <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[500px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                    <h3 className="text-lg font-normal text-slate-800 mb-2 flex items-center gap-2">
                                         <Database className="text-indigo-600" size={20} />
                                         SAP S/4HANA
                                     </h3>
@@ -5478,7 +5754,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <div className="space-y-4">
                                         {/* Connection Settings */}
                                         <div className="border-b border-slate-200 pb-3">
-                                            <h4 className="text-sm font-semibold text-slate-700 mb-3">Connection</h4>
+                                            <h4 className="text-sm font-normal text-slate-700 mb-3">Connection</h4>
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-700 mb-1">
                                                     Connection Name
@@ -5495,7 +5771,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                         {/* Authentication */}
                                         <div className="border-b border-slate-200 pb-3">
-                                            <h4 className="text-sm font-semibold text-slate-700 mb-3">Authentication</h4>
+                                            <h4 className="text-sm font-normal text-slate-700 mb-3">Authentication</h4>
                                             <div className="space-y-3">
                                                 <div>
                                                     <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -5550,7 +5826,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                         {/* API Configuration */}
                                         <div>
-                                            <h4 className="text-sm font-semibold text-slate-700 mb-3">API Configuration</h4>
+                                            <h4 className="text-sm font-normal text-slate-700 mb-3">API Configuration</h4>
                                             <div className="space-y-3">
                                                 <div>
                                                     <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -5596,7 +5872,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <div className="mt-4 pt-2 border-t border-slate-100">
                                         <button
                                             onClick={() => openFeedbackPopup('sapFetch', 'SAP S/4HANA')}
-                                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                            className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
                                         >
                                             <MessageSquare size={14} />
                                             What would you like this node to do?
@@ -5640,9 +5916,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             }
 
                             return (
-                                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringEmailNodeId(null)}>
-                                    <div className="bg-white rounded-lg shadow-xl p-6 w-[550px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringEmailNodeId(null)}>
+                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[550px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                        <h3 className="text-lg font-normal text-slate-800 mb-4 flex items-center gap-2">
                                             <Mail className="text-rose-600" size={20} />
                                             Send Email
                                         </h3>
@@ -5780,7 +6056,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <div className="mt-4 pt-2 border-t border-slate-100">
                                             <button
                                                 onClick={() => openFeedbackPopup('sendEmail', 'Send Email')}
-                                                className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                                className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
                                             >
                                                 <MessageSquare size={14} />
                                                 What would you like this node to do?
@@ -5825,9 +6101,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             }
 
                             return (
-                                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringSMSNodeId(null)}>
-                                    <div className="bg-white rounded-lg shadow-xl p-6 w-[550px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringSMSNodeId(null)}>
+                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[550px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                        <h3 className="text-lg font-normal text-slate-800 mb-4 flex items-center gap-2">
                                             <Smartphone className="text-lime-600" size={20} />
                                             Send SMS
                                         </h3>
@@ -5935,7 +6211,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <div className="mt-4 pt-2 border-t border-slate-100">
                                             <button
                                                 onClick={() => openFeedbackPopup('sendSMS', 'Send SMS')}
-                                                className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                                className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
                                             >
                                                 <MessageSquare size={14} />
                                                 What would you like this node to do?
@@ -5983,9 +6259,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             const dataFields = hasInputData ? Object.keys(inputDataForViz[0] || {}) : [];
 
                             return (
-                                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => { setConfiguringVisualizationNodeId(null); setGeneratedWidget(null); }}>
-                                    <div className="bg-white rounded-lg shadow-xl p-6 w-[700px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => { setConfiguringVisualizationNodeId(null); setGeneratedWidget(null); }}>
+                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[700px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                        <h3 className="text-lg font-normal text-slate-800 mb-4 flex items-center gap-2">
                                             <BarChart3 className="text-indigo-600" size={20} />
                                             Data Visualization
                                         </h3>
@@ -6004,7 +6280,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         <thead className="bg-slate-100">
                                                             <tr>
                                                                 {dataFields.map((field, idx) => (
-                                                                    <th key={idx} className="px-3 py-2 text-left font-semibold text-slate-700 whitespace-nowrap border-b border-slate-200">
+                                                                    <th key={idx} className="px-3 py-2 text-left font-normal text-slate-700 whitespace-nowrap border-b border-slate-200">
                                                                         {field}
                                                                     </th>
                                                                 ))}
@@ -6104,7 +6380,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <div className="mt-4 pt-2 border-t border-slate-100">
                                             <button
                                                 onClick={() => openFeedbackPopup('dataVisualization', 'Data Visualization')}
-                                                className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                                className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
                                             >
                                                 <MessageSquare size={14} />
                                                 What would you like this node to do?
@@ -6133,9 +6409,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                         {/* ESIOS Configuration Modal */}
                         {configuringEsiosNodeId && (
-                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringEsiosNodeId(null)}>
-                                <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-slate-800 mb-4">Configure ESIOS Energy Prices</h3>
+                            <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringEsiosNodeId(null)}>
+                                <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-96" onClick={(e) => e.stopPropagation()}>
+                                    <h3 className="text-lg font-normal text-slate-800 mb-4">Configure ESIOS Energy Prices</h3>
                                     <div className="mb-4">
                                         <label className="block text-sm font-medium text-slate-700 mb-2">
                                             Indicator ID
@@ -6145,7 +6421,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             value={esiosArchiveId}
                                             onChange={(e) => setEsiosArchiveId(e.target.value)}
                                             placeholder="e.g., 1001 for PVPC"
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent"
                                         />
                                         <p className="text-xs text-slate-500 mt-1">
                                             1001 = PVPC prices, 1739 = Spot prices, 10211 = Market price
@@ -6159,7 +6435,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             type="date"
                                             value={esiosDate}
                                             onChange={(e) => setEsiosDate(e.target.value)}
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent"
                                         />
                                     </div>
                                     <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
@@ -6170,7 +6446,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <div className="mb-4 pt-2 border-t border-slate-100">
                                         <button
                                             onClick={() => openFeedbackPopup('esios', 'ESIOS Energy Prices')}
-                                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                            className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
                                         >
                                             <MessageSquare size={14} />
                                             What would you like this node to do?
@@ -6186,7 +6462,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <button
                                             onClick={saveEsiosConfig}
                                             disabled={!esiosArchiveId.trim()}
-                                            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium"
+                                            className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-50 text-sm font-medium"
                                         >
                                             Save
                                         </button>
@@ -6197,9 +6473,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                         {/* Climatiq Configuration Modal */}
                         {configuringClimatiqNodeId && (
-                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringClimatiqNodeId(null)}>
-                                <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-slate-800 mb-2">🌱 Get Emission Factors</h3>
+                            <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringClimatiqNodeId(null)}>
+                                <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[500px] max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+                                    <h3 className="text-lg font-normal text-slate-800 mb-2">🌱 Get Emission Factors</h3>
                                     <p className="text-sm text-slate-600 mb-4">Search emission factors in the Climatiq database, to calculate your process and company emissions.</p>
                                     <div className="mb-4">
                                         <div className="flex gap-2">
@@ -6209,7 +6485,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 onChange={(e) => setClimatiqQuery(e.target.value)}
                                                 onKeyDown={(e) => e.key === 'Enter' && searchClimatiq()}
                                                 placeholder="e.g., Passenger diesel car"
-                                                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65]"
                                             />
                                             <button
                                                 onClick={searchClimatiq}
@@ -6257,7 +6533,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 )}
                                                             </div>
                                                             <div className="flex-1 min-w-0">
-                                                                <p className="font-semibold text-sm text-slate-800">
+                                                                <p className="font-normal text-sm text-slate-800">
                                                                     {result.factor} {result.unit}
                                                                 </p>
                                                                 <p className="text-xs text-slate-600 truncate">
@@ -6285,7 +6561,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <div className="mb-4">
                                         <button
                                             onClick={() => openFeedbackPopup('climatiq', 'Climatiq Emissions')}
-                                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                            className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
                                         >
                                             <MessageSquare size={14} />
                                             What would you like this node to do?
@@ -6317,14 +6593,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                         {/* Human Approval Configuration Modal */}
                         {configuringHumanApprovalNodeId && (
-                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringHumanApprovalNodeId(null)}>
-                                <div className="bg-white rounded-lg shadow-xl p-6 w-[450px]" onClick={(e) => e.stopPropagation()}>
+                            <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringHumanApprovalNodeId(null)}>
+                                <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[450px]" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center gap-3 mb-4">
                                         <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
                                             <UserCheck size={20} className="text-orange-600" />
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-bold text-slate-800">Human in the Loop</h3>
+                                            <h3 className="text-lg font-normal text-slate-800">Human in the Loop</h3>
                                             <p className="text-sm text-slate-500">Assign a user to approve this step</p>
                                         </div>
                                     </div>
@@ -6403,10 +6679,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             if (!hasInput && !hasOutput && !hasOutputA && !hasOutputB) return null;
 
                             return (
-                                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setViewingDataNodeId(null)}>
-                                    <div className="bg-white rounded-lg shadow-xl p-6 max-w-4xl max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+                                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setViewingDataNodeId(null)}>
+                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md max-w-4xl max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
                                         <div className="flex items-center justify-between mb-4">
-                                            <h3 className="text-lg font-bold text-slate-800">
+                                            <h3 className="text-lg font-normal text-slate-800">
                                                 {node.label} - Data Preview
                                             </h3>
                                             <button
@@ -6517,7 +6793,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             <thead className="bg-slate-100 sticky top-0">
                                                                 <tr>
                                                                     {Object.keys(displayData[0]).map(key => (
-                                                                        <th key={key} className="px-4 py-2 text-left font-semibold text-slate-700 border-b">
+                                                                        <th key={key} className="px-4 py-2 text-left font-normal text-slate-700 border-b">
                                                                             {key}
                                                                         </th>
                                                                     ))}
@@ -6581,9 +6857,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             const hasAvailableFields = availableFields.length > 0;
                             
                             return (
-                                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringConditionNodeId(null)}>
-                                    <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
-                                        <h3 className="text-lg font-bold text-slate-800 mb-4">Configure Condition</h3>
+                                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringConditionNodeId(null)}>
+                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-96" onClick={(e) => e.stopPropagation()}>
+                                        <h3 className="text-lg font-normal text-slate-800 mb-4">Configure Condition</h3>
                                         <div className="space-y-4">
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -6698,7 +6974,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <div className="mt-4 pt-2 border-t border-slate-100">
                                             <button
                                                 onClick={() => openFeedbackPopup('condition', 'Condition')}
-                                                className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                                className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
                                             >
                                                 <MessageSquare size={14} />
                                                 What would you like this node to do?
@@ -6726,9 +7002,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                         {/* Add Field Configuration Modal */}
                         {configuringAddFieldNodeId && (
-                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringAddFieldNodeId(null)}>
-                                <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-slate-800 mb-4">Add Field to Records</h3>
+                            <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringAddFieldNodeId(null)}>
+                                <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-96" onClick={(e) => e.stopPropagation()}>
+                                    <h3 className="text-lg font-normal text-slate-800 mb-4">Add Field to Records</h3>
                                     <div className="space-y-4">
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -6819,9 +7095,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             const allFields = [...new Set([...fieldsA, ...fieldsB])];
                             
                             return (
-                                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringJoinNodeId(null)}>
-                                    <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
-                                        <h3 className="text-lg font-bold text-slate-800 mb-4">
+                                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringJoinNodeId(null)}>
+                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-96" onClick={(e) => e.stopPropagation()}>
+                                        <h3 className="text-lg font-normal text-slate-800 mb-4">
                                             <GitMerge className="inline-block mr-2" size={20} />
                                             Configure Join
                                         </h3>
@@ -6912,7 +7188,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 </optgroup>
                                                             </select>
                                                             {commonFields.length > 0 && (
-                                                                <p className="text-xs text-green-600 mt-1">
+                                                                <p className="text-xs text-[#256A65] mt-1">
                                                                     ✓ {commonFields.length} common field(s) found
                                                                 </p>
                                                             )}
@@ -7025,14 +7301,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             };
                             
                             return (
-                                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringSplitColumnsNodeId(null)}>
-                                    <div className="bg-white rounded-lg shadow-xl p-6 w-[600px] max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+                                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringSplitColumnsNodeId(null)}>
+                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[600px] max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
                                         <div className="flex items-center gap-3 mb-4">
                                             <div className="w-10 h-10 bg-sky-100 rounded-lg flex items-center justify-center">
                                                 <Columns size={20} className="text-sky-600" />
                                             </div>
                                             <div>
-                                                <h3 className="text-lg font-bold text-slate-800">Split by Columns</h3>
+                                                <h3 className="text-lg font-normal text-slate-800">Split by Columns</h3>
                                                 <p className="text-sm text-slate-500">Drag columns between outputs A and B</p>
                                             </div>
                                         </div>
@@ -7055,7 +7331,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         <div className="flex items-center justify-between mb-2">
                                                             <div className="flex items-center gap-2">
                                                                 <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                                                                <span className="font-semibold text-blue-700">Output A</span>
+                                                                <span className="font-normal text-blue-700">Output A</span>
                                                                 <span className="text-xs text-slate-500">({splitColumnsOutputA.length} cols)</span>
                                                             </div>
                                                             <button
@@ -7078,7 +7354,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                             draggable
                                                                             onDragStart={() => handleDragStart(column)}
                                                                             onDragEnd={handleDragEnd}
-                                                                            className="flex items-center justify-between px-3 py-2 bg-white rounded border border-slate-200 shadow-sm cursor-grab hover:shadow-md transition-shadow group"
+                                                                            className="flex items-center justify-between px-3 py-2 bg-white rounded border border-slate-200 shadow-sm cursor-grab group"
                                                                         >
                                                                             <div className="flex items-center gap-2">
                                                                                 <GripVertical size={14} className="text-slate-400" />
@@ -7106,7 +7382,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         <div className="flex items-center justify-between mb-2">
                                                             <div className="flex items-center gap-2">
                                                                 <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                                                                <span className="font-semibold text-purple-700">Output B</span>
+                                                                <span className="font-normal text-purple-700">Output B</span>
                                                                 <span className="text-xs text-slate-500">({splitColumnsOutputB.length} cols)</span>
                                                             </div>
                                                             <button
@@ -7129,7 +7405,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                             draggable
                                                                             onDragStart={() => handleDragStart(column)}
                                                                             onDragEnd={handleDragEnd}
-                                                                            className="flex items-center justify-between px-3 py-2 bg-white rounded border border-slate-200 shadow-sm cursor-grab hover:shadow-md transition-shadow group"
+                                                                            className="flex items-center justify-between px-3 py-2 bg-white rounded border border-slate-200 shadow-sm cursor-grab group"
                                                                         >
                                                                             <div className="flex items-center gap-2">
                                                                                 <GripVertical size={14} className="text-slate-400" />
@@ -7175,27 +7451,31 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             );
                         })()}
 
-                        {/* Excel Input Configuration Modal */}
+                        {/* Excel Input Configuration Side Panel */}
                         {configuringExcelNodeId && (
-                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={closeExcelConfig}>
-                                <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                            <FileSpreadsheet className="text-emerald-600" size={20} />
-                                            Excel/CSV Input
-                                        </h3>
+                            <>
+                                {/* Backdrop */}
+                                <div className="fixed inset-0 bg-black/20 z-50" onClick={closeExcelConfig} />
+                                {/* Side Panel */}
+                                <div className="fixed top-16 right-0 h-[calc(100vh-4rem)] w-[400px] bg-white shadow-[0_0_20px_rgba(0,0,0,0.1)] z-50 flex flex-col">
+                                    {/* Header */}
+                                    <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 rounded-lg bg-slate-50">
+                                                <FileSpreadsheet size={18} className="text-slate-600" />
+                                            </div>
+                                            <h3 className="text-sm font-normal text-slate-900">Excel/CSV Input</h3>
+                                        </div>
                                         <button
                                             onClick={closeExcelConfig}
-                                            disabled={!excelFile && !nodes.find(n => n.id === configuringExcelNodeId)?.config?.fileName}
-                                            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                                                !excelFile && !nodes.find(n => n.id === configuringExcelNodeId)?.config?.fileName
-                                                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                                                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                            }`}
+                                            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
                                         >
-                                            Done
+                                            <X size={18} className="text-slate-600" />
                                         </button>
                                     </div>
+                                    
+                                    {/* Content - Scrollable */}
+                                    <div className="flex-1 overflow-y-auto px-6 py-4">
                                     
                                     {/* File Upload Area */}
                                     <div className="mb-4">
@@ -7254,7 +7534,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         <thead className="bg-slate-100 sticky top-0">
                                                             <tr>
                                                                 {excelPreviewData.headers.map((header, i) => (
-                                                                    <th key={i} className="px-3 py-2 text-left font-semibold text-slate-700 whitespace-nowrap">
+                                                                    <th key={i} className="px-3 py-2 text-left font-normal text-slate-700 whitespace-nowrap">
                                                                         {header}
                                                                     </th>
                                                                 ))}
@@ -7296,17 +7576,32 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </p>
                                         </div>
                                     )}
-
+                                    </div>
+                                    
+                                    {/* Actions */}
+                                    <div className="px-6 py-4 flex gap-2 justify-end border-t border-slate-200 shrink-0">
+                                        <button
+                                            onClick={closeExcelConfig}
+                                            disabled={!excelFile && !nodes.find(n => n.id === configuringExcelNodeId)?.config?.fileName}
+                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                                !excelFile && !nodes.find(n => n.id === configuringExcelNodeId)?.config?.fileName
+                                                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                                    : 'bg-[#256A65] text-white hover:bg-[#1e554f]'
+                                            }`}
+                                        >
+                                            Done
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
+                            </>
                         )}
 
                         {/* PDF Input Configuration Modal */}
                         {configuringPdfNodeId && (
-                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={closePdfConfig}>
-                                <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                            <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closePdfConfig}>
+                                <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[500px] max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                        <h3 className="text-lg font-normal text-slate-800 flex items-center gap-2">
                                             <FileText className="text-red-600" size={20} />
                                             PDF Input
                                         </h3>
@@ -7407,9 +7702,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                         {/* Save Records Configuration Modal */}
                         {configuringSaveNodeId && (
-                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringSaveNodeId(null)}>
-                                <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-slate-800 mb-4">Save to Database</h3>
+                            <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringSaveNodeId(null)}>
+                                <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-96" onClick={(e) => e.stopPropagation()}>
+                                    <h3 className="text-lg font-normal text-slate-800 mb-4">Save to Database</h3>
                                     <div className="mb-4">
                                         <label className="block text-sm font-medium text-slate-700 mb-2">
                                             Select Entity
@@ -7449,7 +7744,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     {configuringLLMNodeId && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                             <div className="bg-white rounded-xl shadow-xl p-6 w-[500px] max-w-full">
-                                <h3 className="text-lg font-bold text-slate-800 mb-4">Configure AI Generation</h3>
+                                <h3 className="text-lg font-normal text-slate-800 mb-4">Configure AI Generation</h3>
 
                                 <div className="space-y-4">
                                     <div>
@@ -7552,7 +7847,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <div className="mt-4 pt-2 border-t border-slate-100">
                                     <button
                                         onClick={() => openFeedbackPopup('llm', 'LLM / AI Generate')}
-                                        className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                        className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
                                     >
                                         <MessageSquare size={14} />
                                         What would you like this node to do?
@@ -7582,7 +7877,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     {configuringPythonNodeId && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                             <div className="bg-white rounded-xl shadow-xl p-6 w-[600px] max-w-full">
-                                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <h3 className="text-lg font-normal text-slate-800 mb-4 flex items-center gap-2">
                                     <Code className="text-indigo-600" />
                                     Configure Python Code
                                 </h3>
@@ -7649,7 +7944,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <div className="mt-4 pt-2 border-t border-slate-100">
                                     <button
                                         onClick={() => openFeedbackPopup('python', 'Python Code')}
-                                        className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                        className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
                                     >
                                         <MessageSquare size={14} />
                                         What would you like this node to do?
@@ -7678,8 +7973,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     {configuringManualInputNodeId && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                             <div className="bg-white rounded-xl shadow-xl p-6 w-96 max-w-full">
-                                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    <Edit className="text-teal-600" size={20} />
+                                <h3 className="text-lg font-normal text-slate-800 mb-4 flex items-center gap-2">
+                                    <Edit className="text-[#256A65]" size={20} />
                                     Configure Manual Data Input
                                 </h3>
 
@@ -7693,7 +7988,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             value={manualInputVarName}
                                             onChange={(e) => setManualInputVarName(e.target.value)}
                                             placeholder="e.g., temperature, count, status"
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#256A65] focus:border-[#256A65] outline-none"
                                         />
                                     </div>
                                     <div>
@@ -7705,7 +8000,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             value={manualInputVarValue}
                                             onChange={(e) => setManualInputVarValue(e.target.value)}
                                             placeholder="e.g., 25, Active, Hello World"
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#256A65] focus:border-[#256A65] outline-none"
                                         />
                                         <p className="text-xs text-slate-500 mt-1">
                                             Numbers will be parsed automatically.
@@ -7723,7 +8018,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <button
                                         onClick={saveManualInputConfig}
                                         disabled={!manualInputVarName.trim()}
-                                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Save
                                     </button>
@@ -7739,7 +8034,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 {/* Header */}
                                 <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
                                     <div className="flex items-center justify-between">
-                                        <h2 className="text-xl font-bold text-slate-800">Export Workflow</h2>
+                                        <h2 className="text-xl font-normal text-slate-800">Export Workflow</h2>
                                         <button
                                             onClick={() => setShowRunnerModal(false)}
                                             className="text-slate-400 hover:text-slate-600 transition-colors"
@@ -7755,8 +8050,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     {/* Share & Embed Section */}
                                     <div className="mb-6 space-y-4">
                                         {/* Shareable Link */}
-                                        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 rounded-xl p-4 border border-teal-100">
-                                            <label className="block text-sm font-semibold text-teal-800 mb-2 flex items-center gap-2">
+                                        <div className="bg-gradient-to-r from-[#256A65]/5 to-[#256A65]/10 rounded-xl p-4 border border-[#256A65]/20">
+                                            <label className="block text-sm font-normal text-teal-800 mb-2 flex items-center gap-2">
                                                 <Globe size={16} />
                                                 Published Interface
                                             </label>
@@ -7765,11 +8060,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     type="text"
                                                     readOnly
                                                     value={getShareableUrl()}
-                                                    className="flex-1 px-3 py-2 bg-white border border-teal-200 rounded-lg text-sm text-slate-600 focus:outline-none"
+                                                    className="flex-1 px-3 py-2 bg-white border border-[#256A65]/30 rounded-lg text-sm text-slate-600 focus:outline-none"
                                                 />
                                                 <button
                                                     onClick={() => copyToClipboard(getShareableUrl(), 'Link copied to clipboard!')}
-                                                    className="px-4 py-2 bg-white border border-teal-200 rounded-lg hover:bg-teal-50 transition-colors text-teal-700 font-medium text-sm flex items-center gap-2"
+                                                    className="px-4 py-2 bg-white border border-[#256A65]/30 rounded-lg hover:bg-[#256A65]/5 transition-colors text-[#1e554f] font-medium text-sm flex items-center gap-2"
                                                 >
                                                     <Share2 size={16} />
                                                     Copy
@@ -7783,7 +8078,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 onClick={() => setShowEmbedCode(!showEmbedCode)}
                                                 className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-100 transition-colors"
                                             >
-                                                <span className="font-semibold text-slate-700 flex items-center gap-2">
+                                                <span className="font-normal text-slate-700 flex items-center gap-2">
                                                     <Code size={16} />
                                                     Embed Code
                                                 </span>
@@ -7816,7 +8111,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     {/* File Input Form */}
                                     {nodes.filter(n => n.type === 'excelInput' || n.type === 'pdfInput').length > 0 && (
                                         <div className="space-y-4 mb-6">
-                                            <h3 className="font-semibold text-slate-700 flex items-center gap-2">
+                                            <h3 className="font-normal text-slate-700 flex items-center gap-2">
                                                 <Upload size={18} />
                                                 File Inputs
                                             </h3>
@@ -7843,11 +8138,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         />
                                                         <label
                                                             htmlFor={`runner-file-${node.id}`}
-                                                            className="flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-teal-500 hover:bg-teal-50 transition-all"
+                                                            className="flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-[#256A65] hover:bg-[#256A65]/5 transition-all"
                                                         >
                                                             {runnerFileInputs[node.id] ? (
                                                                 <>
-                                                                    <CheckCircle className="text-teal-600" size={20} />
+                                                                    <CheckCircle className="text-[#256A65]" size={20} />
                                                                     <span className="text-slate-700 font-medium">{runnerFileInputs[node.id]?.name}</span>
                                                                 </>
                                                             ) : (
@@ -7866,7 +8161,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     {/* Input Form */}
                                     {Object.keys(runnerInputs).length > 0 ? (
                                         <div className="space-y-4 mb-6">
-                                            <h3 className="font-semibold text-slate-700 flex items-center gap-2">
+                                            <h3 className="font-normal text-slate-700 flex items-center gap-2">
                                                 <Edit size={18} />
                                                 Inputs
                                             </h3>
@@ -7885,7 +8180,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 [nodeId]: e.target.value
                                                             }))}
                                                             placeholder="Enter value..."
-                                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                            className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent"
                                                         />
                                                     </div>
                                                 );
@@ -7902,9 +8197,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <button
                                         onClick={runWorkflowFromRunner}
                                         disabled={isRunningWorkflow}
-                                        className={`w-full py-3 rounded-lg font-semibold text-white flex items-center justify-center gap-2 transition-all ${isRunningWorkflow
+                                        className={`w-full py-3 rounded-lg font-normal text-white flex items-center justify-center gap-2 transition-all ${isRunningWorkflow
                                             ? 'bg-slate-400 cursor-not-allowed'
-                                            : 'bg-slate-800 hover:bg-slate-900 shadow-lg hover:shadow-xl'
+                                            : 'bg-slate-800 hover:bg-slate-900'
                                             }`}
                                     >
                                         {isRunningWorkflow ? (
@@ -7923,7 +8218,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     {/* Output Display */}
                                     {Object.keys(runnerOutputs).length > 0 && (
                                         <div className="mt-6 space-y-4">
-                                            <h3 className="font-semibold text-slate-700 flex items-center gap-2 border-t pt-6">
+                                            <h3 className="font-normal text-slate-700 flex items-center gap-2 border-t pt-6">
                                                 <Database size={18} />
                                                 Output
                                             </h3>
@@ -7989,7 +8284,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <Sparkles size={20} className="text-slate-700" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-lg text-slate-800">Workflow Generated!</h3>
+                                    <h3 className="font-normal text-lg text-slate-800">Workflow Generated!</h3>
                                     <p className="text-sm text-slate-500">
                                         {aiGeneratedWorkflow.nodes.length} nodes, {aiGeneratedWorkflow.connections.length} connections
                                     </p>
@@ -8043,7 +8338,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <div className="flex items-center gap-3">
                                     <History size={24} />
                                     <div>
-                                        <h3 className="font-bold text-lg">Execution History</h3>
+                                        <h3 className="font-normal text-lg">Execution History</h3>
                                         <p className="text-teal-200 text-sm">View past workflow executions and their results</p>
                                     </div>
                                 </div>
@@ -8060,10 +8355,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <div className="p-3 border-b border-slate-100 bg-slate-50">
                                     <button
                                         onClick={loadExecutionHistory}
-                                        className="w-full px-3 py-2 bg-teal-100 text-teal-700 rounded-lg text-sm font-medium hover:bg-teal-200 transition-colors flex items-center justify-center gap-2"
+                                        className="w-full px-3 py-2 bg-teal-100 text-[#1e554f] rounded-lg text-sm font-medium hover:bg-teal-200 transition-colors flex items-center justify-center gap-2"
                                     >
                                         {loadingExecutions ? (
-                                            <div className="w-4 h-4 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+                                            <div className="w-4 h-4 border-2 border-[#256A65] border-t-transparent rounded-full animate-spin" />
                                         ) : (
                                             <History size={14} />
                                         )}
@@ -8072,7 +8367,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 </div>
                                 {loadingExecutions ? (
                                     <div className="p-8 text-center text-slate-500">
-                                        <div className="w-8 h-8 border-2 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                                        <div className="w-8 h-8 border-2 border-[#256A65] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                                         Loading...
                                     </div>
                                 ) : executionHistory.length === 0 ? (
@@ -8087,11 +8382,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             <button
                                                 key={exec.id}
                                                 onClick={() => setSelectedExecution(exec)}
-                                                className={`w-full p-3 text-left hover:bg-slate-50 transition-colors ${selectedExecution?.id === exec.id ? 'bg-teal-50 border-l-2 border-teal-500' : ''}`}
+                                                className={`w-full p-3 text-left hover:bg-slate-50 transition-colors ${selectedExecution?.id === exec.id ? 'bg-[#256A65]/5 border-l-2 border-[#256A65]' : ''}`}
                                             >
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                                        exec.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                                        exec.status === 'completed' ? 'bg-[#256A65]/10 text-[#1e554f]' :
                                                         exec.status === 'failed' ? 'bg-red-100 text-red-700' :
                                                         exec.status === 'running' ? 'bg-yellow-100 text-yellow-700' :
                                                         'bg-slate-100 text-slate-700'
@@ -8115,12 +8410,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 {selectedExecution ? (
                                     <div className="space-y-4">
                                         <div className="bg-slate-50 rounded-lg p-4">
-                                            <h4 className="font-semibold text-slate-800 mb-2">Execution Details</h4>
+                                            <h4 className="font-normal text-slate-800 mb-2">Execution Details</h4>
                                             <div className="grid grid-cols-2 gap-2 text-sm">
                                                 <div>
                                                     <span className="text-slate-500">Status:</span>
                                                     <span className={`ml-2 font-medium ${
-                                                        selectedExecution.status === 'completed' ? 'text-green-600' :
+                                                        selectedExecution.status === 'completed' ? 'text-[#256A65]' :
                                                         selectedExecution.status === 'failed' ? 'text-red-600' :
                                                         'text-slate-600'
                                                     }`}>{selectedExecution.status}</span>
@@ -8142,7 +8437,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                         {selectedExecution.inputs && Object.keys(selectedExecution.inputs).length > 0 && (
                                             <div className="bg-blue-50 rounded-lg p-4">
-                                                <h4 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                                                <h4 className="font-normal text-blue-800 mb-2 flex items-center gap-2">
                                                     <ArrowRight size={16} />
                                                     Inputs
                                                 </h4>
@@ -8153,8 +8448,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         )}
 
                                         {selectedExecution.nodeResults && Object.keys(selectedExecution.nodeResults).length > 0 && (
-                                            <div className="bg-green-50 rounded-lg p-4">
-                                                <h4 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
+                                            <div className="bg-[#256A65]/5 rounded-lg p-4">
+                                                <h4 className="font-normal text-[#1e554f] mb-2 flex items-center gap-2">
                                                     <CheckCircle size={16} />
                                                     Node Results
                                                 </h4>
@@ -8166,11 +8461,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         const nodeType = node?.type || result.nodeType || '';
                                                         
                                                         return (
-                                                            <div key={nodeId} className="bg-white p-3 rounded border border-green-100">
+                                                            <div key={nodeId} className="bg-white p-3 rounded border border-[#256A65]/20">
                                                                 <div className="flex items-center gap-2 mb-1">
                                                                     <span className="font-medium text-slate-700">{nodeLabel}</span>
                                                                     {nodeType && <span className="text-xs text-slate-400">({nodeType})</span>}
-                                                                    {result.success && <Check size={14} className="text-green-500" />}
+                                                                    {result.success && <Check size={14} className="text-[#256A65]" />}
                                                                 </div>
                                                                 {result.message && (
                                                                     <p className="text-xs text-slate-500 mb-1">{result.message}</p>
@@ -8189,7 +8484,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                         {selectedExecution.error && (
                                             <div className="bg-red-50 rounded-lg p-4">
-                                                <h4 className="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                                                <h4 className="font-normal text-red-800 mb-2 flex items-center gap-2">
                                                     <XCircle size={16} />
                                                     Error
                                                 </h4>
@@ -8219,10 +8514,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     <div className="bg-white rounded-xl shadow-2xl p-6 w-[450px] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
-                                <MessageSquare size={20} className="text-teal-600" />
+                                <MessageSquare size={20} className="text-[#256A65]" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-slate-800">Share Your Feedback</h3>
+                                <h3 className="text-lg font-normal text-slate-800">Share Your Feedback</h3>
                                 <p className="text-sm text-slate-500">Node: {feedbackPopupNodeLabel}</p>
                             </div>
                         </div>
@@ -8236,7 +8531,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 onChange={(e) => setFeedbackText(e.target.value)}
                                 placeholder="Describe the functionality you'd like to see, any improvements, or share your ideas..."
                                 rows={4}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] resize-none"
                                 autoFocus
                             />
                             <p className="text-xs text-slate-500 mt-1">
@@ -8254,7 +8549,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <button
                                 onClick={submitFeedback}
                                 disabled={!feedbackText.trim() || isSubmittingFeedback}
-                                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 text-sm font-medium flex items-center gap-2"
+                                className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-50 text-sm font-medium flex items-center gap-2"
                             >
                                 {isSubmittingFeedback ? (
                                     <>
@@ -8281,7 +8576,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <AlertCircle size={20} className="text-amber-600" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="text-base font-semibold text-slate-900">Unsaved Changes</h3>
+                                    <h3 className="text-base font-normal text-slate-900">Unsaved Changes</h3>
                                     <p className="text-xs text-slate-500 mt-0.5">Do you want to save your workflow before leaving?</p>
                                 </div>
                             </div>
@@ -8333,7 +8628,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <div className="flex items-center gap-3">
                                     <BookOpen size={28} />
                                     <div>
-                                        <h3 className="font-bold text-xl">Workflow Templates</h3>
+                                        <h3 className="font-normal text-xl">Workflow Templates</h3>
                                         <p className="text-slate-300 text-sm">Pre-built workflows to get you started quickly</p>
                                     </div>
                                 </div>
@@ -8375,11 +8670,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 {filteredTemplates.map(template => (
                                     <div
                                         key={template.id}
-                                        className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-lg hover:border-slate-400 transition-all group"
+                                        className="bg-white border border-slate-200 rounded-lg p-5 group"
                                     >
                                         <div className="flex justify-between items-start mb-3">
                                             <div>
-                                                <h4 className="font-semibold text-lg text-slate-800 group-hover:text-slate-900 transition-colors">
+                                                <h4 className="font-normal text-lg text-slate-800 group-hover:text-slate-900 transition-colors">
                                                     {template.name}
                                                 </h4>
                                                 <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full mt-1">
@@ -8399,7 +8694,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <div className="bg-slate-50 rounded-lg p-3 mb-4 border border-slate-100">
                                             <div className="flex items-center gap-2 text-xs text-slate-500">
                                                 <span className="flex items-center gap-1">
-                                                    <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                                                    <div className="w-2 h-2 bg-[#256A65]/50 rounded-full"></div>
                                                     {template.nodes.length} nodes
                                                 </span>
                                                 <span className="text-slate-300">•</span>
@@ -8493,7 +8788,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <div className="flex items-center gap-3">
                                     <Eye size={24} />
                                     <div>
-                                        <h3 className="font-bold text-lg">Template Preview</h3>
+                                        <h3 className="font-normal text-lg">Template Preview</h3>
                                         <p className="text-slate-300 text-sm">{previewingTemplate.name}</p>
                                     </div>
                                 </div>
@@ -8578,7 +8873,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 </div>
                                                 {node.type === 'condition' && (
                                                     <div className="flex gap-1 mt-2 text-[10px]">
-                                                        <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded">TRUE</span>
+                                                        <span className="px-1.5 py-0.5 bg-[#256A65]/10 text-[#1e554f] rounded">TRUE</span>
                                                         <span className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded">FALSE</span>
                                                     </div>
                                                 )}
@@ -8598,7 +8893,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         <div className="px-6 py-4 border-t border-slate-200 bg-white shrink-0">
                             <div className="flex items-center justify-between mb-3">
                                 <div>
-                                    <h4 className="font-semibold text-slate-800">{previewingTemplate.name}</h4>
+                                    <h4 className="font-normal text-slate-800">{previewingTemplate.name}</h4>
                                     <p className="text-sm text-slate-500">{previewingTemplate.description}</p>
                                 </div>
                                 <span className="px-3 py-1 bg-slate-100 text-slate-600 text-sm rounded-full">
@@ -8607,7 +8902,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             </div>
                             <div className="flex items-center gap-4 text-sm text-slate-500">
                                 <span className="flex items-center gap-1">
-                                    <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                                    <div className="w-2 h-2 bg-[#256A65]/50 rounded-full"></div>
                                     {previewingTemplate.nodes.length} nodes
                                 </span>
                                 <span className="flex items-center gap-1">
@@ -8647,6 +8942,102 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     )}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Quick Connect Component Search Modal */}
+            {showComponentSearch && connectingFromNodeId && (
+                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => {
+                    setShowComponentSearch(false);
+                    setConnectingFromNodeId(null);
+                    setComponentSearchQuery('');
+                }}>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-[#256A65]/5 to-transparent">
+                            <h3 className="text-base font-normal text-slate-900">Connect Component</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">Search and select a component to connect</p>
+                        </div>
+                        
+                        {/* Search Input */}
+                        <div className="px-6 py-4 border-b border-slate-200">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                <input
+                                    type="text"
+                                    value={componentSearchQuery}
+                                    onChange={(e) => setComponentSearchQuery(e.target.value)}
+                                    placeholder="Search components..."
+                                    className="w-full pl-10 pr-4 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-slate-400"
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+
+                        {/* Components List */}
+                        <div className="px-6 py-4 max-h-96 overflow-y-auto">
+                            {DRAGGABLE_ITEMS
+                                .filter(item => 
+                                    item.type !== 'trigger' && // Don't show triggers (can't connect after trigger)
+                                    item.type !== 'comment' && // Don't show comments
+                                    (componentSearchQuery === '' || 
+                                     item.label.toLowerCase().includes(componentSearchQuery.toLowerCase()) ||
+                                     item.description.toLowerCase().includes(componentSearchQuery.toLowerCase()) ||
+                                     item.category.toLowerCase().includes(componentSearchQuery.toLowerCase()))
+                                )
+                                .map((item) => {
+                                    const Icon = item.icon;
+                                    return (
+                                        <button
+                                            key={item.type}
+                                            onClick={() => handleQuickConnect(item.type)}
+                                            className="w-full flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:border-[#256A65] hover:bg-[#256A65]/5 transition-all text-left mb-2 group"
+                                        >
+                                            <div className={`p-2 rounded-lg flex-shrink-0 ${getNodeIconBg(item.type)}`}>
+                                                <Icon size={18} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-normal text-sm text-slate-900 group-hover:text-[#256A65] transition-colors">
+                                                    {item.label}
+                                                </div>
+                                                <div className="text-xs text-slate-500 mt-0.5">
+                                                    {item.description}
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 mt-1">
+                                                    {item.category}
+                                                </div>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            {DRAGGABLE_ITEMS.filter(item => 
+                                item.type !== 'trigger' && 
+                                item.type !== 'comment' &&
+                                (componentSearchQuery === '' || 
+                                 item.label.toLowerCase().includes(componentSearchQuery.toLowerCase()) ||
+                                 item.description.toLowerCase().includes(componentSearchQuery.toLowerCase()) ||
+                                 item.category.toLowerCase().includes(componentSearchQuery.toLowerCase()))
+                            ).length === 0 && (
+                                <div className="text-center py-8 text-slate-400 text-sm">
+                                    No components found
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-slate-200 flex justify-end">
+                            <button
+                                onClick={() => {
+                                    setShowComponentSearch(false);
+                                    setConnectingFromNodeId(null);
+                                    setComponentSearchQuery('');
+                                }}
+                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700 transition-colors"
+                            >
+                                Cancel
+                            </button>
                         </div>
                     </div>
                 </div>

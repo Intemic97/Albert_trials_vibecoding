@@ -44,7 +44,7 @@ export function ForgotPassword() {
                         <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                             <CheckCircle className="w-8 h-8 text-emerald-400" />
                         </div>
-                        <h1 className="text-2xl font-bold text-white mb-2">Check your email</h1>
+                        <h1 className="text-2xl font-normal text-white mb-2">Check your email</h1>
                         <p className="text-slate-400 mb-6">
                             If an account exists for <span className="text-white font-medium">{email}</span>, 
                             you'll receive an email with a link to reset your password.
@@ -74,7 +74,7 @@ export function ForgotPassword() {
                         <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
                             <Mail className="w-8 h-8 text-blue-400" />
                         </div>
-                        <h1 className="text-2xl font-bold text-white mb-2">Forgot your password?</h1>
+                        <h1 className="text-2xl font-normal text-white mb-2">Forgot your password?</h1>
                         <p className="text-slate-400">
                             No worries! Enter your email and we'll send you a reset link.
                         </p>

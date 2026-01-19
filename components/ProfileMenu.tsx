@@ -40,7 +40,7 @@ export const UserAvatar: React.FC<{
     }
 
     return (
-        <div className={`${sizeClasses[size]} rounded-full bg-[#256A65] text-white flex items-center justify-center font-bold ${className}`}>
+        <div className={`${sizeClasses[size]} rounded-full bg-[#256A65] text-white flex items-center justify-center font-normal ${className}`}>
             {initials}
         </div>
     );
@@ -264,7 +264,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     <div className="mb-3 shadow-sm">
                                         <UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="lg" />
                                     </div>
-                                    <h3 className="font-semibold text-slate-900 text-base">{user?.name || 'User'}</h3>
+                                    <h3 className="font-normal text-slate-900 text-base">{user?.name || 'User'}</h3>
                                     {user?.companyRole && (
                                         <p className="text-xs text-slate-600 font-medium">{user.companyRole}</p>
                                     )}
@@ -353,7 +353,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                 >
                                     <ChevronRight className="rotate-180" size={16} />
                                 </button>
-                                <h3 className="font-semibold text-slate-900 text-base">Organizations</h3>
+                                <h3 className="font-normal text-slate-900 text-base">Organizations</h3>
                             </div>
 
                             <div className="p-2 space-y-1 max-h-48 overflow-y-auto">
@@ -367,7 +367,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                             }`}
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className={`w-8 h-8 rounded flex items-center justify-center font-semibold text-xs ${user?.orgId === org.id
+                                            <div className={`w-8 h-8 rounded flex items-center justify-center font-normal text-xs ${user?.orgId === org.id
                                                 ? 'bg-slate-200 text-slate-700'
                                                 : 'bg-slate-200 text-slate-600 group-hover:bg-slate-300'
                                                 }`}>
@@ -413,7 +413,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                 <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-[420px] max-w-full mx-4" onClick={e => e.stopPropagation()}>
                     {/* Header */}
                     <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50/50">
-                        <h2 className="text-sm font-semibold text-slate-900">My Profile</h2>
+                        <h2 className="text-sm font-normal text-slate-900">My Profile</h2>
                         <button 
                             onClick={() => setShowProfileModal(false)}
                             className="p-1 hover:bg-slate-100 rounded-md transition-colors"
@@ -525,7 +525,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                 <div className="bg-white rounded-lg border border-slate-200 shadow-lg w-[400px] max-w-full mx-4" onClick={e => e.stopPropagation()}>
                     {/* Header */}
                     <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50/50">
-                        <h2 className="text-sm font-semibold text-slate-900">Create Organization</h2>
+                        <h2 className="text-sm font-normal text-slate-900">Create Organization</h2>
                         <button 
                             onClick={() => setShowCreateOrgModal(false)}
                             className="p-1 hover:bg-slate-100 rounded-md transition-colors"

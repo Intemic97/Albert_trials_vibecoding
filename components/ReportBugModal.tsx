@@ -64,7 +64,7 @@ export const ReportBugModal: React.FC<ReportBugModalProps> = ({ isOpen, onClose 
                         <div className="p-2 bg-red-50 rounded-lg">
                             <Bug size={18} className="text-red-600" />
                         </div>
-                        <h2 className="text-base font-semibold text-slate-900">Report a Bug</h2>
+                        <h2 className="text-base font-normal text-slate-900">Report a Bug</h2>
                     </div>
                     <button
                         onClick={onClose}
