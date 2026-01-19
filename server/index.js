@@ -1679,7 +1679,7 @@ IMPORTANT:
 // Get all chats for the current user
 app.get('/api/copilot/chats', authenticateToken, async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = req.user.sub;
         const orgId = req.user.orgId;
 
         const chats = await db.all(
@@ -1703,7 +1703,7 @@ app.get('/api/copilot/chats', authenticateToken, async (req, res) => {
 // Create a new chat
 app.post('/api/copilot/chats', authenticateToken, async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = req.user.sub;
         const orgId = req.user.orgId;
         const { id, title, messages, createdAt, updatedAt } = req.body;
 
@@ -1723,7 +1723,7 @@ app.post('/api/copilot/chats', authenticateToken, async (req, res) => {
 // Update a chat
 app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = req.user.sub;
         const orgId = req.user.orgId;
         const { chatId } = req.params;
         const { title, messages, updatedAt } = req.body;
@@ -1753,7 +1753,7 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
 // Delete a chat
 app.delete('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = req.user.sub;
         const orgId = req.user.orgId;
         const { chatId } = req.params;
 

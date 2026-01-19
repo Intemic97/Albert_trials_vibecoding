@@ -323,7 +323,7 @@ export const Copilots: React.FC = () => {
                         </div>
                         <button
                             onClick={createNewChat}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg transition-colors font-medium"
                         >
                             <Plus size={18} />
                             New Chat
