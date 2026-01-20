@@ -551,11 +551,11 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
             </header>
 
             {/* Main Content */}
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-7xl mx-auto space-y-6">
                     
                     <section>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {/* Active Workflows */}
                             <div className="bg-white border border-slate-200 rounded-lg p-5">
                                 <div className="flex items-start justify-between">
@@ -611,7 +611,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                         </div>
                     </section>
 
-                    <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2 bg-white border border-slate-200 rounded-lg p-4">
                             <div className="flex items-center justify-between mb-3">
                                 <h2 className="text-base font-normal text-slate-900">Overview</h2>
@@ -878,14 +878,14 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                         <div className="flex gap-2 justify-end mt-6 pt-4 border-t border-slate-100">
                             <button
                                 onClick={() => { setShowAddKpiModal(false); setEditingKpi(null); resetForm(); }}
-                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                className="btn-3d btn-secondary-3d text-sm font-medium"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={editingKpi ? handleEditKpi : handleAddKpi}
                                 disabled={!kpiTitle || !kpiEntityId || (!kpiPropertyName && kpiOperation !== 'count')}
-                                className="px-3 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+                                className="btn-3d btn-primary-3d disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
                             >
                                 {editingKpi ? 'Save changes' : 'Create KPI'}
                             </button>

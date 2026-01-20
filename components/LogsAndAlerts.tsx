@@ -312,7 +312,7 @@ export const LogsAndAlerts: React.FC = () => {
             </header>
 
             {/* Main Content */}
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-7xl mx-auto space-y-6">
                     {/* Filters */}
                     <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">

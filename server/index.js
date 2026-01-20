@@ -11,7 +11,29 @@ const { initDb, openDb } = require('./db');
 const { WorkflowExecutor } = require('./workflowExecutor');
 const { gcsService } = require('./gcsService');
 const { prefectClient } = require('./prefectClient');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+// Load environment variables - Try multiple methods to ensure it loads
+const envPath = path.join(__dirname, '.env');
+console.log('[ENV] Attempting to load .env from:', envPath);
+console.log('[ENV] File exists:', require('fs').existsSync(envPath));
+
+// Method 1: Explicit path
+const result1 = require('dotenv').config({ path: envPath });
+if (result1.error) {
+    console.error('[ENV] Error loading .env:', result1.error);
+}
+
+// Method 2: Also try without explicit path (default behavior)
+if (!process.env.OPENAI_API_KEY) {
+    require('dotenv').config();
+}
+
+// Debug: Verificar que OPENAI_API_KEY se cargó correctamente
+const openaiKey = process.env.OPENAI_API_KEY;
+console.log('[ENV] OPENAI_API_KEY cargada:', openaiKey ? `✅ SÍ (length: ${openaiKey.length}, starts with: ${openaiKey.substring(0, 20)}...)` : '❌ NO - VARIABLE NO ENCONTRADA');
+if (!openaiKey) {
+    console.error('[ENV] ERROR: OPENAI_API_KEY no está configurada. Verifica el archivo .env');
+    console.error('[ENV] Variables disponibles:', Object.keys(process.env).filter(k => k.includes('API') || k.includes('KEY')).join(', '));
+}
 
 // Stripe configuration
 const Stripe = require('stripe');
@@ -1670,13 +1692,28 @@ IMPORTANT:
             { role: 'user', content: question }
         ];
 
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages,
-            temperature: 0.3,
-            max_tokens: 1500,
-            response_format: { type: "json_object" }
-        });
+        console.log('[Database Assistant] Calling OpenAI API...');
+        console.log('[Database Assistant] API Key present:', !!process.env.OPENAI_API_KEY);
+        console.log('[Database Assistant] API Key length:', process.env.OPENAI_API_KEY?.length);
+        
+        let completion;
+        try {
+            completion = await openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages,
+                temperature: 0.3,
+                max_tokens: 1500,
+                response_format: { type: "json_object" }
+            });
+            console.log('[Database Assistant] OpenAI API call successful');
+        } catch (openaiError) {
+            console.error('[Database Assistant] OpenAI API Error:', openaiError.message);
+            console.error('[Database Assistant] OpenAI API Error details:', openaiError);
+            return res.status(500).json({ 
+                error: 'Failed to get response from OpenAI',
+                details: openaiError.message 
+            });
+        }
 
         const responseText = completion.choices[0]?.message?.content || '{}';
         let parsedResponse;
@@ -1704,7 +1741,12 @@ IMPORTANT:
 
     } catch (error) {
         console.error('[Database Assistant] Error:', error);
-        res.status(500).json({ error: 'Failed to process your question. Please try again.' });
+        console.error('[Database Assistant] Error stack:', error.stack);
+        console.error('[Database Assistant] Error name:', error.name);
+        res.status(500).json({ 
+            error: 'Failed to process your question. Please try again.',
+            details: error.message 
+        });
     }
 });
 
@@ -1722,17 +1764,34 @@ app.get('/api/copilot/chats', authenticateToken, async (req, res) => {
         );
 
         // Parse messages JSON for each chat
-        const parsedChats = chats.map(chat => ({
-            ...chat,
-            messages: JSON.parse(chat.messages || '[]'),
-            instructions: chat.instructions || null,
-            allowedEntities: chat.allowedEntities ? JSON.parse(chat.allowedEntities) : null
-        }));
+        const parsedChats = chats.map(chat => {
+            try {
+                return {
+                    ...chat,
+                    messages: chat.messages ? JSON.parse(chat.messages) : [],
+                    instructions: chat.instructions || null,
+                    allowedEntities: chat.allowedEntities ? JSON.parse(chat.allowedEntities) : null,
+                    createdAt: chat.createdAt ? new Date(chat.createdAt) : new Date(),
+                    updatedAt: chat.updatedAt ? new Date(chat.updatedAt) : new Date()
+                };
+            } catch (parseError) {
+                console.error('[Copilot] Error parsing chat:', chat.id, parseError);
+                return {
+                    ...chat,
+                    messages: [],
+                    instructions: chat.instructions || null,
+                    allowedEntities: null,
+                    createdAt: chat.createdAt ? new Date(chat.createdAt) : new Date(),
+                    updatedAt: chat.updatedAt ? new Date(chat.updatedAt) : new Date()
+                };
+            }
+        });
 
         res.json({ chats: parsedChats });
     } catch (error) {
         console.error('[Copilot] Error loading chats:', error);
-        res.status(500).json({ error: 'Failed to load chats' });
+        console.error('[Copilot] Error stack:', error.stack);
+        res.status(500).json({ error: 'Failed to load chats', details: error.message });
     }
 });
 

@@ -40,7 +40,7 @@ export const UserAvatar: React.FC<{
     }
 
     return (
-        <div className={`${sizeClasses[size]} rounded-full bg-[#256A65] text-white flex items-center justify-center font-normal ${className}`}>
+        <div className={`${sizeClasses[size]} rounded-full bg-slate-900 text-white flex items-center justify-center font-normal ${className}`}>
             {initials}
         </div>
     );
@@ -248,7 +248,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
             {isOpen && menuPosition && createPortal(
                 <div 
                     ref={menuRef}
-                    className="fixed w-72 bg-white rounded-lg border border-slate-200 shadow-xl py-2 z-[99999] overflow-hidden text-sm pointer-events-auto"
+                    className="fixed w-72 bg-white rounded-lg border border-slate-200 shadow-lg py-2 z-[99999] overflow-hidden text-sm font-light font-sans pointer-events-auto"
                     style={{
                         top: `${menuPosition.top}px`,
                         ...(menuPosition.left !== undefined ? { left: `${menuPosition.left}px` } : {}),
@@ -259,57 +259,51 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                     {view === 'main' ? (
                         <>
                             {/* Header */}
-                            <div className="px-5 py-4 border-b border-slate-200 bg-white">
+                            <div className="px-4 py-4 border-b border-slate-200">
                                 <div className="flex flex-col items-center">
-                                    <div className="mb-3 shadow-sm">
+                                    <div className="mb-3">
                                         <UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="lg" />
                                     </div>
-                                    <h3 className="font-normal text-slate-900 text-base">{user?.name || 'User'}</h3>
+                                    <h3 className="font-normal text-slate-900 text-sm" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{user?.name || 'User'}</h3>
                                     {user?.companyRole && (
-                                        <p className="text-xs text-slate-600 font-medium">{user.companyRole}</p>
+                                        <p className="text-xs text-slate-500 font-light mt-0.5">{user.companyRole}</p>
                                     )}
-                                    <p className="text-xs text-slate-500">{user?.email || 'user@example.com'}</p>
+                                    <p className="text-xs text-slate-400 font-light mt-1">{user?.email || 'user@example.com'}</p>
                                 </div>
                             </div>
 
                             {/* Menu Items */}
-                            <div className="px-2 py-2 space-y-1">
+                            <div className="px-3 py-2 space-y-0.5">
                                 <button
                                     onClick={() => setView('organizations')}
-                                    className="w-full flex items-center justify-between px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg group transition-colors"
+                                    className="w-full flex items-center justify-between px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-left group text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-1.5 bg-slate-100 rounded text-slate-500 group-hover:text-slate-700 group-hover:bg-slate-200 transition-colors">
-                                            <Building size={16} />
-                                        </div>
+                                    <div className="flex items-center">
+                                        <Building size={16} className="mr-3 transition-colors text-slate-400 group-hover:text-slate-600" />
                                         <div className="text-left">
-                                            <p className="font-medium">Change organization</p>
-                                            <p className="text-xs text-slate-400">{currentOrg?.name || 'Select Organization'}</p>
+                                            <span className="text-sm font-light">Change organization</span>
+                                            <p className="text-xs text-slate-400 font-light mt-0.5">{currentOrg?.name || 'Select Organization'}</p>
                                         </div>
                                     </div>
-                                    <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-600" />
+                                    <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
                                 </button>
 
                                 <button 
                                     onClick={openProfileModal}
-                                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg group transition-colors"
+                                    className="w-full flex items-center px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-left group text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                                 >
-                                    <div className="p-1.5 bg-slate-100 rounded text-slate-500 group-hover:text-slate-700 group-hover:bg-slate-200 transition-colors">
-                                        <User size={16} />
-                                    </div>
-                                    <span className="font-medium">My Profile</span>
+                                    <User size={16} className="mr-3 transition-colors text-slate-400 group-hover:text-slate-600" />
+                                    <span>My Profile</span>
                                 </button>
                                 <button
                                     onClick={() => {
                                         setIsOpen(false);
                                         onNavigate?.('settings');
                                     }}
-                                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg group transition-colors"
+                                    className="w-full flex items-center px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-left group text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                                 >
-                                    <div className="p-1.5 bg-slate-100 rounded text-slate-500 group-hover:text-slate-700 group-hover:bg-slate-200 transition-colors">
-                                        <Settings size={16} />
-                                    </div>
-                                    <span className="font-medium">Settings</span>
+                                    <Settings size={16} className="mr-3 transition-colors text-slate-400 group-hover:text-slate-600" />
+                                    <span>Settings</span>
                                 </button>
                                 
                                 {/* Admin Panel - Only visible for admins */}
@@ -319,85 +313,79 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                             setIsOpen(false);
                                             onNavigate?.('admin');
                                         }}
-                                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg group transition-colors"
+                                        className="w-full flex items-center px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-left group text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                                     >
-                                        <div className="p-1.5 bg-red-50 rounded text-red-500 group-hover:text-red-600 group-hover:bg-red-100 transition-colors">
-                                            <Shield size={16} />
-                                        </div>
-                                        <span className="font-medium">Admin Panel</span>
+                                        <Shield size={16} className="mr-3 transition-colors text-slate-400 group-hover:text-slate-600" />
+                                        <span>Admin Panel</span>
                                     </button>
                                 )}
                             </div>
 
-                            <div className="border-t border-slate-100 my-1 mx-2"></div>
+                            <div className="border-t border-slate-100 my-1 mx-3"></div>
 
-                            <div className="px-2 pb-2">
+                            <div className="px-3 pb-2">
                                 <button
                                     onClick={logout}
-                                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg group transition-colors"
+                                    className="w-full flex items-center px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-left group text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                                 >
-                                    <div className="p-1.5 bg-red-50 rounded text-red-500 group-hover:bg-red-100 transition-colors">
-                                        <LogOut size={16} />
-                                    </div>
-                                    <span className="font-medium">Log Out</span>
+                                    <LogOut size={16} className="mr-3 transition-colors text-slate-400 group-hover:text-slate-600" />
+                                    <span>Log Out</span>
                                 </button>
                             </div>
                         </>
                     ) : (
                         <>
                             {/* Organizations Submenu */}
-                            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/50 flex items-center">
+                            <div className="px-4 py-3 border-b border-slate-200 flex items-center">
                                 <button
                                     onClick={() => setView('main')}
-                                    className="p-1 -ml-1 mr-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors"
+                                    className="p-1 -ml-1 mr-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                                 >
                                     <ChevronRight className="rotate-180" size={16} />
                                 </button>
-                                <h3 className="font-normal text-slate-900 text-base">Organizations</h3>
+                                <h3 className="font-normal text-slate-900 text-sm" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Organizations</h3>
                             </div>
 
-                            <div className="p-2 space-y-1 max-h-48 overflow-y-auto">
+                            <div className="px-3 py-2 space-y-0.5 max-h-48 overflow-y-auto">
                                 {organizations.map(org => (
                                     <button
                                         key={org.id}
                                         onClick={() => switchOrganization(org.id)}
-                                        className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg group transition-colors ${user?.orgId === org.id
-                                            ? 'bg-slate-100 text-slate-900'
-                                            : 'text-slate-700 hover:bg-slate-50'
+                                        className={`w-full flex items-center justify-between px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-left group ${user?.orgId === org.id
+                                            ? 'bg-[rgb(235,245,250)] text-slate-900'
+                                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                                             }`}
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-8 h-8 rounded flex items-center justify-center font-normal text-xs ${user?.orgId === org.id
-                                                ? 'bg-slate-200 text-slate-700'
-                                                : 'bg-slate-200 text-slate-600 group-hover:bg-slate-300'
+                                        <div className="flex items-center">
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs mr-3 font-normal ${user?.orgId === org.id
+                                                ? 'bg-slate-900 text-white'
+                                                : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
                                                 }`}>
                                                 {org.name.substring(0, 2).toUpperCase()}
                                             </div>
                                             <div className="text-left">
-                                                <p className="font-medium">{org.name}</p>
-                                                <p className="text-xs opacity-70 capitalize">{org.role}</p>
+                                                <span>{org.name}</span>
+                                                <p className="text-xs text-slate-400 font-light mt-0.5 capitalize">{org.role}</p>
                                             </div>
                                         </div>
                                         {user?.orgId === org.id && (
-                                            <div className="w-2 h-2 rounded-full bg-slate-700"></div>
+                                            <div className="w-2 h-2 rounded-full bg-slate-900"></div>
                                         )}
                                     </button>
                                 ))}
                             </div>
                             
                             {/* Create Organization Button */}
-                            <div className="p-2 border-t border-slate-100">
+                            <div className="px-3 py-2 border-t border-slate-100">
                                 <button
                                     onClick={() => {
                                         setIsOpen(false);
                                         setShowCreateOrgModal(true);
                                     }}
-                                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg group transition-colors"
+                                    className="w-full flex items-center px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-left group text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                                 >
-                                    <div className="p-1.5 bg-slate-100 rounded text-slate-600 group-hover:bg-slate-200 transition-colors">
-                                        <Plus size={16} />
-                                    </div>
-                                    <span className="font-medium">Create Organization</span>
+                                    <Plus size={16} className="mr-3 transition-colors text-slate-400 group-hover:text-slate-600" />
+                                    <span>Create Organization</span>
                                 </button>
                             </div>
                         </>
@@ -465,7 +453,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     type="text"
                                     value={editName}
                                     onChange={(e) => setEditName(e.target.value)}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                     placeholder="Your name"
                                 />
                             </div>
@@ -478,7 +466,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     type="text"
                                     value={editRole}
                                     onChange={(e) => setEditRole(e.target.value)}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                     placeholder="e.g. Product Manager, Developer, Designer"
                                 />
                             </div>
@@ -509,7 +497,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                         <button
                             onClick={handleSaveProfile}
                             disabled={isSaving}
-                            className="px-3 py-2 bg-[#256A65] text-white rounded-lg text-sm hover:bg-[#1e554f] transition-colors disabled:opacity-50 flex items-center gap-2"
+                            className="btn-3d btn-primary-3d text-sm text-white rounded-lg text-sm hover:bg-[#1e554f] transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
                             {isSaving && <Loader2 size={16} className="animate-spin" />}
                             Save Changes
@@ -571,7 +559,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                         <button
                             onClick={handleCreateOrganization}
                             disabled={isCreatingOrg || !newOrgName.trim()}
-                            className="px-3 py-2 bg-[#256A65] text-white rounded-lg text-sm hover:bg-[#1e554f] transition-colors disabled:opacity-50 flex items-center gap-2"
+                            className="btn-3d btn-primary-3d text-sm text-white rounded-lg text-sm hover:bg-[#1e554f] transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
                             {isCreatingOrg && <Loader2 size={16} className="animate-spin" />}
                             Create Organization

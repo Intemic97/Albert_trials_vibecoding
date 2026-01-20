@@ -350,7 +350,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
             </header>
 
             {/* Main Content */}
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-6xl mx-auto space-y-6">
 
                     {/* Documents View */}
@@ -361,7 +361,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                             <span className="text-xs text-slate-400 ml-1">{reports.length} document{reports.length !== 1 ? 's' : ''}</span>
                             <button
                                 onClick={() => setShowNewReportModal(true)}
-                                className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-[rgb(91,121,128)] hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
+                                className="ml-auto flex items-center gap-2 btn-3d btn-primary-3d text-xs hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
                             >
                                 <Plus size={14} />
                                 New Document
@@ -393,13 +393,13 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                 <p className="text-slate-400 text-xs mt-1">Create your first document to get started</p>
                                 <button
                                     onClick={() => setShowNewReportModal(true)}
-                                    className="mt-4 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors"
+                                    className="mt-4 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
                                 >
                                     Create Document
                                 </button>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {reports
                                     .filter(report => {
                                         if (!documentsSearch.trim()) return true;
@@ -478,7 +478,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                             <span className="text-xs text-slate-400 ml-1">Templates define the structure of your documents</span>
                             <button
                                 onClick={handleCreateTemplate}
-                                className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-[rgb(91,121,128)] hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
+                                className="ml-auto flex items-center gap-2 btn-3d btn-primary-3d text-xs hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
                             >
                                 <Plus size={14} />
                                 New Template
@@ -510,13 +510,13 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                 <p className="text-slate-400 text-sm mt-1">Create your first template to structure your documents</p>
                                 <button
                                     onClick={handleCreateTemplate}
-                                    className="mt-4 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors"
+                                    className="mt-4 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
                                 >
                                     Create Template
                                 </button>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                 {templates
                                     .filter(template => {
                                         if (!templatesSearch.trim()) return true;
@@ -755,7 +755,7 @@ const NewReportModal: React.FC<NewReportModalProps> = ({ templates, orgUsers, on
                     <button
                         onClick={handleSubmit}
                         disabled={isCreating || templates.length === 0}
-                        className="flex items-center gap-2 px-3 py-2 bg-[rgb(91,121,128)] hover:bg-[#1e554f] disabled:bg-slate-400 text-white rounded-lg text-sm font-medium transition-colors"
+                        className="flex items-center gap-2 btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] disabled:bg-slate-400 text-white rounded-lg text-sm font-medium transition-colors"
                     >
                         {isCreating ? (
                             <>
@@ -1102,7 +1102,7 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                     <button
                         onClick={handleSubmit}
                         disabled={isSaving}
-                        className="flex items-center gap-2 px-3 py-2 bg-[rgb(91,121,128)] hover:bg-[#1e554f] disabled:bg-slate-400 text-white rounded-lg text-sm font-medium transition-colors"
+                        className="flex items-center gap-2 btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] disabled:bg-slate-400 text-white rounded-lg text-sm font-medium transition-colors"
                     >
                         {isSaving ? (
                             <>

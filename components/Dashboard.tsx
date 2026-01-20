@@ -532,35 +532,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     </header>
 
                     {/* Content Area */}
-                    <div className="flex-1 overflow-y-auto p-6">
+                    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                         {/* Toolbar */}
-                        <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-4">
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                                     <input
                                         type="text"
                                         placeholder="Search dashboards..."
                                         value={dashboardSearchQuery}
                                         onChange={(e) => setDashboardSearchQuery(e.target.value)}
-                                        className="pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 w-72 placeholder:text-slate-400 hover:border-slate-300 transition-colors"
+                                        className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 w-60 placeholder:text-slate-400"
                                     />
                                 </div>
-                                <p className="text-xs text-slate-500">
+                                <p className="text-sm text-slate-500">
                                     {filteredDashboards.length} {filteredDashboards.length === 1 ? 'dashboard' : 'dashboards'}
                                 </p>
                             </div>
                             <button
                                 onClick={handleCreateDashboard}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] transition-colors text-sm font-medium"
+                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                             >
-                                <Plus size={14} />
+                                <Plus size={14} className="mr-2" />
                                 Create Dashboard
                             </button>
                         </div>
 
                         {/* Dashboards Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
                             {filteredDashboards.map((dashboard) => (
                                 <div
                                     key={dashboard.id}
@@ -620,7 +620,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                     <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-100">
                                         <div className="flex items-center gap-1.5 text-xs text-slate-400">
                                             <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            <span className="opacity-0 group-hover:opacity-100 transition-opacity font-medium text-blue-600">Open dashboard</span>
+                                            <span className="opacity-0 group-hover:opacity-100 transition-opacity font-medium text-slate-900">Open dashboard</span>
                                         </div>
                                     </div>
                                 </div>

@@ -4,6 +4,44 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { API_BASE } from '../config';
 import { Entity } from '../types';
 
+// Intemic Logo Icon Component
+const IntemicIcon: React.FC<{ size?: number; className?: string }> = ({ size = 14, className = '' }) => {
+    return (
+        <svg
+            width={size}
+            height={size}
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className={className}
+        >
+            {/* Left curvilinear shape - chevron/parenthesis opening left */}
+            <path
+                d="M 4 4 Q 2 8 2 12 Q 2 16 4 20"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                fill="none"
+            />
+            {/* Right curvilinear shape - chevron/parenthesis opening right */}
+            <path
+                d="M 20 4 Q 22 8 22 12 Q 22 16 20 20"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                fill="none"
+            />
+            {/* Center circle */}
+            <circle
+                cx="12"
+                cy="12"
+                r="2"
+                fill="currentColor"
+            />
+        </svg>
+    );
+};
+
 interface Message {
     id: string;
     role: 'user' | 'assistant';
@@ -88,20 +126,21 @@ export const Copilots: React.FC = () => {
 
     const loadChats = async () => {
         try {
-            const response = await fetch(`${API_BASE}/copilot/chats`, {
+            const response = await fetch(`${API_BASE}/api/copilot/chats`, {
                 credentials: 'include'
             });
             if (response.ok) {
                 const data = await response.json();
-                const loadedChats = data.chats.map((chat: any) => ({
+                const loadedChats = (data.chats || []).map((chat: any) => ({
                     ...chat,
-                    createdAt: new Date(chat.createdAt),
-                    updatedAt: new Date(chat.updatedAt),
+                    createdAt: chat.createdAt ? new Date(chat.createdAt) : new Date(),
+                    updatedAt: chat.updatedAt ? new Date(chat.updatedAt) : new Date(),
                     instructions: chat.instructions || undefined,
                     allowedEntities: chat.allowedEntities || [],
-                    messages: chat.messages.map((msg: any) => ({
+                    messages: (chat.messages || []).map((msg: any) => ({
                         ...msg,
-                        timestamp: new Date(msg.timestamp)
+                        id: msg.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
                     }))
                 }));
                 
@@ -160,10 +199,10 @@ export const Copilots: React.FC = () => {
             : "Good afternoon! I'm your Database Copilot. I can help you navigate through your entities, find records, and answer questions about relationships between your tables. What would you like to know?";
 
         const newChat: Chat = {
-            id: Date.now().toString(),
+            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             title: name || 'New Copilot',
             messages: [{
-                id: '1',
+                id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 role: 'assistant',
                 content: welcomeMessage,
                 timestamp: new Date()
@@ -265,7 +304,7 @@ export const Copilots: React.FC = () => {
         }
 
         const userMessage: Message = {
-            id: Date.now().toString(),
+            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             role: 'user',
             content: input.trim(),
             timestamp: new Date()
@@ -304,7 +343,7 @@ export const Copilots: React.FC = () => {
             const data = await response.json();
 
             const assistantMessage: Message = {
-                id: (Date.now() + 1).toString(),
+                id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 role: 'assistant',
                 content: data.answer || data.error || 'Sorry, I could not process your question.',
                 timestamp: new Date(),
@@ -324,7 +363,7 @@ export const Copilots: React.FC = () => {
         } catch (error) {
             console.error('Error asking database:', error);
             const errorMessage: Message = {
-                id: (Date.now() + 1).toString(),
+                id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 role: 'assistant',
                 content: 'Sorry, I encountered an error while processing your question. Please try again.',
                 timestamp: new Date()
@@ -440,47 +479,53 @@ export const Copilots: React.FC = () => {
             <div className="flex-1 flex overflow-hidden">
                 {/* Sidebar - Chat History */}
                 <div
-                    className={`bg-slate-50 border-r border-slate-200 flex flex-col transition-all duration-300 ${
+                    className={`bg-white border-r border-slate-200 flex flex-col transition-all duration-300 ${
                         isSidebarOpen ? 'w-80' : 'w-0'
                     } overflow-hidden`}
                 >
                     {/* Sidebar Header */}
-                    <div className="p-4 border-b border-slate-200 shrink-0">
-                        <div className="flex items-center justify-between mb-3">
-                            <h2 className="text-base font-normal text-slate-700 uppercase tracking-wider" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Your Copilots</h2>
+                    <div className="p-4 border-b border-slate-200 shrink-0 bg-white">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-xs font-light text-slate-400 uppercase tracking-wider" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Your Copilots</h2>
                             <button
                                 onClick={() => setIsSidebarOpen(false)}
-                                className="p-1 hover:bg-slate-200 rounded transition-colors"
+                                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
                             >
-                                <ChevronsLeft size={16} className="text-slate-500" />
+                                <ChevronsLeft size={14} className="text-slate-400" />
                             </button>
                         </div>
                         <button
                             onClick={handleCreateCopilot}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg transition-all duration-200 text-sm font-medium shadow-sm hover:shadow-md"
+                            className="w-full flex items-center justify-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                         >
-                            <Sparkles size={16} />
+                            <Sparkles size={14} className="mr-2" />
                             New Copilot
                         </button>
                     </div>
 
                     {/* Chat List */}
-                    <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                    <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
                         {filteredChats.map(chat => (
                             <div
                                 key={chat.id}
                                 className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${
                                     activeChat === chat.id
                                         ? 'bg-white shadow-sm border border-slate-200'
-                                        : 'hover:bg-white/50'
+                                        : 'hover:bg-white/70'
                                 }`}
                                 onClick={() => setActiveChat(chat.id)}
                             >
-                                <MessageSquare size={16} className={`shrink-0 ${activeChat === chat.id ? 'text-teal-600' : 'text-slate-400'}`} />
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                                    activeChat === chat.id
+                                        ? 'bg-slate-900 text-white'
+                                        : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
+                                }`}>
+                                    <IntemicIcon size={14} />
+                                </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium truncate text-slate-700">{chat.title}</p>
-                                    <p className="text-xs text-slate-400">
-                                        {chat.messages.length} messages
+                                    <p className="text-sm font-normal truncate text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{chat.title}</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        {chat.messages.length} {chat.messages.length === 1 ? 'message' : 'messages'}
                                     </p>
                                 </div>
                                 <button
@@ -488,7 +533,7 @@ export const Copilots: React.FC = () => {
                                         e.stopPropagation();
                                         deleteChat(chat.id);
                                     }}
-                                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-100 rounded-lg transition-all"
+                                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-50 rounded transition-all"
                                 >
                                     <Trash2 size={14} className="text-red-500" />
                                 </button>
@@ -542,10 +587,20 @@ export const Copilots: React.FC = () => {
                                             <button
                                                 type="submit"
                                                 disabled={!input.trim() || isLoading}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
                                             >
-                                                <Send size={18} />
+                                                <Send size={16} />
                                             </button>
+                                            <div className="flex items-center space-x-4 text-xs text-slate-400 mt-2">
+                                                <span className="flex items-center">
+                                                    <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded mr-1.5 font-sans">@</kbd>
+                                                    to mention entities
+                                                </span>
+                                                <span className="flex items-center">
+                                                    <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded mr-1.5 font-sans">.</kbd>
+                                                    for attributes
+                                                </span>
+                                            </div>
                                         </form>
                                     </div>
 
@@ -576,8 +631,8 @@ export const Copilots: React.FC = () => {
                                         className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                     >
                                         {message.role === 'assistant' && (
-                                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-600 to-teal-700 flex items-center justify-center shrink-0 mt-1">
-                                                <Bot size={18} className="text-white" />
+                                            <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center shrink-0 mt-1">
+                                                <IntemicIcon size={16} className="text-white" />
                                             </div>
                                         )}
 
@@ -702,10 +757,20 @@ export const Copilots: React.FC = () => {
                                 <button
                                     type="submit"
                                     disabled={!input.trim() || isLoading}
-                                    className="absolute right-3 bottom-3 p-2.5 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
-                                    <Send size={18} />
+                                    <Send size={16} />
                                 </button>
+                                <div className="flex items-center space-x-4 text-xs text-slate-400 mt-2">
+                                    <span className="flex items-center">
+                                        <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded mr-1.5 font-sans">@</kbd>
+                                        to mention entities
+                                    </span>
+                                    <span className="flex items-center">
+                                        <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded mr-1.5 font-sans">.</kbd>
+                                        for attributes
+                                    </span>
+                                </div>
                             </form>
                             <div className="mt-2 flex items-center justify-center gap-4 text-xs text-slate-400">
                                 <span>Try: "How many customers do we have?"</span>
@@ -871,9 +936,9 @@ export const Copilots: React.FC = () => {
                             <button
                                 onClick={handleSaveCopilot}
                                 disabled={!copilotName.trim()}
-                                className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors flex items-center gap-2"
+                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <Sparkles size={14} />
+                                <Sparkles size={14} className="mr-2" />
                                 Create Copilot
                             </button>
                         </div>

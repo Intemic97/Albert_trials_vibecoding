@@ -1681,7 +1681,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     onClick={() => handleAcceptSuggestion(pendingSuggestion.messageId)}
-                                                    className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
+                                                    className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-all shadow-sm hover:shadow-md flex items-center gap-2 text-sm font-medium"
                                                 >
                                                     <Check size={16} />
                                                     Accept
@@ -2860,7 +2860,7 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                     <button
                         onClick={handleSubmit}
                         disabled={isSaving}
-                        className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                        className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 flex items-center gap-2"
                     >
                         {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                         Save Changes

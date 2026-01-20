@@ -4023,18 +4023,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     </header>
 
                     {/* Content Area */}
-                    <div className="flex-1 overflow-y-auto p-8">
+                    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                         {/* Toolbar */}
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-4">
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                                     <input
                                         type="text"
                                         placeholder="Search workflows..."
                                         value={workflowSearchQuery}
                                         onChange={(e) => setWorkflowSearchQuery(e.target.value)}
-                                        className="pl-10 pr-4 py-2 bg-white text-slate-800 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] w-80 placeholder:text-slate-400"
+                                        className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 w-60 placeholder:text-slate-400"
                                     />
                                 </div>
                                 <p className="text-sm text-slate-500">
@@ -4044,23 +4044,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => setShowTemplatesModal(true)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors shadow-sm font-medium"
+                                    className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                                 >
-                                    <BookOpen size={18} />
+                                    <BookOpen size={14} className="mr-2" />
                                     Open Templates
                                 </button>
                                 <button
                                     onClick={createNewWorkflow}
-                                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors shadow-sm font-medium"
+                                    className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                 >
-                                    <Workflow size={18} />
+                                    <Workflow size={14} className="mr-2" />
                                     Create Workflow
                                 </button>
                             </div>
                         </div>
 
                     {/* Workflows Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
                         {filteredWorkflows.map((workflow) => (
                             <div
                                 key={workflow.id}
@@ -4306,7 +4306,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             }
                                                             setExpandedFolders(newExpanded);
                                                         }}
-                                                        className="w-full flex items-center justify-between px-4 py-2 hover:bg-slate-50 transition-colors text-left"
+                                                        className="w-full flex items-center justify-between px-4 py-2 bg-[#F4F5F5] hover:bg-[#E8EAEA] transition-colors text-left"
                                                     >
                                                         <div className="flex items-center gap-2.5">
                                                             <folder.icon size={14} className="text-slate-600 flex-shrink-0" />
@@ -8567,16 +8567,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             {/* Exit Confirmation Modal */}
             {showExitConfirmation && (
-                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-[70] p-4" onClick={() => setShowExitConfirmation(false)}>
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[70] p-4" onClick={() => setShowExitConfirmation(false)}>
                     <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-[#256A65]/5 to-transparent">
+                        <div className="px-6 py-5 border-b border-slate-200">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
-                                    <AlertCircle size={20} className="text-amber-600" />
+                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                    <AlertCircle size={20} className="text-slate-600" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="text-base font-normal text-slate-900">Unsaved Changes</h3>
+                                    <h3 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Unsaved Changes</h3>
                                     <p className="text-xs text-slate-500 mt-0.5">Do you want to save your workflow before leaving?</p>
                                 </div>
                             </div>
@@ -8586,20 +8586,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         <div className="px-6 py-4 flex gap-2 justify-end">
                             <button
                                 onClick={() => setShowExitConfirmation(false)}
-                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700 transition-colors"
+                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={confirmExitWithoutSaving}
-                                className="px-4 py-2 border border-red-200 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm font-medium transition-colors"
+                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                             >
                                 Don't Save
                             </button>
                             <button
                                 onClick={confirmExitWithSaving}
                                 disabled={isSaving}
-                                className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2 transition-colors"
+                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
                             >
                                 {isSaving ? (
                                     <>
@@ -8608,7 +8608,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </>
                                 ) : (
                                     <>
-                                        <Save size={16} />
+                                        <Save size={14} />
                                         Save & Exit
                                     </>
                                 )}

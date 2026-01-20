@@ -66,7 +66,7 @@ export const EntityCard: React.FC<EntityCardProps> = ({ entity, onClick, onDelet
       <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-100">
         <div className="flex items-center gap-1.5 text-xs text-slate-400">
           <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-          <span className="opacity-0 group-hover:opacity-100 transition-opacity font-medium text-purple-600">Manage entity</span>
+          <span className="opacity-0 group-hover:opacity-100 transition-opacity font-medium text-slate-900">Manage entity</span>
         </div>
       </div>
     </div>

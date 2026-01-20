@@ -125,7 +125,7 @@ export const ReportBugModal: React.FC<ReportBugModalProps> = ({ isOpen, onClose 
                         <button
                             type="submit"
                             disabled={isSubmitting || !description.trim()}
-                            className="px-3 py-2 bg-[rgb(91,121,128)] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium transition-colors flex items-center gap-2"
+                            className="px-3 py-2 btn-3d btn-primary-3d disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium transition-colors flex items-center gap-2"
                         >
                             {isSubmitting ? (
                                 <>

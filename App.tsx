@@ -965,28 +965,28 @@ function AuthenticatedApp() {
                         </header>
 
                         {/* Content Area */}
-                        <div data-tutorial="database-main" className="flex-1 overflow-y-auto p-8 custom-scrollbar relative">
+                        <div data-tutorial="database-main" className="flex-1 overflow-y-auto p-8 custom-scrollbar">
 
                             {/* LIST VIEW */}
                             {!activeEntityId && (
-                                <div className="space-y-6">
+                                <div>
                                     {/* Toolbar */}
-                                    <div className="flex justify-between items-center">
+                                    <div className="flex justify-between items-center mb-6">
                                                 <div className="text-sm text-slate-500">
                                                     {entitySearchQuery 
                                                         ? `Showing ${entities.filter(e => e.name.toLowerCase().includes(entitySearchQuery.toLowerCase()) || e.description?.toLowerCase().includes(entitySearchQuery.toLowerCase())).length} of ${entities.length} entities`
                                                         : `Total: ${entities.length} entities`
                                                     }
                                                 </div>
-                                                <div className="flex space-x-3">
+                                                <div className="flex items-center gap-3">
                                                     <div className="relative">
-                                                        <Search className="absolute left-3 top-2 text-slate-400" size={14} />
+                                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                                                         <input
                                                             type="text"
                                                             placeholder="Search entities..."
                                                             value={entitySearchQuery}
                                                             onChange={(e) => setEntitySearchQuery(e.target.value)}
-                                                            className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 w-60"
+                                                            className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 w-60 placeholder:text-slate-400"
                                                         />
                                                     </div>
                                                     <button className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
@@ -995,7 +995,7 @@ function AuthenticatedApp() {
                                                     </button>
                                                     <button
                                                         onClick={() => setIsCreatingEntity(true)}
-                                                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-colors"
+                                                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                                     >
                                                         <Plus size={14} className="mr-2" />
                                                         Create Entity

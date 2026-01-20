@@ -227,7 +227,7 @@ export const Connections: React.FC = () => {
             </header>
 
             {/* Main Content */}
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-7xl mx-auto space-y-6">
                     {/* Filters */}
                     <div className="bg-white border border-slate-200 rounded-lg p-4">
@@ -271,7 +271,7 @@ export const Connections: React.FC = () => {
                             <p className="text-sm text-slate-500">No connections found matching your filters.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {filteredConnections.map((connection) => {
                             const Icon = connection.icon || Database;
                             const hasLogoError = logoErrors.has(connection.id);
@@ -793,7 +793,7 @@ export const Connections: React.FC = () => {
                                 <button
                                     type="submit"
                                     disabled={isConnecting}
-                                    className="px-3 py-2 bg-[#256A65] text-white rounded-lg text-sm font-medium hover:bg-[#1e554f] transition-colors disabled:opacity-50 flex items-center gap-2"
+                                    className="btn-3d btn-primary-3d text-sm text-white rounded-lg text-sm font-medium hover:bg-[#1e554f] transition-colors disabled:opacity-50 flex items-center gap-2"
                                 >
                                     {isConnecting && <Loader2 size={16} className="animate-spin" />}
                                     Connect
