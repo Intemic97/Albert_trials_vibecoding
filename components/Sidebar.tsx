@@ -218,8 +218,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
                 setShowResults(false);
               }
             }}
-            placeholder="Search (⌘K)"
-            className="w-full pl-9 pr-3 py-2.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 text-slate-700 placeholder:text-slate-400 transition-all"
+            placeholder="Search"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 text-slate-700 placeholder:text-slate-400 transition-all"
           />
           {showResults && (
             <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-lg shadow-xl text-sm z-20 overflow-hidden">

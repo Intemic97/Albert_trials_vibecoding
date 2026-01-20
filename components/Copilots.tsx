@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Info, Bot, User, Plus, Trash2, MessageSquare, ArrowLeft, Menu, X, Sparkles, Database, Check, XCircle, ChevronsLeft } from 'lucide-react';
+import { Send, Loader2, Info, Bot, User, Plus, Trash2, MessageSquare, ArrowLeft, Menu, X, Sparkles, Database, Check, XCircle, ChevronsLeft, Search, Settings } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { API_BASE } from '../config';
 import { Entity } from '../types';
@@ -79,6 +79,10 @@ export const Copilots: React.FC = () => {
     const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
     const [availableEntities, setAvailableEntities] = useState<Entity[]>([]);
     const [isLoadingEntities, setIsLoadingEntities] = useState(false);
+    const [chatSearchQuery, setChatSearchQuery] = useState('');
+    const [editingChatId, setEditingChatId] = useState<string | null>(null);
+    const [editingInstructions, setEditingInstructions] = useState('');
+    const [editingEntities, setEditingEntities] = useState<string[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const titleInputRef = useRef<HTMLInputElement>(null);
@@ -376,6 +380,7 @@ export const Copilots: React.FC = () => {
             };
             
             setChats(prev => prev.map(c => c.id === activeChat ? finalChat : c));
+            saveChat(finalChat);
         } finally {
             setIsLoading(false);
         }
@@ -404,8 +409,8 @@ export const Copilots: React.FC = () => {
 
     const chatQuery = new URLSearchParams(location.search).get('q')?.toLowerCase() || '';
     const chatIdParam = new URLSearchParams(location.search).get('chatId');
-    const filteredChats = chatQuery
-        ? chats.filter(chat => chat.title.toLowerCase().includes(chatQuery))
+    const filteredChats = (chatQuery || chatSearchQuery)
+        ? chats.filter(chat => chat.title.toLowerCase().includes((chatQuery || chatSearchQuery).toLowerCase()))
         : chats;
 
     useEffect(() => {
@@ -425,6 +430,41 @@ export const Copilots: React.FC = () => {
         setChats(prev => prev.map(c => c.id === currentChat.id ? updatedChat : c));
         setIsEditingTitle(false);
         await saveChat(updatedChat);
+    };
+
+    const openEditModal = (chatId: string) => {
+        const chat = chats.find(c => c.id === chatId);
+        if (!chat) return;
+        setEditingChatId(chatId);
+        setEditingInstructions(chat.instructions || '');
+        setEditingEntities(chat.allowedEntities || []);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingChatId) return;
+        const chat = chats.find(c => c.id === editingChatId);
+        if (!chat) return;
+
+        const updatedChat = {
+            ...chat,
+            instructions: editingInstructions.trim() || undefined,
+            allowedEntities: editingEntities,
+            updatedAt: new Date()
+        };
+
+        setChats(prev => prev.map(c => c.id === editingChatId ? updatedChat : c));
+        setEditingChatId(null);
+        setEditingInstructions('');
+        setEditingEntities([]);
+        await saveChat(updatedChat);
+    };
+
+    const toggleEditingEntity = (entityId: string) => {
+        setEditingEntities(prev => 
+            prev.includes(entityId) 
+                ? prev.filter(id => id !== entityId)
+                : [...prev, entityId]
+        );
     };
 
     return (
@@ -494,6 +534,17 @@ export const Copilots: React.FC = () => {
                                 <ChevronsLeft size={14} className="text-slate-400" />
                             </button>
                         </div>
+                        {/* Search Bar */}
+                        <div className="relative mb-3">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                            <input
+                                type="text"
+                                value={chatSearchQuery}
+                                onChange={(e) => setChatSearchQuery(e.target.value)}
+                                placeholder="Search chats..."
+                                className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                            />
+                        </div>
                         <button
                             onClick={handleCreateCopilot}
                             className="w-full flex items-center justify-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
@@ -528,15 +579,27 @@ export const Copilots: React.FC = () => {
                                         {chat.messages.length} {chat.messages.length === 1 ? 'message' : 'messages'}
                                     </p>
                                 </div>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        deleteChat(chat.id);
-                                    }}
-                                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-50 rounded transition-all"
-                                >
-                                    <Trash2 size={14} className="text-red-500" />
-                                </button>
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            openEditModal(chat.id);
+                                        }}
+                                        className="p-1.5 hover:bg-slate-100 rounded transition-all"
+                                        title="Edit configuration"
+                                    >
+                                        <Settings size={14} className="text-slate-600" />
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteChat(chat.id);
+                                        }}
+                                        className="p-1.5 hover:bg-red-50 rounded transition-all"
+                                    >
+                                        <Trash2 size={14} className="text-red-500" />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -940,6 +1003,161 @@ export const Copilots: React.FC = () => {
                             >
                                 <Sparkles size={14} className="mr-2" />
                                 Create Copilot
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Chat Configuration Modal */}
+            {editingChatId && (
+                <div 
+                    className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" 
+                    onClick={() => {
+                        setEditingChatId(null);
+                        setEditingInstructions('');
+                        setEditingEntities([]);
+                    }}
+                >
+                    <div 
+                        className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-[#256A65]/5 to-transparent">
+                            <div className="flex items-center gap-3 mb-1">
+                                <div className="w-10 h-10 rounded-lg bg-[#256A65] flex items-center justify-center">
+                                    <Settings size={20} className="text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Edit Copilot Configuration</h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">Update instructions, datasets, and settings</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                            {/* Instructions */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Instructions
+                                </label>
+                                <textarea
+                                    value={editingInstructions}
+                                    onChange={(e) => setEditingInstructions(e.target.value)}
+                                    placeholder="Define how your copilot should behave. For example: 'You are a sales assistant focused on customer data. Always provide concise answers and cite specific records when possible. Focus on revenue and customer metrics.'"
+                                    rows={5}
+                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-slate-400 resize-none"
+                                />
+                                <p className="text-xs text-slate-500 mt-2">
+                                    Describe the copilot's role, tone, and focus areas. Mention which datasets it should prioritize.
+                                </p>
+                            </div>
+
+                            {/* Entity Selection */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Available Datasets
+                                </label>
+                                <p className="text-xs text-slate-500 mb-3">
+                                    Select which entities this copilot can access. Leave empty to allow access to all entities.
+                                </p>
+                                
+                                {isLoadingEntities ? (
+                                    <div className="flex items-center justify-center py-8">
+                                        <Loader2 size={20} className="animate-spin text-slate-400" />
+                                    </div>
+                                ) : availableEntities.length === 0 ? (
+                                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-500 text-center">
+                                        No entities available. Create entities in Knowledge Base first.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2 max-h-64 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-slate-50/50">
+                                        {availableEntities.map((entity) => (
+                                            <button
+                                                key={entity.id}
+                                                onClick={() => toggleEditingEntity(entity.id)}
+                                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all text-left ${
+                                                    editingEntities.includes(entity.id)
+                                                        ? 'bg-[#256A65]/10 border-[#256A65] text-slate-900'
+                                                        : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
+                                                }`}
+                                            >
+                                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                                                    editingEntities.includes(entity.id)
+                                                        ? 'bg-[#256A65] border-[#256A65]'
+                                                        : 'border-slate-300'
+                                                }`}>
+                                                    {editingEntities.includes(entity.id) && (
+                                                        <Check size={12} className="text-white" />
+                                                    )}
+                                                </div>
+                                                <Database size={16} className={`flex-shrink-0 ${
+                                                    editingEntities.includes(entity.id) ? 'text-[#256A65]' : 'text-slate-400'
+                                                }`} />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`text-sm font-medium truncate ${
+                                                        editingEntities.includes(entity.id) ? 'text-slate-900' : 'text-slate-700'
+                                                    }`}>
+                                                        {entity.name}
+                                                    </p>
+                                                    {entity.description && (
+                                                        <p className="text-xs text-slate-500 truncate mt-0.5">
+                                                            {entity.description}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <span className="text-xs text-slate-400 flex-shrink-0">
+                                                    {entity.properties?.length || 0} fields
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                
+                                {editingEntities.length > 0 && (
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {editingEntities.map(entityId => {
+                                            const entity = availableEntities.find(e => e.id === entityId);
+                                            return entity ? (
+                                                <span
+                                                    key={entityId}
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#256A65]/10 text-[#256A65] rounded-lg text-xs font-medium"
+                                                >
+                                                    {entity.name}
+                                                    <button
+                                                        onClick={() => toggleEditingEntity(entityId)}
+                                                        className="hover:bg-[#256A65]/20 rounded-full p-0.5"
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                </span>
+                                            ) : null;
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/50 flex items-center justify-end gap-3">
+                            <button
+                                onClick={() => {
+                                    setEditingChatId(null);
+                                    setEditingInstructions('');
+                                    setEditingEntities([]);
+                                }}
+                                className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-white transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSaveEdit}
+                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                            >
+                                <Check size={14} className="mr-2" />
+                                Save Changes
                             </button>
                         </div>
                     </div>
