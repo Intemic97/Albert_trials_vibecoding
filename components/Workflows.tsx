@@ -2,9 +2,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut, Bot, Smartphone, BarChart3, User, Calendar, ChevronRight, ChevronDown, ChevronUp, Plus, Folder, Shield, Terminal } from 'lucide-react';
+import { NodeConfigSidePanel } from './NodeConfigSidePanel';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
+import { AIPromptSection } from './AIPromptSection';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useCollaborativeCursors } from '../hooks/useCollaborativeCursors';
@@ -1052,17 +1054,26 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 scrollAreaComputedHeight: scrollArea ? window.getComputedStyle(scrollArea).height : 'none',
             };
             
-            fetch('http://127.0.0.1:7243/ingest/fd608484-a148-4cb0-9431-b6404421dcde',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Workflows.tsx:1020',message:'Height measurements',data:measurements,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D,E'})}).catch(()=>{});
+            // Debug logging disabled to prevent performance issues
+            // fetch('http://127.0.0.1:7243/ingest/fd608484-a148-4cb0-9431-b6404421dcde',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Workflows.tsx:1020',message:'Height measurements',data:measurements,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D,E'})}).catch(()=>{});
             // #endregion
         };
         
         // Measure after a short delay to allow DOM to settle
+        // Throttle resize events to prevent excessive calls
+        let resizeTimeout: NodeJS.Timeout;
+        const handleResize = () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(measureHeights, 200);
+        };
+        
         const timeoutId = setTimeout(measureHeights, 100);
-        window.addEventListener('resize', measureHeights);
+        window.addEventListener('resize', handleResize);
         
         return () => {
             clearTimeout(timeoutId);
-            window.removeEventListener('resize', measureHeights);
+            clearTimeout(resizeTimeout);
+            window.removeEventListener('resize', handleResize);
         };
     }, [currentView, isSidebarCollapsed]);
     
@@ -3891,6 +3902,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
     const [dragConnectionStart, setDragConnectionStart] = useState<{ nodeId: string, outputType?: 'true' | 'false' | 'A' | 'B', x: number, y: number } | null>(null);
     const [dragConnectionCurrent, setDragConnectionCurrent] = useState<{ x: number, y: number } | null>(null);
+    const [hoveredConnection, setHoveredConnection] = useState<string | null>(null);
 
     const handleConnectorMouseDown = (e: React.MouseEvent, nodeId: string, outputType?: 'true' | 'false' | 'A' | 'B') => {
         e.stopPropagation();
@@ -4144,8 +4156,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 /* Canvas View */
                 <div data-tutorial="workflow-editor" className="flex flex-col min-h-0 overflow-hidden" style={{ height: '100%', maxHeight: '100%' }}>
                     {/* Top Bar */}
-                    <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-sm z-20 shrink-0">
-                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="bg-white border-b border-slate-200 px-6 py-2 flex items-center justify-between shadow-sm z-20 shrink-0">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
                             <button
                                 onClick={backToList}
                                 className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg transition-colors text-sm font-medium text-slate-600 flex-shrink-0"
@@ -4162,7 +4174,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 placeholder="Workflow Name"
                             />
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-3 flex-shrink-0">
                             <button
                                 onClick={saveWorkflow}
                                 disabled={isSaving}
@@ -4182,7 +4194,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <button
                                 onClick={runWorkflow}
                                 disabled={isRunning || nodes.length === 0}
-                                className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50"
+                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
                             >
                                 <Play size={16} />
                                 {isRunning ? 'Running...' : 'Run'}
@@ -4190,7 +4202,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <button
                                 onClick={openWorkflowRunner}
                                 disabled={nodes.length === 0}
-                                className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50"
+                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed gap-2"
                             >
                                 <Share2 size={16} />
                                 Export
@@ -4203,7 +4215,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     {/* Content Area (Sidebar + Canvas) */}
                     <div ref={contentAreaRef} className="flex flex-1 min-h-0 overflow-hidden" style={{ height: '100%', maxHeight: '100%' }}>
                     {/* Sidebar */}
-                    <div ref={sidebarRef} data-tutorial="node-palette" className={`${isSidebarCollapsed ? 'w-14' : 'w-72'} bg-slate-50 border-r border-slate-200 flex flex-col shadow-sm z-10 transition-all duration-300 overflow-hidden`} style={{ height: '100%', maxHeight: '100%' }}>
+                    <div ref={sidebarRef} data-tutorial="node-palette" className={`${isSidebarCollapsed ? 'w-14' : 'w-64'} bg-slate-50 border-r border-slate-200 flex flex-col shadow-sm z-10 transition-all duration-300 overflow-hidden`} style={{ height: '100%', maxHeight: '100%' }}>
 
                         {!isSidebarCollapsed ? (
                             <>
@@ -4551,7 +4563,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <svg
                                     className="absolute pointer-events-none"
                                     style={{
-                                        zIndex: 1,
+                                        zIndex: 0,
                                         overflow: 'visible',
                                         left: 0,
                                         top: 0,
@@ -4606,12 +4618,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         const c2x = x2 - Math.abs(x2 - x1) / 2;
                                         const c2y = y2;
 
-                                        // Color based on outputType: green for true, red for false, blue for A, purple for B, branding color for default
-                                        const strokeColor = conn.outputType === 'true' ? '#10b981'
-                                            : conn.outputType === 'false' ? '#ef4444'
-                                            : conn.outputType === 'A' ? '#3b82f6'
-                                            : conn.outputType === 'B' ? '#a855f7'
-                                                : '#256A65';
+                                        // Color based on running state
+                                        // When running, use #CFE8ED for all connections
+                                        // When not running, use light gray
+                                        const strokeColor = isRunning 
+                                            ? '#CFE8ED'
+                                            : '#cbd5e1'; // Light gray when not running
                                         
                                         // Use different arrowhead colors
                                         const arrowId = conn.outputType === 'true' ? 'arrow-green'
@@ -4623,23 +4635,68 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         const pathId = `connection-path-${conn.id}`;
                                         
                                         return (
-                                            <g key={conn.id}>
-                                                {/* Shadow/glow effect */}
-                                                <path
-                                                    d={`M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`}
-                                                    stroke={strokeColor}
-                                                    strokeWidth="4"
-                                                    fill="none"
-                                                    opacity="0.2"
-                                                />
+                                            <g 
+                                                key={conn.id}
+                                                className="connection-group"
+                                                style={{ pointerEvents: 'none' }}
+                                            >
+                                                {/* Invisible wider path for hover detection - only on the line itself */}
+                                                {!isRunning && (
+                                                    <path
+                                                        d={`M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`}
+                                                        stroke="transparent"
+                                                        strokeWidth="8"
+                                                        fill="none"
+                                                        className="cursor-pointer"
+                                                        style={{ 
+                                                            pointerEvents: 'stroke'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            // Only show delete if not hovering over a connector
+                                                            const target = e.target as SVGElement;
+                                                            const relatedTarget = (e.nativeEvent as MouseEvent).relatedTarget as HTMLElement;
+                                                            if (!relatedTarget?.closest('.group\\/connector')) {
+                                                                setHoveredConnection(conn.id);
+                                                            }
+                                                        }}
+                                                        onMouseLeave={() => setHoveredConnection(null)}
+                                                        onClick={(e) => {
+                                                            // Don't delete if clicking on a connector
+                                                            const target = e.target as HTMLElement;
+                                                            if (target.closest('.group\\/connector')) {
+                                                                return;
+                                                            }
+                                                            e.stopPropagation();
+                                                            setConnections(prev => prev.filter(c => c.id !== conn.id));
+                                                            if (sendConnectionDelete) {
+                                                                sendConnectionDelete(conn.id);
+                                                            }
+                                                        }}
+                                                    />
+                                                )}
+                                                {/* Shadow/glow effect - only when running */}
+                                                {isRunning && (
+                                                    <path
+                                                        d={`M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`}
+                                                        stroke={strokeColor}
+                                                        strokeWidth="4"
+                                                        fill="none"
+                                                        opacity="0.2"
+                                                    />
+                                                )}
                                                 {/* Main line */}
                                                 <path
                                                     id={pathId}
                                                     d={`M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`}
                                                     stroke={strokeColor}
-                                                    strokeWidth="3"
+                                                    strokeWidth={isRunning ? "3" : "2"}
                                                     fill="none"
-                                                    style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }}
+                                                    strokeDasharray={isRunning ? "none" : "5,5"}
+                                                    style={{ 
+                                                        filter: isRunning ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' : 'none',
+                                                        transition: 'all 0.2s ease',
+                                                        pointerEvents: 'none'
+                                                    }}
                                                 />
                                                 {/* End point circle (replaces arrow) - same size as connector circles (w-4 h-4 = 16px, so r=8) */}
                                                 <circle
@@ -4649,7 +4706,44 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     fill={strokeColor}
                                                     stroke="white"
                                                     strokeWidth="2"
+                                                    style={{ pointerEvents: 'none' }}
                                                 />
+                                                {/* Delete button on hover */}
+                                                {!isRunning && hoveredConnection === conn.id && (
+                                                    <g style={{ pointerEvents: 'auto' }}>
+                                                        {/* Delete button circle */}
+                                                        <circle
+                                                            cx={(x1 + x2) / 2}
+                                                            cy={(y1 + y2) / 2}
+                                                            r="12"
+                                                            fill="#ef4444"
+                                                            stroke="white"
+                                                            strokeWidth="2"
+                                                            className="cursor-pointer"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setConnections(prev => prev.filter(c => c.id !== conn.id));
+                                                                if (sendConnectionDelete) {
+                                                                    sendConnectionDelete(conn.id);
+                                                                }
+                                                            }}
+                                                        />
+                                                        {/* X icon */}
+                                                        <text
+                                                            x={(x1 + x2) / 2}
+                                                            y={(y1 + y2) / 2}
+                                                            textAnchor="middle"
+                                                            dominantBaseline="middle"
+                                                            fill="white"
+                                                            fontSize="14"
+                                                            fontWeight="bold"
+                                                            className="pointer-events-none"
+                                                            style={{ userSelect: 'none' }}
+                                                        >
+                                                            ×
+                                                        </text>
+                                                    </g>
+                                                )}
                                                 {/* Animated ball when running */}
                                                 {isRunning && (
                                                     <circle
@@ -4657,7 +4751,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         fill={strokeColor}
                                                         stroke="white"
                                                         strokeWidth="2"
-                                                        style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}
+                                                        style={{ 
+                                                            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))',
+                                                            pointerEvents: 'none'
+                                                        }}
                                                     >
                                                         <animateMotion
                                                             dur="1.5s"
@@ -4738,6 +4835,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             transform: 'translate(-50%, -50%)', // Center on drop point
                                             width: '192px', // Enforce fixed width (w-48)
                                             cursor: (node.data || ['fetchData', 'condition', 'addField', 'saveRecords', 'llm'].includes(node.type)) ? 'grab' : 'default',
+                                            zIndex: 10,
                                             // Fixed height for nodes with dual connectors to ensure consistent positioning
                                             ...(node.type === 'condition' || node.type === 'join' || node.type === 'splitColumns' ? { minHeight: '112px' } : {})
                                         }}
@@ -4990,26 +5088,38 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     // Condition nodes have TWO output connectors: TRUE and FALSE
                                                     <>
                                                         {/* TRUE output - top right (green) - fixed position */}
-                                                        <div className="absolute -right-2 group/connector" style={{ top: '28px', transform: 'translateY(-50%)' }}>
+                                                        <div className="absolute -right-2 group/connector z-30 pointer-events-auto" style={{ top: '28px', transform: 'translateY(-50%)' }}>
                                                             {/* Larger hit area */}
-                                                            <div className="absolute inset-0 -m-2 cursor-crosshair" 
-                                                                onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'true')}
-                                                                onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                            <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
+                                                                onMouseDown={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleConnectorMouseDown(e, node.id, 'true');
+                                                                }}
+                                                                onMouseUp={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleConnectorMouseUp(e, node.id);
+                                                                }}
                                                             />
                                                             {/* Visible connector point */}
-                                                            <div className={`w-4 h-4 bg-green-50 border-2 rounded-full transition-all shadow-sm ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'true' ? 'border-green-500 scale-125 bg-green-100 shadow-md' : 'border-green-400 group-hover/connector:border-green-500 group-hover/connector:bg-green-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="TRUE path" />
+                                                            <div className={`w-4 h-4 bg-green-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'true' ? 'border-green-500 scale-125 bg-green-100 shadow-md' : 'border-green-400 group-hover/connector:border-green-500 group-hover/connector:bg-green-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="TRUE path" />
                                                         </div>
                                                         <span className="absolute -right-6 text-[9px] font-normal text-[#256A65]" style={{ top: '28px', transform: 'translateY(-50%)' }}>✓</span>
 
                                                         {/* FALSE output - bottom right (red) - fixed position */}
-                                                        <div className="absolute -right-2 group/connector" style={{ bottom: '28px', transform: 'translateY(50%)' }}>
+                                                        <div className="absolute -right-2 group/connector z-30 pointer-events-auto" style={{ bottom: '28px', transform: 'translateY(50%)' }}>
                                                             {/* Larger hit area */}
-                                                            <div className="absolute inset-0 -m-2 cursor-crosshair" 
-                                                                onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'false')}
-                                                                onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                            <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
+                                                                onMouseDown={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleConnectorMouseDown(e, node.id, 'false');
+                                                                }}
+                                                                onMouseUp={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleConnectorMouseUp(e, node.id);
+                                                                }}
                                                             />
                                                             {/* Visible connector point */}
-                                                            <div className={`w-4 h-4 bg-red-50 border-2 rounded-full transition-all shadow-sm ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'false' ? 'border-red-500 scale-125 bg-red-100 shadow-md' : 'border-red-400 group-hover/connector:border-red-500 group-hover/connector:bg-red-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="FALSE path" />
+                                                            <div className={`w-4 h-4 bg-red-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'false' ? 'border-red-500 scale-125 bg-red-100 shadow-md' : 'border-red-400 group-hover/connector:border-red-500 group-hover/connector:bg-red-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="FALSE path" />
                                                         </div>
                                                         <span className="absolute -right-6 text-[9px] font-normal text-red-600" style={{ bottom: '28px', transform: 'translateY(50%)' }}>✗</span>
                                                     </>
@@ -5017,33 +5127,45 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     // Split Columns nodes have TWO output connectors: A and B
                                                     <>
                                                         {/* Output A - top right (blue) - fixed position */}
-                                                        <div className="absolute -right-2 group/connector" style={{ top: '28px', transform: 'translateY(-50%)' }}>
+                                                        <div className="absolute -right-2 group/connector z-30 pointer-events-auto" style={{ top: '28px', transform: 'translateY(-50%)' }}>
                                                             {/* Larger hit area */}
-                                                            <div className="absolute inset-0 -m-2 cursor-crosshair" 
-                                                                onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'A')}
-                                                                onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                            <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
+                                                                onMouseDown={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleConnectorMouseDown(e, node.id, 'A');
+                                                                }}
+                                                                onMouseUp={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleConnectorMouseUp(e, node.id);
+                                                                }}
                                                             />
                                                             {/* Visible connector point */}
-                                                            <div className={`w-4 h-4 bg-blue-50 border-2 rounded-full transition-all shadow-sm ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'A' ? 'border-blue-500 scale-125 bg-blue-100 shadow-md' : 'border-blue-400 group-hover/connector:border-blue-500 group-hover/connector:bg-blue-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="Output A" />
+                                                            <div className={`w-4 h-4 bg-blue-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'A' ? 'border-blue-500 scale-125 bg-blue-100 shadow-md' : 'border-blue-400 group-hover/connector:border-blue-500 group-hover/connector:bg-blue-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="Output A" />
                                                         </div>
                                                         <span className="absolute -right-6 text-[9px] font-normal text-blue-600" style={{ top: '28px', transform: 'translateY(-50%)' }}>A</span>
 
                                                         {/* Output B - bottom right (purple) - fixed position */}
-                                                        <div className="absolute -right-2 group/connector" style={{ bottom: '28px', transform: 'translateY(50%)' }}>
+                                                        <div className="absolute -right-2 group/connector z-30 pointer-events-auto" style={{ bottom: '28px', transform: 'translateY(50%)' }}>
                                                             {/* Larger hit area */}
-                                                            <div className="absolute inset-0 -m-2 cursor-crosshair" 
-                                                                onMouseDown={(e) => handleConnectorMouseDown(e, node.id, 'B')}
-                                                                onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                            <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
+                                                                onMouseDown={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleConnectorMouseDown(e, node.id, 'B');
+                                                                }}
+                                                                onMouseUp={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleConnectorMouseUp(e, node.id);
+                                                                }}
                                                             />
                                                             {/* Visible connector point */}
-                                                            <div className={`w-4 h-4 bg-purple-50 border-2 rounded-full transition-all shadow-sm ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'B' ? 'border-purple-500 scale-125 bg-purple-100 shadow-md' : 'border-purple-400 group-hover/connector:border-purple-500 group-hover/connector:bg-purple-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="Output B" />
+                                                            <div className={`w-4 h-4 bg-purple-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'B' ? 'border-purple-500 scale-125 bg-purple-100 shadow-md' : 'border-purple-400 group-hover/connector:border-purple-500 group-hover/connector:bg-purple-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="Output B" />
                                                         </div>
                                                         <span className="absolute -right-6 text-[9px] font-normal text-purple-600" style={{ bottom: '28px', transform: 'translateY(50%)' }}>B</span>
                                                     </>
                                                 ) : (
                                                     // Regular nodes have ONE output connector
                                                     <div 
-                                                        className="absolute -right-2 top-1/2 -translate-y-1/2 group/connector cursor-crosshair z-10"
+                                                        className="absolute -right-2 top-1/2 -translate-y-1/2 group/connector cursor-crosshair z-30 pointer-events-auto"
                                                         onMouseDown={(e) => {
                                                             e.stopPropagation();
                                                             handleConnectorMouseDown(e, node.id);
@@ -5054,7 +5176,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         }}
                                                     >
                                                         {/* Visible connector point */}
-                                                        <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm ${dragConnectionStart?.nodeId === node.id ? 'border-[#256A65] scale-125 bg-[#256A65]/10 shadow-md' : 'border-slate-400 group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} />
+                                                        <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id ? 'border-[#256A65] scale-125 bg-[#256A65]/10 shadow-md' : 'border-slate-400 group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} />
                                                     </div>
                                                 )}
                                                 
@@ -5064,33 +5186,42 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         // Join nodes have TWO input connectors: A and B - fixed positions
                                                         <>
                                                             {/* Input A - top left */}
-                                                            <div className="absolute -left-2 group/connector" style={{ top: '28px', transform: 'translateY(-50%)' }}>
+                                                            <div className="absolute -left-2 group/connector z-30 pointer-events-auto" style={{ top: '28px', transform: 'translateY(-50%)' }}>
                                                                 {/* Larger hit area */}
-                                                                <div className="absolute inset-0 -m-2 cursor-crosshair" 
-                                                                    onMouseUp={(e) => handleConnectorMouseUp(e, node.id, 'A')}
+                                                                <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
+                                                                    onMouseUp={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleConnectorMouseUp(e, node.id, 'A');
+                                                                    }}
                                                                 />
                                                                 {/* Visible connector point */}
-                                                                <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm border-slate-400 group-hover/connector:border-cyan-500 group-hover/connector:bg-cyan-50 group-hover/connector:scale-110 group-hover/connector:shadow-md`} title="Input A" />
+                                                                <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none border-slate-400 group-hover/connector:border-cyan-500 group-hover/connector:bg-cyan-50 group-hover/connector:scale-110 group-hover/connector:shadow-md`} title="Input A" />
                                                             </div>
                                                             {/* Input B - bottom left */}
-                                                            <div className="absolute -left-2 group/connector" style={{ bottom: '28px', transform: 'translateY(50%)' }}>
+                                                            <div className="absolute -left-2 group/connector z-30 pointer-events-auto" style={{ bottom: '28px', transform: 'translateY(50%)' }}>
                                                                 {/* Larger hit area */}
-                                                                <div className="absolute inset-0 -m-2 cursor-crosshair" 
-                                                                    onMouseUp={(e) => handleConnectorMouseUp(e, node.id, 'B')}
+                                                                <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
+                                                                    onMouseUp={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleConnectorMouseUp(e, node.id, 'B');
+                                                                    }}
                                                                 />
                                                                 {/* Visible connector point */}
-                                                                <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm border-slate-400 group-hover/connector:border-cyan-500 group-hover/connector:bg-cyan-50 group-hover/connector:scale-110 group-hover/connector:shadow-md`} title="Input B" />
+                                                                <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none border-slate-400 group-hover/connector:border-cyan-500 group-hover/connector:bg-cyan-50 group-hover/connector:scale-110 group-hover/connector:shadow-md`} title="Input B" />
                                                             </div>
                                                         </>
                                                     ) : (
                                                         // Regular nodes have ONE input connector
-                                                        <div className="absolute -left-2 top-1/2 -translate-y-1/2 group/connector">
+                                                        <div className="absolute -left-2 top-1/2 -translate-y-1/2 group/connector z-30 pointer-events-auto">
                                                             {/* Larger hit area */}
-                                                            <div className="absolute inset-0 -m-2 cursor-crosshair" 
-                                                                onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+                                                            <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
+                                                                onMouseUp={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleConnectorMouseUp(e, node.id);
+                                                                }}
                                                             />
                                                             {/* Visible connector point */}
-                                                            <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm border-slate-400 group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md`} />
+                                                            <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none border-slate-400 group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md`} />
                                                         </div>
                                                     )
                                                 )}
@@ -5107,7 +5238,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             setShowComponentSearch(true);
                                                             setComponentSearchQuery('');
                                                         }}
-                                                        className="absolute -right-14 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border-2 border-slate-300 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:border-[#256A65] hover:bg-[#256A65]/10 hover:scale-110 shadow-sm z-20"
+                                                        className="absolute -right-14 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border-2 border-slate-300 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:border-[#256A65] hover:bg-[#256A65]/10 hover:scale-110 shadow-sm z-25 pointer-events-auto"
                                                         title="Quick connect component"
                                                     >
                                                         <Plus size={14} className="text-slate-600 group-hover:text-[#256A65]" />
@@ -5365,291 +5496,239 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                         {/* Configuration Modal */}
                         {configuringNodeId && (
-                            <>
-                                {/* Backdrop */}
-                                <div className="fixed inset-0 bg-black/20 z-50" onClick={() => setConfiguringNodeId(null)} />
-                                {/* Side Panel */}
-                                <div className="fixed top-16 right-0 h-[calc(100vh-4rem)] w-[400px] bg-white shadow-[0_0_20px_rgba(0,0,0,0.1)] z-50 flex flex-col">
-                                    {/* Header */}
-                                    <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 rounded-lg bg-slate-50">
-                                                <Database size={18} className="text-slate-600" />
-                                            </div>
-                                            <h3 className="text-sm font-normal text-slate-900">Configure Fetch Data</h3>
-                                        </div>
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringNodeId}
+                                onClose={() => setConfiguringNodeId(null)}
+                                title="Configure Fetch Data"
+                                icon={Database}
+                                footer={
+                                    <>
                                         <button
                                             onClick={() => setConfiguringNodeId(null)}
-                                            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
-                                        >
-                                            <X size={18} className="text-slate-600" />
-                                        </button>
-                                    </div>
-                                    
-                                    {/* Content - Scrollable */}
-                                    <div className="flex-1 overflow-y-auto px-6 py-4">
-                                        <div className="mb-4">
-                                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                                Select Entity
-                                            </label>
-                                            <select
-                                                value={selectedEntityId}
-                                                onChange={(e) => setSelectedEntityId(e.target.value)}
-                                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent text-sm"
-                                            >
-                                                <option value="">Choose entity...</option>
-                                                {entities.map(entity => (
-                                                    <option key={entity.id} value={entity.id}>{entity.name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        {/* Feedback Link */}
-                                        <div className="mb-4 pt-2 border-t border-slate-100">
-                                            <button
-                                                onClick={() => openFeedbackPopup('fetchData', 'Fetch Data')}
-                                                className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1 transition-colors"
-                                            >
-                                                <MessageSquare size={14} />
-                                                What would you like this node to do?
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Actions */}
-                                    <div className="px-6 py-4 flex gap-2 justify-end border-t border-slate-200 shrink-0">
-                                        <button
-                                            onClick={() => setConfiguringNodeId(null)}
-                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveNodeConfig}
                                             disabled={!selectedEntityId}
-                                            className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
+                                    </>
+                                }
+                            >
+                                <div className="space-y-5">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            Select Entity
+                                        </label>
+                                        <select
+                                            value={selectedEntityId}
+                                            onChange={(e) => setSelectedEntityId(e.target.value)}
+                                            className="w-full px-3 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                        >
+                                            <option value="">Choose entity...</option>
+                                            {entities.map(entity => (
+                                                <option key={entity.id} value={entity.id}>{entity.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {/* Feedback Link */}
+                                    <div className="pt-3 border-t border-slate-200">
+                                        <button
+                                            onClick={() => openFeedbackPopup('fetchData', 'Fetch Data')}
+                                            className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1 transition-colors"
+                                        >
+                                            <MessageSquare size={12} />
+                                            What would you like this node to do?
+                                        </button>
                                     </div>
                                 </div>
-                            </>
+                            </NodeConfigSidePanel>
                         )}
 
                         {/* HTTP Configuration Modal */}
                         {configuringHttpNodeId && (
-                            <>
-                                {/* Backdrop */}
-                                <div className="fixed inset-0 bg-black/20 z-50" onClick={() => setConfiguringHttpNodeId(null)} />
-                                {/* Side Panel */}
-                                <div className="fixed top-16 right-0 h-[calc(100vh-4rem)] w-[400px] bg-white shadow-[0_0_20px_rgba(0,0,0,0.1)] z-50 flex flex-col">
-                                    {/* Header */}
-                                    <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 rounded-lg bg-slate-50">
-                                                <Globe size={18} className="text-slate-600" />
-                                            </div>
-                                            <h3 className="text-sm font-normal text-slate-900">Configure HTTP Request</h3>
-                                        </div>
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringHttpNodeId}
+                                onClose={() => setConfiguringHttpNodeId(null)}
+                                title="Configure HTTP Request"
+                                icon={Globe}
+                                footer={
+                                    <>
                                         <button
                                             onClick={() => setConfiguringHttpNodeId(null)}
-                                            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
-                                        >
-                                            <X size={18} className="text-slate-600" />
-                                        </button>
-                                    </div>
-                                    
-                                    {/* Content - Scrollable */}
-                                    <div className="flex-1 overflow-y-auto px-6 py-4">
-                                        <div className="mb-4">
-                                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                                URL
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={httpUrl}
-                                                onChange={(e) => setHttpUrl(e.target.value)}
-                                                placeholder="https://api.example.com/data"
-                                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent text-sm"
-                                            />
-                                            <p className="text-xs text-slate-500 mt-1">
-                                                Enter the full URL to fetch data from (GET request).
-                                            </p>
-                                        </div>
-                                        {/* Feedback Link */}
-                                        <div className="mb-4 pt-2 border-t border-slate-100">
-                                            <button
-                                                onClick={() => openFeedbackPopup('http', 'HTTP Request')}
-                                                className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1 transition-colors"
-                                            >
-                                                <MessageSquare size={14} />
-                                                What would you like this node to do?
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Actions */}
-                                    <div className="px-6 py-4 flex gap-2 justify-end border-t border-slate-200 shrink-0">
-                                        <button
-                                            onClick={() => setConfiguringHttpNodeId(null)}
-                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveHttpConfig}
                                             disabled={!httpUrl.trim()}
-                                            className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
+                                    </>
+                                }
+                            >
+                                <div className="space-y-5">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            URL
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={httpUrl}
+                                            onChange={(e) => setHttpUrl(e.target.value)}
+                                            placeholder="https://api.example.com/data"
+                                            className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                        />
+                                        <p className="text-[10px] text-slate-500 mt-1.5">
+                                            Enter the full URL to fetch data from (GET request).
+                                        </p>
+                                    </div>
+                                    {/* Feedback Link */}
+                                    <div className="pt-3 border-t border-slate-200">
+                                        <button
+                                            onClick={() => openFeedbackPopup('http', 'HTTP Request')}
+                                            className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1 transition-colors"
+                                        >
+                                            <MessageSquare size={12} />
+                                            What would you like this node to do?
+                                        </button>
                                     </div>
                                 </div>
-                            </>
+                            </NodeConfigSidePanel>
                         )}
 
                         {/* Webhook Configuration Modal */}
                         {configuringWebhookNodeId && (
-                            <>
-                                {/* Backdrop */}
-                                <div className="fixed inset-0 bg-black/20 z-50" onClick={closeWebhookConfig} />
-                                {/* Side Panel */}
-                                <div className="fixed top-16 right-0 h-[calc(100vh-4rem)] w-[400px] bg-white shadow-[0_0_20px_rgba(0,0,0,0.1)] z-50 flex flex-col">
-                                    {/* Header */}
-                                    <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 rounded-lg bg-slate-50">
-                                                <Globe size={18} className="text-slate-600" />
-                                            </div>
-                                            <h3 className="text-sm font-normal text-slate-900">Webhook Configuration</h3>
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringWebhookNodeId}
+                                onClose={closeWebhookConfig}
+                                title="Webhook Configuration"
+                                icon={Globe}
+                                footer={
+                                    <button
+                                        onClick={closeWebhookConfig}
+                                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                    >
+                                        Close
+                                    </button>
+                                }
+                            >
+                                <div className="space-y-5">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            Your Webhook URL
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                readOnly
+                                                value={webhookUrl}
+                                                className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-700"
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(webhookUrl);
+                                                    showToast('Webhook URL copied!', 'success');
+                                                }}
+                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                            >
+                                                Copy
+                                            </button>
                                         </div>
-                                        <button
-                                            onClick={closeWebhookConfig}
-                                            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
-                                        >
-                                            <X size={18} className="text-slate-600" />
-                                        </button>
                                     </div>
                                     
-                                    {/* Content - Scrollable */}
-                                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                                            <p className="text-sm text-purple-800 mb-2 font-medium">
-                                                Your Webhook URL
-                                            </p>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    value={webhookUrl}
-                                                    className="flex-1 px-3 py-2 bg-white border border-purple-200 rounded-lg text-sm font-mono text-slate-700"
-                                                />
-                                                <button
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(webhookUrl);
-                                                        showToast('Webhook URL copied!', 'success');
-                                                    }}
-                                                    className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
-                                                >
-                                                    Copy
-                                                </button>
-                                            </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            URL with Token (more secure)
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                readOnly
+                                                value={`${webhookUrl}/${webhookToken}`}
+                                                className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-700"
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(`${webhookUrl}/${webhookToken}`);
+                                                    showToast('Secure webhook URL copied!', 'success');
+                                                }}
+                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                            >
+                                                Copy
+                                            </button>
                                         </div>
-                                        
-                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                                            <p className="text-sm text-slate-700 mb-2 font-medium">
-                                                URL with Token (more secure)
-                                            </p>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    readOnly
-                                                    value={`${webhookUrl}/${webhookToken}`}
-                                                    className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-mono text-slate-700"
-                                                />
-                                                <button
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(`${webhookUrl}/${webhookToken}`);
-                                                        showToast('Secure webhook URL copied!', 'success');
-                                                    }}
-                                                    className="px-3 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 text-sm font-medium"
-                                                >
-                                                    Copy
-                                                </button>
-                                            </div>
-                                        </div>
+                                    </div>
 
-                                        <div className="text-sm text-slate-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                            <p className="font-medium text-blue-800 mb-1">How to use:</p>
-                                            <ol className="list-decimal list-inside space-y-1 text-blue-700">
+                                    <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                                            <p className="font-medium text-slate-800 mb-1">How to use:</p>
+                                            <ol className="list-decimal list-inside space-y-1 text-slate-700">
                                                 <li>Copy the webhook URL above</li>
                                                 <li>Configure your external service to POST data to this URL</li>
                                                 <li>The workflow will execute automatically when data is received</li>
                                             </ol>
-                                        </div>
+                                    </div>
 
-                                        <div className="text-xs text-slate-500">
+                                    <div className="text-xs text-slate-500">
                                             <p className="font-medium mb-1">Example cURL:</p>
                                             <pre className="bg-slate-800 text-[#256A65] p-2 rounded overflow-x-auto">
 {`curl -X POST ${webhookUrl} \\
   -H "Content-Type: application/json" \\
   -d '{"key": "value"}'`}
                                             </pre>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Actions */}
-                                    <div className="px-6 py-4 flex gap-2 justify-end border-t border-slate-200 shrink-0">
-                                        <button
-                                            onClick={closeWebhookConfig}
-                                            className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] text-sm font-medium transition-colors"
-                                        >
-                                            Close
-                                        </button>
                                     </div>
                                 </div>
-                            </>
+                            </NodeConfigSidePanel>
                         )}
 
                         {/* MySQL Configuration Modal */}
                         {configuringMySQLNodeId && (
-                            <>
-                                {/* Backdrop */}
-                                <div className="fixed inset-0 bg-black/20 z-50" onClick={() => setConfiguringMySQLNodeId(null)} />
-                                {/* Side Panel */}
-                                <div className="fixed top-16 right-0 h-[calc(100vh-4rem)] w-[400px] bg-white shadow-[0_0_20px_rgba(0,0,0,0.1)] z-50 flex flex-col">
-                                    {/* Header */}
-                                    <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 rounded-lg bg-slate-50">
-                                                <Database size={18} className="text-slate-600" />
-                                            </div>
-                                            <h3 className="text-sm font-normal text-slate-900">MySQL</h3>
-                                        </div>
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringMySQLNodeId}
+                                onClose={() => setConfiguringMySQLNodeId(null)}
+                                title="MySQL"
+                                icon={Database}
+                                footer={
+                                    <>
                                         <button
                                             onClick={() => setConfiguringMySQLNodeId(null)}
-                                            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                                         >
-                                            <X size={18} className="text-slate-600" />
+                                            Cancel
                                         </button>
-                                    </div>
-                                    
-                                    {/* Content - Scrollable */}
-                                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">
-                                                Host
-                                            </label>
+                                        <button
+                                            onClick={saveMySQLConfig}
+                                            disabled={!mysqlQuery.trim()}
+                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save
+                                        </button>
+                                    </>
+                                }
+                            >
+                                <div className="space-y-5">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            Host
+                                        </label>
                                             <input
                                                 type="text"
                                                 value={mysqlHost}
                                                 onChange={(e) => setMysqlHost(e.target.value)}
                                                 placeholder="localhost"
-                                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent text-sm"
+                                                className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                             />
                                         </div>
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                                     Port
                                                 </label>
                                                 <input
@@ -5657,11 +5736,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     value={mysqlPort}
                                                     onChange={(e) => setMysqlPort(e.target.value)}
                                                     placeholder="3306"
-                                                    className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent text-sm"
+                                                    className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                                     Database
                                                 </label>
                                                 <input
@@ -5669,12 +5748,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     value={mysqlDatabase}
                                                     onChange={(e) => setMysqlDatabase(e.target.value)}
                                                     placeholder="mydb"
-                                                    className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent text-sm"
+                                                    className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                 />
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                            <label className="block text-xs font-medium text-slate-700 mb-2">
                                                 Username
                                             </label>
                                             <input
@@ -5682,11 +5761,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 value={mysqlUsername}
                                                 onChange={(e) => setMysqlUsername(e.target.value)}
                                                 placeholder="root"
-                                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent text-sm"
+                                                className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                            <label className="block text-xs font-medium text-slate-700 mb-2">
                                                 Password
                                             </label>
                                             <input
@@ -5694,11 +5773,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 value={mysqlPassword}
                                                 onChange={(e) => setMysqlPassword(e.target.value)}
                                                 placeholder="••••••"
-                                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent text-sm"
+                                                className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                            <label className="block text-xs font-medium text-slate-700 mb-2">
                                                 SQL Query
                                             </label>
                                             <textarea
@@ -5706,57 +5785,56 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 onChange={(e) => setMysqlQuery(e.target.value)}
                                                 placeholder="SELECT * FROM users"
                                                 rows={3}
-                                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent font-mono text-sm"
+                                                className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 font-mono placeholder:text-slate-400"
                                             />
                                         </div>
-                                        {/* Feedback Link */}
-                                        <div className="pt-2 border-t border-slate-100">
-                                            <button
-                                                onClick={() => openFeedbackPopup('mysql', 'MySQL')}
-                                                className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1 transition-colors"
-                                            >
-                                                <MessageSquare size={14} />
-                                                What would you like this node to do?
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Actions */}
-                                    <div className="px-6 py-4 flex gap-2 justify-end border-t border-slate-200 shrink-0">
+                                    {/* Feedback Link */}
+                                    <div className="pt-3 border-t border-slate-200">
                                         <button
-                                            onClick={() => setConfiguringMySQLNodeId(null)}
-                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700 transition-colors"
+                                            onClick={() => openFeedbackPopup('mysql', 'MySQL')}
+                                            className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1 transition-colors"
                                         >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={saveMySQLConfig}
-                                            disabled={!mysqlQuery.trim()}
-                                            className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
-                                        >
-                                            Save
+                                            <MessageSquare size={12} />
+                                            What would you like this node to do?
                                         </button>
                                     </div>
                                 </div>
-                            </>
+                            </NodeConfigSidePanel>
                         )}
 
                         {/* SAP Fetch Configuration Modal */}
                         {configuringSAPNodeId && (
-                            <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringSAPNodeId(null)}>
-                                <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[500px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-normal text-slate-800 mb-2 flex items-center gap-2">
-                                        <Database className="text-indigo-600" size={20} />
-                                        SAP S/4HANA
-                                    </h3>
-                                    <p className="text-sm text-slate-500 mb-4">Read data from SAP S/4HANA OData API</p>
-                                    
-                                    <div className="space-y-4">
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringSAPNodeId}
+                                onClose={() => setConfiguringSAPNodeId(null)}
+                                title="SAP S/4HANA"
+                                description="Read data from SAP S/4HANA OData API"
+                                icon={Database}
+                                width="w-[500px]"
+                                footer={
+                                    <>
+                                        <button
+                                            onClick={() => setConfiguringSAPNodeId(null)}
+                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveSAPConfig}
+                                            disabled={!sapBaseApiUrl.trim() || !sapEntity.trim()}
+                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save
+                                        </button>
+                                    </>
+                                }
+                            >
+                                    <div className="space-y-5">
                                         {/* Connection Settings */}
                                         <div className="border-b border-slate-200 pb-3">
-                                            <h4 className="text-sm font-normal text-slate-700 mb-3">Connection</h4>
+                                            <h4 className="text-xs font-medium text-slate-700 mb-3">Connection</h4>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                                     Connection Name
                                                 </label>
                                                 <input
@@ -5764,17 +5842,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     value={sapConnectionName}
                                                     onChange={(e) => setSapConnectionName(e.target.value)}
                                                     placeholder="SAP_Production"
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                 />
                                             </div>
                                         </div>
 
                                         {/* Authentication */}
                                         <div className="border-b border-slate-200 pb-3">
-                                            <h4 className="text-sm font-normal text-slate-700 mb-3">Authentication</h4>
+                                            <h4 className="text-xs font-medium text-slate-700 mb-3">Authentication</h4>
                                             <div className="space-y-3">
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
                                                         Auth Type
                                                     </label>
                                                     <input
@@ -5782,11 +5860,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={sapAuthType}
                                                         onChange={(e) => setSapAuthType(e.target.value)}
                                                         placeholder="OAuth2_Client_Credentials"
-                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
                                                         Client ID
                                                     </label>
                                                     <input
@@ -5794,11 +5872,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={sapClientId}
                                                         onChange={(e) => setSapClientId(e.target.value)}
                                                         placeholder="sb-83f9a9..."
-                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
                                                         Client Secret
                                                     </label>
                                                     <input
@@ -5806,11 +5884,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={sapClientSecret}
                                                         onChange={(e) => setSapClientSecret(e.target.value)}
                                                         placeholder="********"
-                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
                                                         Token URL
                                                     </label>
                                                     <input
@@ -5818,7 +5896,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={sapTokenUrl}
                                                         onChange={(e) => setSapTokenUrl(e.target.value)}
                                                         placeholder="https://company.authentication.eu10.hana.ondemand.com/oauth/token"
-                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                     />
                                                 </div>
                                             </div>
@@ -5826,10 +5904,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                         {/* API Configuration */}
                                         <div>
-                                            <h4 className="text-sm font-normal text-slate-700 mb-3">API Configuration</h4>
+                                            <h4 className="text-xs font-medium text-slate-700 mb-3">API Configuration</h4>
                                             <div className="space-y-3">
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
                                                         Base API URL
                                                     </label>
                                                     <input
@@ -5837,11 +5915,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={sapBaseApiUrl}
                                                         onChange={(e) => setSapBaseApiUrl(e.target.value)}
                                                         placeholder="https://company-api.s4hana.ondemand.com"
-                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
                                                         Service Path
                                                     </label>
                                                     <input
@@ -5849,11 +5927,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={sapServicePath}
                                                         onChange={(e) => setSapServicePath(e.target.value)}
                                                         placeholder="/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV"
-                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
                                                         Entity
                                                     </label>
                                                     <input
@@ -5861,7 +5939,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={sapEntity}
                                                         onChange={(e) => setSapEntity(e.target.value)}
                                                         placeholder="A_ProductionOrder"
-                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                     />
                                                 </div>
                                             </div>
@@ -5869,33 +5947,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </div>
 
                                     {/* Feedback Link */}
-                                    <div className="mt-4 pt-2 border-t border-slate-100">
+                                    <div className="pt-3 border-t border-slate-200">
                                         <button
                                             onClick={() => openFeedbackPopup('sapFetch', 'SAP S/4HANA')}
-                                            className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
+                                            className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
                                         >
-                                            <MessageSquare size={14} />
+                                            <MessageSquare size={12} />
                                             What would you like this node to do?
                                         </button>
                                     </div>
-
-                                    <div className="flex gap-2 justify-end mt-6">
-                                        <button
-                                            onClick={() => setConfiguringSAPNodeId(null)}
-                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={saveSAPConfig}
-                                            disabled={!sapBaseApiUrl.trim() || !sapEntity.trim()}
-                                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
-                                        >
-                                            Save
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                            </NodeConfigSidePanel>
                         )}
 
                         {/* Send Email Configuration Modal */}
@@ -5916,16 +5977,33 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             }
 
                             return (
-                                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringEmailNodeId(null)}>
-                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[550px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                                        <h3 className="text-lg font-normal text-slate-800 mb-4 flex items-center gap-2">
-                                            <Mail className="text-rose-600" size={20} />
-                                            Send Email
-                                        </h3>
-                                        
-                                        <div className="space-y-4">
+                                <NodeConfigSidePanel
+                                    isOpen={!!configuringEmailNodeId}
+                                    onClose={() => setConfiguringEmailNodeId(null)}
+                                    title="Send Email"
+                                    icon={Mail}
+                                    width="w-[550px]"
+                                    footer={
+                                        <>
+                                            <button
+                                                onClick={() => setConfiguringEmailNodeId(null)}
+                                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveEmailConfig}
+                                                disabled={!emailTo.trim()}
+                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Save
+                                            </button>
+                                        </>
+                                    }
+                                >
+                                        <div className="space-y-5">
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                                     To (recipient email)
                                                 </label>
                                                 <div className="h-16">
@@ -5944,7 +6022,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </div>
 
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                                     Subject
                                                 </label>
                                                 <div className="h-16">
@@ -5963,7 +6041,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </div>
 
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                                     Body
                                                 </label>
                                                 <div className="h-48">
@@ -5996,7 +6074,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     <div className="p-4 border-t border-slate-200 space-y-3">
                                                         <div className="grid grid-cols-2 gap-3">
                                                             <div>
-                                                                <label className="block text-xs font-medium text-slate-600 mb-1">
+                                                                <label className="block text-xs font-medium text-slate-600 mb-2">
                                                                     SMTP Host
                                                                 </label>
                                                                 <input
@@ -6004,11 +6082,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     value={emailSmtpHost}
                                                                     onChange={(e) => setEmailSmtpHost(e.target.value)}
                                                                     placeholder="smtp.gmail.com"
-                                                                    className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-rose-500"
+                                                                    className="w-full px-3 py-1.5 text-xs text-slate-700 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                                 />
                                                             </div>
                                                             <div>
-                                                                <label className="block text-xs font-medium text-slate-600 mb-1">
+                                                                <label className="block text-xs font-medium text-slate-600 mb-2">
                                                                     SMTP Port
                                                                 </label>
                                                                 <input
@@ -6016,12 +6094,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     value={emailSmtpPort}
                                                                     onChange={(e) => setEmailSmtpPort(e.target.value)}
                                                                     placeholder="587"
-                                                                    className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-rose-500"
+                                                                    className="w-full px-3 py-1.5 text-xs text-slate-700 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                                 />
                                                             </div>
                                                         </div>
                                                         <div>
-                                                            <label className="block text-xs font-medium text-slate-600 mb-1">
+                                                            <label className="block text-xs font-medium text-slate-600 mb-2">
                                                                 SMTP Username (email)
                                                             </label>
                                                             <input
@@ -6029,11 +6107,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 value={emailSmtpUser}
                                                                 onChange={(e) => setEmailSmtpUser(e.target.value)}
                                                                 placeholder="your-email@gmail.com"
-                                                                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-rose-500"
+                                                                className="w-full px-3 py-1.5 text-xs text-slate-700 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="block text-xs font-medium text-slate-600 mb-1">
+                                                            <label className="block text-xs font-medium text-slate-600 mb-2">
                                                                 SMTP Password / App Password
                                                             </label>
                                                             <input
@@ -6041,7 +6119,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 value={emailSmtpPass}
                                                                 onChange={(e) => setEmailSmtpPass(e.target.value)}
                                                                 placeholder="••••••••••••"
-                                                                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-rose-500"
+                                                                className="w-full px-3 py-1.5 text-xs text-slate-700 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                             />
                                                             <p className="text-[10px] text-slate-500 mt-1">
                                                                 For Gmail, use an App Password (not your regular password)
@@ -6053,33 +6131,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </div>
 
                                         {/* Feedback Link */}
-                                        <div className="mt-4 pt-2 border-t border-slate-100">
+                                        <div className="pt-3 border-t border-slate-200">
                                             <button
                                                 onClick={() => openFeedbackPopup('sendEmail', 'Send Email')}
-                                                className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
+                                                className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
                                             >
-                                                <MessageSquare size={14} />
+                                                <MessageSquare size={12} />
                                                 What would you like this node to do?
                                             </button>
                                         </div>
-
-                                        <div className="flex gap-2 justify-end mt-6">
-                                            <button
-                                                onClick={() => setConfiguringEmailNodeId(null)}
-                                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                onClick={saveEmailConfig}
-                                                disabled={!emailTo.trim()}
-                                                className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 disabled:opacity-50 text-sm font-medium"
-                                            >
-                                                Save
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
+                                </NodeConfigSidePanel>
                             );
                         })()}
 
@@ -6101,16 +6162,33 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             }
 
                             return (
-                                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringSMSNodeId(null)}>
-                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[550px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                                        <h3 className="text-lg font-normal text-slate-800 mb-4 flex items-center gap-2">
-                                            <Smartphone className="text-lime-600" size={20} />
-                                            Send SMS
-                                        </h3>
-                                        
-                                        <div className="space-y-4">
+                                <NodeConfigSidePanel
+                                    isOpen={!!configuringSMSNodeId}
+                                    onClose={() => setConfiguringSMSNodeId(null)}
+                                    title="Send SMS"
+                                    icon={Smartphone}
+                                    width="w-[550px]"
+                                    footer={
+                                        <>
+                                            <button
+                                                onClick={() => setConfiguringSMSNodeId(null)}
+                                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveSMSConfig}
+                                                disabled={!smsTo.trim()}
+                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Save
+                                            </button>
+                                        </>
+                                    }
+                                >
+                                        <div className="space-y-5">
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                                     To (phone number with country code)
                                                 </label>
                                                 <div className="h-16">
@@ -6129,7 +6207,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </div>
 
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                                     Message Body
                                                 </label>
                                                 <div className="h-32">
@@ -6208,33 +6286,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </div>
 
                                         {/* Feedback Link */}
-                                        <div className="mt-4 pt-2 border-t border-slate-100">
+                                        <div className="pt-3 border-t border-slate-200">
                                             <button
                                                 onClick={() => openFeedbackPopup('sendSMS', 'Send SMS')}
-                                                className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
+                                                className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
                                             >
-                                                <MessageSquare size={14} />
+                                                <MessageSquare size={12} />
                                                 What would you like this node to do?
                                             </button>
                                         </div>
-
-                                        <div className="flex gap-2 justify-end mt-6">
-                                            <button
-                                                onClick={() => setConfiguringSMSNodeId(null)}
-                                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                onClick={saveSMSConfig}
-                                                disabled={!smsTo.trim()}
-                                                className="px-4 py-2 bg-lime-600 text-white rounded-lg hover:bg-lime-700 disabled:opacity-50 text-sm font-medium"
-                                            >
-                                                Save
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
+                                </NodeConfigSidePanel>
                             );
                         })()}
 
@@ -6259,13 +6320,30 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             const dataFields = hasInputData ? Object.keys(inputDataForViz[0] || {}) : [];
 
                             return (
-                                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => { setConfiguringVisualizationNodeId(null); setGeneratedWidget(null); }}>
-                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[700px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                                        <h3 className="text-lg font-normal text-slate-800 mb-4 flex items-center gap-2">
-                                            <BarChart3 className="text-indigo-600" size={20} />
-                                            Data Visualization
-                                        </h3>
-                                        
+                                <NodeConfigSidePanel
+                                    isOpen={!!configuringVisualizationNodeId}
+                                    onClose={() => { setConfiguringVisualizationNodeId(null); setGeneratedWidget(null); }}
+                                    title="Data Visualization"
+                                    icon={BarChart3}
+                                    width="w-[700px]"
+                                    footer={
+                                        <>
+                                            <button
+                                                onClick={() => { setConfiguringVisualizationNodeId(null); setGeneratedWidget(null); }}
+                                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveVisualizationConfig}
+                                                disabled={!generatedWidget}
+                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Save Visualization
+                                            </button>
+                                        </>
+                                    }
+                                >
                                         {/* Data Preview */}
                                         {hasInputData && (
                                             <div className="mb-4 border border-slate-200 rounded-lg overflow-hidden">
@@ -6316,7 +6394,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 <button
                                                     onClick={generateWidgetFromPrompt}
                                                     disabled={!visualizationPrompt.trim() || !hasInputData || isGeneratingWidget}
-                                                    className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2"
+                                                    className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
                                                 >
                                                     {isGeneratingWidget ? (
                                                         <>
@@ -6335,7 +6413,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 value={visualizationPrompt}
                                                 onChange={(e) => setVisualizationPrompt(e.target.value)}
                                                 placeholder="e.g., 'Show a bar chart of sales by month' or 'Create a pie chart showing the distribution of categories'"
-                                                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                                                className="w-full px-3 py-1.5 text-xs text-slate-700 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 resize-none placeholder:text-slate-400"
                                                 rows={3}
                                             />
                                             {!hasInputData && (
@@ -6347,10 +6425,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                         {/* Generated Widget Preview */}
                                         {generatedWidget && (
-                                            <div className="mb-4 border border-indigo-200 rounded-lg overflow-hidden">
-                                                <div className="bg-indigo-50 px-4 py-2 border-b border-indigo-200">
-                                                    <h4 className="font-medium text-indigo-800">{generatedWidget.title}</h4>
-                                                    <p className="text-xs text-indigo-600">{generatedWidget.description}</p>
+                                            <div className="mb-4 border border-slate-200 rounded-lg overflow-hidden">
+                                                <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
+                                                    <h4 className="font-medium text-xs text-slate-800">{generatedWidget.title}</h4>
+                                                    <p className="text-xs text-slate-600">{generatedWidget.description}</p>
                                                 </div>
                                                 <div className="p-4 bg-white">
                                                     <DynamicChart config={generatedWidget} />
@@ -6358,10 +6436,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 
                                                 {/* Explanation Toggle */}
                                                 {generatedWidget.explanation && (
-                                                    <div className="border-t border-indigo-200">
+                                                    <div className="border-t border-slate-200">
                                                         <button
                                                             onClick={() => setShowWidgetExplanation(!showWidgetExplanation)}
-                                                            className="w-full px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 flex items-center justify-between"
+                                                            className="w-full px-4 py-2 text-xs text-slate-600 hover:bg-slate-50 flex items-center justify-between"
                                                         >
                                                             <span>How was this created?</span>
                                                             <span>{showWidgetExplanation ? '▲' : '▼'}</span>
@@ -6377,43 +6455,47 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         )}
 
                                         {/* Feedback Link */}
-                                        <div className="mt-4 pt-2 border-t border-slate-100">
+                                        <div className="pt-3 border-t border-slate-200">
                                             <button
                                                 onClick={() => openFeedbackPopup('dataVisualization', 'Data Visualization')}
-                                                className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
+                                                className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
                                             >
-                                                <MessageSquare size={14} />
+                                                <MessageSquare size={12} />
                                                 What would you like this node to do?
                                             </button>
                                         </div>
-
-                                        <div className="flex gap-2 justify-end mt-6">
-                                            <button
-                                                onClick={() => { setConfiguringVisualizationNodeId(null); setGeneratedWidget(null); }}
-                                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                onClick={saveVisualizationConfig}
-                                                disabled={!generatedWidget}
-                                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
-                                            >
-                                                Save Visualization
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
+                                </NodeConfigSidePanel>
                             );
                         })()}
 
                         {/* ESIOS Configuration Modal */}
                         {configuringEsiosNodeId && (
-                            <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringEsiosNodeId(null)}>
-                                <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-96" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-normal text-slate-800 mb-4">Configure ESIOS Energy Prices</h3>
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringEsiosNodeId}
+                                onClose={() => setConfiguringEsiosNodeId(null)}
+                                title="Configure ESIOS Energy Prices"
+                                icon={Leaf}
+                                footer={
+                                    <>
+                                        <button
+                                            onClick={() => setConfiguringEsiosNodeId(null)}
+                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveEsiosConfig}
+                                            disabled={!esiosArchiveId.trim()}
+                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save
+                                        </button>
+                                    </>
+                                }
+                            >
+                                    <div className="space-y-5">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
                                             Indicator ID
                                         </label>
                                         <input
@@ -6421,63 +6503,73 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             value={esiosArchiveId}
                                             onChange={(e) => setEsiosArchiveId(e.target.value)}
                                             placeholder="e.g., 1001 for PVPC"
-                                            className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent"
+                                            className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                         />
                                         <p className="text-xs text-slate-500 mt-1">
                                             1001 = PVPC prices, 1739 = Spot prices, 10211 = Market price
                                         </p>
                                     </div>
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
                                             Date
                                         </label>
                                         <input
                                             type="date"
                                             value={esiosDate}
                                             onChange={(e) => setEsiosDate(e.target.value)}
-                                            className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent"
+                                            className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
                                         />
                                     </div>
-                                    <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                                        <p className="text-xs text-slate-600 font-medium">Using Token:</p>
-                                        <code className="text-[10px] text-slate-500 break-all">d668...da64</code>
+                                    <div className="p-3 border border-slate-200 rounded-lg">
+                                        <p className="text-xs text-slate-700 font-medium mb-1">Using Token:</p>
+                                        <code className="text-[10px] text-slate-600 break-all">d668...da64</code>
                                     </div>
                                     {/* Feedback Link */}
-                                    <div className="mb-4 pt-2 border-t border-slate-100">
+                                    <div className="pt-3 border-t border-slate-200">
                                         <button
                                             onClick={() => openFeedbackPopup('esios', 'ESIOS Energy Prices')}
-                                            className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
+                                            className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
                                         >
-                                            <MessageSquare size={14} />
+                                            <MessageSquare size={12} />
                                             What would you like this node to do?
                                         </button>
                                     </div>
-                                    <div className="flex gap-2 justify-end">
-                                        <button
-                                            onClick={() => setConfiguringEsiosNodeId(null)}
-                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={saveEsiosConfig}
-                                            disabled={!esiosArchiveId.trim()}
-                                            className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-50 text-sm font-medium"
-                                        >
-                                            Save
-                                        </button>
                                     </div>
-                                </div>
-                            </div>
+                            </NodeConfigSidePanel>
                         )}
 
                         {/* Climatiq Configuration Modal */}
                         {configuringClimatiqNodeId && (
-                            <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringClimatiqNodeId(null)}>
-                                <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[500px] max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-normal text-slate-800 mb-2">🌱 Get Emission Factors</h3>
-                                    <p className="text-sm text-slate-600 mb-4">Search emission factors in the Climatiq database, to calculate your process and company emissions.</p>
-                                    <div className="mb-4">
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringClimatiqNodeId}
+                                onClose={() => setConfiguringClimatiqNodeId(null)}
+                                title="🌱 Get Emission Factors"
+                                description="Search emission factors in the Climatiq database, to calculate your process and company emissions."
+                                icon={Leaf}
+                                width="w-[500px]"
+                                footer={
+                                    <>
+                                        <button
+                                            onClick={() => setConfiguringClimatiqNodeId(null)}
+                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveClimatiqConfig}
+                                            disabled={climatiqSelectedIndex === null}
+                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save
+                                        </button>
+                                    </>
+                                }
+                            >
+                                <div className="space-y-5">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            Search
+                                        </label>
                                         <div className="flex gap-2">
                                             <input
                                                 type="text"
@@ -6485,32 +6577,35 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 onChange={(e) => setClimatiqQuery(e.target.value)}
                                                 onKeyDown={(e) => e.key === 'Enter' && searchClimatiq()}
                                                 placeholder="e.g., Passenger diesel car"
-                                                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65]"
+                                                className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                             />
                                             <button
                                                 onClick={searchClimatiq}
                                                 disabled={climatiqSearching || !climatiqQuery.trim()}
-                                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
                                             >
                                                 {climatiqSearching ? (
                                                     <>
-                                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                                         Searching...
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <Sparkles size={16} />
+                                                        <Sparkles size={14} />
                                                         Search
                                                     </>
                                                 )}
                                             </button>
                                         </div>
+                                        <p className="text-[10px] text-slate-500 mt-1.5">
+                                            Introduce your activity and click search
+                                        </p>
                                     </div>
 
                                     {/* Results List */}
                                     {climatiqSearchResults.length > 0 && (
-                                        <div className="mb-4 flex-1 overflow-y-auto">
-                                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-700 mb-2">
                                                 Similar activities and its Emission factors
                                             </label>
                                             <div className="space-y-2">
@@ -6518,28 +6613,28 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     <div
                                                         key={index}
                                                         onClick={() => setClimatiqSelectedIndex(index)}
-                                                        className={`p-3 border rounded-lg cursor-pointer transition-all ${climatiqSelectedIndex === index
-                                                            ? 'border-blue-600 bg-blue-50'
-                                                            : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                                                        className={`p-2.5 border rounded-lg cursor-pointer transition-all ${climatiqSelectedIndex === index
+                                                            ? 'border-slate-400 bg-slate-50'
+                                                            : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                                                             }`}
                                                     >
                                                         <div className="flex items-start gap-2">
-                                                            <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 ${climatiqSelectedIndex === index
-                                                                ? 'border-blue-600 bg-blue-600'
+                                                            <div className={`mt-0.5 w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${climatiqSelectedIndex === index
+                                                                ? 'border-slate-700 bg-slate-700'
                                                                 : 'border-slate-300'
                                                                 }`}>
                                                                 {climatiqSelectedIndex === index && (
-                                                                    <Check size={12} className="text-white" />
+                                                                    <Check size={10} className="text-white" />
                                                                 )}
                                                             </div>
                                                             <div className="flex-1 min-w-0">
-                                                                <p className="font-normal text-sm text-slate-800">
+                                                                <p className="font-medium text-xs text-slate-800">
                                                                     {result.factor} {result.unit}
                                                                 </p>
-                                                                <p className="text-xs text-slate-600 truncate">
+                                                                <p className="text-xs text-slate-600 truncate mt-0.5">
                                                                     {result.name} ({result.region_name || result.region})
                                                                 </p>
-                                                                <p className="text-[10px] text-slate-500">
+                                                                <p className="text-[10px] text-slate-500 mt-0.5">
                                                                     Source: {result.source} • Year: {result.year}
                                                                 </p>
                                                             </div>
@@ -6552,64 +6647,51 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                     {/* No results message */}
                                     {!climatiqSearching && climatiqSearchResults.length === 0 && climatiqQuery && (
-                                        <div className="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200 text-center text-slate-600 text-sm">
-                                            Introduce your activity and click search
+                                        <div className="p-3 border border-slate-200 rounded-lg text-center">
+                                            <p className="text-xs text-slate-500">
+                                                Introduce your activity and click search
+                                            </p>
                                         </div>
                                     )}
 
                                     {/* Feedback Link */}
-                                    <div className="mb-4">
+                                    <div className="pt-3 border-t border-slate-200">
                                         <button
                                             onClick={() => openFeedbackPopup('climatiq', 'Climatiq Emissions')}
-                                            className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
+                                            className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
                                         >
-                                            <MessageSquare size={14} />
+                                            <MessageSquare size={12} />
                                             What would you like this node to do?
                                         </button>
                                     </div>
-
-                                    <div className="flex gap-2 justify-end pt-4 border-t">
-                                        <button
-                                            onClick={() => {
-                                                setConfiguringClimatiqNodeId(null);
-                                                setClimatiqSearchResults([]);
-                                                setClimatiqSelectedIndex(null);
-                                            }}
-                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={saveClimatiqConfig}
-                                            disabled={climatiqSelectedIndex === null}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                                        >
-                                            Save
-                                        </button>
-                                    </div>
                                 </div>
-                            </div>
+                            </NodeConfigSidePanel>
                         )}
 
                         {/* Human Approval Configuration Modal */}
                         {configuringHumanApprovalNodeId && (
-                            <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringHumanApprovalNodeId(null)}>
-                                <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[450px]" onClick={(e) => e.stopPropagation()}>
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                                            <UserCheck size={20} className="text-orange-600" />
-                                        </div>
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringHumanApprovalNodeId}
+                                onClose={() => setConfiguringHumanApprovalNodeId(null)}
+                                title="Human in the Loop"
+                                description="Assign a user to approve this step"
+                                icon={UserCheck}
+                                width="w-[450px]"
+                                footer={
+                                    <button
+                                        onClick={() => setConfiguringHumanApprovalNodeId(null)}
+                                        className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                    >
+                                        Close
+                                    </button>
+                                }
+                            >
+                                    <div className="space-y-5">
                                         <div>
-                                            <h3 className="text-lg font-normal text-slate-800">Human in the Loop</h3>
-                                            <p className="text-sm text-slate-500">Assign a user to approve this step</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="mb-6">
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                                            Assign to
-                                        </label>
-                                        {organizationUsers.length === 0 ? (
+                                            <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                Assign to
+                                            </label>
+                                            {organizationUsers.length === 0 ? (
                                             <div className="flex items-center justify-center py-8 text-slate-400">
                                                 <div className="w-5 h-5 border-2 border-slate-300 border-t-teal-500 rounded-full animate-spin mr-2" />
                                                 Loading users...
@@ -6625,8 +6707,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             onClick={() => saveHumanApprovalConfig(user.id, user.name || user.email, user.profilePhoto)}
                                                             className={`w-full p-3 rounded-lg border-2 text-left transition-all flex items-center gap-3 ${
                                                                 isSelected
-                                                                    ? 'border-orange-500 bg-orange-50'
-                                                                    : 'border-slate-200 hover:border-orange-300 hover:bg-orange-50/50'
+                                                                    ? 'border-slate-400 bg-slate-50'
+                                                                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
                                                             }`}
                                                         >
                                                             <UserAvatar name={user.name || user.email} profilePhoto={user.profilePhoto} size="sm" />
@@ -6640,7 +6722,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             </div>
                                                             <span className={`text-xs px-2 py-1 rounded-full ${
                                                                 user.role === 'admin' 
-                                                                    ? 'bg-purple-100 text-purple-700' 
+                                                                    ? 'bg-slate-100 text-slate-700' 
                                                                     : 'bg-slate-100 text-slate-600'
                                                             }`}>
                                                                 {user.role}
@@ -6650,18 +6732,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 })}
                                             </div>
                                         )}
+                                        </div>
                                     </div>
-
-                                    <div className="flex gap-2 justify-end pt-4 border-t border-slate-100">
-                                        <button
-                                            onClick={() => setConfiguringHumanApprovalNodeId(null)}
-                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                            </NodeConfigSidePanel>
                         )}
 
                         {/* Data Preview Modal */}
@@ -6679,8 +6752,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             if (!hasInput && !hasOutput && !hasOutputA && !hasOutputB) return null;
 
                             return (
-                                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setViewingDataNodeId(null)}>
-                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md max-w-4xl max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+                                <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none" onClick={() => setViewingDataNodeId(null)}>
+                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md max-w-4xl max-h-[80vh] overflow-hidden flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                                         <div className="flex items-center justify-between mb-4">
                                             <h3 className="text-lg font-normal text-slate-800">
                                                 {node.label} - Data Preview
@@ -6784,7 +6857,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 return displayData && displayData.length > 0 ? (
                                                     <>
                                                         {isLimited && (
-                                                            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 rounded-lg mb-3 text-sm flex items-center gap-2">
+                                                            <div className="bg-slate-50 border border-slate-200 text-slate-800 px-4 py-2 rounded-lg mb-3 text-xs flex items-center gap-2">
                                                                 <span>⚠️</span>
                                                                 <span>Showing first {MAX_PREVIEW_ROWS} of {totalRows.toLocaleString()} rows for performance</span>
                                                             </div>
@@ -6857,12 +6930,32 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             const hasAvailableFields = availableFields.length > 0;
                             
                             return (
-                                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringConditionNodeId(null)}>
-                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-96" onClick={(e) => e.stopPropagation()}>
-                                        <h3 className="text-lg font-normal text-slate-800 mb-4">Configure Condition</h3>
-                                        <div className="space-y-4">
+                                <NodeConfigSidePanel
+                                    isOpen={!!configuringConditionNodeId}
+                                    onClose={() => setConfiguringConditionNodeId(null)}
+                                    title="Configure Condition"
+                                    icon={AlertCircle}
+                                    footer={
+                                        <>
+                                            <button
+                                                onClick={() => setConfiguringConditionNodeId(null)}
+                                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveConditionConfig}
+                                                disabled={!conditionField}
+                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Save
+                                            </button>
+                                        </>
+                                    }
+                                >
+                                    <div className="space-y-5">
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                                     Field Name
                                                 </label>
                                                 {hasAvailableFields ? (
@@ -6870,7 +6963,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         <select
                                                             value={conditionField}
                                                             onChange={(e) => setConditionField(e.target.value)}
-                                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
                                                         >
                                                             <option value="">Select a field...</option>
                                                             {availableFields.map(field => (
@@ -6888,7 +6981,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             value={conditionField}
                                                             onChange={(e) => setConditionField(e.target.value)}
                                                             placeholder="e.g., status, price, name"
-                                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                         />
                                                         <p className="text-xs text-amber-600 mt-1">
                                                             ⚠️ Run the previous node first to see available fields
@@ -6897,13 +6990,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 )}
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                                     Operator
                                                 </label>
                                                 <select
                                                     value={conditionOperator}
                                                     onChange={(e) => setConditionOperator(e.target.value)}
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
                                                 >
                                                     <option value="equals">Equals</option>
                                                     <option value="notEquals">Not Equals</option>
@@ -6916,7 +7009,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </div>
                                             {['equals', 'notEquals', 'contains', 'greaterThan', 'lessThan'].includes(conditionOperator) && (
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
                                                         Value
                                                     </label>
                                                     <input
@@ -6924,18 +7017,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={conditionValue}
                                                         onChange={(e) => setConditionValue(e.target.value)}
                                                         placeholder="Comparison value"
-                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                     />
                                                 </div>
                                             )}
 
                                             {/* Processing Mode */}
                                             <div className="pt-2 border-t border-slate-200">
-                                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                                     Processing Mode
                                                 </label>
                                                 <div className="space-y-2">
-                                                    <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${conditionProcessingMode === 'batch' ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                                    <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${conditionProcessingMode === 'batch' ? 'border-slate-400 bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}>
                                                         <input
                                                             type="radio"
                                                             name="processingMode"
@@ -6951,7 +7044,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             </p>
                                                         </div>
                                                     </label>
-                                                    <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${conditionProcessingMode === 'perRow' ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                                    <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${conditionProcessingMode === 'perRow' ? 'border-slate-400 bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}>
                                                         <input
                                                             type="radio"
                                                             name="processingMode"
@@ -6969,85 +7062,73 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     </label>
                                                 </div>
                                             </div>
-                                        </div>
                                         {/* Feedback Link */}
-                                        <div className="mt-4 pt-2 border-t border-slate-100">
+                                        <div className="pt-3 border-t border-slate-200">
                                             <button
                                                 onClick={() => openFeedbackPopup('condition', 'Condition')}
-                                                className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
+                                                className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
                                             >
-                                                <MessageSquare size={14} />
+                                                <MessageSquare size={12} />
                                                 What would you like this node to do?
                                             </button>
                                         </div>
-                                        <div className="flex gap-2 justify-end mt-6">
-                                            <button
-                                                onClick={() => setConfiguringConditionNodeId(null)}
-                                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                onClick={saveConditionConfig}
-                                                disabled={!conditionField}
-                                                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 text-sm font-medium"
-                                            >
-                                                Save
-                                            </button>
-                                        </div>
                                     </div>
-                                </div>
+                            </NodeConfigSidePanel>
                             );
                         })()}
 
                         {/* Add Field Configuration Modal */}
                         {configuringAddFieldNodeId && (
-                            <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringAddFieldNodeId(null)}>
-                                <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-96" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-normal text-slate-800 mb-4">Add Field to Records</h3>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                                Field Name
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={addFieldName}
-                                                onChange={(e) => setAddFieldName(e.target.value)}
-                                                placeholder="e.g., Nombre, Category"
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                                Field Value
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={addFieldValue}
-                                                onChange={(e) => setAddFieldValue(e.target.value)}
-                                                placeholder="e.g., Albert, Active"
-                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2 justify-end mt-6">
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringAddFieldNodeId}
+                                onClose={() => setConfiguringAddFieldNodeId(null)}
+                                title="Add Field to Records"
+                                icon={Plus}
+                                footer={
+                                    <>
                                         <button
                                             onClick={() => setConfiguringAddFieldNodeId(null)}
-                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveAddFieldConfig}
                                             disabled={!addFieldName}
-                                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
+                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
+                                    </>
+                                }
+                            >
+                                <div className="space-y-5">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            Field Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={addFieldName}
+                                            onChange={(e) => setAddFieldName(e.target.value)}
+                                            placeholder="e.g., Nombre, Category"
+                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            Field Value
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={addFieldValue}
+                                            onChange={(e) => setAddFieldValue(e.target.value)}
+                                            placeholder="e.g., Albert, Active"
+                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                        />
                                     </div>
                                 </div>
-                            </div>
+                            </NodeConfigSidePanel>
                         )}
 
                         {/* Join Configuration Modal */}
@@ -7095,26 +7176,42 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             const allFields = [...new Set([...fieldsA, ...fieldsB])];
                             
                             return (
-                                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringJoinNodeId(null)}>
-                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-96" onClick={(e) => e.stopPropagation()}>
-                                        <h3 className="text-lg font-normal text-slate-800 mb-4">
-                                            <GitMerge className="inline-block mr-2" size={20} />
-                                            Configure Join
-                                        </h3>
-                                        <div className="space-y-4">
+                                <NodeConfigSidePanel
+                                    isOpen={!!configuringJoinNodeId}
+                                    onClose={() => setConfiguringJoinNodeId(null)}
+                                    title="Configure Join"
+                                    icon={GitMerge}
+                                    footer={
+                                        <>
+                                            <button
+                                                onClick={() => setConfiguringJoinNodeId(null)}
+                                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveJoinConfig}
+                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                            >
+                                                Save
+                                            </button>
+                                        </>
+                                    }
+                                >
+                                    <div className="space-y-5">
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                                     Join Strategy
                                                 </label>
                                                 <select
                                                     value={joinStrategy}
                                                     onChange={(e) => setJoinStrategy(e.target.value as 'concat' | 'mergeByKey')}
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
                                                 >
                                                     <option value="concat">Concatenate (combine all records)</option>
                                                     <option value="mergeByKey">Merge by common key</option>
                                                 </select>
-                                                <p className="text-xs text-slate-500 mt-1">
+                                                <p className="text-xs text-slate-400 mt-1.5">
                                                     {joinStrategy === 'concat' 
                                                         ? 'All records from A and B will be combined into one list'
                                                         : 'Records with matching key values will be merged together'}
@@ -7124,11 +7221,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             {joinStrategy === 'mergeByKey' && (
                                                 <>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
                                                         Join Type
                                                     </label>
                                                     <div className="space-y-2">
-                                                        <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${joinType === 'inner' ? 'border-cyan-500 bg-cyan-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                                        <label className={`flex items-start p-2.5 border rounded-lg cursor-pointer transition-all ${joinType === 'inner' ? 'border-slate-400 bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}>
                                                             <input
                                                                 type="radio"
                                                                 name="joinType"
@@ -7138,13 +7235,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 className="mt-0.5 mr-3"
                                                             />
                                                             <div>
-                                                                <span className="font-medium text-sm">Inner Join</span>
-                                                                <p className="text-xs text-slate-500 mt-0.5">
+                                                                <span className="font-medium text-xs text-slate-900">Inner Join</span>
+                                                                <p className="text-xs text-slate-400 mt-0.5">
                                                                     Only records that match in both inputs
                                                                 </p>
                                                             </div>
                                                         </label>
-                                                        <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${joinType === 'outer' ? 'border-cyan-500 bg-cyan-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                                        <label className={`flex items-start p-2.5 border rounded-lg cursor-pointer transition-all ${joinType === 'outer' ? 'border-slate-400 bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}>
                                                             <input
                                                                 type="radio"
                                                                 name="joinType"
@@ -7154,8 +7251,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 className="mt-0.5 mr-3"
                                                             />
                                                             <div>
-                                                                <span className="font-medium text-sm">Outer Join</span>
-                                                                <p className="text-xs text-slate-500 mt-0.5">
+                                                                <span className="font-medium text-xs text-slate-900">Outer Join</span>
+                                                                <p className="text-xs text-slate-400 mt-0.5">
                                                                     All records from both inputs (empty where no match)
                                                                 </p>
                                                             </div>
@@ -7163,7 +7260,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
                                                         Common Key Field
                                                     </label>
                                                     {allFields.length > 0 ? (
@@ -7171,7 +7268,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             <select
                                                                 value={joinKey}
                                                                 onChange={(e) => setJoinKey(e.target.value)}
-                                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
                                                             >
                                                                 <option value="">Select a field...</option>
                                                                 {commonFields.length > 0 && (
@@ -7188,7 +7285,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 </optgroup>
                                                             </select>
                                                             {commonFields.length > 0 && (
-                                                                <p className="text-xs text-[#256A65] mt-1">
+                                                                <p className="text-xs text-[#256A65] mt-1.5">
                                                                     ✓ {commonFields.length} common field(s) found
                                                                 </p>
                                                             )}
@@ -7200,9 +7297,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 value={joinKey}
                                                                 onChange={(e) => setJoinKey(e.target.value)}
                                                                 placeholder="e.g., id, name"
-                                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                             />
-                                                            <p className="text-xs text-amber-600 mt-1">
+                                                            <p className="text-xs text-amber-600 mt-1.5">
                                                                 ⚠️ Run the input nodes first to see available fields
                                                             </p>
                                                         </>
@@ -7210,23 +7307,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 </div>
                                                 </>
                                             )}
-                                        </div>
-                                        <div className="flex gap-2 justify-end mt-6">
-                                            <button
-                                                onClick={() => setConfiguringJoinNodeId(null)}
-                                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                onClick={saveJoinConfig}
-                                                className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm font-medium"
-                                            >
-                                                Save
-                                            </button>
-                                        </div>
                                     </div>
-                                </div>
+                                </NodeConfigSidePanel>
                             );
                         })()}
 
@@ -7301,18 +7383,31 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             };
                             
                             return (
-                                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringSplitColumnsNodeId(null)}>
-                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[600px] max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <div className="w-10 h-10 bg-sky-100 rounded-lg flex items-center justify-center">
-                                                <Columns size={20} className="text-sky-600" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-lg font-normal text-slate-800">Split by Columns</h3>
-                                                <p className="text-sm text-slate-500">Drag columns between outputs A and B</p>
-                                            </div>
-                                        </div>
-                                        
+                                <NodeConfigSidePanel
+                                    isOpen={!!configuringSplitColumnsNodeId}
+                                    onClose={() => setConfiguringSplitColumnsNodeId(null)}
+                                    title="Split by Columns"
+                                    description="Drag columns between outputs A and B"
+                                    icon={Columns}
+                                    width="w-[600px]"
+                                    footer={
+                                        <>
+                                            <button
+                                                onClick={() => setConfiguringSplitColumnsNodeId(null)}
+                                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveSplitColumnsConfig}
+                                                disabled={splitColumnsOutputA.length === 0 && splitColumnsOutputB.length === 0}
+                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Save Configuration
+                                            </button>
+                                        </>
+                                    }
+                                >
                                         {allColumns.length === 0 ? (
                                             <div className="text-center py-8 text-slate-500">
                                                 <Columns size={32} className="mx-auto mb-2 opacity-50" />
@@ -7330,20 +7425,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     >
                                                         <div className="flex items-center justify-between mb-2">
                                                             <div className="flex items-center gap-2">
-                                                                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                                                                <span className="font-normal text-blue-700">Output A</span>
+                                                                <div className="w-3 h-3 rounded-full bg-slate-700"></div>
+                                                                <span className="text-xs font-medium text-slate-700">Output A</span>
                                                                 <span className="text-xs text-slate-500">({splitColumnsOutputA.length} cols)</span>
                                                             </div>
                                                             <button
                                                                 onClick={moveAllToA}
-                                                                className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                                                                className="text-xs text-slate-600 hover:text-slate-900 hover:underline"
                                                             >
                                                                 Move all here
                                                             </button>
                                                         </div>
-                                                        <div className={`flex-1 border-2 rounded-lg p-2 min-h-[200px] max-h-[300px] overflow-y-auto transition-colors ${draggedColumn && !splitColumnsOutputA.includes(draggedColumn) ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-slate-50'}`}>
+                                                        <div className={`flex-1 border-2 rounded-lg p-2 min-h-[200px] max-h-[300px] overflow-y-auto transition-colors ${draggedColumn && !splitColumnsOutputA.includes(draggedColumn) ? 'border-slate-400 bg-slate-50' : 'border-slate-200 bg-white'}`}>
                                                             {splitColumnsOutputA.length === 0 ? (
-                                                                <div className="text-center py-8 text-slate-400 text-sm">
+                                                                <div className="text-center py-8 text-slate-400 text-xs">
                                                                     Drop columns here
                                                                 </div>
                                                             ) : (
@@ -7354,15 +7449,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                             draggable
                                                                             onDragStart={() => handleDragStart(column)}
                                                                             onDragEnd={handleDragEnd}
-                                                                            className="flex items-center justify-between px-3 py-2 bg-white rounded border border-slate-200 shadow-sm cursor-grab group"
+                                                                            className="flex items-center justify-between px-2.5 py-1.5 bg-white rounded border border-slate-200 cursor-grab group"
                                                                         >
                                                                             <div className="flex items-center gap-2">
-                                                                                <GripVertical size={14} className="text-slate-400" />
-                                                                                <span className="text-sm font-medium text-slate-700">{column}</span>
+                                                                                <GripVertical size={12} className="text-slate-400" />
+                                                                                <span className="text-xs font-medium text-slate-700">{column}</span>
                                                                             </div>
                                                                             <button
                                                                                 onClick={() => moveColumnToB(column)}
-                                                                                className="opacity-0 group-hover:opacity-100 text-xs text-purple-600 hover:text-purple-800 transition-opacity"
+                                                                                className="opacity-0 group-hover:opacity-100 text-xs text-slate-600 hover:text-slate-900 transition-opacity"
                                                                             >
                                                                                 → B
                                                                             </button>
@@ -7381,20 +7476,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     >
                                                         <div className="flex items-center justify-between mb-2">
                                                             <div className="flex items-center gap-2">
-                                                                <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                                                                <span className="font-normal text-purple-700">Output B</span>
+                                                                <div className="w-3 h-3 rounded-full bg-slate-700"></div>
+                                                                <span className="text-xs font-medium text-slate-700">Output B</span>
                                                                 <span className="text-xs text-slate-500">({splitColumnsOutputB.length} cols)</span>
                                                             </div>
                                                             <button
                                                                 onClick={moveAllToB}
-                                                                className="text-xs text-purple-600 hover:text-purple-800 hover:underline"
+                                                                className="text-xs text-slate-600 hover:text-slate-900 hover:underline"
                                                             >
                                                                 Move all here
                                                             </button>
                                                         </div>
-                                                        <div className={`flex-1 border-2 rounded-lg p-2 min-h-[200px] max-h-[300px] overflow-y-auto transition-colors ${draggedColumn && !splitColumnsOutputB.includes(draggedColumn) ? 'border-purple-400 bg-purple-50' : 'border-slate-200 bg-slate-50'}`}>
+                                                        <div className={`flex-1 border-2 rounded-lg p-2 min-h-[200px] max-h-[300px] overflow-y-auto transition-colors ${draggedColumn && !splitColumnsOutputB.includes(draggedColumn) ? 'border-slate-400 bg-slate-50' : 'border-slate-200 bg-white'}`}>
                                                             {splitColumnsOutputB.length === 0 ? (
-                                                                <div className="text-center py-8 text-slate-400 text-sm">
+                                                                <div className="text-center py-8 text-slate-400 text-xs">
                                                                     Drop columns here
                                                                 </div>
                                                             ) : (
@@ -7405,15 +7500,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                             draggable
                                                                             onDragStart={() => handleDragStart(column)}
                                                                             onDragEnd={handleDragEnd}
-                                                                            className="flex items-center justify-between px-3 py-2 bg-white rounded border border-slate-200 shadow-sm cursor-grab group"
+                                                                            className="flex items-center justify-between px-2.5 py-1.5 bg-white rounded border border-slate-200 cursor-grab group"
                                                                         >
                                                                             <div className="flex items-center gap-2">
-                                                                                <GripVertical size={14} className="text-slate-400" />
-                                                                                <span className="text-sm font-medium text-slate-700">{column}</span>
+                                                                                <GripVertical size={12} className="text-slate-400" />
+                                                                                <span className="text-xs font-medium text-slate-700">{column}</span>
                                                                             </div>
                                                                             <button
                                                                                 onClick={() => moveColumnToA(column)}
-                                                                                className="opacity-0 group-hover:opacity-100 text-xs text-blue-600 hover:text-blue-800 transition-opacity"
+                                                                                className="opacity-0 group-hover:opacity-100 text-xs text-slate-600 hover:text-slate-900 transition-opacity"
                                                                             >
                                                                                 ← A
                                                                             </button>
@@ -7425,61 +7520,30 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     </div>
                                                 </div>
                                                 
-                                                <div className="mt-4 p-3 bg-slate-50 rounded-lg text-xs text-slate-600">
-                                                    <strong>Tip:</strong> Drag columns between outputs, or use the arrow buttons. Each row will be split into two datasets with the selected columns.
+                                                <div className="mt-4 pt-3 border-t border-slate-200">
+                                                    <p className="text-xs text-slate-500">
+                                                        <span className="font-medium">Tip:</span> Drag columns between outputs, or use the arrow buttons. Each row will be split into two datasets with the selected columns.
+                                                    </p>
                                                 </div>
                                             </>
                                         )}
-                                        
-                                        <div className="flex gap-2 justify-end mt-4 pt-4 border-t">
-                                            <button
-                                                onClick={() => setConfiguringSplitColumnsNodeId(null)}
-                                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                onClick={saveSplitColumnsConfig}
-                                                disabled={splitColumnsOutputA.length === 0 && splitColumnsOutputB.length === 0}
-                                                className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                                            >
-                                                Save Configuration
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
+                                </NodeConfigSidePanel>
                             );
                         })()}
 
                         {/* Excel Input Configuration Side Panel */}
                         {configuringExcelNodeId && (
-                            <>
-                                {/* Backdrop */}
-                                <div className="fixed inset-0 bg-black/20 z-50" onClick={closeExcelConfig} />
-                                {/* Side Panel */}
-                                <div className="fixed top-16 right-0 h-[calc(100vh-4rem)] w-[400px] bg-white shadow-[0_0_20px_rgba(0,0,0,0.1)] z-50 flex flex-col">
-                                    {/* Header */}
-                                    <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 rounded-lg bg-slate-50">
-                                                <FileSpreadsheet size={18} className="text-slate-600" />
-                                            </div>
-                                            <h3 className="text-sm font-normal text-slate-900">Excel/CSV Input</h3>
-                                        </div>
-                                        <button
-                                            onClick={closeExcelConfig}
-                                            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
-                                        >
-                                            <X size={18} className="text-slate-600" />
-                                        </button>
-                                    </div>
-                                    
-                                    {/* Content - Scrollable */}
-                                    <div className="flex-1 overflow-y-auto px-6 py-4">
-                                    
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringExcelNodeId}
+                                onClose={closeExcelConfig}
+                                title="Excel/CSV Input"
+                                icon={FileSpreadsheet}
+                                width="w-[400px]"
+                            >
+                                <div className="space-y-5">
                                     {/* File Upload Area */}
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
                                             Upload File
                                         </label>
                                         <div className="relative">
@@ -7493,23 +7557,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             />
                                             <label
                                                 htmlFor="excel-file-input"
-                                                className={`flex items-center justify-center gap-2 w-full px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
+                                                className={`flex items-center justify-center gap-2 w-full px-4 py-6 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
                                                     isParsingExcel 
                                                         ? 'bg-slate-50 border-slate-300 cursor-wait'
-                                                        : 'border-emerald-300 hover:border-emerald-500 hover:bg-emerald-50'
+                                                        : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
                                                 }`}
                                             >
                                                 {isParsingExcel ? (
                                                     <>
-                                                        <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                                                        <span className="text-slate-600">Parsing file...</span>
+                                                        <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                                                        <span className="text-xs text-slate-600">Parsing file...</span>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <Upload className="text-emerald-500" size={24} />
+                                                        <Upload className="text-slate-600" size={18} />
                                                         <div className="text-center">
-                                                            <span className="text-slate-600 font-medium">Click to upload</span>
-                                                            <p className="text-xs text-slate-400 mt-1">CSV, XLS, XLSX supported</p>
+                                                            <span className="text-xs text-slate-700 font-medium">Click to upload</span>
+                                                            <p className="text-[10px] text-slate-400 mt-1">CSV, XLS, XLSX supported</p>
                                                         </div>
                                                     </>
                                                 )}
@@ -7519,22 +7583,22 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                     {/* Preview Section */}
                                     {excelPreviewData && (
-                                        <div className="mb-4">
+                                        <div>
                                             <div className="flex items-center justify-between mb-2">
-                                                <label className="block text-sm font-medium text-slate-700">
+                                                <label className="block text-xs font-medium text-slate-700">
                                                     Preview
                                                 </label>
-                                                <span className="text-xs text-slate-500">
+                                                <span className="text-[10px] text-slate-500">
                                                     {excelPreviewData.rowCount} total rows • {excelPreviewData.headers.length} columns
                                                 </span>
                                             </div>
                                             <div className="border border-slate-200 rounded-lg overflow-hidden">
                                                 <div className="overflow-x-auto max-h-48">
                                                     <table className="w-full text-xs">
-                                                        <thead className="bg-slate-100 sticky top-0">
+                                                        <thead className="bg-slate-50 sticky top-0">
                                                             <tr>
                                                                 {excelPreviewData.headers.map((header, i) => (
-                                                                    <th key={i} className="px-3 py-2 text-left font-normal text-slate-700 whitespace-nowrap">
+                                                                    <th key={i} className="px-2 py-1.5 text-left font-medium text-slate-700 whitespace-nowrap text-xs">
                                                                         {header}
                                                                     </th>
                                                                 ))}
@@ -7544,7 +7608,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             {excelPreviewData.data.map((row, i) => (
                                                                 <tr key={i} className="hover:bg-slate-50">
                                                                     {excelPreviewData.headers.map((header, j) => (
-                                                                        <td key={j} className="px-3 py-2 text-slate-600 whitespace-nowrap max-w-[150px] truncate">
+                                                                        <td key={j} className="px-2 py-1.5 text-slate-600 whitespace-nowrap max-w-[120px] truncate text-xs">
                                                                             {row[header] || '-'}
                                                                         </td>
                                                                     ))}
@@ -7554,7 +7618,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     </table>
                                                 </div>
                                                 {excelPreviewData.rowCount > 5 && (
-                                                    <div className="px-3 py-2 bg-slate-50 text-xs text-slate-500 text-center border-t border-slate-200">
+                                                    <div className="px-3 py-1.5 border-t border-slate-200 text-[10px] text-slate-500 text-center">
                                                         Showing first 5 of {excelPreviewData.rowCount} rows
                                                     </div>
                                                 )}
@@ -7564,63 +7628,43 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                     {/* Current File Info */}
                                     {nodes.find(n => n.id === configuringExcelNodeId)?.config?.fileName && !excelFile && (
-                                        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                                            <div className="flex items-center gap-2 text-sm">
-                                                <FileSpreadsheet className="text-emerald-600" size={16} />
-                                                <span className="font-medium text-emerald-800">
+                                        <div className="p-3 border border-slate-200 rounded-lg">
+                                            <div className="flex items-center gap-2">
+                                                <FileSpreadsheet className="text-slate-600" size={14} />
+                                                <span className="text-xs font-medium text-slate-700">
                                                     {nodes.find(n => n.id === configuringExcelNodeId)?.config?.fileName}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-emerald-600 mt-1">
+                                            <p className="text-[10px] text-slate-500 mt-1">
                                                 {nodes.find(n => n.id === configuringExcelNodeId)?.config?.rowCount} rows loaded
                                             </p>
                                         </div>
                                     )}
-                                    </div>
-                                    
-                                    {/* Actions */}
-                                    <div className="px-6 py-4 flex gap-2 justify-end border-t border-slate-200 shrink-0">
-                                        <button
-                                            onClick={closeExcelConfig}
-                                            disabled={!excelFile && !nodes.find(n => n.id === configuringExcelNodeId)?.config?.fileName}
-                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                                !excelFile && !nodes.find(n => n.id === configuringExcelNodeId)?.config?.fileName
-                                                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                                                    : 'bg-[#256A65] text-white hover:bg-[#1e554f]'
-                                            }`}
-                                        >
-                                            Done
-                                        </button>
-                                    </div>
                                 </div>
-                            </>
+                            </NodeConfigSidePanel>
                         )}
 
                         {/* PDF Input Configuration Modal */}
                         {configuringPdfNodeId && (
-                            <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closePdfConfig}>
-                                <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-[500px] max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-lg font-normal text-slate-800 flex items-center gap-2">
-                                            <FileText className="text-red-600" size={20} />
-                                            PDF Input
-                                        </h3>
-                                        <button
-                                            onClick={closePdfConfig}
-                                            disabled={!pdfFile && !nodes.find(n => n.id === configuringPdfNodeId)?.config?.fileName}
-                                            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                                                !pdfFile && !nodes.find(n => n.id === configuringPdfNodeId)?.config?.fileName
-                                                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                                                    : 'bg-red-600 text-white hover:bg-red-700'
-                                            }`}
-                                        >
-                                            Done
-                                        </button>
-                                    </div>
-                                    
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringPdfNodeId}
+                                onClose={closePdfConfig}
+                                title="PDF Input"
+                                icon={FileText}
+                                footer={
+                                    <button
+                                        onClick={closePdfConfig}
+                                        disabled={!pdfFile && !nodes.find(n => n.id === configuringPdfNodeId)?.config?.fileName}
+                                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Done
+                                    </button>
+                                }
+                            >
+                                <div className="space-y-5">
                                     {/* File Upload Area */}
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
                                             Upload PDF File
                                         </label>
                                         <div className="relative">
@@ -7634,23 +7678,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             />
                                             <label
                                                 htmlFor="pdf-file-input"
-                                                className={`flex items-center justify-center gap-2 w-full px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
+                                                className={`flex items-center justify-center gap-2 w-full px-4 py-6 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
                                                     isParsingPdf 
                                                         ? 'bg-slate-50 border-slate-300 cursor-wait'
-                                                        : 'border-red-300 hover:border-red-500 hover:bg-red-50'
+                                                        : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
                                                 }`}
                                             >
                                                 {isParsingPdf ? (
                                                     <>
-                                                        <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-                                                        <span className="text-slate-600">Parsing PDF...</span>
+                                                        <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                                                        <span className="text-xs text-slate-600">Parsing PDF...</span>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <Upload className="text-red-500" size={24} />
+                                                        <Upload className="text-slate-600" size={18} />
                                                         <div className="text-center">
-                                                            <span className="text-slate-600 font-medium">Click to upload</span>
-                                                            <p className="text-xs text-slate-400 mt-1">PDF files supported</p>
+                                                            <span className="text-xs text-slate-700 font-medium">Click to upload</span>
+                                                            <p className="text-[10px] text-slate-400 mt-1">PDF files supported</p>
                                                         </div>
                                                     </>
                                                 )}
@@ -7660,22 +7704,22 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                     {/* Preview Section */}
                                     {pdfPreviewData && (
-                                        <div className="mb-4">
+                                        <div>
                                             <div className="flex items-center justify-between mb-2">
-                                                <label className="block text-sm font-medium text-slate-700">
+                                                <label className="block text-xs font-medium text-slate-700">
                                                     Extracted Text Preview
                                                 </label>
-                                                <span className="text-xs text-slate-500">
+                                                <span className="text-[10px] text-slate-500">
                                                     {pdfPreviewData.pages} pages
                                                 </span>
                                             </div>
-                                            <div className="border border-slate-200 rounded-lg p-4 max-h-64 overflow-y-auto bg-slate-50">
+                                            <div className="border border-slate-200 rounded-lg p-3 max-h-64 overflow-y-auto">
                                                 <pre className="text-xs text-slate-600 whitespace-pre-wrap font-mono">
                                                     {pdfPreviewData.text.substring(0, 1000)}
                                                     {pdfPreviewData.text.length > 1000 && '\n\n... (text truncated for preview)'}
                                                 </pre>
                                             </div>
-                                            <p className="text-xs text-slate-500 mt-2">
+                                            <p className="text-[10px] text-slate-500 mt-2">
                                                 Full text ({pdfPreviewData.text.length} characters) will be available to the workflow
                                             </p>
                                         </div>
@@ -7683,36 +7727,56 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                     {/* Current File Info */}
                                     {nodes.find(n => n.id === configuringPdfNodeId)?.config?.fileName && !pdfFile && (
-                                        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                                            <div className="flex items-center gap-2 text-sm">
-                                                <FileText className="text-red-600" size={16} />
-                                                <span className="font-medium text-red-800">
+                                        <div className="p-3 border border-slate-200 rounded-lg">
+                                            <div className="flex items-center gap-2">
+                                                <FileText className="text-slate-600" size={14} />
+                                                <span className="text-xs font-medium text-slate-700">
                                                     {nodes.find(n => n.id === configuringPdfNodeId)?.config?.fileName}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-red-600 mt-1">
+                                            <p className="text-[10px] text-slate-500 mt-1">
                                                 {nodes.find(n => n.id === configuringPdfNodeId)?.config?.pages} pages • {nodes.find(n => n.id === configuringPdfNodeId)?.config?.pdfText?.length || 0} characters
                                             </p>
                                         </div>
                                     )}
-
                                 </div>
-                            </div>
+                            </NodeConfigSidePanel>
                         )}
 
                         {/* Save Records Configuration Modal */}
                         {configuringSaveNodeId && (
-                            <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfiguringSaveNodeId(null)}>
-                                <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md w-96" onClick={(e) => e.stopPropagation()}>
-                                    <h3 className="text-lg font-normal text-slate-800 mb-4">Save to Database</h3>
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringSaveNodeId}
+                                onClose={() => setConfiguringSaveNodeId(null)}
+                                title="Save to Database"
+                                icon={Database}
+                                footer={
+                                    <>
+                                        <button
+                                            onClick={() => setConfiguringSaveNodeId(null)}
+                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveSaveRecordsConfig}
+                                            disabled={!saveEntityId}
+                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save
+                                        </button>
+                                    </>
+                                }
+                            >
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
                                             Select Entity
                                         </label>
                                         <select
                                             value={saveEntityId}
                                             onChange={(e) => setSaveEntityId(e.target.value)}
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
                                         >
                                             <option value="">Choose entity...</option>
                                             {entities.map(entity => (
@@ -7720,35 +7784,40 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             ))}
                                         </select>
                                     </div>
-                                    <div className="flex gap-2 justify-end">
-                                        <button
-                                            onClick={() => setConfiguringSaveNodeId(null)}
-                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={saveSaveRecordsConfig}
-                                            disabled={!saveEntityId}
-                                            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm font-medium"
-                                        >
-                                            Save
-                                        </button>
-                                    </div>
                                 </div>
-                            </div>
+                            </NodeConfigSidePanel>
                         )}
                     </div>
 
                     {/* LLM Config Modal */}
                     {configuringLLMNodeId && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                            <div className="bg-white rounded-xl shadow-xl p-6 w-[500px] max-w-full">
-                                <h3 className="text-lg font-normal text-slate-800 mb-4">Configure AI Generation</h3>
-
-                                <div className="space-y-4">
+                        <NodeConfigSidePanel
+                            isOpen={!!configuringLLMNodeId}
+                            onClose={() => setConfiguringLLMNodeId(null)}
+                            title="Configure AI Generation"
+                            icon={Sparkles}
+                            width="w-[500px]"
+                            footer={
+                                <>
+                                    <button
+                                        onClick={() => setConfiguringLLMNodeId(null)}
+                                        className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={saveLLMConfig}
+                                        disabled={!llmPrompt.trim()}
+                                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Save
+                                    </button>
+                                </>
+                            }
+                        >
+                                <div className="space-y-6">
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
                                             Prompt
                                         </label>
                                         <div className="h-48">
@@ -7806,7 +7875,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             Processing Mode
                                         </label>
                                         <div className="space-y-2">
-                                            <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${llmProcessingMode === 'batch' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                            <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${llmProcessingMode === 'batch' ? 'border-slate-400 bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}>
                                                 <input
                                                     type="radio"
                                                     name="llmProcessingMode"
@@ -7844,83 +7913,60 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 </div>
 
                                 {/* Feedback Link */}
-                                <div className="mt-4 pt-2 border-t border-slate-100">
+                                <div className="pt-3 border-t border-slate-200">
                                     <button
                                         onClick={() => openFeedbackPopup('llm', 'LLM / AI Generate')}
-                                        className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
+                                        className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
                                     >
-                                        <MessageSquare size={14} />
+                                        <MessageSquare size={12} />
                                         What would you like this node to do?
                                     </button>
                                 </div>
-
-                                <div className="flex justify-end gap-2 mt-6">
-                                    <button
-                                        onClick={() => setConfiguringLLMNodeId(null)}
-                                        className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={saveLLMConfig}
-                                        disabled={!llmPrompt.trim()}
-                                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Save
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                        </NodeConfigSidePanel>
                     )}
 
                     {/* Python Config Modal */}
                     {configuringPythonNodeId && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                            <div className="bg-white rounded-xl shadow-xl p-6 w-[600px] max-w-full">
-                                <h3 className="text-lg font-normal text-slate-800 mb-4 flex items-center gap-2">
-                                    <Code className="text-indigo-600" />
-                                    Configure Python Code
-                                </h3>
-
-                                <div className="space-y-4">
+                        <NodeConfigSidePanel
+                            isOpen={!!configuringPythonNodeId}
+                            onClose={() => setConfiguringPythonNodeId(null)}
+                            title="Configure Python Code"
+                            icon={Code}
+                            width="w-[600px]"
+                            footer={
+                                <>
+                                    <button
+                                        onClick={() => setConfiguringPythonNodeId(null)}
+                                        className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={savePythonConfig}
+                                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                    >
+                                        Save
+                                    </button>
+                                </>
+                            }
+                        >
+                                <div className="space-y-5">
                                     {/* AI Assistant Section */}
-                                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                                        <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-                                            <Sparkles size={14} className="text-indigo-500" />
-                                            Ask AI to write code
-                                        </label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                value={pythonAiPrompt}
-                                                onChange={(e) => setPythonAiPrompt(e.target.value)}
-                                                placeholder="e.g., Filter records where price > 100"
-                                                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm"
-                                                onKeyDown={(e) => e.key === 'Enter' && generatePythonCode()}
-                                            />
-                                            <button
-                                                onClick={generatePythonCode}
-                                                disabled={isGeneratingCode || !pythonAiPrompt.trim()}
-                                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium whitespace-nowrap flex items-center gap-2"
-                                            >
-                                                {isGeneratingCode ? (
-                                                    <>
-                                                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                        Generating...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Sparkles size={14} />
-                                                        Generate
-                                                    </>
-                                                )}
-                                            </button>
-                                        </div>
-                                    </div>
+                                    <AIPromptSection
+                                        label="Ask AI to write code"
+                                        placeholder="e.g., Filter records where price > 100"
+                                        value={pythonAiPrompt}
+                                        onChange={setPythonAiPrompt}
+                                        onGenerate={generatePythonCode}
+                                        isGenerating={isGeneratingCode}
+                                        generatingText="Generating..."
+                                        icon={Sparkles}
+                                        buttonText="Generate"
+                                    />
 
                                     {/* Code Editor */}
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
                                             Python Code
                                         </label>
                                         <div className="relative">
@@ -7941,46 +7987,46 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 </div>
 
                                 {/* Feedback Link */}
-                                <div className="mt-4 pt-2 border-t border-slate-100">
+                                <div className="pt-3 border-t border-slate-200">
                                     <button
                                         onClick={() => openFeedbackPopup('python', 'Python Code')}
-                                        className="text-sm text-[#256A65] hover:text-[#1e554f] hover:underline flex items-center gap-1"
+                                        className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
                                     >
-                                        <MessageSquare size={14} />
+                                        <MessageSquare size={12} />
                                         What would you like this node to do?
                                     </button>
                                 </div>
-
-                                <div className="flex justify-end gap-2 mt-6">
-                                    <button
-                                        onClick={() => setConfiguringPythonNodeId(null)}
-                                        className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={savePythonConfig}
-                                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                                    >
-                                        Save
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                        </NodeConfigSidePanel>
                     )}
 
                     {/* Manual Input Config Modal */}
                     {configuringManualInputNodeId && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                            <div className="bg-white rounded-xl shadow-xl p-6 w-96 max-w-full">
-                                <h3 className="text-lg font-normal text-slate-800 mb-4 flex items-center gap-2">
-                                    <Edit className="text-[#256A65]" size={20} />
-                                    Configure Manual Data Input
-                                </h3>
-
-                                <div className="space-y-4">
+                        <NodeConfigSidePanel
+                            isOpen={!!configuringManualInputNodeId}
+                            onClose={() => setConfiguringManualInputNodeId(null)}
+                            title="Configure Manual Data Input"
+                            icon={Edit}
+                            footer={
+                                <>
+                                    <button
+                                        onClick={() => setConfiguringManualInputNodeId(null)}
+                                        className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={saveManualInputConfig}
+                                        disabled={!manualInputVarName.trim()}
+                                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Save
+                                    </button>
+                                </>
+                            }
+                        >
+                                <div className="space-y-6">
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
                                             Variable Name
                                         </label>
                                         <input
@@ -7988,11 +8034,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             value={manualInputVarName}
                                             onChange={(e) => setManualInputVarName(e.target.value)}
                                             placeholder="e.g., temperature, count, status"
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#256A65] focus:border-[#256A65] outline-none"
+                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
                                             Value
                                         </label>
                                         <input
@@ -8000,37 +8046,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             value={manualInputVarValue}
                                             onChange={(e) => setManualInputVarValue(e.target.value)}
                                             placeholder="e.g., 25, Active, Hello World"
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#256A65] focus:border-[#256A65] outline-none"
+                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                         />
                                         <p className="text-xs text-slate-500 mt-1">
                                             Numbers will be parsed automatically.
                                         </p>
                                     </div>
                                 </div>
-
-                                <div className="flex justify-end gap-2 mt-6">
-                                    <button
-                                        onClick={() => setConfiguringManualInputNodeId(null)}
-                                        className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={saveManualInputConfig}
-                                        disabled={!manualInputVarName.trim()}
-                                        className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Save
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                        </NodeConfigSidePanel>
                     )}
 
                     {/* Workflow Runner Modal */}
                     {showRunnerModal && (
-                        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowRunnerModal(false)}>
-                            <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none" onClick={() => setShowRunnerModal(false)}>
+                            <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                                 {/* Header */}
                                 <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
                                     <div className="flex items-center justify-between">
@@ -8180,7 +8209,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 [nodeId]: e.target.value
                                                             }))}
                                                             placeholder="Enter value..."
-                                                            className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent"
+                                                            className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                                         />
                                                     </div>
                                                 );
@@ -8276,8 +8305,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             {/* AI Confirm Dialog */}
             {showAiConfirmDialog && aiGeneratedWorkflow && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl shadow-2xl w-[400px] overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+                    <div className="bg-white rounded-xl shadow-2xl w-[400px] overflow-hidden pointer-events-auto" onClick={e => e.stopPropagation()}>
                         <div className="p-6">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
@@ -8330,8 +8359,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             {/* Execution History Modal */}
             {showExecutionHistory && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowExecutionHistory(false)}>
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none" onClick={() => setShowExecutionHistory(false)}>
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
                         <div className="bg-gradient-to-r from-teal-600 to-teal-700 px-6 py-4 text-white rounded-t-xl shrink-0">
                             <div className="flex items-center justify-between">
@@ -8510,8 +8539,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             {/* Node Feedback Popup */}
             {feedbackPopupNodeId && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]" onClick={closeFeedbackPopup}>
-                    <div className="bg-white rounded-xl shadow-2xl p-6 w-[450px] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+                <div className="fixed inset-0 flex items-center justify-center z-[60] pointer-events-none" onClick={closeFeedbackPopup}>
+                    <div className="bg-white rounded-xl shadow-2xl p-6 w-[450px] max-w-[90vw] pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
                                 <MessageSquare size={20} className="text-[#256A65]" />
@@ -8531,7 +8560,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 onChange={(e) => setFeedbackText(e.target.value)}
                                 placeholder="Describe the functionality you'd like to see, any improvements, or share your ideas..."
                                 rows={4}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] resize-none"
+                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 resize-none placeholder:text-slate-400"
                                 autoFocus
                             />
                             <p className="text-xs text-slate-500 mt-1">
@@ -8567,8 +8596,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             {/* Exit Confirmation Modal */}
             {showExitConfirmation && (
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[70] p-4" onClick={() => setShowExitConfirmation(false)}>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                <div className="fixed inset-0 flex items-center justify-center z-[70] p-4 pointer-events-none" onClick={() => setShowExitConfirmation(false)}>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
                         <div className="px-6 py-5 border-b border-slate-200">
                             <div className="flex items-center gap-3">
@@ -8620,8 +8649,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             {/* Workflow Templates Modal */}
             {showTemplatesModal && !previewingTemplate && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !isCopyingTemplate && setShowTemplatesModal(false)}>
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none" onClick={() => !isCopyingTemplate && setShowTemplatesModal(false)}>
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col pointer-events-auto" onClick={e => e.stopPropagation()}>
                         {/* Header */}
                         <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-5 text-white rounded-t-xl shrink-0">
                             <div className="flex items-center justify-between">
@@ -8780,8 +8809,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             {/* Template Preview Modal */}
             {previewingTemplate && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={() => setPreviewingTemplate(null)}>
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 flex items-center justify-center z-[60] p-4 pointer-events-none" onClick={() => setPreviewingTemplate(null)}>
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col pointer-events-auto" onClick={e => e.stopPropagation()}>
                         {/* Header */}
                         <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-4 text-white rounded-t-xl shrink-0">
                             <div className="flex items-center justify-between">
@@ -8949,12 +8978,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             {/* Quick Connect Component Search Modal */}
             {showComponentSearch && connectingFromNodeId && (
-                <div className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => {
+                <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none" onClick={() => {
                     setShowComponentSearch(false);
                     setConnectingFromNodeId(null);
                     setComponentSearchQuery('');
                 }}>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
                         <div className="px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-[#256A65]/5 to-transparent">
                             <h3 className="text-base font-normal text-slate-900">Connect Component</h3>
@@ -8970,7 +8999,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     value={componentSearchQuery}
                                     onChange={(e) => setComponentSearchQuery(e.target.value)}
                                     placeholder="Search components..."
-                                    className="w-full pl-10 pr-4 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-slate-400"
+                                    className="w-full pl-10 pr-4 py-2 bg-white text-slate-700 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-slate-400"
                                     autoFocus
                                 />
                             </div>

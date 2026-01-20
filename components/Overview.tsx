@@ -804,7 +804,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                         setKpiEntityId(e.target.value);
                                         setKpiPropertyName('');
                                     }}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
                                 >
                                     <option value="">Select an entity...</option>
                                     {entities.map(entity => (

@@ -572,7 +572,7 @@ export const Copilots: React.FC = () => {
 
                                     {/* Centered Input */}
                                     <div className="relative">
-                                        <form onSubmit={handleSubmit}>
+                                        <form onSubmit={handleSubmit} className="relative">
                                             <textarea
                                                 ref={inputRef}
                                                 value={input}
@@ -580,14 +580,14 @@ export const Copilots: React.FC = () => {
                                                 onKeyDown={handleKeyDown}
                                                 placeholder="Ask about your data..."
                                                 rows={1}
-                                                className="w-full px-5 py-4 pr-14 bg-white border border-slate-200 rounded-xl text-[15px] focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 resize-none transition-all"
+                                                className="w-full px-5 py-4 pr-16 bg-white border border-slate-200 rounded-xl text-[15px] focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 resize-none transition-all"
                                                 style={{ minHeight: '64px', maxHeight: '200px' }}
                                                 disabled={isLoading}
                                             />
                                             <button
                                                 type="submit"
                                                 disabled={!input.trim() || isLoading}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
                                             >
                                                 <Send size={16} />
                                             </button>
@@ -750,14 +750,14 @@ export const Copilots: React.FC = () => {
                                     onKeyDown={handleKeyDown}
                                     placeholder="Ask about your data... (Press Enter to send, Shift+Enter for new line)"
                                     rows={1}
-                                    className="w-full px-5 py-4 pr-14 bg-slate-50 border border-slate-200 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-slate-400 resize-none transition-all"
+                                    className="w-full px-5 py-4 pr-16 bg-slate-50 border border-slate-200 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-slate-400 resize-none transition-all"
                                     style={{ minHeight: '56px', maxHeight: '200px' }}
                                     disabled={isLoading}
                                 />
                                 <button
                                     type="submit"
                                     disabled={!input.trim() || isLoading}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     <Send size={16} />
                                 </button>
