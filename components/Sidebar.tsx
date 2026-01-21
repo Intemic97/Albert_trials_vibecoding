@@ -131,10 +131,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
   const NavItem = ({ icon: Icon, label, view, active = false, onClick, onNavigate }: { icon: any, label: string, view?: string, active?: boolean, onClick?: () => void, onNavigate?: () => void }) => {
     const route = view ? viewToRoute[view] || `/${view}` : '#';
     
-    const baseClasses = "flex items-center px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 w-full text-left group";
+    const baseClasses = "flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out w-full text-left group";
     const activeClasses = active 
-      ? 'bg-[rgb(235,245,250)] text-slate-900' 
-      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900';
+      ? 'bg-white/60 text-black shadow-[0_1px_2px_rgba(0,0,0,0.05),0_0_0_1px_rgba(0,0,0,0.02)]' 
+      : 'text-slate-600 hover:text-slate-800 hover:bg-white/30';
     
     if (onClick) {
       // Clickable item with custom handler (like Quickstart)
@@ -143,8 +143,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
           onClick={onClick}
           className={`${baseClasses} ${activeClasses}`}
         >
-          <Icon size={16} className={`mr-3 transition-colors ${active ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600'}`} />
-          <span>{label}</span>
+          <Icon size={16} className={`mr-3 transition-colors duration-200 ease-in-out ${active ? 'text-black' : 'text-slate-500 group-hover:text-slate-700'}`} />
+          <span className="transition-colors duration-200 ease-in-out">{label}</span>
         </button>
       );
     }
@@ -153,8 +153,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
       // Non-navigable item (like Documentation)
       return (
         <div className={`${baseClasses} ${activeClasses}`}>
-          <Icon size={16} className={`mr-3 transition-colors ${active ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600'}`} />
-          <span>{label}</span>
+          <Icon size={16} className={`mr-3 transition-colors duration-200 ease-in-out ${active ? 'text-black' : 'text-slate-500 group-hover:text-slate-700'}`} />
+          <span className="transition-colors duration-200 ease-in-out">{label}</span>
         </div>
       );
     }
@@ -172,8 +172,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         className={`${baseClasses} ${activeClasses}`}
         onClick={handleClick}
       >
-        <Icon size={16} className={`mr-3 transition-colors ${active ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600'}`} />
-        <span>{label}</span>
+        <Icon size={16} className={`mr-3 transition-colors duration-200 ease-in-out ${active ? 'text-black' : 'text-slate-500 group-hover:text-slate-700'}`} />
+        <span className="transition-colors duration-200 ease-in-out">{label}</span>
       </Link>
     );
   };
@@ -185,9 +185,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
   );
 
   return (
-    <div data-tutorial="sidebar" className="w-60 bg-white border-r border-slate-200 h-screen flex flex-col sticky top-0 font-sans z-40">
+    <div data-tutorial="sidebar" className="w-60 bg-slate-50 border-r border-slate-200 h-screen flex flex-col sticky top-0 font-sans z-40">
       {/* Header */}
-      <div className="px-6 pt-5 pb-5 border-b border-slate-100">
+      <div className="px-6 pt-5 pb-5 border-b border-slate-200 bg-white">
         <div className="flex items-center mb-5 pl-1">
           <img
             src="/logo.svg"
@@ -326,16 +326,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-3 border-t border-slate-100 bg-slate-50/30">
+      <div className="px-3 py-3 border-t border-slate-200">
         {/* Help Dropdown */}
         <div className="mb-2">
           <button
             onClick={() => setShowHelpDropdown(!showHelpDropdown)}
-            className="flex items-center justify-between w-full px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-slate-600 hover:bg-slate-50 hover:text-slate-900 group"
+            className="flex items-center justify-between w-full px-3 py-2 text-sm rounded-lg cursor-pointer transition-colors duration-200 ease-in-out text-slate-600 hover:bg-white/30 hover:text-slate-800 group"
           >
             <div className="flex items-center">
-              <HelpCircle size={16} className="mr-3 text-slate-400 group-hover:text-slate-600 transition-colors" />
-              <span>Help</span>
+              <HelpCircle size={16} className="mr-3 text-slate-500 group-hover:text-slate-700 transition-colors duration-200 ease-in-out" />
+              <span className="transition-colors duration-200 ease-in-out">Help</span>
             </div>
             {showHelpDropdown ? (
               <ChevronUp size={16} className="text-slate-400" />
@@ -383,7 +383,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         <ProfileMenu
           onNavigate={onNavigate}
           menuPlacement="top-right"
-          triggerClassName="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-white transition-colors text-left border border-transparent hover:border-slate-200"
+          triggerClassName="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-white/30 transition-colors duration-200 ease-in-out text-left border border-transparent hover:border-slate-200"
           triggerContent={(
             <>
               <UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="md" />

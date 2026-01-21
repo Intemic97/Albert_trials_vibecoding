@@ -361,7 +361,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                             <span className="text-xs text-slate-400 ml-1">{reports.length} document{reports.length !== 1 ? 's' : ''}</span>
                             <button
                                 onClick={() => setShowNewReportModal(true)}
-                                className="ml-auto flex items-center gap-2 btn-3d btn-primary-3d text-xs hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
+                                className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                             >
                                 <Plus size={14} />
                                 New Document
@@ -478,7 +478,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                             <span className="text-xs text-slate-400 ml-1">Templates define the structure of your documents</span>
                             <button
                                 onClick={handleCreateTemplate}
-                                className="ml-auto flex items-center gap-2 btn-3d btn-primary-3d text-xs hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
+                                className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                             >
                                 <Plus size={14} />
                                 New Template
@@ -755,7 +755,7 @@ const NewReportModal: React.FC<NewReportModalProps> = ({ templates, orgUsers, on
                     <button
                         onClick={handleSubmit}
                         disabled={isCreating || templates.length === 0}
-                        className="flex items-center gap-2 btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] disabled:bg-slate-400 text-white rounded-lg text-sm font-medium transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:shadow-none"
                     >
                         {isCreating ? (
                             <>
@@ -1102,7 +1102,7 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                     <button
                         onClick={handleSubmit}
                         disabled={isSaving}
-                        className="flex items-center gap-2 btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] disabled:bg-slate-400 text-white rounded-lg text-sm font-medium transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:shadow-none"
                     >
                         {isSaving ? (
                             <>

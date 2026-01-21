@@ -276,34 +276,34 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                             <div className="px-3 py-2 space-y-0.5">
                                 <button
                                     onClick={() => setView('organizations')}
-                                    className="w-full flex items-center justify-between px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-left group text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                    className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg cursor-pointer transition-colors duration-200 ease-in-out text-left group text-slate-600 hover:text-slate-800 hover:bg-white/30"
                                 >
                                     <div className="flex items-center">
-                                        <Building size={16} className="mr-3 transition-colors text-slate-400 group-hover:text-slate-600" />
+                                        <Building size={16} className="mr-3 transition-colors duration-200 ease-in-out text-slate-500 group-hover:text-slate-700" />
                                         <div className="text-left">
-                                            <span className="text-sm font-light">Change organization</span>
-                                            <p className="text-xs text-slate-400 font-light mt-0.5">{currentOrg?.name || 'Select Organization'}</p>
+                                            <span className="text-sm">Change organization</span>
+                                            <p className="text-xs text-slate-400 mt-0.5">{currentOrg?.name || 'Select Organization'}</p>
                                         </div>
                                     </div>
-                                    <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
+                                    <ChevronRight size={16} className="text-slate-500 group-hover:text-slate-700 transition-colors duration-200 ease-in-out" />
                                 </button>
 
                                 <button 
                                     onClick={openProfileModal}
-                                    className="w-full flex items-center px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-left group text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                    className="w-full flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-colors duration-200 ease-in-out text-left group text-slate-600 hover:text-slate-800 hover:bg-white/30"
                                 >
-                                    <User size={16} className="mr-3 transition-colors text-slate-400 group-hover:text-slate-600" />
-                                    <span>My Profile</span>
+                                    <User size={16} className="mr-3 transition-colors duration-200 ease-in-out text-slate-500 group-hover:text-slate-700" />
+                                    <span className="transition-colors duration-200 ease-in-out">My Profile</span>
                                 </button>
                                 <button
                                     onClick={() => {
                                         setIsOpen(false);
                                         onNavigate?.('settings');
                                     }}
-                                    className="w-full flex items-center px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-left group text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                    className="w-full flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-colors duration-200 ease-in-out text-left group text-slate-600 hover:text-slate-800 hover:bg-white/30"
                                 >
-                                    <Settings size={16} className="mr-3 transition-colors text-slate-400 group-hover:text-slate-600" />
-                                    <span>Settings</span>
+                                    <Settings size={16} className="mr-3 transition-colors duration-200 ease-in-out text-slate-500 group-hover:text-slate-700" />
+                                    <span className="transition-colors duration-200 ease-in-out">Settings</span>
                                 </button>
                                 
                                 {/* Admin Panel - Only visible for admins */}
@@ -313,10 +313,10 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                             setIsOpen(false);
                                             onNavigate?.('admin');
                                         }}
-                                        className="w-full flex items-center px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-left group text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                        className="w-full flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-colors duration-200 ease-in-out text-left group text-slate-600 hover:text-slate-800 hover:bg-white/30"
                                     >
-                                        <Shield size={16} className="mr-3 transition-colors text-slate-400 group-hover:text-slate-600" />
-                                        <span>Admin Panel</span>
+                                        <Shield size={16} className="mr-3 transition-colors duration-200 ease-in-out text-slate-500 group-hover:text-slate-700" />
+                                        <span className="transition-colors duration-200 ease-in-out">Admin Panel</span>
                                     </button>
                                 )}
                             </div>
@@ -326,10 +326,10 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                             <div className="px-3 pb-2">
                                 <button
                                     onClick={logout}
-                                    className="w-full flex items-center px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-left group text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                    className="w-full flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-colors duration-200 ease-in-out text-left group text-slate-600 hover:text-slate-800 hover:bg-white/30"
                                 >
-                                    <LogOut size={16} className="mr-3 transition-colors text-slate-400 group-hover:text-slate-600" />
-                                    <span>Log Out</span>
+                                    <LogOut size={16} className="mr-3 transition-colors duration-200 ease-in-out text-slate-500 group-hover:text-slate-700" />
+                                    <span className="transition-colors duration-200 ease-in-out">Log Out</span>
                                 </button>
                             </div>
                         </>
@@ -351,25 +351,25 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     <button
                                         key={org.id}
                                         onClick={() => switchOrganization(org.id)}
-                                        className={`w-full flex items-center justify-between px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-left group ${user?.orgId === org.id
-                                            ? 'bg-[rgb(235,245,250)] text-slate-900'
-                                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                        className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg cursor-pointer transition-colors duration-200 ease-in-out text-left group ${user?.orgId === org.id
+                                            ? 'bg-white/60 text-black shadow-[0_1px_2px_rgba(0,0,0,0.05),0_0_0_1px_rgba(0,0,0,0.02)]'
+                                            : 'text-slate-600 hover:text-slate-800 hover:bg-white/30'
                                             }`}
                                     >
                                         <div className="flex items-center">
-                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs mr-3 font-normal ${user?.orgId === org.id
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs mr-3 font-normal transition-colors duration-200 ease-in-out ${user?.orgId === org.id
                                                 ? 'bg-slate-900 text-white'
                                                 : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
                                                 }`}>
                                                 {org.name.substring(0, 2).toUpperCase()}
                                             </div>
                                             <div className="text-left">
-                                                <span>{org.name}</span>
-                                                <p className="text-xs text-slate-400 font-light mt-0.5 capitalize">{org.role}</p>
+                                                <span className="transition-colors duration-200 ease-in-out">{org.name}</span>
+                                                <p className="text-xs text-slate-400 mt-0.5 capitalize">{org.role}</p>
                                             </div>
                                         </div>
                                         {user?.orgId === org.id && (
-                                            <div className="w-2 h-2 rounded-full bg-slate-900"></div>
+                                            <div className="w-2 h-2 rounded-full bg-black transition-colors duration-200 ease-in-out"></div>
                                         )}
                                     </button>
                                 ))}
@@ -382,10 +382,10 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                         setIsOpen(false);
                                         setShowCreateOrgModal(true);
                                     }}
-                                    className="w-full flex items-center px-3 py-2 text-sm font-light rounded-lg cursor-pointer transition-all duration-150 text-left group text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                    className="w-full flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-colors duration-200 ease-in-out text-left group text-slate-600 hover:text-slate-800 hover:bg-white/30"
                                 >
-                                    <Plus size={16} className="mr-3 transition-colors text-slate-400 group-hover:text-slate-600" />
-                                    <span>Create Organization</span>
+                                    <Plus size={16} className="mr-3 transition-colors duration-200 ease-in-out text-slate-500 group-hover:text-slate-700" />
+                                    <span className="transition-colors duration-200 ease-in-out">Create Organization</span>
                                 </button>
                             </div>
                         </>

@@ -9,6 +9,7 @@ import {
     Search, 
     ChevronDown, 
     ChevronRight,
+    ChevronLeft,
     RefreshCw,
     Calendar,
     Workflow,
@@ -73,6 +74,11 @@ export const LogsAndAlerts: React.FC = () => {
     const [typeFilter, setTypeFilter] = useState<string>('all'); // 'executions' | 'alerts'
     const [searchQuery, setSearchQuery] = useState('');
     const [dateFilter, setDateFilter] = useState<string>('all'); // 'all' | 'today' | 'week' | 'month'
+    
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const [currentAlertsPage, setCurrentAlertsPage] = useState(1);
+    const itemsPerPage = 20;
 
     useEffect(() => {
         loadData();
@@ -292,6 +298,24 @@ export const LogsAndAlerts: React.FC = () => {
         a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         a.message.toLowerCase().includes(searchQuery.toLowerCase())
     );
+    
+    // Pagination calculations
+    const totalExecutionsPages = Math.ceil(filteredExecutions.length / itemsPerPage);
+    const totalAlertsPages = Math.ceil(filteredAlerts.length / itemsPerPage);
+    const paginatedExecutions = filteredExecutions.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+    const paginatedAlerts = filteredAlerts.slice(
+        (currentAlertsPage - 1) * itemsPerPage,
+        currentAlertsPage * itemsPerPage
+    );
+    
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+        setCurrentAlertsPage(1);
+    }, [statusFilter, typeFilter, searchQuery, dateFilter]);
 
     return (
         <div className="flex flex-col h-full bg-slate-50">
@@ -400,21 +424,21 @@ export const LogsAndAlerts: React.FC = () => {
                                         <p className="text-slate-500 mt-2 text-sm">No executions found</p>
                                     </div>
                                 ) : (
-                                    filteredExecutions.map((execution) => {
+                                    paginatedExecutions.map((execution) => {
                                         const isExpanded = expandedExecutions.has(execution.id);
                                         const logs = executionLogs[execution.id] || [];
                                         return (
                                             <div key={execution.id} className="hover:bg-slate-50 transition-colors">
                                                 <div
-                                                    className="px-6 py-4 flex items-center justify-between cursor-pointer"
+                                                    className="px-6 py-2.5 flex items-center justify-between cursor-pointer"
                                                     onClick={() => toggleExecutionExpanded(execution.id)}
                                                 >
-                                                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                                                    <div className="flex items-center gap-3 flex-1 min-w-0">
                                                         <button className="text-slate-400 hover:text-slate-600">
                                                             {isExpanded ? (
-                                                                <ChevronDown size={18} />
+                                                                <ChevronDown size={16} />
                                                             ) : (
-                                                                <ChevronRight size={18} />
+                                                                <ChevronRight size={16} />
                                                             )}
                                                         </button>
                                                         {getStatusIcon(execution.status)}
@@ -427,7 +451,7 @@ export const LogsAndAlerts: React.FC = () => {
                                                                     {execution.status}
                                                                 </span>
                                                             </div>
-                                                            <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                                                            <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-500">
                                                                 <span>ID: {execution.id.slice(0, 8)}...</span>
                                                                 {execution.duration && (
                                                                     <span>Duration: {formatDuration(execution.duration)}</span>
@@ -437,13 +461,13 @@ export const LogsAndAlerts: React.FC = () => {
                                                         </div>
                                                     </div>
                                                     {execution.error && (
-                                                        <AlertTriangle size={16} className="text-red-500 flex-shrink-0" />
+                                                        <AlertTriangle size={14} className="text-red-500 flex-shrink-0" />
                                                     )}
                                                 </div>
                                                 
                                                 {/* Expanded Logs */}
                                                 {isExpanded && (
-                                                    <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
+                                                    <div className="px-6 py-3 bg-slate-50 border-t border-slate-100">
                                                         {execution.error && (
                                                             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                                                                 <div className="flex items-start gap-2">
@@ -500,6 +524,33 @@ export const LogsAndAlerts: React.FC = () => {
                                     })
                                 )}
                             </div>
+                            {/* Pagination for Executions */}
+                            {filteredExecutions.length > itemsPerPage && (
+                                <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
+                                    <div className="text-sm text-slate-600">
+                                        Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredExecutions.length)} of {filteredExecutions.length}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                            disabled={currentPage === 1}
+                                            className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            <ChevronLeft size={16} />
+                                        </button>
+                                        <span className="text-sm text-slate-600 px-2">
+                                            Page {currentPage} of {totalExecutionsPages}
+                                        </span>
+                                        <button
+                                            onClick={() => setCurrentPage(prev => Math.min(totalExecutionsPages, prev + 1))}
+                                            disabled={currentPage === totalExecutionsPages}
+                                            className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            <ChevronRight size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -518,7 +569,7 @@ export const LogsAndAlerts: React.FC = () => {
                                         <p className="text-slate-500 mt-2 text-sm">No alerts</p>
                                     </div>
                                 ) : (
-                                    filteredAlerts.map((alert) => {
+                                    paginatedAlerts.map((alert) => {
                                         const alertIcons = {
                                             error: <XCircle size={16} className="text-red-600" />,
                                             warning: <AlertTriangle size={16} className="text-amber-600" />,
@@ -554,6 +605,33 @@ export const LogsAndAlerts: React.FC = () => {
                                     })
                                 )}
                             </div>
+                            {/* Pagination for Alerts */}
+                            {filteredAlerts.length > itemsPerPage && (
+                                <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
+                                    <div className="text-sm text-slate-600">
+                                        Showing {(currentAlertsPage - 1) * itemsPerPage + 1} to {Math.min(currentAlertsPage * itemsPerPage, filteredAlerts.length)} of {filteredAlerts.length}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setCurrentAlertsPage(prev => Math.max(1, prev - 1))}
+                                            disabled={currentAlertsPage === 1}
+                                            className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            <ChevronLeft size={16} />
+                                        </button>
+                                        <span className="text-sm text-slate-600 px-2">
+                                            Page {currentAlertsPage} of {totalAlertsPages}
+                                        </span>
+                                        <button
+                                            onClick={() => setCurrentAlertsPage(prev => Math.min(totalAlertsPages, prev + 1))}
+                                            disabled={currentAlertsPage === totalAlertsPages}
+                                            className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            <ChevronRight size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

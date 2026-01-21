@@ -13,6 +13,7 @@ import {
     Clock,
     Workflow,
     ChevronRight,
+    ChevronLeft,
     AlertCircle,
     Hash,
     Calculator,
@@ -452,6 +453,10 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
         }>;
     } | null>(null);
     const [isLoadingStats, setIsLoadingStats] = useState(true);
+    
+    // Pagination for workflows table
+    const [workflowsPage, setWorkflowsPage] = useState(1);
+    const workflowsPerPage = 10;
 
     // Generate chart data from daily executions
     const getChartData = () => {
@@ -709,7 +714,9 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                             </td>
                                         </tr>
                                     ) : overviewStats && overviewStats.recentWorkflows && overviewStats.recentWorkflows.length > 0 ? (
-                                        overviewStats.recentWorkflows.map(workflow => (
+                                        overviewStats.recentWorkflows
+                                            .slice((workflowsPage - 1) * workflowsPerPage, workflowsPage * workflowsPerPage)
+                                            .map(workflow => (
                                             <tr key={workflow.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                                                 <td className="px-4 py-2 text-slate-900 font-medium">{workflow.name}</td>
                                                 <td className="px-4 py-2">
@@ -740,6 +747,33 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                 </tbody>
                             </table>
                         </div>
+                        {/* Pagination for Workflows */}
+                        {overviewStats && overviewStats.recentWorkflows && overviewStats.recentWorkflows.length > workflowsPerPage && (
+                            <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between">
+                                <div className="text-sm text-slate-600">
+                                    Showing {(workflowsPage - 1) * workflowsPerPage + 1} to {Math.min(workflowsPage * workflowsPerPage, overviewStats.recentWorkflows.length)} of {overviewStats.recentWorkflows.length}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setWorkflowsPage(prev => Math.max(1, prev - 1))}
+                                        disabled={workflowsPage === 1}
+                                        className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        <ChevronLeft size={16} />
+                                    </button>
+                                    <span className="text-sm text-slate-600 px-2">
+                                        Page {workflowsPage} of {Math.ceil(overviewStats.recentWorkflows.length / workflowsPerPage)}
+                                    </span>
+                                    <button
+                                        onClick={() => setWorkflowsPage(prev => Math.min(Math.ceil(overviewStats.recentWorkflows.length / workflowsPerPage), prev + 1))}
+                                        disabled={workflowsPage === Math.ceil(overviewStats.recentWorkflows.length / workflowsPerPage)}
+                                        className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        <ChevronRight size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </section>
 
                 </div>

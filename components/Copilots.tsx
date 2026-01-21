@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Info, Bot, User, Plus, Trash2, MessageSquare, ArrowLeft, Menu, X, Sparkles, Database, Check, XCircle, ChevronsLeft, Search, Settings } from 'lucide-react';
+import { Send, Loader2, Info, Bot, User, Plus, Trash2, MessageSquare, ArrowLeft, Menu, X, Sparkles, Database, Check, XCircle, ChevronsLeft, Search, Settings, Hash, ArrowLeftCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { API_BASE } from '../config';
-import { Entity } from '../types';
+import { Entity, Property } from '../types';
 
 // Intemic Logo Icon Component
 const IntemicIcon: React.FC<{ size?: number; className?: string }> = ({ size = 14, className = '' }) => {
@@ -86,12 +86,48 @@ export const Copilots: React.FC = () => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const titleInputRef = useRef<HTMLInputElement>(null);
+    const mirrorRef = useRef<HTMLDivElement>(null);
+    const mentionContainerRef = useRef<HTMLDivElement>(null);
+    const previousActiveChatRef = useRef<string | null>(null);
+    
+    // Mention state
+    type MentionType = 'entity' | 'attribute';
+    interface MentionState {
+        isActive: boolean;
+        type: MentionType;
+        query: string;
+        top: number;
+        left: number;
+        triggerIndex: number;
+        entityContext?: Entity;
+    }
+    const [mention, setMention] = useState<MentionState>({
+        isActive: false,
+        type: 'entity',
+        query: '',
+        top: 0,
+        left: 0,
+        triggerIndex: -1
+    });
+    const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
 
-    // Load chats from backend on mount
+    // Load chats from backend on mount (only once)
     useEffect(() => {
-        loadChats();
-        loadEntities();
-    }, []);
+        let mounted = true;
+        
+        const initialize = async () => {
+            await loadEntities();
+            if (mounted) {
+                await loadChats();
+            }
+        };
+        
+        initialize();
+        
+        return () => {
+            mounted = false;
+        };
+    }, []); // Empty dependency array - only run on mount
 
     const loadEntities = async () => {
         try {
@@ -121,6 +157,67 @@ export const Copilots: React.FC = () => {
             inputRef.current.focus();
         }
     }, [activeChat]);
+    
+    // Auto-save chats when they change (with debounce)
+    useEffect(() => {
+        const saveTimeout = setTimeout(() => {
+            chats.forEach(chat => {
+                // Save all chats that have been modified (have messages or configuration)
+                if (chat.messages.length > 0 || chat.instructions || (chat.allowedEntities && chat.allowedEntities.length > 0)) {
+                    saveChat(chat).catch(err => console.error('[Copilots] Error auto-saving chat:', chat.id, err));
+                }
+            });
+        }, 1000); // Debounce: save 1 second after last change
+
+        return () => {
+            clearTimeout(saveTimeout);
+        };
+    }, [chats]);
+
+    // Save previous chat when switching to a different chat
+    useEffect(() => {
+        if (previousActiveChatRef.current && previousActiveChatRef.current !== activeChat) {
+            const previousChat = chats.find(c => c.id === previousActiveChatRef.current);
+            if (previousChat && (previousChat.messages.length > 0 || previousChat.instructions || (previousChat.allowedEntities && previousChat.allowedEntities.length > 0))) {
+                console.log('[Copilots] Saving previous chat before switch:', previousActiveChatRef.current);
+                saveChat(previousChat).catch(err => console.error('[Copilots] Error saving previous chat:', err));
+            }
+        }
+        previousActiveChatRef.current = activeChat;
+    }, [activeChat, chats]);
+
+    // Save all chats on unmount
+    useEffect(() => {
+        return () => {
+            chats.forEach(chat => {
+                if (chat.messages.length > 0 || chat.instructions || (chat.allowedEntities && chat.allowedEntities.length > 0)) {
+                    // Use synchronous-like approach for unmount
+                    fetch(`${API_BASE}/api/copilot/chats/${chat.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            title: chat.title || 'New Copilot',
+                            messages: chat.messages.map(m => ({
+                                id: m.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                role: m.role,
+                                content: m.content || '',
+                                timestamp: m.timestamp ? (m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp) : new Date().toISOString(),
+                                data: m.data,
+                                explanation: m.explanation,
+                                entitiesUsed: m.entitiesUsed
+                            })),
+                            createdAt: chat.createdAt ? (chat.createdAt instanceof Date ? chat.createdAt.toISOString() : chat.createdAt) : new Date().toISOString(),
+                            updatedAt: chat.updatedAt ? (chat.updatedAt instanceof Date ? chat.updatedAt.toISOString() : chat.updatedAt) : new Date().toISOString(),
+                            instructions: chat.instructions || null,
+                            allowedEntities: Array.isArray(chat.allowedEntities) && chat.allowedEntities.length > 0 ? chat.allowedEntities : null
+                        }),
+                        keepalive: true // Keep request alive even after page unload
+                    }).catch(err => console.error('[Copilots] Error saving on unmount:', chat.id, err));
+                }
+            });
+        };
+    }, [chats]);
 
     useEffect(() => {
         if (isEditingTitle) {
@@ -135,57 +232,131 @@ export const Copilots: React.FC = () => {
             });
             if (response.ok) {
                 const data = await response.json();
-                const loadedChats = (data.chats || []).map((chat: any) => ({
-                    ...chat,
-                    createdAt: chat.createdAt ? new Date(chat.createdAt) : new Date(),
-                    updatedAt: chat.updatedAt ? new Date(chat.updatedAt) : new Date(),
-                    instructions: chat.instructions || undefined,
-                    allowedEntities: chat.allowedEntities || [],
-                    messages: (chat.messages || []).map((msg: any) => ({
-                        ...msg,
-                        id: msg.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                        timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
-                    }))
-                }));
+                console.log('[Copilots] Loaded chats from server:', data);
                 
-                // If no chats exist, create one
-                if (loadedChats.length === 0) {
-                    console.log('No chats found, creating default chat');
-                    await createNewChat();
-                } else {
+                const loadedChats = (data.chats || []).map((chat: any) => {
+                    try {
+                        // Server already parses messages and allowedEntities
+                        return {
+                            id: chat.id,
+                            title: chat.title || 'New Copilot',
+                            createdAt: chat.createdAt ? new Date(chat.createdAt) : new Date(),
+                            updatedAt: chat.updatedAt ? new Date(chat.updatedAt) : new Date(),
+                            instructions: chat.instructions || undefined,
+                            allowedEntities: Array.isArray(chat.allowedEntities) ? chat.allowedEntities : [],
+                            messages: Array.isArray(chat.messages) ? chat.messages.map((msg: any) => ({
+                                id: msg.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                role: msg.role,
+                                content: msg.content || '',
+                                timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+                                data: msg.data,
+                                explanation: msg.explanation,
+                                entitiesUsed: msg.entitiesUsed
+                            })) : []
+                        };
+                    } catch (parseError) {
+                        console.error('[Copilots] Error parsing chat:', chat.id, parseError);
+                        return null;
+                    }
+                }).filter((chat: any) => chat !== null);
+                
+                console.log('[Copilots] Loaded chats from server:', loadedChats.length, loadedChats.map(c => ({ 
+                    id: c.id, 
+                    title: c.title, 
+                    messages: c.messages.length,
+                    hasInstructions: !!c.instructions,
+                    updatedAt: c.updatedAt 
+                })));
+                
+                // Always set loaded chats, even if empty - this preserves state
+                if (loadedChats.length > 0) {
                     setChats(loadedChats);
                     // Set active chat to most recent if none selected
                     if (!activeChat) {
+                        console.log('[Copilots] Setting active chat to most recent:', loadedChats[0].id);
                         setActiveChat(loadedChats[0].id);
+                    } else {
+                        // Verify active chat still exists
+                        const chatExists = loadedChats.some(c => c.id === activeChat);
+                        if (!chatExists) {
+                            console.log('[Copilots] Active chat not found, setting to most recent');
+                            setActiveChat(loadedChats[0].id);
+                        } else {
+                            console.log('[Copilots] Active chat still exists:', activeChat);
+                        }
                     }
+                } else {
+                    // Only create new chat if truly no chats exist
+                    console.log('[Copilots] No chats found, creating default chat');
+                    await createNewChat();
                 }
             } else {
-                console.error('Failed to load chats, creating default chat');
-                await createNewChat();
+                const errorData = await response.json().catch(() => ({}));
+                console.error('[Copilots] Failed to load chats:', response.status, response.statusText, errorData);
+                // Don't create a new chat on error, let user see the error
             }
         } catch (error) {
-            console.error('Error loading chats:', error);
-            // Initialize with a default chat if loading fails
-            await createNewChat();
+            console.error('[Copilots] Error loading chats:', error);
+            // Don't create a new chat on error
         }
     };
 
     const saveChat = async (chat: Chat) => {
+        if (!chat || !chat.id) {
+            console.error('[Copilots] Cannot save chat: invalid chat object', chat);
+            return;
+        }
+        
         try {
-            await fetch(`${API_BASE}/copilot/chats/${chat.id}`, {
+            const payload = {
+                title: chat.title || 'New Copilot',
+                messages: chat.messages.map(m => ({
+                    id: m.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    role: m.role,
+                    content: m.content || '',
+                    timestamp: m.timestamp ? (m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp) : new Date().toISOString(),
+                    data: m.data,
+                    explanation: m.explanation,
+                    entitiesUsed: m.entitiesUsed
+                })),
+                createdAt: chat.createdAt ? (chat.createdAt instanceof Date ? chat.createdAt.toISOString() : chat.createdAt) : new Date().toISOString(),
+                updatedAt: chat.updatedAt ? (chat.updatedAt instanceof Date ? chat.updatedAt.toISOString() : chat.updatedAt) : new Date().toISOString(),
+                instructions: chat.instructions || null,
+                allowedEntities: Array.isArray(chat.allowedEntities) && chat.allowedEntities.length > 0 ? chat.allowedEntities : null
+            };
+            
+            console.log('[Copilots] Saving chat:', chat.id, { 
+                title: payload.title, 
+                messageCount: payload.messages.length,
+                hasInstructions: !!payload.instructions,
+                allowedEntitiesCount: payload.allowedEntities ? payload.allowedEntities.length : 0
+            });
+            
+            const response = await fetch(`${API_BASE}/api/copilot/chats/${chat.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({
-                    title: chat.title,
-                    messages: chat.messages,
-                    updatedAt: chat.updatedAt.toISOString(),
-                    instructions: chat.instructions,
-                    allowedEntities: chat.allowedEntities
-                })
+                body: JSON.stringify(payload)
             });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                let errorData;
+                try {
+                    errorData = JSON.parse(errorText);
+                } catch {
+                    errorData = { message: errorText };
+                }
+                console.error('[Copilots] Failed to save chat:', response.status, response.statusText, errorData);
+                throw new Error(`Failed to save chat: ${response.status} ${response.statusText}`);
+            } else {
+                const result = await response.json().catch(() => ({ success: true }));
+                console.log('[Copilots] Chat saved successfully:', chat.id, result);
+            }
         } catch (error) {
-            console.error('Error saving chat:', error);
+            console.error('[Copilots] Error saving chat:', error);
+            // Re-throw to allow caller to handle if needed
+            throw error;
         }
     };
 
@@ -223,12 +394,40 @@ export const Copilots: React.FC = () => {
 
         // Try to save to backend
         try {
-            await fetch(`${API_BASE}/copilot/chats`, {
+            const response = await fetch(`${API_BASE}/api/copilot/chats`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify(newChat)
+                body: JSON.stringify({
+                    id: newChat.id,
+                    title: newChat.title,
+                    messages: newChat.messages.map(m => ({
+                        id: m.id,
+                        role: m.role,
+                        content: m.content,
+                        timestamp: m.timestamp.toISOString()
+                    })),
+                    createdAt: newChat.createdAt.toISOString(),
+                    updatedAt: newChat.updatedAt.toISOString(),
+                    instructions: newChat.instructions || null,
+                    allowedEntities: newChat.allowedEntities || null
+                })
             });
+            if (response.ok) {
+                const savedChat = await response.json();
+                console.log('[Copilots] Chat created successfully:', newChat.id, savedChat);
+                // Server returns { success: true, chatId: id }, but we use our own ID
+                // No need to update ID since we're using client-generated IDs
+            } else {
+                const errorText = await response.text();
+                let errorData;
+                try {
+                    errorData = JSON.parse(errorText);
+                } catch {
+                    errorData = { message: errorText };
+                }
+                console.error('[Copilots] Failed to create chat:', response.status, response.statusText, errorData);
+            }
         } catch (error) {
             console.error('Error saving chat to backend:', error);
             // Chat is already in local state, so user can continue
@@ -257,10 +456,13 @@ export const Copilots: React.FC = () => {
 
     const deleteChat = async (chatId: string) => {
         try {
-            await fetch(`${API_BASE}/copilot/chats/${chatId}`, {
+            const response = await fetch(`${API_BASE}/api/copilot/chats/${chatId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
+            if (!response.ok) {
+                console.error('Failed to delete chat:', response.status, response.statusText);
+            }
         } catch (error) {
             console.error('Error deleting chat:', error);
         }
@@ -326,6 +528,9 @@ export const Copilots: React.FC = () => {
         setChats(prev => prev.map(c => c.id === activeChat ? updatedChat : c));
         setInput('');
         setIsLoading(true);
+        
+        // Save user message immediately
+        saveChat(updatedChat).catch(err => console.error('[Copilots] Error saving user message:', err));
 
         try {
             const response = await fetch(`${API_BASE}/database/ask`, {
@@ -363,9 +568,10 @@ export const Copilots: React.FC = () => {
             };
 
             setChats(prev => prev.map(c => c.id === activeChat ? finalChat : c));
-            saveChat(finalChat);
+            // Save assistant response immediately
+            await saveChat(finalChat).catch(err => console.error('[Copilots] Error saving assistant message:', err));
         } catch (error) {
-            console.error('Error asking database:', error);
+            console.error('[Copilots] Error asking database:', error);
             const errorMessage: Message = {
                 id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 role: 'assistant',
@@ -380,18 +586,185 @@ export const Copilots: React.FC = () => {
             };
             
             setChats(prev => prev.map(c => c.id === activeChat ? finalChat : c));
-            saveChat(finalChat);
+            // Save error message immediately
+            await saveChat(finalChat).catch(err => console.error('[Copilots] Error saving error message:', err));
         } finally {
             setIsLoading(false);
         }
     };
 
+    // Get mention suggestions
+    const getMentionSuggestions = (): (Entity | Property)[] => {
+        if (!mention.isActive) return [];
+
+        const query = mention.query.toLowerCase();
+
+        if (mention.type === 'entity') {
+            return availableEntities.filter(e =>
+                e.name.toLowerCase().includes(query)
+            );
+        } else if (mention.type === 'attribute' && mention.entityContext) {
+            return mention.entityContext.properties.filter(p =>
+                p.name.toLowerCase().includes(query)
+            );
+        }
+        return [];
+    };
+
+    const mentionSuggestions = getMentionSuggestions();
+
+    // Update mention position
+    const updateMentionPosition = (cursorIndex: number, textareaElement: HTMLTextAreaElement, mirrorElement: HTMLDivElement) => {
+        if (!textareaElement || !mirrorElement) return;
+
+        const text = textareaElement.value;
+        const textBefore = text.slice(0, cursorIndex);
+
+        // Clear and set mirror content
+        mirrorElement.textContent = textBefore;
+        mirrorElement.style.fontSize = '15px';
+        mirrorElement.style.padding = '16px 80px 16px 20px';
+        mirrorElement.style.lineHeight = '1.5';
+        mirrorElement.style.fontFamily = 'inherit';
+        mirrorElement.style.whiteSpace = 'pre-wrap';
+
+        const span = document.createElement('span');
+        span.textContent = '.';
+        mirrorElement.appendChild(span);
+
+        const rect = span.getBoundingClientRect();
+        const textareaRect = textareaElement.getBoundingClientRect();
+
+        setMention(prev => ({
+            ...prev,
+            top: rect.top - textareaRect.top + 24,
+            left: rect.left - textareaRect.left
+        }));
+    };
+
+    // Handle input change with mention detection
+    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const val = e.target.value;
+        setInput(val);
+
+        const cursor = e.target.selectionStart;
+        const textBeforeCursor = val.slice(0, cursor);
+        const lastAt = textBeforeCursor.lastIndexOf('@');
+
+        if (lastAt !== -1) {
+            const textSinceAt = textBeforeCursor.slice(lastAt + 1);
+            if (textSinceAt.includes(' ')) {
+                setMention(prev => ({ ...prev, isActive: false }));
+                return;
+            }
+
+            const dotIndex = textSinceAt.indexOf('.');
+
+            if (dotIndex !== -1) {
+                const entityName = textSinceAt.slice(0, dotIndex);
+                const entity = availableEntities.find(e => e.name === entityName);
+
+                if (entity) {
+                    const attrQuery = textSinceAt.slice(dotIndex + 1);
+                    if (mirrorRef.current) {
+                        updateMentionPosition(cursor, e.target, mirrorRef.current);
+                    }
+                    setMention({
+                        isActive: true,
+                        type: 'attribute',
+                        query: attrQuery,
+                        top: 0,
+                        left: 0,
+                        triggerIndex: lastAt + 1 + dotIndex + 1,
+                        entityContext: entity
+                    });
+                    setSelectedMentionIndex(0);
+                    return;
+                }
+            }
+
+            if (mirrorRef.current) {
+                updateMentionPosition(lastAt + 1, e.target, mirrorRef.current);
+            }
+            setMention({
+                isActive: true,
+                type: 'entity',
+                query: textSinceAt,
+                top: 0,
+                left: 0,
+                triggerIndex: lastAt + 1
+            });
+            setSelectedMentionIndex(0);
+        } else {
+            setMention(prev => ({ ...prev, isActive: false }));
+        }
+    };
+
+    // Select mention suggestion
+    const selectMentionSuggestion = (item: Entity | Property) => {
+        if (!inputRef.current) return;
+
+        const text = input;
+        let insertText = '';
+        let newCursorPos = 0;
+
+        if (mention.type === 'entity') {
+            const entity = item as Entity;
+            insertText = entity.name;
+
+            const start = text.lastIndexOf('@', inputRef.current.selectionStart);
+            const end = inputRef.current.selectionStart;
+
+            const newText = text.slice(0, start) + '@' + insertText + text.slice(end);
+            setInput(newText);
+            newCursorPos = start + 1 + insertText.length;
+        } else {
+            const prop = item as Property;
+            insertText = prop.name;
+
+            const start = text.lastIndexOf('.', inputRef.current.selectionStart);
+            const end = inputRef.current.selectionStart;
+
+            const newText = text.slice(0, start) + '.' + insertText + text.slice(end);
+            setInput(newText);
+            newCursorPos = start + 1 + insertText.length;
+        }
+
+        setTimeout(() => {
+            if (inputRef.current) {
+                inputRef.current.focus();
+                inputRef.current.setSelectionRange(newCursorPos, newCursorPos);
+            }
+        }, 0);
+
+        setMention(prev => ({ ...prev, isActive: false }));
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if (mention.isActive) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSelectedMentionIndex(prev => (prev + 1) % mentionSuggestions.length);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSelectedMentionIndex(prev => (prev - 1 + mentionSuggestions.length) % mentionSuggestions.length);
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                if (mentionSuggestions.length > 0) {
+                    selectMentionSuggestion(mentionSuggestions[selectedMentionIndex]);
+                }
+            } else if (e.key === 'Escape') {
+                setMention(prev => ({ ...prev, isActive: false }));
+            }
+        } else if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSubmit(e);
         }
     };
+
+    useEffect(() => {
+        setSelectedMentionIndex(0);
+    }, [mention.query, mention.type]);
 
     const currentChat = chats.find(c => c.id === activeChat);
     const messages = currentChat?.messages || [];
@@ -429,7 +802,8 @@ export const Copilots: React.FC = () => {
         const updatedChat = { ...currentChat, title: nextTitle, updatedAt: new Date() };
         setChats(prev => prev.map(c => c.id === currentChat.id ? updatedChat : c));
         setIsEditingTitle(false);
-        await saveChat(updatedChat);
+        // Save title change immediately
+        await saveChat(updatedChat).catch(err => console.error('[Copilots] Error saving title:', err));
     };
 
     const openEditModal = (chatId: string) => {
@@ -456,7 +830,8 @@ export const Copilots: React.FC = () => {
         setEditingChatId(null);
         setEditingInstructions('');
         setEditingEntities([]);
-        await saveChat(updatedChat);
+        // Save configuration changes immediately
+        await saveChat(updatedChat).catch(err => console.error('[Copilots] Error saving configuration:', err));
     };
 
     const toggleEditingEntity = (entityId: string) => {
@@ -513,6 +888,17 @@ export const Copilots: React.FC = () => {
                         )}
                     </div>
                 </div>
+                {/* Edit Configuration Button */}
+                {currentChat && (
+                    <button
+                        onClick={() => openEditModal(currentChat.id)}
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-white/30 rounded-lg transition-colors duration-200 ease-in-out"
+                        title="Edit copilot configuration"
+                    >
+                        <Settings size={14} className="text-slate-500" />
+                        <span>Edit Configuration</span>
+                    </button>
+                )}
             </div>
 
             {/* Main Content Area */}
@@ -636,24 +1022,67 @@ export const Copilots: React.FC = () => {
                                     {/* Centered Input */}
                                     <div className="relative">
                                         <form onSubmit={handleSubmit} className="relative">
-                                            <textarea
-                                                ref={inputRef}
-                                                value={input}
-                                                onChange={(e) => setInput(e.target.value)}
-                                                onKeyDown={handleKeyDown}
-                                                placeholder="Ask about your data..."
-                                                rows={1}
-                                                className="w-full px-5 py-4 pr-16 bg-white border border-slate-200 rounded-xl text-[15px] focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 resize-none transition-all"
-                                                style={{ minHeight: '64px', maxHeight: '200px' }}
-                                                disabled={isLoading}
-                                            />
-                                            <button
-                                                type="submit"
-                                                disabled={!input.trim() || isLoading}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
-                                            >
-                                                <Send size={16} />
-                                            </button>
+                                            <div className="relative">
+                                                <textarea
+                                                    ref={inputRef}
+                                                    value={input}
+                                                    onChange={handleInputChange}
+                                                    onKeyDown={handleKeyDown}
+                                                    placeholder="Ask about your data..."
+                                                    rows={1}
+                                                    className="w-full px-5 py-4 pr-16 bg-white border border-slate-200 rounded-xl text-[15px] focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 resize-none transition-all"
+                                                    style={{ minHeight: '64px', maxHeight: '200px' }}
+                                                    disabled={isLoading}
+                                                />
+                                                {/* Mention suggestions popover */}
+                                                {mention.isActive && mentionSuggestions.length > 0 && (
+                                                    <div
+                                                        className="absolute z-50 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden"
+                                                        style={{
+                                                            top: mention.top,
+                                                            left: mention.left
+                                                        }}
+                                                    >
+                                                        <div className="bg-slate-50 px-3 py-2 border-b border-slate-100 text-xs font-normal text-slate-500 uppercase tracking-wider">
+                                                            {mention.type === 'entity' ? 'Entities' : `Properties of ${mention.entityContext?.name}`}
+                                                        </div>
+                                                        <div className="max-h-48 overflow-y-auto">
+                                                            {mentionSuggestions.map((item, index) => (
+                                                                <button
+                                                                    key={item.id}
+                                                                    onClick={() => selectMentionSuggestion(item)}
+                                                                    className={`w-full text-left px-4 py-2 text-sm flex items-center space-x-2 transition-colors ${
+                                                                        index === selectedMentionIndex
+                                                                            ? 'bg-teal-50 text-teal-700'
+                                                                            : 'text-slate-700 hover:bg-slate-50'
+                                                                    }`}
+                                                                >
+                                                                    {mention.type === 'entity' ? (
+                                                                        <Database size={14} className="text-slate-400" />
+                                                                    ) : (
+                                                                        <Hash size={14} className="text-slate-400" />
+                                                                    )}
+                                                                    <span>{item.name}</span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {/* Mirror div for positioning */}
+                                                <div
+                                                    ref={mirrorRef}
+                                                    className="absolute top-0 left-0 w-full pointer-events-none invisible whitespace-pre-wrap"
+                                                    style={{ fontSize: '15px', padding: '16px 80px 16px 20px', lineHeight: '1.5' }}
+                                                />
+                                                {/* Send button */}
+                                                <button
+                                                    type="submit"
+                                                    disabled={!input.trim() || isLoading}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+                                                >
+                                                    <Send size={16} />
+                                                </button>
+                                            </div>
                                             <div className="flex items-center space-x-4 text-xs text-slate-400 mt-2">
                                                 <span className="flex items-center">
                                                     <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded mr-1.5 font-sans">@</kbd>
@@ -806,24 +1235,67 @@ export const Copilots: React.FC = () => {
                         <div className="border-t border-slate-200 bg-white shrink-0">
                         <div className="max-w-4xl mx-auto px-6 py-4">
                             <form onSubmit={handleSubmit} className="relative">
-                                <textarea
-                                    ref={inputRef}
-                                    value={input}
-                                    onChange={(e) => setInput(e.target.value)}
-                                    onKeyDown={handleKeyDown}
-                                    placeholder="Ask about your data... (Press Enter to send, Shift+Enter for new line)"
-                                    rows={1}
-                                    className="w-full px-5 py-4 pr-16 bg-slate-50 border border-slate-200 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-slate-400 resize-none transition-all"
-                                    style={{ minHeight: '56px', maxHeight: '200px' }}
-                                    disabled={isLoading}
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={!input.trim() || isLoading}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    <Send size={16} />
-                                </button>
+                                <div className="relative">
+                                    <textarea
+                                        ref={inputRef}
+                                        value={input}
+                                        onChange={handleInputChange}
+                                        onKeyDown={handleKeyDown}
+                                        placeholder="Ask about your data... (Press Enter to send, Shift+Enter for new line)"
+                                        rows={1}
+                                        className="w-full px-5 py-4 pr-16 bg-slate-50 border border-slate-200 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-slate-400 resize-none transition-all"
+                                        style={{ minHeight: '56px', maxHeight: '200px' }}
+                                        disabled={isLoading}
+                                    />
+                                    {/* Mention suggestions popover */}
+                                    {mention.isActive && mentionSuggestions.length > 0 && (
+                                        <div
+                                            className="absolute z-50 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden"
+                                            style={{
+                                                top: mention.top,
+                                                left: mention.left
+                                            }}
+                                        >
+                                            <div className="bg-slate-50 px-3 py-2 border-b border-slate-100 text-xs font-normal text-slate-500 uppercase tracking-wider">
+                                                {mention.type === 'entity' ? 'Entities' : `Properties of ${mention.entityContext?.name}`}
+                                            </div>
+                                            <div className="max-h-48 overflow-y-auto">
+                                                {mentionSuggestions.map((item, index) => (
+                                                    <button
+                                                        key={item.id}
+                                                        onClick={() => selectMentionSuggestion(item)}
+                                                        className={`w-full text-left px-4 py-2 text-sm flex items-center space-x-2 transition-colors ${
+                                                            index === selectedMentionIndex
+                                                                ? 'bg-teal-50 text-teal-700'
+                                                                : 'text-slate-700 hover:bg-slate-50'
+                                                        }`}
+                                                    >
+                                                        {mention.type === 'entity' ? (
+                                                            <Database size={14} className="text-slate-400" />
+                                                        ) : (
+                                                            <Hash size={14} className="text-slate-400" />
+                                                        )}
+                                                        <span>{item.name}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Mirror div for positioning */}
+                                    <div
+                                        ref={mirrorRef}
+                                        className="absolute top-0 left-0 w-full pointer-events-none invisible whitespace-pre-wrap"
+                                        style={{ fontSize: '15px', padding: '16px 80px 16px 20px', lineHeight: '1.5' }}
+                                    />
+                                    {/* Send button */}
+                                    <button
+                                        type="submit"
+                                        disabled={!input.trim() || isLoading}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        <Send size={16} />
+                                    </button>
+                                </div>
                                 <div className="flex items-center space-x-4 text-xs text-slate-400 mt-2">
                                     <span className="flex items-center">
                                         <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded mr-1.5 font-sans">@</kbd>
@@ -849,21 +1321,21 @@ export const Copilots: React.FC = () => {
             {/* New Copilot Configuration Modal */}
             {showCopilotModal && (
                 <div 
-                    className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" 
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" 
                     onClick={() => setShowCopilotModal(false)}
                 >
                     <div 
-                        className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+                        className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
-                        <div className="px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-[#256A65]/5 to-transparent">
-                            <div className="flex items-center gap-3 mb-1">
-                                <div className="w-10 h-10 rounded-lg bg-[#256A65] flex items-center justify-center">
-                                    <Sparkles size={20} className="text-white" />
+                        <div className="px-6 py-4 border-b border-slate-200 bg-white">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-slate-900 flex items-center justify-center">
+                                    <Sparkles size={18} className="text-white" />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Create New Copilot</h3>
+                                    <h3 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Create New Copilot</h3>
                                     <p className="text-xs text-slate-500 mt-0.5">Configure your AI assistant with custom instructions and data access</p>
                                 </div>
                             </div>
@@ -873,7 +1345,7 @@ export const Copilots: React.FC = () => {
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
                             {/* Name */}
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                     Copilot Name <span className="text-red-500">*</span>
                                 </label>
                                 <input
@@ -881,14 +1353,14 @@ export const Copilots: React.FC = () => {
                                     value={copilotName}
                                     onChange={(e) => setCopilotName(e.target.value)}
                                     placeholder="e.g., Sales Assistant, Customer Support Bot"
-                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-slate-400"
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 transition-all"
                                     autoFocus
                                 />
                             </div>
 
                             {/* Instructions */}
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                     Instructions
                                 </label>
                                 <textarea
@@ -896,7 +1368,7 @@ export const Copilots: React.FC = () => {
                                     onChange={(e) => setCopilotInstructions(e.target.value)}
                                     placeholder="Define how your copilot should behave. For example: 'You are a sales assistant focused on customer data. Always provide concise answers and cite specific records when possible. Focus on revenue and customer metrics.'"
                                     rows={5}
-                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-slate-400 resize-none"
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 resize-none transition-all"
                                 />
                                 <p className="text-xs text-slate-500 mt-2">
                                     Describe the copilot's role, tone, and focus areas. Mention which datasets it should prioritize.
@@ -905,7 +1377,7 @@ export const Copilots: React.FC = () => {
 
                             {/* Entity Selection */}
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                     Available Datasets
                                 </label>
                                 <p className="text-xs text-slate-500 mb-3">
@@ -921,31 +1393,31 @@ export const Copilots: React.FC = () => {
                                         No entities available. Create entities in Knowledge Base first.
                                     </div>
                                 ) : (
-                                    <div className="space-y-2 max-h-64 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-slate-50/50">
+                                    <div className="space-y-1.5 max-h-64 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-slate-50">
                                         {availableEntities.map((entity) => (
                                             <button
                                                 key={entity.id}
                                                 onClick={() => toggleEntitySelection(entity.id)}
-                                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all text-left ${
+                                                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors duration-200 ease-in-out text-left ${
                                                     selectedEntities.includes(entity.id)
-                                                        ? 'bg-[#256A65]/10 border-[#256A65] text-slate-900'
+                                                        ? 'bg-white/60 border-slate-300 text-slate-900 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_0_0_1px_rgba(0,0,0,0.02)]'
                                                         : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
                                                 }`}
                                             >
-                                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors duration-200 ease-in-out ${
                                                     selectedEntities.includes(entity.id)
-                                                        ? 'bg-[#256A65] border-[#256A65]'
+                                                        ? 'bg-slate-900 border-slate-900'
                                                         : 'border-slate-300'
                                                 }`}>
                                                     {selectedEntities.includes(entity.id) && (
                                                         <Check size={12} className="text-white" />
                                                     )}
                                                 </div>
-                                                <Database size={16} className={`flex-shrink-0 ${
-                                                    selectedEntities.includes(entity.id) ? 'text-[#256A65]' : 'text-slate-400'
+                                                <Database size={16} className={`flex-shrink-0 transition-colors duration-200 ease-in-out ${
+                                                    selectedEntities.includes(entity.id) ? 'text-slate-700' : 'text-slate-400'
                                                 }`} />
                                                 <div className="flex-1 min-w-0">
-                                                    <p className={`text-sm font-medium truncate ${
+                                                    <p className={`text-sm truncate transition-colors duration-200 ease-in-out ${
                                                         selectedEntities.includes(entity.id) ? 'text-slate-900' : 'text-slate-700'
                                                     }`}>
                                                         {entity.name}
@@ -971,12 +1443,12 @@ export const Copilots: React.FC = () => {
                                             return entity ? (
                                                 <span
                                                     key={entityId}
-                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#256A65]/10 text-[#256A65] rounded-lg text-xs font-medium"
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium border border-slate-200"
                                                 >
                                                     {entity.name}
                                                     <button
                                                         onClick={() => toggleEntitySelection(entityId)}
-                                                        className="hover:bg-[#256A65]/20 rounded-full p-0.5"
+                                                        className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
                                                     >
                                                         <X size={12} />
                                                     </button>
@@ -989,19 +1461,19 @@ export const Copilots: React.FC = () => {
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/50 flex items-center justify-end gap-3">
+                        <div className="px-6 py-4 border-t border-slate-200 bg-white flex items-center justify-end gap-3">
                             <button
                                 onClick={() => setShowCopilotModal(false)}
-                                className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-white transition-colors"
+                                className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 font-medium transition-colors duration-200 ease-in-out"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSaveCopilot}
                                 disabled={!copilotName.trim()}
-                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <Sparkles size={14} className="mr-2" />
+                                <Sparkles size={14} />
                                 Create Copilot
                             </button>
                         </div>
@@ -1012,7 +1484,7 @@ export const Copilots: React.FC = () => {
             {/* Edit Chat Configuration Modal */}
             {editingChatId && (
                 <div 
-                    className="fixed inset-0 bg-[#256A65]/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" 
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" 
                     onClick={() => {
                         setEditingChatId(null);
                         setEditingInstructions('');
@@ -1020,17 +1492,17 @@ export const Copilots: React.FC = () => {
                     }}
                 >
                     <div 
-                        className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+                        className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
-                        <div className="px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-[#256A65]/5 to-transparent">
-                            <div className="flex items-center gap-3 mb-1">
-                                <div className="w-10 h-10 rounded-lg bg-[#256A65] flex items-center justify-center">
-                                    <Settings size={20} className="text-white" />
+                        <div className="px-6 py-4 border-b border-slate-200 bg-white">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-slate-900 flex items-center justify-center">
+                                    <Settings size={18} className="text-white" />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Edit Copilot Configuration</h3>
+                                    <h3 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Edit Copilot Configuration</h3>
                                     <p className="text-xs text-slate-500 mt-0.5">Update instructions, datasets, and settings</p>
                                 </div>
                             </div>
@@ -1040,7 +1512,7 @@ export const Copilots: React.FC = () => {
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
                             {/* Instructions */}
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                     Instructions
                                 </label>
                                 <textarea
@@ -1048,7 +1520,7 @@ export const Copilots: React.FC = () => {
                                     onChange={(e) => setEditingInstructions(e.target.value)}
                                     placeholder="Define how your copilot should behave. For example: 'You are a sales assistant focused on customer data. Always provide concise answers and cite specific records when possible. Focus on revenue and customer metrics.'"
                                     rows={5}
-                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-slate-400 resize-none"
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 resize-none transition-all"
                                 />
                                 <p className="text-xs text-slate-500 mt-2">
                                     Describe the copilot's role, tone, and focus areas. Mention which datasets it should prioritize.
@@ -1057,7 +1529,7 @@ export const Copilots: React.FC = () => {
 
                             {/* Entity Selection */}
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                <label className="block text-xs font-medium text-slate-700 mb-2">
                                     Available Datasets
                                 </label>
                                 <p className="text-xs text-slate-500 mb-3">
@@ -1073,31 +1545,31 @@ export const Copilots: React.FC = () => {
                                         No entities available. Create entities in Knowledge Base first.
                                     </div>
                                 ) : (
-                                    <div className="space-y-2 max-h-64 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-slate-50/50">
+                                    <div className="space-y-1.5 max-h-64 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-slate-50">
                                         {availableEntities.map((entity) => (
                                             <button
                                                 key={entity.id}
                                                 onClick={() => toggleEditingEntity(entity.id)}
-                                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all text-left ${
+                                                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors duration-200 ease-in-out text-left ${
                                                     editingEntities.includes(entity.id)
-                                                        ? 'bg-[#256A65]/10 border-[#256A65] text-slate-900'
+                                                        ? 'bg-white/60 border-slate-300 text-slate-900 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_0_0_1px_rgba(0,0,0,0.02)]'
                                                         : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
                                                 }`}
                                             >
-                                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors duration-200 ease-in-out ${
                                                     editingEntities.includes(entity.id)
-                                                        ? 'bg-[#256A65] border-[#256A65]'
+                                                        ? 'bg-slate-900 border-slate-900'
                                                         : 'border-slate-300'
                                                 }`}>
                                                     {editingEntities.includes(entity.id) && (
                                                         <Check size={12} className="text-white" />
                                                     )}
                                                 </div>
-                                                <Database size={16} className={`flex-shrink-0 ${
-                                                    editingEntities.includes(entity.id) ? 'text-[#256A65]' : 'text-slate-400'
+                                                <Database size={16} className={`flex-shrink-0 transition-colors duration-200 ease-in-out ${
+                                                    editingEntities.includes(entity.id) ? 'text-slate-700' : 'text-slate-400'
                                                 }`} />
                                                 <div className="flex-1 min-w-0">
-                                                    <p className={`text-sm font-medium truncate ${
+                                                    <p className={`text-sm truncate transition-colors duration-200 ease-in-out ${
                                                         editingEntities.includes(entity.id) ? 'text-slate-900' : 'text-slate-700'
                                                     }`}>
                                                         {entity.name}
@@ -1123,12 +1595,12 @@ export const Copilots: React.FC = () => {
                                             return entity ? (
                                                 <span
                                                     key={entityId}
-                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#256A65]/10 text-[#256A65] rounded-lg text-xs font-medium"
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium border border-slate-200"
                                                 >
                                                     {entity.name}
                                                     <button
                                                         onClick={() => toggleEditingEntity(entityId)}
-                                                        className="hover:bg-[#256A65]/20 rounded-full p-0.5"
+                                                        className="hover:bg-slate-200 rounded-full p-0.5 transition-colors"
                                                     >
                                                         <X size={12} />
                                                     </button>
@@ -1141,22 +1613,22 @@ export const Copilots: React.FC = () => {
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/50 flex items-center justify-end gap-3">
+                        <div className="px-6 py-4 border-t border-slate-200 bg-white flex items-center justify-end gap-3">
                             <button
                                 onClick={() => {
                                     setEditingChatId(null);
                                     setEditingInstructions('');
                                     setEditingEntities([]);
                                 }}
-                                className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-white transition-colors"
+                                className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 font-medium transition-colors duration-200 ease-in-out"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSaveEdit}
-                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                             >
-                                <Check size={14} className="mr-2" />
+                                <Check size={14} />
                                 Save Changes
                             </button>
                         </div>
