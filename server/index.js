@@ -3113,14 +3113,21 @@ app.get('/api/dashboards/:id/widgets', authenticateToken, async (req, res) => {
         }
         
         const widgets = await db.all(
-            'SELECT id, title, description, config, position, createdAt FROM widgets WHERE dashboardId = ? ORDER BY position ASC',
+            `SELECT id, title, description, config, position, gridX, gridY, gridWidth, gridHeight, 
+             dataSource, workflowConnectionId, createdAt 
+             FROM widgets WHERE dashboardId = ? ORDER BY position ASC`,
             [req.params.id]
         );
         
         // Parse config JSON
         const parsedWidgets = widgets.map(w => ({
             ...w,
-            config: JSON.parse(w.config || '{}')
+            config: JSON.parse(w.config || '{}'),
+            gridX: w.gridX || 0,
+            gridY: w.gridY || 0,
+            gridWidth: w.gridWidth || 1,
+            gridHeight: w.gridHeight || 1,
+            dataSource: w.dataSource || 'entity'
         }));
         
         res.json(parsedWidgets);
@@ -3190,13 +3197,19 @@ app.get('/api/shared/:token', async (req, res) => {
         }
         
         const widgets = await db.all(
-            'SELECT id, title, description, config, position FROM widgets WHERE dashboardId = ? ORDER BY position ASC',
+            `SELECT id, title, description, config, position, gridX, gridY, gridWidth, gridHeight, dataSource 
+             FROM widgets WHERE dashboardId = ? ORDER BY position ASC`,
             [dashboard.id]
         );
         
         const parsedWidgets = widgets.map(w => ({
             ...w,
-            config: JSON.parse(w.config || '{}')
+            config: JSON.parse(w.config || '{}'),
+            gridX: w.gridX || 0,
+            gridY: w.gridY || 0,
+            gridWidth: w.gridWidth || 1,
+            gridHeight: w.gridHeight || 1,
+            dataSource: w.dataSource || 'entity'
         }));
         
         res.json({
@@ -3206,6 +3219,818 @@ app.get('/api/shared/:token', async (req, res) => {
     } catch (error) {
         console.error('Error fetching shared dashboard:', error);
         res.status(500).json({ error: 'Failed to fetch shared dashboard' });
+    }
+});
+
+// ==================== KNOWLEDGE BASE ENDPOINTS ====================
+
+// Get all knowledge documents
+app.get('/api/knowledge/documents', authenticateToken, async (req, res) => {
+    try {
+        const documents = await db.all(
+            `SELECT id, name, type, source, filePath, googleDriveId, googleDriveUrl, mimeType, fileSize, 
+             summary, tags, relatedEntityIds, uploadedBy, createdAt, updatedAt 
+             FROM knowledge_documents 
+             WHERE organizationId = ? 
+             ORDER BY updatedAt DESC`,
+            [req.user.orgId]
+        );
+        
+        // Parse JSON fields
+        const parsedDocs = documents.map(doc => ({
+            ...doc,
+            relatedEntityIds: doc.relatedEntityIds ? JSON.parse(doc.relatedEntityIds) : [],
+            tags: doc.tags ? doc.tags.split(',').filter(t => t) : []
+        }));
+        
+        res.json(parsedDocs);
+    } catch (error) {
+        console.error('Error fetching knowledge documents:', error);
+        res.status(500).json({ error: 'Failed to fetch documents' });
+    }
+});
+
+// Get single knowledge document
+app.get('/api/knowledge/documents/:id', authenticateToken, async (req, res) => {
+    try {
+        const doc = await db.get(
+            `SELECT * FROM knowledge_documents 
+             WHERE id = ? AND organizationId = ?`,
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!doc) {
+            return res.status(404).json({ error: 'Document not found' });
+        }
+        
+        // Parse JSON fields
+        doc.relatedEntityIds = doc.relatedEntityIds ? JSON.parse(doc.relatedEntityIds) : [];
+        doc.tags = doc.tags ? doc.tags.split(',').filter(t => t) : [];
+        doc.metadata = doc.metadata ? JSON.parse(doc.metadata) : {};
+        
+        res.json(doc);
+    } catch (error) {
+        console.error('Error fetching document:', error);
+        res.status(500).json({ error: 'Failed to fetch document' });
+    }
+});
+
+// Upload knowledge document
+const knowledgeUpload = multer({ 
+    dest: 'server/uploads/knowledge/',
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+});
+
+app.post('/api/knowledge/documents', authenticateToken, knowledgeUpload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const { name, tags, relatedEntityIds } = req.body;
+        const id = require('crypto').randomBytes(16).toString('hex');
+        const now = new Date().toISOString();
+        
+        // Extract text based on file type
+        let extractedText = '';
+        let summary = '';
+        
+        try {
+            if (req.file.mimetype === 'application/pdf') {
+                const pdfBuffer = require('fs').readFileSync(req.file.path);
+                const pdfData = await pdfParse(pdfBuffer);
+                extractedText = pdfData.text;
+            } else if (req.file.mimetype === 'text/plain' || req.file.mimetype === 'text/csv') {
+                extractedText = require('fs').readFileSync(req.file.path, 'utf-8');
+            } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                       req.file.mimetype === 'application/vnd.ms-excel') {
+                const workbook = XLSX.readFile(req.file.path);
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                extractedText = XLSX.utils.sheet_to_csv(worksheet);
+            }
+            
+            // Generate summary with OpenAI if text extracted
+            if (extractedText && extractedText.length > 100 && process.env.OPENAI_API_KEY) {
+                const OpenAI = require('openai');
+                const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+                
+                const summaryResponse = await openai.chat.completions.create({
+                    model: 'gpt-4o-mini',
+                    messages: [{
+                        role: 'user',
+                        content: `Resume este documento en máximo 3 frases:\n\n${extractedText.substring(0, 2000)}`
+                    }],
+                    max_tokens: 150
+                });
+                
+                summary = summaryResponse.choices[0].message.content.trim();
+            }
+        } catch (extractError) {
+            console.error('Error extracting text:', extractError);
+            // Continue without extracted text
+        }
+        
+        await db.run(
+            `INSERT INTO knowledge_documents 
+             (id, organizationId, name, type, source, filePath, mimeType, fileSize, extractedText, summary, tags, relatedEntityIds, uploadedBy, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id,
+                req.user.orgId,
+                name || req.file.originalname,
+                'file',
+                'upload',
+                req.file.path,
+                req.file.mimetype,
+                req.file.size,
+                extractedText,
+                summary,
+                tags || '',
+                relatedEntityIds ? JSON.stringify(JSON.parse(relatedEntityIds)) : '[]',
+                req.user.id,
+                now,
+                now
+            ]
+        );
+        
+        res.json({
+            id,
+            name: name || req.file.originalname,
+            type: 'file',
+            source: 'upload',
+            fileSize: req.file.size,
+            summary,
+            createdAt: now
+        });
+    } catch (error) {
+        console.error('Error uploading document:', error);
+        res.status(500).json({ error: 'Failed to upload document' });
+    }
+});
+
+// Delete knowledge document
+app.delete('/api/knowledge/documents/:id', authenticateToken, async (req, res) => {
+    try {
+        const doc = await db.get(
+            'SELECT filePath FROM knowledge_documents WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!doc) {
+            return res.status(404).json({ error: 'Document not found' });
+        }
+        
+        // Delete file if exists
+        if (doc.filePath && require('fs').existsSync(doc.filePath)) {
+            require('fs').unlinkSync(doc.filePath);
+        }
+        
+        await db.run('DELETE FROM knowledge_documents WHERE id = ?', [req.params.id]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting document:', error);
+        res.status(500).json({ error: 'Failed to delete document' });
+    }
+});
+
+// Search in knowledge documents
+app.post('/api/knowledge/search', authenticateToken, async (req, res) => {
+    try {
+        const { query } = req.body;
+        
+        if (!query || query.trim().length === 0) {
+            return res.json([]);
+        }
+        
+        // Simple text search in extractedText and name
+        const documents = await db.all(
+            `SELECT id, name, summary, extractedText, type, createdAt 
+             FROM knowledge_documents 
+             WHERE organizationId = ? 
+             AND (extractedText LIKE ? OR name LIKE ? OR summary LIKE ?)
+             ORDER BY updatedAt DESC
+             LIMIT 20`,
+            [req.user.orgId, `%${query}%`, `%${query}%`, `%${query}%`]
+        );
+        
+        res.json(documents);
+    } catch (error) {
+        console.error('Error searching documents:', error);
+        res.status(500).json({ error: 'Failed to search documents' });
+    }
+});
+
+// Relate document to entity
+app.post('/api/knowledge/documents/:id/relate', authenticateToken, async (req, res) => {
+    try {
+        const { entityId } = req.body;
+        
+        const doc = await db.get(
+            'SELECT relatedEntityIds FROM knowledge_documents WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!doc) {
+            return res.status(404).json({ error: 'Document not found' });
+        }
+        
+        const relatedIds = doc.relatedEntityIds ? JSON.parse(doc.relatedEntityIds) : [];
+        if (!relatedIds.includes(entityId)) {
+            relatedIds.push(entityId);
+        }
+        
+        await db.run(
+            'UPDATE knowledge_documents SET relatedEntityIds = ?, updatedAt = ? WHERE id = ?',
+            [JSON.stringify(relatedIds), new Date().toISOString(), req.params.id]
+        );
+        
+        res.json({ success: true, relatedEntityIds: relatedIds });
+    } catch (error) {
+        console.error('Error relating document:', error);
+        res.status(500).json({ error: 'Failed to relate document' });
+    }
+});
+
+// ==================== DASHBOARD-WORKFLOW CONNECTION ENDPOINTS ====================
+
+// Connect widget to workflow output
+app.post('/api/dashboards/:dashboardId/widgets/:widgetId/connect-workflow', authenticateToken, async (req, res) => {
+    try {
+        const { workflowId, nodeId, executionId, outputPath, refreshMode, refreshInterval } = req.body;
+        
+        // Verify dashboard belongs to user's org
+        const dashboard = await db.get(
+            'SELECT id FROM dashboards WHERE id = ? AND organizationId = ?',
+            [req.params.dashboardId, req.user.orgId]
+        );
+        
+        if (!dashboard) {
+            return res.status(404).json({ error: 'Dashboard not found' });
+        }
+        
+        // Verify widget belongs to dashboard
+        const widget = await db.get(
+            'SELECT id FROM widgets WHERE id = ? AND dashboardId = ?',
+            [req.params.widgetId, req.params.dashboardId]
+        );
+        
+        if (!widget) {
+            return res.status(404).json({ error: 'Widget not found' });
+        }
+        
+        const connectionId = require('crypto').randomBytes(16).toString('hex');
+        const now = new Date().toISOString();
+        
+        // Check if connection already exists
+        const existing = await db.get(
+            'SELECT id FROM dashboard_workflow_connections WHERE widgetId = ?',
+            [req.params.widgetId]
+        );
+        
+        if (existing) {
+            // Update existing connection
+            await db.run(
+                `UPDATE dashboard_workflow_connections 
+                 SET workflowId = ?, nodeId = ?, executionId = ?, outputPath = ?, refreshMode = ?, refreshInterval = ?, updatedAt = ?
+                 WHERE widgetId = ?`,
+                [workflowId, nodeId, executionId || null, outputPath || '', refreshMode || 'manual', refreshInterval || null, now, req.params.widgetId]
+            );
+            
+            // Update widget
+            await db.run(
+                'UPDATE widgets SET workflowConnectionId = ?, dataSource = ? WHERE id = ?',
+                [existing.id, 'workflow', req.params.widgetId]
+            );
+            
+            res.json({ success: true, connectionId: existing.id });
+        } else {
+            // Create new connection
+            await db.run(
+                `INSERT INTO dashboard_workflow_connections 
+                 (id, dashboardId, widgetId, workflowId, nodeId, executionId, outputPath, refreshMode, refreshInterval, createdAt, updatedAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [connectionId, req.params.dashboardId, req.params.widgetId, workflowId, nodeId, executionId || null, outputPath || '', refreshMode || 'manual', refreshInterval || null, now, now]
+            );
+            
+            // Update widget
+            await db.run(
+                'UPDATE widgets SET workflowConnectionId = ?, dataSource = ? WHERE id = ?',
+                [connectionId, 'workflow', req.params.widgetId]
+            );
+            
+            res.json({ success: true, connectionId });
+        }
+    } catch (error) {
+        console.error('Error connecting widget to workflow:', error);
+        res.status(500).json({ error: 'Failed to connect widget to workflow' });
+    }
+});
+
+// Get widget data from workflow execution
+app.get('/api/dashboards/:dashboardId/widgets/:widgetId/data', authenticateToken, async (req, res) => {
+    try {
+        // Get connection
+        const connection = await db.get(
+            `SELECT c.*, d.organizationId 
+             FROM dashboard_workflow_connections c
+             JOIN dashboards d ON c.dashboardId = d.id
+             WHERE c.widgetId = ? AND d.organizationId = ?`,
+            [req.params.widgetId, req.user.orgId]
+        );
+        
+        if (!connection) {
+            return res.status(404).json({ error: 'Widget not connected to workflow' });
+        }
+        
+        // Get execution data
+        let execution;
+        if (connection.executionId) {
+            execution = await db.get(
+                'SELECT * FROM workflow_executions WHERE id = ? AND organizationId = ?',
+                [connection.executionId, req.user.orgId]
+            );
+        } else {
+            // Get latest execution
+            execution = await db.get(
+                'SELECT * FROM workflow_executions WHERE workflowId = ? AND organizationId = ? ORDER BY createdAt DESC LIMIT 1',
+                [connection.workflowId, req.user.orgId]
+            );
+        }
+        
+        if (!execution) {
+            return res.status(404).json({ error: 'Workflow execution not found' });
+        }
+        
+        // Extract data based on outputPath
+        let data = null;
+        if (execution.nodeResults) {
+            const nodeResults = JSON.parse(execution.nodeResults);
+            if (connection.outputPath) {
+                // Navigate JSON path (e.g., "results.node1.outputData")
+                const parts = connection.outputPath.split('.');
+                data = nodeResults;
+                for (const part of parts) {
+                    if (data && typeof data === 'object') {
+                        data = data[part];
+                    } else {
+                        data = null;
+                        break;
+                    }
+                }
+            } else if (connection.nodeId && nodeResults[connection.nodeId]) {
+                data = nodeResults[connection.nodeId].outputData || nodeResults[connection.nodeId];
+            } else {
+                data = nodeResults;
+            }
+        } else if (execution.finalOutput) {
+            data = JSON.parse(execution.finalOutput);
+        }
+        
+        res.json({
+            data,
+            executionId: execution.id,
+            status: execution.status,
+            createdAt: execution.createdAt,
+            completedAt: execution.completedAt
+        });
+    } catch (error) {
+        console.error('Error fetching widget data:', error);
+        res.status(500).json({ error: 'Failed to fetch widget data' });
+    }
+});
+
+// Generate widget from workflow output with prompt
+app.post('/api/dashboards/:dashboardId/generate-widget-from-workflow', authenticateToken, async (req, res) => {
+    try {
+        const { workflowId, nodeId, executionId, prompt, mentionedEntityIds } = req.body;
+        
+        // Verify dashboard belongs to user's org
+        const dashboard = await db.get(
+            'SELECT id FROM dashboards WHERE id = ? AND organizationId = ?',
+            [req.params.dashboardId, req.user.orgId]
+        );
+        
+        if (!dashboard) {
+            return res.status(404).json({ error: 'Dashboard not found' });
+        }
+        
+        // Get execution data
+        let execution;
+        if (executionId) {
+            execution = await db.get(
+                'SELECT * FROM workflow_executions WHERE id = ? AND organizationId = ?',
+                [executionId, req.user.orgId]
+            );
+        } else {
+            execution = await db.get(
+                'SELECT * FROM workflow_executions WHERE workflowId = ? AND organizationId = ? ORDER BY createdAt DESC LIMIT 1',
+                [workflowId, req.user.orgId]
+            );
+        }
+        
+        if (!execution) {
+            return res.status(404).json({ error: 'Workflow execution not found' });
+        }
+        
+        // Extract data from execution
+        let workflowData = null;
+        if (execution.nodeResults) {
+            const nodeResults = JSON.parse(execution.nodeResults);
+            if (nodeId && nodeResults[nodeId]) {
+                workflowData = nodeResults[nodeId].outputData || nodeResults[nodeId];
+            } else {
+                workflowData = nodeResults;
+            }
+        } else if (execution.finalOutput) {
+            workflowData = JSON.parse(execution.finalOutput);
+        }
+        
+        if (!workflowData) {
+            return res.status(400).json({ error: 'No data available from workflow execution' });
+        }
+        
+        // Use existing generate-widget endpoint logic but with workflow data
+        // This will be handled by the existing generate-widget endpoint with workflow data context
+        // For now, return the data and let frontend handle widget generation
+        res.json({
+            workflowData,
+            executionId: execution.id,
+            nodeId
+        });
+    } catch (error) {
+        console.error('Error generating widget from workflow:', error);
+        res.status(500).json({ error: 'Failed to generate widget from workflow' });
+    }
+});
+
+// ==================== STANDARDS ENDPOINTS ====================
+
+// Get all standards
+app.get('/api/standards', authenticateToken, async (req, res) => {
+    try {
+        const standards = await db.all(
+            `SELECT id, name, code, category, description, version, status, effectiveDate, expiryDate, 
+             tags, relatedEntityIds, createdBy, createdAt, updatedAt 
+             FROM standards 
+             WHERE organizationId = ? 
+             ORDER BY updatedAt DESC`,
+            [req.user.orgId]
+        );
+        
+        const parsedStandards = standards.map(s => ({
+            ...s,
+            tags: s.tags ? s.tags.split(',').filter(t => t) : [],
+            relatedEntityIds: s.relatedEntityIds ? JSON.parse(s.relatedEntityIds) : []
+        }));
+        
+        res.json(parsedStandards);
+    } catch (error) {
+        console.error('Error fetching standards:', error);
+        res.status(500).json({ error: 'Failed to fetch standards' });
+    }
+});
+
+// Get single standard
+app.get('/api/standards/:id', authenticateToken, async (req, res) => {
+    try {
+        const standard = await db.get(
+            'SELECT * FROM standards WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!standard) {
+            return res.status(404).json({ error: 'Standard not found' });
+        }
+        
+        standard.tags = standard.tags ? standard.tags.split(',').filter(t => t) : [];
+        standard.relatedEntityIds = standard.relatedEntityIds ? JSON.parse(standard.relatedEntityIds) : [];
+        
+        res.json(standard);
+    } catch (error) {
+        console.error('Error fetching standard:', error);
+        res.status(500).json({ error: 'Failed to fetch standard' });
+    }
+});
+
+// Create standard
+app.post('/api/standards', authenticateToken, async (req, res) => {
+    try {
+        const { id, name, code, category, description, version, status, effectiveDate, expiryDate, content, tags, relatedEntityIds } = req.body;
+        const now = new Date().toISOString();
+        
+        await db.run(
+            `INSERT INTO standards 
+             (id, organizationId, name, code, category, description, version, status, effectiveDate, expiryDate, content, tags, relatedEntityIds, createdBy, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id,
+                req.user.orgId,
+                name,
+                code || null,
+                category || null,
+                description || null,
+                version || null,
+                status || 'active',
+                effectiveDate || null,
+                expiryDate || null,
+                content || null,
+                tags ? tags.join(',') : '',
+                relatedEntityIds ? JSON.stringify(relatedEntityIds) : '[]',
+                req.user.id,
+                now,
+                now
+            ]
+        );
+        
+        res.json({ id, name, createdAt: now });
+    } catch (error) {
+        console.error('Error creating standard:', error);
+        res.status(500).json({ error: 'Failed to create standard' });
+    }
+});
+
+// Update standard
+app.put('/api/standards/:id', authenticateToken, async (req, res) => {
+    try {
+        const { name, code, category, description, version, status, effectiveDate, expiryDate, content, tags, relatedEntityIds } = req.body;
+        const now = new Date().toISOString();
+        
+        await db.run(
+            `UPDATE standards 
+             SET name = ?, code = ?, category = ?, description = ?, version = ?, status = ?, 
+                 effectiveDate = ?, expiryDate = ?, content = ?, tags = ?, relatedEntityIds = ?, updatedAt = ?
+             WHERE id = ? AND organizationId = ?`,
+            [
+                name,
+                code || null,
+                category || null,
+                description || null,
+                version || null,
+                status || 'active',
+                effectiveDate || null,
+                expiryDate || null,
+                content || null,
+                tags ? tags.join(',') : '',
+                relatedEntityIds ? JSON.stringify(relatedEntityIds) : '[]',
+                now,
+                req.params.id,
+                req.user.orgId
+            ]
+        );
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating standard:', error);
+        res.status(500).json({ error: 'Failed to update standard' });
+    }
+});
+
+// Delete standard
+app.delete('/api/standards/:id', authenticateToken, async (req, res) => {
+    try {
+        await db.run('DELETE FROM standards WHERE id = ? AND organizationId = ?', [req.params.id, req.user.orgId]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting standard:', error);
+        res.status(500).json({ error: 'Failed to delete standard' });
+    }
+});
+
+// ==================== DATA CONNECTIONS ENDPOINTS ====================
+
+// Get all data connections
+app.get('/api/data-connections', authenticateToken, async (req, res) => {
+    try {
+        const connections = await db.all(
+            `SELECT id, name, type, description, status, lastTestedAt, lastError, createdBy, createdAt, updatedAt 
+             FROM data_connections 
+             WHERE organizationId = ? 
+             ORDER BY updatedAt DESC`,
+            [req.user.orgId]
+        );
+        
+        // Parse config JSON (but don't send sensitive data)
+        const parsedConnections = connections.map(c => {
+            let config = {};
+            try {
+                const fullConfig = JSON.parse(c.config || '{}');
+                // Only return non-sensitive config fields
+                config = {
+                    type: fullConfig.type,
+                    host: fullConfig.host ? '***' : undefined,
+                    port: fullConfig.port,
+                    database: fullConfig.database ? '***' : undefined,
+                    // Don't send passwords, tokens, etc.
+                };
+            } catch (e) {
+                // Invalid JSON, return empty
+            }
+            return {
+                ...c,
+                config
+            };
+        });
+        
+        res.json(parsedConnections);
+    } catch (error) {
+        console.error('Error fetching connections:', error);
+        res.status(500).json({ error: 'Failed to fetch connections' });
+    }
+});
+
+// Get single connection
+app.get('/api/data-connections/:id', authenticateToken, async (req, res) => {
+    try {
+        const connection = await db.get(
+            'SELECT * FROM data_connections WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!connection) {
+            return res.status(404).json({ error: 'Connection not found' });
+        }
+        
+        connection.config = connection.config ? JSON.parse(connection.config) : {};
+        
+        res.json(connection);
+    } catch (error) {
+        console.error('Error fetching connection:', error);
+        res.status(500).json({ error: 'Failed to fetch connection' });
+    }
+});
+
+// Create data connection
+app.post('/api/data-connections', authenticateToken, async (req, res) => {
+    try {
+        const { id, name, type, description, config, status } = req.body;
+        const now = new Date().toISOString();
+        
+        await db.run(
+            `INSERT INTO data_connections 
+             (id, organizationId, name, type, description, config, status, createdBy, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id,
+                req.user.orgId,
+                name,
+                type,
+                description || null,
+                JSON.stringify(config || {}),
+                status || 'inactive',
+                req.user.id,
+                now,
+                now
+            ]
+        );
+        
+        res.json({ id, name, createdAt: now });
+    } catch (error) {
+        console.error('Error creating connection:', error);
+        res.status(500).json({ error: 'Failed to create connection' });
+    }
+});
+
+// Update data connection
+app.put('/api/data-connections/:id', authenticateToken, async (req, res) => {
+    try {
+        const { name, type, description, config, status } = req.body;
+        const now = new Date().toISOString();
+        
+        await db.run(
+            `UPDATE data_connections 
+             SET name = ?, type = ?, description = ?, config = ?, status = ?, updatedAt = ?
+             WHERE id = ? AND organizationId = ?`,
+            [
+                name,
+                type,
+                description || null,
+                JSON.stringify(config || {}),
+                status || 'inactive',
+                now,
+                req.params.id,
+                req.user.orgId
+            ]
+        );
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating connection:', error);
+        res.status(500).json({ error: 'Failed to update connection' });
+    }
+});
+
+// Delete data connection
+app.delete('/api/data-connections/:id', authenticateToken, async (req, res) => {
+    try {
+        await db.run('DELETE FROM data_connections WHERE id = ? AND organizationId = ?', [req.params.id, req.user.orgId]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting connection:', error);
+        res.status(500).json({ error: 'Failed to delete connection' });
+    }
+});
+
+// Test data connection
+app.post('/api/data-connections/:id/test', authenticateToken, async (req, res) => {
+    try {
+        const connection = await db.get(
+            'SELECT * FROM data_connections WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!connection) {
+            return res.status(404).json({ error: 'Connection not found' });
+        }
+        
+        const config = JSON.parse(connection.config || '{}');
+        const now = new Date().toISOString();
+        
+        // Test connection based on type
+        let testResult = { success: false, message: 'Unknown connection type' };
+        
+        if (connection.type === 'mysql' || connection.type === 'postgresql') {
+            // Test database connection
+            try {
+                const mysql = require('mysql2/promise');
+                const conn = await mysql.createConnection({
+                    host: config.host,
+                    port: config.port || 3306,
+                    user: config.username,
+                    password: config.password,
+                    database: config.database,
+                    connectTimeout: 5000
+                });
+                await conn.execute('SELECT 1');
+                await conn.end();
+                testResult = { success: true, message: 'Connection successful' };
+                
+                await db.run(
+                    'UPDATE data_connections SET status = ?, lastTestedAt = ?, lastError = NULL, updatedAt = ? WHERE id = ?',
+                    ['active', now, now, req.params.id]
+                );
+            } catch (error) {
+                testResult = { success: false, message: error.message };
+                await db.run(
+                    'UPDATE data_connections SET status = ?, lastTestedAt = ?, lastError = ?, updatedAt = ? WHERE id = ?',
+                    ['inactive', now, error.message, now, req.params.id]
+                );
+            }
+        } else if (connection.type === 'api' || connection.type === 'rest') {
+            // Test API connection
+            try {
+                const response = await fetch(config.url, {
+                    method: config.method || 'GET',
+                    headers: config.headers || {},
+                    signal: AbortSignal.timeout(5000)
+                });
+                testResult = { success: response.ok, message: response.ok ? 'Connection successful' : `HTTP ${response.status}` };
+                
+                await db.run(
+                    'UPDATE data_connections SET status = ?, lastTestedAt = ?, lastError = NULL, updatedAt = ? WHERE id = ?',
+                    [response.ok ? 'active' : 'inactive', now, now, req.params.id]
+                );
+            } catch (error) {
+                testResult = { success: false, message: error.message };
+                await db.run(
+                    'UPDATE data_connections SET status = ?, lastTestedAt = ?, lastError = ?, updatedAt = ? WHERE id = ?',
+                    ['inactive', now, error.message, now, req.params.id]
+                );
+            }
+        }
+        
+        res.json(testResult);
+    } catch (error) {
+        console.error('Error testing connection:', error);
+        res.status(500).json({ error: 'Failed to test connection' });
+    }
+});
+
+// Update widget grid position
+app.put('/api/widgets/:id/grid', authenticateToken, async (req, res) => {
+    try {
+        const { gridX, gridY, gridWidth, gridHeight } = req.body;
+        
+        // Verify widget belongs to user's org
+        const widget = await db.get(`
+            SELECT w.id FROM widgets w 
+            JOIN dashboards d ON w.dashboardId = d.id 
+            WHERE w.id = ? AND d.organizationId = ?
+        `, [req.params.id, req.user.orgId]);
+        
+        if (!widget) {
+            return res.status(404).json({ error: 'Widget not found' });
+        }
+        
+        await db.run(
+            'UPDATE widgets SET gridX = ?, gridY = ?, gridWidth = ?, gridHeight = ? WHERE id = ?',
+            [gridX || 0, gridY || 0, gridWidth || 1, gridHeight || 1, req.params.id]
+        );
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating widget grid:', error);
+        res.status(500).json({ error: 'Failed to update widget grid' });
     }
 });
 

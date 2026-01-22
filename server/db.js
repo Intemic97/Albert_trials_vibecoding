@@ -305,6 +305,108 @@ async function initDb() {
     );
   `);
 
+  // Create Knowledge Base documents table
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS knowledge_documents (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT,
+      name TEXT NOT NULL,
+      type TEXT,
+      source TEXT,
+      filePath TEXT,
+      googleDriveId TEXT,
+      googleDriveUrl TEXT,
+      mimeType TEXT,
+      fileSize INTEGER,
+      extractedText TEXT,
+      summary TEXT,
+      metadata TEXT,
+      tags TEXT,
+      relatedEntityIds TEXT,
+      uploadedBy TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(uploadedBy) REFERENCES users(id)
+    );
+  `);
+
+  // Create Knowledge Base document chunks table (for semantic search)
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS knowledge_document_chunks (
+      id TEXT PRIMARY KEY,
+      documentId TEXT,
+      chunkIndex INTEGER,
+      content TEXT,
+      embedding TEXT,
+      FOREIGN KEY(documentId) REFERENCES knowledge_documents(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Create dashboard-workflow connections table
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS dashboard_workflow_connections (
+      id TEXT PRIMARY KEY,
+      dashboardId TEXT,
+      widgetId TEXT,
+      workflowId TEXT,
+      nodeId TEXT,
+      executionId TEXT,
+      outputPath TEXT,
+      refreshMode TEXT DEFAULT 'manual',
+      refreshInterval INTEGER,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(dashboardId) REFERENCES dashboards(id) ON DELETE CASCADE,
+      FOREIGN KEY(widgetId) REFERENCES widgets(id) ON DELETE CASCADE,
+      FOREIGN KEY(workflowId) REFERENCES workflows(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Create standards table
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS standards (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT,
+      name TEXT NOT NULL,
+      code TEXT,
+      category TEXT,
+      description TEXT,
+      version TEXT,
+      status TEXT DEFAULT 'active',
+      effectiveDate TEXT,
+      expiryDate TEXT,
+      content TEXT,
+      relatedEntityIds TEXT,
+      tags TEXT,
+      createdBy TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(createdBy) REFERENCES users(id)
+    );
+  `);
+
+  // Create data connections table
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS data_connections (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      description TEXT,
+      config TEXT NOT NULL,
+      status TEXT DEFAULT 'inactive',
+      lastTestedAt TEXT,
+      lastError TEXT,
+      createdBy TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(createdBy) REFERENCES users(id)
+    );
+  `);
+
   // Migration: Add profilePhoto and companyRole columns to users table if they don't exist
   try {
     await db.exec(`ALTER TABLE users ADD COLUMN profilePhoto TEXT`);
@@ -571,6 +673,38 @@ async function initDb() {
 
   try {
     await db.exec(`ALTER TABLE copilot_chats ADD COLUMN allowedEntities TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add grid layout columns to widgets table
+  try {
+    await db.exec(`ALTER TABLE widgets ADD COLUMN gridX INTEGER DEFAULT 0`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE widgets ADD COLUMN gridY INTEGER DEFAULT 0`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE widgets ADD COLUMN gridWidth INTEGER DEFAULT 1`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE widgets ADD COLUMN gridHeight INTEGER DEFAULT 1`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE widgets ADD COLUMN dataSource TEXT DEFAULT 'entity'`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE widgets ADD COLUMN workflowConnectionId TEXT`);
   } catch (e) {
     // Column already exists, ignore
   }

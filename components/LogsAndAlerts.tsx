@@ -409,7 +409,7 @@ export const LogsAndAlerts: React.FC = () => {
                     {(typeFilter === 'all' || typeFilter === 'executions') && (
                         <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
                             <div className="px-6 py-4 border-b border-slate-200 bg-white">
-                                <h2 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                <h2 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Share Tech Mono', monospace" }}>
                                     Workflow Executions ({filteredExecutions.length})
                                 </h2>
                             </div>

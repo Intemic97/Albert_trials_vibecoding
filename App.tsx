@@ -27,6 +27,8 @@ import { Copilots } from './components/Copilots';
 import { LogsAndAlerts } from './components/LogsAndAlerts';
 import { Connections } from './components/Connections';
 import { Documentation } from './components/Documentation';
+import { KnowledgeBase } from './components/KnowledgeBase';
+import { Tabs } from './components/Tabs';
 import { API_BASE } from './config';
 
 export default function App() {
@@ -935,7 +937,16 @@ function AuthenticatedApp() {
                     <Route path="/admin" element={
                         <AdminPanel onNavigate={handleNavigate} />
                     } />
-                    <Route path="/database/:entityId?" element={
+                    <Route path="/database" element={
+                        <KnowledgeBase 
+                            entities={entities}
+                            onNavigate={(entityId) => {
+                                setActiveEntityId(entityId);
+                                navigate(`/database/${entityId}`);
+                            }}
+                        />
+                    } />
+                    <Route path="/database/:entityId" element={
                     <div data-tutorial="database-content" className="contents">
                         {/* Top Header */}
                         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
@@ -1042,26 +1053,14 @@ function AuthenticatedApp() {
                                 <div className="max-w-6xl mx-auto space-y-8">
 
                                     {/* Tab Switcher */}
-                                    <div className="flex space-x-6 border-b border-slate-200">
-                                        <button
-                                            onClick={() => setActiveTab('structure')}
-                                            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'structure'
-                                                ? 'border-teal-600 text-teal-600'
-                                                : 'border-transparent text-slate-500 hover:text-slate-700'
-                                                }`}
-                                        >
-                                            Structure & Properties
-                                        </button>
-                                        <button
-                                            onClick={() => setActiveTab('data')}
-                                            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'data'
-                                                ? 'border-teal-600 text-teal-600'
-                                                : 'border-transparent text-slate-500 hover:text-slate-700'
-                                                }`}
-                                        >
-                                            Data Records
-                                        </button>
-                                    </div>
+                                    <Tabs
+                                        items={[
+                                            { id: 'structure', label: 'Structure & Properties' },
+                                            { id: 'data', label: 'Data Records' }
+                                        ]}
+                                        activeTab={activeTab}
+                                        onChange={setActiveTab}
+                                    />
 
                                     {/* STRUCTURE TAB */}
                                     {activeTab === 'structure' && (

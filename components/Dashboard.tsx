@@ -4,6 +4,8 @@ import { Entity } from '../types';
 import { Database, Sparkles, X, Info, Plus, Share2, ChevronDown, Copy, Check, Trash2, Link, ExternalLink, LayoutDashboard, Search, ArrowLeft, Calendar, Clock, ChevronRight, Sliders } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
+import { Tabs } from './Tabs';
+import { Pagination } from './Pagination';
 import { API_BASE } from '../config';
 
 // Generate UUID that works in non-HTTPS contexts
@@ -131,7 +133,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     const navigate = useNavigate();
     
     // Tab state
-    const [activeTab, setActiveTab] = useState<'dashboards' | 'interactive'>('dashboards');
+    const [activeTab, setActiveTab] = useState<'dashboards' | 'simulations'>('dashboards');
     
     // Dashboard state
     const [dashboards, setDashboards] = useState<DashboardData[]>([]);
@@ -516,9 +518,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     };
 
     const [dashboardSearchQuery, setDashboardSearchQuery] = useState('');
+    const [currentDashboardPage, setCurrentDashboardPage] = useState(1);
+    const dashboardsPerPage = 6;
+    
     const filteredDashboards = dashboards.filter(d => 
         d.name.toLowerCase().includes(dashboardSearchQuery.toLowerCase())
     );
+    
+    const totalDashboardPages = Math.ceil(filteredDashboards.length / dashboardsPerPage);
+    const paginatedDashboards = filteredDashboards.slice(
+        (currentDashboardPage - 1) * dashboardsPerPage,
+        currentDashboardPage * dashboardsPerPage
+    );
+    
+    // Reset to page 1 when search changes
+    useEffect(() => {
+        setCurrentDashboardPage(1);
+    }, [dashboardSearchQuery]);
 
     // Interactive Dashboard state
     const [interactiveDashboards, setInteractiveDashboards] = useState<any[]>([]);
@@ -527,62 +543,57 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
 
     return (
         <div className="flex flex-col h-full bg-slate-50" data-tutorial="dashboard-content">
-            {/* Top Header with Tabs */}
+            {/* Top Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
-                <div className="flex items-center gap-6">
-                    <div>
-                        <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Dashboards</h1>
-                        <p className="text-[11px] text-slate-500">Create and manage your data visualizations</p>
-                    </div>
-                    <div className="h-8 w-px bg-slate-200"></div>
-                    {/* Tabs */}
-                    <div className="flex items-center gap-1">
-                        <button
-                            onClick={() => {
-                                setActiveTab('dashboards');
-                                setSelectedDashboardId(null);
-                                setSelectedInteractiveDashboardId(null);
-                                navigate('/dashboard', { replace: true });
-                            }}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                activeTab === 'dashboards'
-                                    ? 'bg-slate-900 text-white'
-                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                            }`}
-                        >
-                            <div className="flex items-center gap-2">
-                                <LayoutDashboard size={16} />
-                                Dashboards
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => {
-                                setActiveTab('interactive');
-                                setSelectedDashboardId(null);
-                                setSelectedInteractiveDashboardId(null);
-                            }}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                activeTab === 'interactive'
-                                    ? 'bg-slate-900 text-white'
-                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                            }`}
-                        >
-                            <div className="flex items-center gap-2">
-                                <Sliders size={16} />
-                                Interactive Dashboards
-                            </div>
-                        </button>
-                    </div>
+                <div>
+                    <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Dashboards</h1>
+                    <p className="text-[11px] text-slate-500">Create and manage your data visualizations</p>
                 </div>
                 <div />
             </header>
 
+            {/* Content with Tabs */}
+            <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                {/* Tabs */}
+                <div className="px-8 pt-6">
+                    <Tabs
+                        items={[
+                            { 
+                                id: 'dashboards', 
+                                label: 'Dashboards', 
+                                icon: LayoutDashboard,
+                                badge: dashboards.length
+                            },
+                            { 
+                                id: 'simulations', 
+                                label: 'Simulations', 
+                                icon: Sliders,
+                                badge: interactiveDashboards.length
+                            }
+                        ]}
+                        activeTab={activeTab}
+                        onChange={(tabId) => {
+                            if (tabId === 'dashboards') {
+                                setActiveTab('dashboards');
+                                setSelectedDashboardId(null);
+                                setSelectedInteractiveDashboardId(null);
+                                navigate('/dashboard', { replace: true });
+                            } else {
+                                setActiveTab('simulations');
+                                setSelectedDashboardId(null);
+                                setSelectedInteractiveDashboardId(null);
+                            }
+                        }}
+                    />
+                </div>
+
+                {/* Tab Content */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
             {activeTab === 'dashboards' && !selectedDashboardId ? (
                 /* Dashboards List View */
                 <>
-
                     {/* Content Area */}
-                    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                    <div className="p-8">
                         {/* Toolbar */}
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-4">
@@ -610,8 +621,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                         </div>
 
                         {/* Dashboards Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
-                            {filteredDashboards.map((dashboard) => (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-6">
+                            {paginatedDashboards.map((dashboard) => (
                                 <div
                                     key={dashboard.id}
                                     onClick={() => selectDashboard(dashboard.id)}
@@ -676,21 +687,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                 </div>
                             ))}
 
-                            {/* Create New Card */}
-                            <div
-                                onClick={handleCreateDashboard}
-                                className="border border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center min-h-[200px] text-slate-400 cursor-pointer group"
-                            >
-                                <div className="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center mb-4">
-                                    <Plus size={24} className="text-slate-400" />
+                            {/* Create New Card - Only show if no pagination */}
+                            {totalDashboardPages <= 1 && (
+                                <div
+                                    onClick={handleCreateDashboard}
+                                    className="border border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center min-h-[200px] text-slate-400 cursor-pointer group"
+                                >
+                                    <div className="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center mb-4">
+                                        <Plus size={24} className="text-slate-400" />
+                                    </div>
+                                    <span className="font-medium text-sm">Create new dashboard</span>
                                 </div>
-                                <span className="font-medium text-sm">Create new dashboard</span>
-                            </div>
+                            )}
                         </div>
+                        
+                        {/* Pagination */}
+                        {totalDashboardPages > 1 && (
+                            <div className="mt-6">
+                                <Pagination
+                                    currentPage={currentDashboardPage}
+                                    totalPages={totalDashboardPages}
+                                    onPageChange={setCurrentDashboardPage}
+                                    itemsPerPage={dashboardsPerPage}
+                                    totalItems={filteredDashboards.length}
+                                />
+                            </div>
+                        )}
                     </div>
                 </>
             ) : activeTab === 'dashboards' && selectedDashboardId ? (
-                /* Dashboard Editor View */
                 <>
                     {/* Header */}
                     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-20 shrink-0">
@@ -868,8 +893,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                         </div>
                     </div>
                 </>
-            ) : activeTab === 'interactive' ? (
-                /* Interactive Dashboards View */
+            ) : activeTab === 'simulations' ? (
                 <InteractiveDashboardsView
                     entities={entities}
                     interactiveDashboards={interactiveDashboards}
@@ -881,6 +905,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     onNavigate={onNavigate}
                 />
             ) : null}
+                </div>
+            </div>
 
             {/* Share Dashboard Modal */}
             {showShareModal && (
@@ -944,7 +970,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     );
 };
 
-// Interactive Dashboards Component
+// Simulations Component
 interface InteractiveDashboardsViewProps {
     entities: Entity[];
     interactiveDashboards: any[];
@@ -1023,7 +1049,7 @@ const InteractiveDashboardsView: React.FC<InteractiveDashboardsViewProps> = ({
                     <div className="flex items-center justify-between mb-6">
                         <div>
                             <h2 className="text-xl font-normal text-slate-900 mb-1">{selectedDashboard.name}</h2>
-                            <p className="text-sm text-slate-500">Interactive dashboard for what-if scenarios</p>
+                            <p className="text-sm text-slate-500">Simulation for what-if scenarios</p>
                         </div>
                         <button
                             onClick={() => setSelectedInteractiveDashboardId(null)}
@@ -1169,15 +1195,15 @@ const InteractiveDashboardsView: React.FC<InteractiveDashboardsViewProps> = ({
                 {/* Toolbar */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h2 className="text-lg font-normal text-slate-900 mb-1">Interactive Dashboards</h2>
-                        <p className="text-sm text-slate-500">Create interactive dashboards for what-if scenario analysis</p>
+                        <h2 className="text-lg font-normal text-slate-900 mb-1">Simulations</h2>
+                        <p className="text-sm text-slate-500">Create simulations for what-if scenario analysis</p>
                     </div>
                     <button
                         onClick={() => setIsCreating(true)}
                         className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                     >
                         <Plus size={14} className="mr-2" />
-                        Create Interactive Dashboard
+                        Create Simulation
                     </button>
                 </div>
 
@@ -1185,7 +1211,7 @@ const InteractiveDashboardsView: React.FC<InteractiveDashboardsViewProps> = ({
                 {isCreating && (
                     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setIsCreating(false)}>
                         <div className="bg-white rounded-lg border border-slate-200 shadow-xl p-6 w-[500px]" onClick={e => e.stopPropagation()}>
-                            <h3 className="text-lg font-normal text-slate-800 mb-4">Create Interactive Dashboard</h3>
+                            <h3 className="text-lg font-normal text-slate-800 mb-4">Create Simulation</h3>
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-2">Dashboard Name</label>
@@ -1252,15 +1278,15 @@ const InteractiveDashboardsView: React.FC<InteractiveDashboardsViewProps> = ({
                 ) : (
                     <div className="bg-white rounded-lg border border-slate-200 p-12 text-center">
                         <Sliders className="mx-auto text-slate-300 mb-4" size={48} />
-                        <h3 className="text-base font-normal text-slate-700 mb-2">No Interactive Dashboards</h3>
+                        <h3 className="text-base font-normal text-slate-700 mb-2">No Simulations</h3>
                         <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
-                            Create an interactive dashboard to explore what-if scenarios by adjusting variables and seeing how they affect your data.
+                            Create a simulation to explore what-if scenarios by adjusting variables and seeing how they affect your data.
                         </p>
                         <button
                             onClick={() => setIsCreating(true)}
                             className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium"
                         >
-                            Create Your First Interactive Dashboard
+                            Create Your First Simulation
                         </button>
                     </div>
                 )}
