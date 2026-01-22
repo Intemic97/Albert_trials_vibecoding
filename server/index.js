@@ -1827,37 +1827,54 @@ app.post('/api/copilot/chats', authenticateToken, async (req, res) => {
     }
 });
 
-// Update a chat
+// Update a chat (or create if it doesn't exist - upsert)
 app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const orgId = req.user.orgId;
         const { chatId } = req.params;
-        const { title, messages, updatedAt } = req.body;
+        const { title, messages, updatedAt, createdAt } = req.body;
 
-        // Verify ownership
+        // Check if chat exists
         const chat = await db.get(
             'SELECT * FROM copilot_chats WHERE id = ? AND userId = ? AND organizationId = ?',
             [chatId, userId, orgId]
         );
 
-        if (!chat) {
-            return res.status(404).json({ error: 'Chat not found' });
-        }
-
         const { instructions, allowedEntities } = req.body;
         
-        await db.run(
-            `UPDATE copilot_chats SET title = ?, messages = ?, instructions = ?, allowedEntities = ?, updatedAt = ? WHERE id = ?`,
-            [
-                title, 
-                JSON.stringify(messages), 
-                instructions || null,
-                allowedEntities ? JSON.stringify(allowedEntities) : null,
-                updatedAt, 
-                chatId
-            ]
-        );
+        if (!chat) {
+            // Chat doesn't exist, create it (upsert behavior)
+            console.log('[Copilot] Chat not found, creating new chat:', chatId);
+            await db.run(
+                `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, instructions, allowedEntities, createdAt, updatedAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    chatId,
+                    userId,
+                    orgId,
+                    title,
+                    JSON.stringify(messages),
+                    instructions || null,
+                    allowedEntities ? JSON.stringify(allowedEntities) : null,
+                    createdAt || updatedAt || new Date().toISOString(),
+                    updatedAt || new Date().toISOString()
+                ]
+            );
+        } else {
+            // Chat exists, update it
+            await db.run(
+                `UPDATE copilot_chats SET title = ?, messages = ?, instructions = ?, allowedEntities = ?, updatedAt = ? WHERE id = ?`,
+                [
+                    title, 
+                    JSON.stringify(messages), 
+                    instructions || null,
+                    allowedEntities ? JSON.stringify(allowedEntities) : null,
+                    updatedAt, 
+                    chatId
+                ]
+            );
+        }
 
         res.json({ success: true });
     } catch (error) {

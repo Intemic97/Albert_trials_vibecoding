@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Entity } from '../types';
-import { Database, Sparkles, X, Info, Plus, Share2, ChevronDown, Copy, Check, Trash2, Link, ExternalLink, LayoutDashboard, Search, ArrowLeft, Calendar, Clock, ChevronRight, Sliders, GripVertical, Maximize2 } from 'lucide-react';
+import { Database, Sparkles, X, Info, Plus, Share2, ChevronDown, Copy, Check, Trash2, Link, ExternalLink, LayoutDashboard, Search, ArrowLeft, Calendar, Clock, ChevronRight, Sliders, GripVertical, Maximize2, BarChart3, LineChart, PieChart, AreaChart, TrendingUp, Table2 } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { Tabs } from './Tabs';
@@ -226,6 +226,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     
     // Modal state for adding widgets
     const [showAddWidgetModal, setShowAddWidgetModal] = useState(false);
+    const [selectedVisualizationType, setSelectedVisualizationType] = useState<string>('');
     
     // Update grid width on window resize
     useEffect(() => {
@@ -513,8 +514,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const handleGenerateWidget = async (prompt: string, mentionedEntityIds: string[]) => {
+    const handleGenerateWidget = async (prompt: string, mentionedEntityIds: string[], visualizationType?: string) => {
         setIsGenerating(true);
+
+        // Enhance prompt with visualization type if selected
+        let enhancedPrompt = prompt;
+        if (visualizationType && visualizationType !== 'auto') {
+            enhancedPrompt = `${visualizationType} of ${prompt}`;
+        }
 
         // Save prompt as feedback for analytics
         try {
@@ -537,7 +544,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    prompt,
+                    prompt: enhancedPrompt,
                     mentionedEntityIds
                 }),
                 credentials: 'include'
@@ -1039,7 +1046,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
 
                             {/* Add Widget Modal */}
                             {showAddWidgetModal && (
-                                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddWidgetModal(false)}>
+                                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => {
+                                    setShowAddWidgetModal(false);
+                                    setSelectedVisualizationType(''); // Reset when closing
+                                }}>
                                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
                                         <div className="bg-white border-b border-slate-200 px-6 py-5 shrink-0 flex items-center justify-between">
                                             <div>
@@ -1047,22 +1057,52 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                                 <p className="text-xs text-slate-500 mt-1">Describe what you want to visualize and how</p>
                                             </div>
                                             <button
-                                                onClick={() => setShowAddWidgetModal(false)}
+                                                onClick={() => {
+                                                    setShowAddWidgetModal(false);
+                                                    setSelectedVisualizationType(''); // Reset when closing
+                                                }}
                                                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                                             >
                                                 <X size={18} />
                                             </button>
                                         </div>
-                                        <div className="flex-1 overflow-y-auto p-6">
+                                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                                            {/* Visualization Type Selector */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                    Visualization Type
+                                                </label>
+                                                <div className="relative">
+                                                    <select
+                                                        value={selectedVisualizationType}
+                                                        onChange={(e) => setSelectedVisualizationType(e.target.value)}
+                                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-300 appearance-none cursor-pointer"
+                                                    >
+                                                        <option value="auto">Auto (let AI decide)</option>
+                                                        <option value="Bar chart">Bar Chart</option>
+                                                        <option value="Line chart">Line Chart</option>
+                                                        <option value="Area chart">Area Chart</option>
+                                                        <option value="Pie chart">Pie Chart</option>
+                                                        <option value="Table">Table</option>
+                                                        <option value="Scatter plot">Scatter Plot</option>
+                                                        <option value="Heatmap">Heatmap</option>
+                                                        <option value="Gauge">Gauge</option>
+                                                        <option value="Funnel chart">Funnel Chart</option>
+                                                    </select>
+                                                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                                </div>
+                                            </div>
+
                                             <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
                                                 <PromptInput
                                                     entities={entities}
                                                     onGenerate={(prompt, mentionedEntityIds) => {
-                                                        handleGenerateWidget(prompt, mentionedEntityIds);
+                                                        handleGenerateWidget(prompt, mentionedEntityIds, selectedVisualizationType);
                                                         setShowAddWidgetModal(false);
+                                                        setSelectedVisualizationType(''); // Reset after generation
                                                     }}
                                                     isGenerating={isGenerating}
-                                                    placeholder="Describe a chart... e.g. 'Bar chart of @Customers by total orders' or 'Connect to workflow output SalesReport and show as line chart'"
+                                                    placeholder="Describe your data... e.g. '@Customers by total orders' or 'Connect to workflow output SalesReport'"
                                                     buttonLabel="Generate Widget"
                                                     className="text-slate-800"
                                                 />

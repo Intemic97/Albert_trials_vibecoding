@@ -8766,41 +8766,43 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             {/* Workflow Templates Modal */}
             {showTemplatesModal && !previewingTemplate && (
-                <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none" onClick={() => !isCopyingTemplate && setShowTemplatesModal(false)}>
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col pointer-events-auto" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={() => !isCopyingTemplate && setShowTemplatesModal(false)}>
+                    <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-5 text-white rounded-t-xl shrink-0">
+                        <div className="px-6 py-5 border-b border-slate-200 shrink-0">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <BookOpen size={28} />
+                                    <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                                        <BookOpen size={20} className="text-slate-600" />
+                                    </div>
                                     <div>
-                                        <h3 className="font-normal text-xl">Workflow Templates</h3>
-                                        <p className="text-slate-300 text-sm">Pre-built workflows to get you started quickly</p>
+                                        <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Workflow Templates</h3>
+                                        <p className="text-sm text-slate-500 mt-0.5">Pre-built workflows to get you started quickly</p>
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => setShowTemplatesModal(false)}
                                     disabled={isCopyingTemplate}
-                                    className="p-2 hover:bg-white/20 rounded-lg transition-colors disabled:opacity-50"
+                                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
                                 >
-                                    <X size={22} />
+                                    <X size={20} />
                                 </button>
                             </div>
                         </div>
 
                         {/* Category Filter */}
-                        <div className="px-6 py-3 border-b border-slate-200 bg-slate-50 shrink-0">
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-slate-600">Category:</span>
-                                <div className="flex gap-2">
+                        <div className="px-6 py-4 border-b border-slate-200 shrink-0">
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Category</span>
+                                <div className="flex gap-2 flex-wrap">
                                     {templateCategories.map(category => (
                                         <button
                                             key={category}
                                             onClick={() => setSelectedTemplateCategory(category)}
-                                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                                                 selectedTemplateCategory === category
-                                                    ? 'bg-slate-700 text-white'
-                                                    : 'bg-white text-slate-600 border border-slate-300 hover:border-slate-500 hover:text-slate-800'
+                                                    ? 'bg-slate-900 text-white shadow-sm'
+                                                    : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                                             }`}
                                         >
                                             {category}
@@ -8811,46 +8813,49 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         </div>
 
                         {/* Templates Grid */}
-                        <div className="flex-1 overflow-y-auto p-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {filteredTemplates.map(template => (
                                     <div
                                         key={template.id}
-                                        className="bg-white border border-slate-200 rounded-lg p-5 group"
+                                        className="bg-white border border-slate-200 rounded-lg p-5 group hover:shadow-md transition-shadow cursor-pointer"
+                                        onClick={() => setPreviewingTemplate(template)}
                                     >
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div>
-                                                <h4 className="font-normal text-lg text-slate-800 group-hover:text-slate-900 transition-colors">
-                                                    {template.name}
-                                                </h4>
-                                                <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full mt-1">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center flex-shrink-0 group-hover:from-slate-100 group-hover:to-slate-200 transition-all">
+                                                        <Workflow size={16} className="text-slate-600" />
+                                                    </div>
+                                                    <h4 className="text-base font-normal text-slate-900 group-hover:text-slate-700 transition-colors truncate" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                        {template.name}
+                                                    </h4>
+                                                </div>
+                                                <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded mt-1">
                                                     {template.category}
                                                 </span>
                                             </div>
-                                            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 group-hover:bg-slate-200 transition-colors">
-                                                <Workflow size={20} />
-                                            </div>
                                         </div>
                                         
-                                        <p className="text-sm text-slate-600 mb-4 min-h-[40px]">
+                                        <p className="text-sm text-slate-600 mb-4 min-h-[48px] line-clamp-2">
                                             {template.description}
                                         </p>
 
                                         {/* Mini workflow preview */}
                                         <div className="bg-slate-50 rounded-lg p-3 mb-4 border border-slate-100">
-                                            <div className="flex items-center gap-2 text-xs text-slate-500">
-                                                <span className="flex items-center gap-1">
-                                                    <div className="w-2 h-2 bg-[#256A65]/50 rounded-full"></div>
+                                            <div className="flex items-center gap-3 text-xs text-slate-500 mb-2">
+                                                <span className="flex items-center gap-1.5">
+                                                    <div className="w-1.5 h-1.5 bg-slate-400 rounded-full"></div>
                                                     {template.nodes.length} nodes
                                                 </span>
                                                 <span className="text-slate-300">•</span>
-                                                <span className="flex items-center gap-1">
-                                                    <ArrowRight size={12} />
+                                                <span className="flex items-center gap-1.5">
+                                                    <ArrowRight size={12} className="text-slate-400" />
                                                     {template.connections.length} connections
                                                 </span>
                                             </div>
-                                            <div className="flex flex-wrap gap-1.5 mt-2">
-                                                {template.nodes.slice(0, 5).map((node, idx) => (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {template.nodes.slice(0, 4).map((node, idx) => (
                                                     <span
                                                         key={idx}
                                                         className="px-2 py-0.5 bg-white text-slate-600 text-xs rounded border border-slate-200"
@@ -8858,9 +8863,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         {node.label}
                                                     </span>
                                                 ))}
-                                                {template.nodes.length > 5 && (
+                                                {template.nodes.length > 4 && (
                                                     <span className="px-2 py-0.5 text-slate-400 text-xs">
-                                                        +{template.nodes.length - 5} more
+                                                        +{template.nodes.length - 4}
                                                     </span>
                                                 )}
                                             </div>
@@ -8869,25 +8874,31 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         {/* Action Buttons */}
                                         <div className="flex gap-2">
                                             <button
-                                                onClick={() => setPreviewingTemplate(template)}
-                                                className="flex-1 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 hover:border-slate-400 transition-all flex items-center justify-center gap-2"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setPreviewingTemplate(template);
+                                                }}
+                                                className="flex-1 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2"
                                             >
-                                                <Eye size={16} />
+                                                <Eye size={14} />
                                                 Preview
                                             </button>
                                             <button
-                                                onClick={() => copyTemplateToWorkflows(template)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    copyTemplateToWorkflows(template);
+                                                }}
                                                 disabled={isCopyingTemplate}
-                                                className="flex-1 py-2.5 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-lg font-medium hover:from-slate-800 hover:to-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow"
+                                                className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
                                             >
                                                 {isCopyingTemplate ? (
                                                     <>
-                                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                                         Copying...
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <Copy size={16} />
+                                                        <Copy size={14} />
                                                         Use Template
                                                     </>
                                                 )}
@@ -8898,23 +8909,26 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             </div>
 
                             {filteredTemplates.length === 0 && (
-                                <div className="text-center py-12 text-slate-500">
-                                    <BookOpen size={48} className="mx-auto mb-3 opacity-30" />
-                                    <p>No templates found in this category.</p>
+                                <div className="text-center py-16">
+                                    <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                                        <BookOpen size={32} className="text-slate-400" />
+                                    </div>
+                                    <h3 className="text-base font-normal text-slate-700 mb-2">No templates found</h3>
+                                    <p className="text-sm text-slate-500">Try selecting a different category</p>
                                 </div>
                             )}
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-xl shrink-0">
+                        <div className="px-6 py-4 border-t border-slate-200 shrink-0">
                             <div className="flex items-center justify-between">
-                                <p className="text-sm text-slate-500">
+                                <p className="text-xs text-slate-500">
                                     {filteredTemplates.length} template{filteredTemplates.length !== 1 ? 's' : ''} available
                                 </p>
                                 <button
                                     onClick={() => setShowTemplatesModal(false)}
                                     disabled={isCopyingTemplate}
-                                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 font-medium"
+                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
                                 >
                                     Close
                                 </button>
@@ -8926,21 +8940,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             {/* Template Preview Modal */}
             {previewingTemplate && (
-                <div className="fixed inset-0 flex items-center justify-center z-[60] p-4 pointer-events-none" onClick={() => setPreviewingTemplate(null)}>
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col pointer-events-auto" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[60] p-4" onClick={() => setPreviewingTemplate(null)}>
+                    <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-4 text-white rounded-t-xl shrink-0">
+                        <div className="px-6 py-5 border-b border-slate-200 shrink-0">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <Eye size={24} />
+                                    <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                                        <Eye size={20} className="text-slate-600" />
+                                    </div>
                                     <div>
-                                        <h3 className="font-normal text-lg">Template Preview</h3>
-                                        <p className="text-slate-300 text-sm">{previewingTemplate.name}</p>
+                                        <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Template Preview</h3>
+                                        <p className="text-sm text-slate-500 mt-0.5">{previewingTemplate.name}</p>
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => setPreviewingTemplate(null)}
-                                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                                 >
                                     <X size={20} />
                                 </button>
@@ -8948,9 +8964,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         </div>
 
                         {/* Preview Canvas */}
-                        <div className="overflow-hidden bg-slate-100 relative" style={{ height: '400px' }}>
+                        <div className="overflow-hidden bg-slate-50 relative border-b border-slate-200" style={{ height: '450px' }}>
                             <div 
-                                className="absolute inset-0 overflow-auto p-8"
+                                className="absolute inset-0 overflow-auto p-8 custom-scrollbar"
                                 style={{
                                     backgroundImage: `
                                         linear-gradient(to right, #e2e8f0 1px, transparent 1px),
@@ -8978,7 +8994,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         const midX = (startX + endX) / 2;
                                         
                                         // Color based on connection type
-                                        let strokeColor = '#94a3b8';
+                                        let strokeColor = '#cbd5e1';
                                         if (conn.outputType === 'true') strokeColor = '#22c55e';
                                         if (conn.outputType === 'false') strokeColor = '#ef4444';
                                         
@@ -8987,9 +9003,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 <path
                                                     d={`M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`}
                                                     stroke={strokeColor}
-                                                    strokeWidth="2"
+                                                    strokeWidth="2.5"
                                                     fill="none"
-                                                    strokeDasharray="6 3"
+                                                    strokeDasharray="5 4"
                                                 />
                                                 <circle cx={endX} cy={endY} r="4" fill={strokeColor} />
                                             </g>
@@ -9006,25 +9022,25 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         return (
                                             <div
                                                 key={node.id}
-                                                className="absolute bg-white rounded-lg border-2 border-slate-300 shadow-md p-3 w-[140px]"
+                                                className="absolute bg-white rounded-lg border border-slate-200 shadow-sm p-3 w-[140px] hover:shadow-md transition-shadow"
                                                 style={{ left: node.x, top: node.y }}
                                             >
                                                 <div className="flex items-center gap-2">
-                                                    <div className={`w-7 h-7 rounded-md flex items-center justify-center ${iconBg}`}>
+                                                    <div className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 ${iconBg}`}>
                                                         <IconComponent size={14} />
                                                     </div>
-                                                    <span className="text-xs font-medium text-slate-700 truncate flex-1">
+                                                    <span className="text-xs font-normal text-slate-900 truncate flex-1" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                                                         {node.label}
                                                     </span>
                                                 </div>
                                                 {node.type === 'condition' && (
-                                                    <div className="flex gap-1 mt-2 text-[10px]">
-                                                        <span className="px-1.5 py-0.5 bg-[#256A65]/10 text-[#1e554f] rounded">TRUE</span>
-                                                        <span className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded">FALSE</span>
+                                                    <div className="flex gap-1 mt-2">
+                                                        <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-medium">TRUE</span>
+                                                        <span className="px-1.5 py-0.5 bg-red-50 text-red-700 rounded text-[10px] font-medium">FALSE</span>
                                                     </div>
                                                 )}
                                                 {node.type === 'comment' && node.config?.commentText && (
-                                                    <p className="text-[10px] text-slate-500 mt-1 line-clamp-2">
+                                                    <p className="text-[10px] text-slate-500 mt-2 line-clamp-2">
                                                         {node.config.commentText}
                                                     </p>
                                                 )}
@@ -9036,36 +9052,37 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         </div>
 
                         {/* Template Info */}
-                        <div className="px-6 py-4 border-t border-slate-200 bg-white shrink-0">
-                            <div className="flex items-center justify-between mb-3">
-                                <div>
-                                    <h4 className="font-normal text-slate-800">{previewingTemplate.name}</h4>
-                                    <p className="text-sm text-slate-500">{previewingTemplate.description}</p>
+                        <div className="px-6 py-4 border-t border-slate-200 shrink-0">
+                            <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                    <h4 className="text-base font-normal text-slate-900 mb-1" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{previewingTemplate.name}</h4>
+                                    <p className="text-sm text-slate-600">{previewingTemplate.description}</p>
                                 </div>
-                                <span className="px-3 py-1 bg-slate-100 text-slate-600 text-sm rounded-full">
+                                <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs rounded ml-4 flex-shrink-0">
                                     {previewingTemplate.category}
                                 </span>
                             </div>
-                            <div className="flex items-center gap-4 text-sm text-slate-500">
-                                <span className="flex items-center gap-1">
-                                    <div className="w-2 h-2 bg-[#256A65]/50 rounded-full"></div>
+                            <div className="flex items-center gap-4 text-xs text-slate-500">
+                                <span className="flex items-center gap-1.5">
+                                    <div className="w-1.5 h-1.5 bg-slate-400 rounded-full"></div>
                                     {previewingTemplate.nodes.length} nodes
                                 </span>
-                                <span className="flex items-center gap-1">
-                                    <ArrowRight size={14} />
+                                <span className="text-slate-300">•</span>
+                                <span className="flex items-center gap-1.5">
+                                    <ArrowRight size={12} className="text-slate-400" />
                                     {previewingTemplate.connections.length} connections
                                 </span>
                             </div>
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-xl shrink-0">
-                            <div className="flex items-center justify-end gap-3">
+                        <div className="px-6 py-4 border-t border-slate-200 shrink-0">
+                            <div className="flex items-center justify-end gap-2">
                                 <button
                                     onClick={() => setPreviewingTemplate(null)}
-                                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors"
                                 >
-                                    Back to Templates
+                                    Back
                                 </button>
                                 <button
                                     onClick={() => {
@@ -9073,16 +9090,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         setPreviewingTemplate(null);
                                     }}
                                     disabled={isCopyingTemplate}
-                                    className="px-5 py-2 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-lg font-medium hover:from-slate-800 hover:to-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+                                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm hover:shadow-md"
                                 >
                                     {isCopyingTemplate ? (
                                         <>
-                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                             Copying...
                                         </>
                                     ) : (
                                         <>
-                                            <Copy size={16} />
+                                            <Copy size={14} />
                                             Use This Template
                                         </>
                                     )}

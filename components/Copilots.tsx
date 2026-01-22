@@ -471,16 +471,63 @@ export const Copilots: React.FC = () => {
         return newChat;
     };
 
-    const handleSaveCopilot = () => {
+    const handleSaveCopilot = async () => {
         if (!copilotName.trim()) {
             alert('Please enter a name for your copilot');
             return;
         }
-        createNewChat(copilotName.trim(), copilotInstructions.trim() || undefined, selectedEntities);
-        setShowCopilotModal(false);
-        setCopilotName('');
-        setCopilotInstructions('');
-        setSelectedEntities([]);
+        
+        try {
+            // Create the new chat and wait for it to complete
+            const newChat = await createNewChat(copilotName.trim(), copilotInstructions.trim() || undefined, selectedEntities);
+            
+            // Ensure the chat is saved by calling saveChat explicitly
+            // This handles the case where POST might have failed but we still have the chat in state
+            try {
+                await saveChat(newChat);
+                console.log('[Copilots] Copilot saved successfully:', newChat.id);
+            } catch (saveError) {
+                console.error('[Copilots] Error saving copilot after creation:', saveError);
+                // If save fails, try to create it again (in case POST failed)
+                try {
+                    const payload = {
+                        id: newChat.id,
+                        title: newChat.title,
+                        messages: newChat.messages.map(m => ({
+                            id: m.id,
+                            role: m.role,
+                            content: m.content,
+                            timestamp: m.timestamp.toISOString()
+                        })),
+                        createdAt: newChat.createdAt.toISOString(),
+                        updatedAt: newChat.updatedAt.toISOString(),
+                        instructions: newChat.instructions || null,
+                        allowedEntities: newChat.allowedEntities && newChat.allowedEntities.length > 0 ? newChat.allowedEntities : null
+                    };
+                    await fetch(`${API_BASE}/api/copilot/chats`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(payload)
+                    });
+                    console.log('[Copilots] Retried POST and succeeded');
+                } catch (retryError) {
+                    console.error('[Copilots] Retry POST also failed:', retryError);
+                }
+            }
+            
+            // Reload chats to ensure sidebar is updated
+            await loadChats();
+            
+            // Close modal and reset form
+            setShowCopilotModal(false);
+            setCopilotName('');
+            setCopilotInstructions('');
+            setSelectedEntities([]);
+        } catch (error) {
+            console.error('[Copilots] Error creating copilot:', error);
+            alert('Failed to create copilot. Please try again.');
+        }
     };
 
     const toggleEntitySelection = (entityId: string) => {
