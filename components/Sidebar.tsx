@@ -187,7 +187,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
   return (
     <div data-tutorial="sidebar" className="w-60 bg-slate-50 border-r border-slate-200 h-screen flex flex-col sticky top-0 font-sans z-40">
       {/* Header */}
-      <div className="px-6 pt-5 pb-5 border-b border-slate-200 bg-white">
+      <div className="px-6 pt-5 pb-5 border-b border-slate-200 bg-slate-50">
         <div className="flex items-center mb-5 pl-1">
           <img
             src="/logo.svg"

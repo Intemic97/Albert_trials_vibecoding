@@ -160,11 +160,24 @@ export const Copilots: React.FC = () => {
     
     // Auto-save chats when they change (with debounce)
     useEffect(() => {
+        // Don't save on initial load (when chats is empty)
+        if (chats.length === 0) {
+            console.log('[Copilots] Skipping auto-save: no chats to save');
+            return;
+        }
+
         const saveTimeout = setTimeout(() => {
+            console.log('[Copilots] Auto-saving', chats.length, 'chats...');
             chats.forEach(chat => {
                 // Save all chats that have been modified (have messages or configuration)
+                // Also save chats that have been created (even if only welcome message)
                 if (chat.messages.length > 0 || chat.instructions || (chat.allowedEntities && chat.allowedEntities.length > 0)) {
-                    saveChat(chat).catch(err => console.error('[Copilots] Error auto-saving chat:', chat.id, err));
+                    console.log('[Copilots] Auto-saving chat:', chat.id, chat.title, 'messages:', chat.messages.length);
+                    saveChat(chat).catch(err => {
+                        console.error('[Copilots] Error auto-saving chat:', chat.id, err);
+                    });
+                } else {
+                    console.log('[Copilots] Skipping auto-save for chat:', chat.id, '- no content');
                 }
             });
         }, 1000); // Debounce: save 1 second after last change
@@ -189,31 +202,45 @@ export const Copilots: React.FC = () => {
     // Save all chats on unmount
     useEffect(() => {
         return () => {
+            console.log('[Copilots] Component unmounting, saving all chats...');
             chats.forEach(chat => {
                 if (chat.messages.length > 0 || chat.instructions || (chat.allowedEntities && chat.allowedEntities.length > 0)) {
-                    // Use synchronous-like approach for unmount
+                    const payload = {
+                        id: chat.id,
+                        title: chat.title || 'New Copilot',
+                        messages: chat.messages.map(m => ({
+                            id: m.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                            role: m.role,
+                            content: m.content || '',
+                            timestamp: m.timestamp ? (m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp) : new Date().toISOString(),
+                            data: m.data,
+                            explanation: m.explanation,
+                            entitiesUsed: m.entitiesUsed
+                        })),
+                        createdAt: chat.createdAt ? (chat.createdAt instanceof Date ? chat.createdAt.toISOString() : chat.createdAt) : new Date().toISOString(),
+                        updatedAt: chat.updatedAt ? (chat.updatedAt instanceof Date ? chat.updatedAt.toISOString() : chat.updatedAt) : new Date().toISOString(),
+                        instructions: chat.instructions || null,
+                        allowedEntities: Array.isArray(chat.allowedEntities) && chat.allowedEntities.length > 0 ? chat.allowedEntities : null
+                    };
+                    
+                    // Try PUT first, if it fails (404), try POST
                     fetch(`${API_BASE}/api/copilot/chats/${chat.id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
-                        body: JSON.stringify({
-                            title: chat.title || 'New Copilot',
-                            messages: chat.messages.map(m => ({
-                                id: m.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                                role: m.role,
-                                content: m.content || '',
-                                timestamp: m.timestamp ? (m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp) : new Date().toISOString(),
-                                data: m.data,
-                                explanation: m.explanation,
-                                entitiesUsed: m.entitiesUsed
-                            })),
-                            createdAt: chat.createdAt ? (chat.createdAt instanceof Date ? chat.createdAt.toISOString() : chat.createdAt) : new Date().toISOString(),
-                            updatedAt: chat.updatedAt ? (chat.updatedAt instanceof Date ? chat.updatedAt.toISOString() : chat.updatedAt) : new Date().toISOString(),
-                            instructions: chat.instructions || null,
-                            allowedEntities: Array.isArray(chat.allowedEntities) && chat.allowedEntities.length > 0 ? chat.allowedEntities : null
-                        }),
+                        body: JSON.stringify(payload),
                         keepalive: true // Keep request alive even after page unload
-                    }).catch(err => console.error('[Copilots] Error saving on unmount:', chat.id, err));
+                    }).catch(() => {
+                        // If PUT fails, try POST (chat might not exist)
+                        console.log('[Copilots] PUT failed on unmount, trying POST for chat:', chat.id);
+                        fetch(`${API_BASE}/api/copilot/chats`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify(payload),
+                            keepalive: true
+                        }).catch(err => console.error('[Copilots] Error saving on unmount:', chat.id, err));
+                    });
                 }
             });
         };
@@ -227,12 +254,15 @@ export const Copilots: React.FC = () => {
 
     const loadChats = async () => {
         try {
+            console.log('[Copilots] Loading chats from server...');
             const response = await fetch(`${API_BASE}/api/copilot/chats`, {
                 credentials: 'include'
             });
+            console.log('[Copilots] Response status:', response.status, response.statusText);
             if (response.ok) {
                 const data = await response.json();
-                console.log('[Copilots] Loaded chats from server:', data);
+                console.log('[Copilots] Raw response data:', data);
+                console.log('[Copilots] Chats array:', data.chats);
                 
                 const loadedChats = (data.chats || []).map((chat: any) => {
                     try {
@@ -268,35 +298,31 @@ export const Copilots: React.FC = () => {
                     updatedAt: c.updatedAt 
                 })));
                 
-                // Always set loaded chats, even if empty - this preserves state
+                // Always set loaded chats - show them in sidebar (even if empty)
+                console.log('[Copilots] Setting chats state with', loadedChats.length, 'chats');
+                setChats(loadedChats);
                 if (loadedChats.length > 0) {
-                    setChats(loadedChats);
-                    // Set active chat to most recent if none selected
-                    if (!activeChat) {
-                        console.log('[Copilots] Setting active chat to most recent:', loadedChats[0].id);
-                        setActiveChat(loadedChats[0].id);
-                    } else {
-                        // Verify active chat still exists
-                        const chatExists = loadedChats.some(c => c.id === activeChat);
-                        if (!chatExists) {
-                            console.log('[Copilots] Active chat not found, setting to most recent');
-                            setActiveChat(loadedChats[0].id);
-                        } else {
-                            console.log('[Copilots] Active chat still exists:', activeChat);
-                        }
-                    }
+                    // Don't auto-select a chat - start with empty state
+                    // User can click on a chat from sidebar to open it
+                    console.log('[Copilots] Loaded', loadedChats.length, 'chats, starting with empty state');
+                    console.log('[Copilots] Chat IDs:', loadedChats.map(c => c.id));
+                    console.log('[Copilots] Chat titles:', loadedChats.map(c => c.title));
                 } else {
                     // Only create new chat if truly no chats exist
-                    console.log('[Copilots] No chats found, creating default chat');
-                    await createNewChat();
+                    console.log('[Copilots] No chats found, will create one when user sends first message');
+                    // Don't create chat automatically - wait for user to send a message
                 }
             } else {
                 const errorData = await response.json().catch(() => ({}));
                 console.error('[Copilots] Failed to load chats:', response.status, response.statusText, errorData);
+                // Set empty array to ensure state is initialized
+                setChats([]);
                 // Don't create a new chat on error, let user see the error
             }
         } catch (error) {
             console.error('[Copilots] Error loading chats:', error);
+            // Set empty array to ensure state is initialized even on error
+            setChats([]);
             // Don't create a new chat on error
         }
     };
@@ -367,8 +393,8 @@ export const Copilots: React.FC = () => {
         setShowCopilotModal(true);
     };
 
-    const createNewChat = async (name?: string, instructions?: string, entities?: string[]) => {
-        const defaultInstructions = instructions || "You are a helpful database assistant. Help users navigate through their entities, find records, and answer questions about relationships between tables.";
+    const createNewChat = async (name?: string, instructions?: string, entities?: string[]): Promise<Chat> => {
+        const defaultInstructions = instructions || "You are a helpful database assistant. Help users navigate through your entities, find records, and answer questions about relationships between tables.";
         const welcomeMessage = instructions 
             ? `Hello! I'm ${name || 'your Copilot'}. ${instructions}\n\nWhat would you like to know?`
             : "Good afternoon! I'm your Database Copilot. I can help you navigate through your entities, find records, and answer questions about relationships between your tables. What would you like to know?";
@@ -389,33 +415,40 @@ export const Copilots: React.FC = () => {
         };
 
         // Always update local state immediately so the input becomes enabled
-        setChats(prev => [newChat, ...prev]);
+        console.log('[Copilots] Creating new chat:', newChat.id, newChat.title);
+        setChats(prev => {
+            const updated = [newChat, ...prev];
+            console.log('[Copilots] Updated chats state, total chats:', updated.length);
+            return updated;
+        });
         setActiveChat(newChat.id);
 
-        // Try to save to backend
+        // Try to save to backend immediately
         try {
+            const payload = {
+                id: newChat.id,
+                title: newChat.title,
+                messages: newChat.messages.map(m => ({
+                    id: m.id,
+                    role: m.role,
+                    content: m.content,
+                    timestamp: m.timestamp.toISOString()
+                })),
+                createdAt: newChat.createdAt.toISOString(),
+                updatedAt: newChat.updatedAt.toISOString(),
+                instructions: newChat.instructions || null,
+                allowedEntities: newChat.allowedEntities && newChat.allowedEntities.length > 0 ? newChat.allowedEntities : null
+            };
+            console.log('[Copilots] Saving new chat to backend:', newChat.id, payload);
             const response = await fetch(`${API_BASE}/api/copilot/chats`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({
-                    id: newChat.id,
-                    title: newChat.title,
-                    messages: newChat.messages.map(m => ({
-                        id: m.id,
-                        role: m.role,
-                        content: m.content,
-                        timestamp: m.timestamp.toISOString()
-                    })),
-                    createdAt: newChat.createdAt.toISOString(),
-                    updatedAt: newChat.updatedAt.toISOString(),
-                    instructions: newChat.instructions || null,
-                    allowedEntities: newChat.allowedEntities || null
-                })
+                body: JSON.stringify(payload)
             });
             if (response.ok) {
                 const savedChat = await response.json();
-                console.log('[Copilots] Chat created successfully:', newChat.id, savedChat);
+                console.log('[Copilots] Chat created successfully on backend:', newChat.id, savedChat);
                 // Server returns { success: true, chatId: id }, but we use our own ID
                 // No need to update ID since we're using client-generated IDs
             } else {
@@ -426,12 +459,16 @@ export const Copilots: React.FC = () => {
                 } catch {
                     errorData = { message: errorText };
                 }
-                console.error('[Copilots] Failed to create chat:', response.status, response.statusText, errorData);
+                console.error('[Copilots] Failed to create chat on backend:', response.status, response.statusText, errorData);
+                // Chat is still in local state, so user can continue, but it won't persist
             }
         } catch (error) {
-            console.error('Error saving chat to backend:', error);
+            console.error('[Copilots] Error saving chat to backend:', error);
             // Chat is already in local state, so user can continue
         }
+        
+        // Return the created chat so caller can use it immediately
+        return newChat;
     };
 
     const handleSaveCopilot = () => {
@@ -497,17 +534,18 @@ export const Copilots: React.FC = () => {
         if (!input.trim() || isLoading) return;
 
         // If no active chat, create one first
-        if (!activeChat) {
-            await createNewChat();
-            // Wait a bit for the chat to be created
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
-
-        const currentChat = chats.find(c => c.id === activeChat);
+        let currentChat = chats.find(c => c.id === activeChat);
         if (!currentChat) {
-            console.error('No chat available to send message');
+            console.log('[Copilots] No active chat, creating new one...');
+            // createNewChat returns the created chat, so we can use it directly
+            currentChat = await createNewChat();
+            console.log('[Copilots] Created new chat:', currentChat.id, currentChat.title);
+        }
+        if (!currentChat) {
+            console.error('[Copilots] No chat available to send message, chats:', chats.length);
             return;
         }
+        console.log('[Copilots] Sending message to chat:', currentChat.id, currentChat.title);
 
         const userMessage: Message = {
             id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -525,7 +563,12 @@ export const Copilots: React.FC = () => {
             title: currentChat.messages.length === 1 ? input.trim().slice(0, 50) : currentChat.title
         };
 
-        setChats(prev => prev.map(c => c.id === activeChat ? updatedChat : c));
+        // Use currentChat.id instead of activeChat to ensure we update the correct chat
+        setChats(prev => prev.map(c => c.id === currentChat.id ? updatedChat : c));
+        // Ensure activeChat is set to the current chat
+        if (activeChat !== currentChat.id) {
+            setActiveChat(currentChat.id);
+        }
         setInput('');
         setIsLoading(true);
         
@@ -567,7 +610,7 @@ export const Copilots: React.FC = () => {
                 updatedAt: new Date()
             };
 
-            setChats(prev => prev.map(c => c.id === activeChat ? finalChat : c));
+            setChats(prev => prev.map(c => c.id === currentChat.id ? finalChat : c));
             // Save assistant response immediately
             await saveChat(finalChat).catch(err => console.error('[Copilots] Error saving assistant message:', err));
         } catch (error) {
@@ -585,7 +628,7 @@ export const Copilots: React.FC = () => {
                 updatedAt: new Date()
             };
             
-            setChats(prev => prev.map(c => c.id === activeChat ? finalChat : c));
+            setChats(prev => prev.map(c => c.id === currentChat.id ? finalChat : c));
             // Save error message immediately
             await saveChat(finalChat).catch(err => console.error('[Copilots] Error saving error message:', err));
         } finally {
@@ -769,8 +812,8 @@ export const Copilots: React.FC = () => {
     const currentChat = chats.find(c => c.id === activeChat);
     const messages = currentChat?.messages || [];
     
-    // Check if chat is empty (only has the initial assistant message)
-    const isEmptyChat = messages.length <= 1 && messages[0]?.role === 'assistant';
+    // Check if chat is empty (no active chat OR only has the initial assistant message)
+    const isEmptyChat = !activeChat || (messages.length <= 1 && messages[0]?.role === 'assistant');
     
     const examplePrompts = [
         "How many customers do we have?",
@@ -874,17 +917,20 @@ export const Copilots: React.FC = () => {
                                 className="px-2 py-1 border border-slate-200 rounded-md text-sm bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-300 selection:bg-slate-200 selection:text-slate-800"
                             />
                         ) : (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (!currentChat) return;
-                                    setEditingTitle(currentChat.title || 'New Chat');
-                                    setIsEditingTitle(true);
-                                }}
-                                className="text-sm font-normal text-slate-800 hover:text-slate-700 active:text-slate-700 focus:outline-none transition-colors bg-transparent active:bg-transparent appearance-none"
-                            >
-                                {currentChat?.title || 'Database Copilot'}
-                            </button>
+                            currentChat ? (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setEditingTitle(currentChat.title || 'New Chat');
+                                        setIsEditingTitle(true);
+                                    }}
+                                    className="text-sm font-normal text-slate-800 hover:text-slate-700 active:text-slate-700 focus:outline-none transition-colors bg-transparent active:bg-transparent appearance-none"
+                                >
+                                    {currentChat.title || 'New Copilot'}
+                                </button>
+                            ) : (
+                                <span className="text-sm font-normal text-slate-800">Copilots</span>
+                            )
                         )}
                     </div>
                 </div>

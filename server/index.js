@@ -3212,8 +3212,13 @@ app.get('/api/shared/:token', async (req, res) => {
 // Workflow Management Endpoints
 app.get('/api/workflows', authenticateToken, async (req, res) => {
     try {
-        const workflows = await db.all('SELECT id, name, createdAt, updatedAt, createdBy, createdByName, lastEditedBy, lastEditedByName FROM workflows WHERE organizationId = ? ORDER BY updatedAt DESC', [req.user.orgId]);
-        res.json(workflows);
+        const workflows = await db.all('SELECT id, name, createdAt, updatedAt, createdBy, createdByName, lastEditedBy, lastEditedByName, tags FROM workflows WHERE organizationId = ? ORDER BY updatedAt DESC', [req.user.orgId]);
+        // Parse tags JSON for each workflow
+        const parsedWorkflows = workflows.map(workflow => ({
+            ...workflow,
+            tags: workflow.tags ? JSON.parse(workflow.tags) : []
+        }));
+        res.json(parsedWorkflows);
     } catch (error) {
         console.error('Error fetching workflows:', error);
         res.status(500).json({ error: 'Failed to fetch workflows' });
@@ -3227,8 +3232,9 @@ app.get('/api/workflows/:id', authenticateToken, async (req, res) => {
         if (!workflow) {
             return res.status(404).json({ error: 'Workflow not found' });
         }
-        // Parse JSON data before sending
+        // Parse JSON data and tags before sending
         workflow.data = JSON.parse(workflow.data);
+        workflow.tags = workflow.tags ? JSON.parse(workflow.tags) : [];
         res.json(workflow);
     } catch (error) {
         console.error('Error fetching workflow:', error);
@@ -3238,17 +3244,17 @@ app.get('/api/workflows/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/workflows', authenticateToken, async (req, res) => {
     try {
-        const { name, data, createdByName } = req.body;
+        const { name, data, tags, createdByName } = req.body;
         const id = Math.random().toString(36).substr(2, 9);
         const now = new Date().toISOString();
 
-        // Store data as JSON string
+        // Store data and tags as JSON strings
         await db.run(
-            'INSERT INTO workflows (id, organizationId, name, data, createdAt, updatedAt, createdBy, createdByName) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, req.user.orgId, name, JSON.stringify(data), now, now, req.user.sub, createdByName || 'Unknown']
+            'INSERT INTO workflows (id, organizationId, name, data, tags, createdAt, updatedAt, createdBy, createdByName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, req.user.orgId, name, JSON.stringify(data), tags ? JSON.stringify(tags) : null, now, now, req.user.sub, createdByName || 'Unknown']
         );
 
-        res.json({ id, name, createdAt: now, updatedAt: now, createdBy: req.user.sub, createdByName: createdByName || 'Unknown' });
+        res.json({ id, name, tags: tags || [], createdAt: now, updatedAt: now, createdBy: req.user.sub, createdByName: createdByName || 'Unknown' });
     } catch (error) {
         console.error('Error saving workflow:', error);
         res.status(500).json({ error: 'Failed to save workflow' });
@@ -3258,12 +3264,12 @@ app.post('/api/workflows', authenticateToken, async (req, res) => {
 app.put('/api/workflows/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, data, lastEditedByName } = req.body;
+        const { name, data, tags, lastEditedByName } = req.body;
         const now = new Date().toISOString();
 
         await db.run(
-            'UPDATE workflows SET name = ?, data = ?, updatedAt = ?, lastEditedBy = ?, lastEditedByName = ? WHERE id = ? AND organizationId = ?',
-            [name, JSON.stringify(data), now, req.user.sub, lastEditedByName || 'Unknown', id, req.user.orgId]
+            'UPDATE workflows SET name = ?, data = ?, tags = ?, updatedAt = ?, lastEditedBy = ?, lastEditedByName = ? WHERE id = ? AND organizationId = ?',
+            [name, JSON.stringify(data), tags ? JSON.stringify(tags) : null, now, req.user.sub, lastEditedByName || 'Unknown', id, req.user.orgId]
         );
 
         res.json({ message: 'Workflow updated' });

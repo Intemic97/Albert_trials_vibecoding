@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut, Bot, Smartphone, BarChart3, User, Calendar, ChevronRight, ChevronDown, ChevronUp, Plus, Folder, Shield, Terminal } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut, Bot, Smartphone, BarChart3, User, Calendar, ChevronRight, ChevronDown, ChevronUp, Plus, Folder, Shield, Terminal, Tag } from 'lucide-react';
 import { NodeConfigSidePanel } from './NodeConfigSidePanel';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { PromptInput } from './PromptInput';
@@ -551,6 +551,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [savedWorkflows, setSavedWorkflows] = useState<any[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [isRunning, setIsRunning] = useState(false);
+    const [workflowTags, setWorkflowTags] = useState<string[]>([]);
+    const [showTagsModal, setShowTagsModal] = useState(false);
+    const [newTagInput, setNewTagInput] = useState('');
     const [configuringNodeId, setConfiguringNodeId] = useState<string | null>(null);
     const [selectedEntityId, setSelectedEntityId] = useState<string>('');
     const [viewingDataNodeId, setViewingDataNodeId] = useState<string | null>(null);
@@ -721,6 +724,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // Workflows List View State
     const [currentView, setCurrentView] = useState<'list' | 'canvas'>('list');
     const [workflowSearchQuery, setWorkflowSearchQuery] = useState<string>('');
+    const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
 
     // Toast State
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -894,6 +898,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             setCurrentWorkflowId(workflow.id);
             setNodes(workflow.data.nodes || []);
             setConnections(workflow.data.connections || []);
+            setWorkflowTags(workflow.tags || []);
             lastLoadedWorkflowIdRef.current = workflow.id;
             // Update URL to reflect the loaded workflow
             if (updateUrl) {
@@ -922,6 +927,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     body: JSON.stringify({ 
                         name: workflowName, 
                         data,
+                        tags: workflowTags,
                         lastEditedByName: user?.name || user?.email?.split('@')[0] || 'Unknown'
                     }),
                     credentials: 'include'
@@ -935,6 +941,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     body: JSON.stringify({ 
                         name: workflowName, 
                         data,
+                        tags: workflowTags,
                         createdByName: user?.name || user?.email?.split('@')[0] || 'Unknown'
                     }),
                     credentials: 'include'
@@ -968,8 +975,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             await fetchWorkflows();
             if (currentWorkflowId === id) {
                 setCurrentWorkflowId(null);
-                setWorkflowName('Untitled Workflow');
-                setNodes([]);
+            setWorkflowName('Untitled Workflow');
+            setNodes([]);
+            setWorkflowTags([]);
                 setConnections([]);
                 navigate('/workflows', { replace: true });
             }
@@ -984,8 +992,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
     const newWorkflow = () => {
         setCurrentWorkflowId(null);
-        setWorkflowName('Untitled Workflow');
-        setNodes([]);
+            setWorkflowName('Untitled Workflow');
+            setNodes([]);
+            setWorkflowTags([]);
         setConnections([]);
         setConnectingFrom(null);
         navigate('/workflow/new', { replace: true });
@@ -1102,6 +1111,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             setNodes([]);
             setConnections([]);
             setWorkflowName('Untitled Workflow');
+            setWorkflowTags([]);
             lastLoadedWorkflowIdRef.current = null;
         } else if (isWorkflowView && urlWorkflowId) {
             // On /workflow/:id, load the workflow if not already loaded
@@ -4013,10 +4023,43 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         return matchesSearch && matchesCategory;
     });
 
-    // Filter workflows for search
-    const filteredWorkflows = savedWorkflows.filter(wf =>
-        wf.name.toLowerCase().includes(workflowSearchQuery.toLowerCase())
-    );
+    // Function to get subtle colors for each category
+    const getCategoryColors = (categoryName: string): { bg: string; hover: string } => {
+        const colorMap: { [key: string]: { bg: string; hover: string } } = {
+            'Recents': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
+            'Control Flow': { bg: 'bg-blue-50/50', hover: 'hover:bg-blue-50' },
+            'Data and Variables': { bg: 'bg-purple-50/50', hover: 'hover:bg-purple-50' },
+            'String Operations': { bg: 'bg-cyan-50/50', hover: 'hover:bg-cyan-50' },
+            'Date and Time': { bg: 'bg-amber-50/50', hover: 'hover:bg-amber-50' },
+            'Output and Logging': { bg: 'bg-emerald-50/50', hover: 'hover:bg-emerald-50' },
+            'File & Folder Operations': { bg: 'bg-orange-50/50', hover: 'hover:bg-orange-50' },
+            'Excel / Spreadsheet': { bg: 'bg-green-50/50', hover: 'hover:bg-green-50' },
+            'CSV': { bg: 'bg-lime-50/50', hover: 'hover:bg-lime-50' },
+            'Database': { bg: 'bg-indigo-50/50', hover: 'hover:bg-indigo-50' },
+            'Web and API': { bg: 'bg-teal-50/50', hover: 'hover:bg-teal-50' },
+            'Email': { bg: 'bg-pink-50/50', hover: 'hover:bg-pink-50' },
+            'FTP/SFTP': { bg: 'bg-rose-50/50', hover: 'hover:bg-rose-50' },
+            'Security': { bg: 'bg-red-50/50', hover: 'hover:bg-red-50' },
+            'Code Block': { bg: 'bg-violet-50/50', hover: 'hover:bg-violet-50' },
+            'Exception Handling': { bg: 'bg-yellow-50/50', hover: 'hover:bg-yellow-50' },
+            'Advanced Logic': { bg: 'bg-fuchsia-50/50', hover: 'hover:bg-fuchsia-50' },
+        };
+        return colorMap[categoryName] || { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' };
+    };
+
+    // Get all unique tags from workflows
+    const allTags = Array.from(new Set(
+        savedWorkflows
+            .flatMap(wf => wf.tags || [])
+            .filter(Boolean)
+    )).sort();
+
+    // Filter workflows for search and tags
+    const filteredWorkflows = savedWorkflows.filter(wf => {
+        const matchesSearch = wf.name.toLowerCase().includes(workflowSearchQuery.toLowerCase());
+        const matchesTag = !selectedTagFilter || (wf.tags && Array.isArray(wf.tags) && wf.tags.includes(selectedTagFilter));
+        return matchesSearch && matchesTag;
+    });
 
     return (
         <div className="flex flex-col bg-slate-50" data-tutorial="workflows-content" style={{ height: '100%', maxHeight: '100vh', overflow: 'hidden' }}>
@@ -4049,6 +4092,30 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 w-60 placeholder:text-slate-400"
                                     />
                                 </div>
+                                {/* Tag Filter */}
+                                {allTags.length > 0 && (
+                                    <div className="relative">
+                                        <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                        <select
+                                            value={selectedTagFilter || ''}
+                                            onChange={(e) => setSelectedTagFilter(e.target.value || null)}
+                                            className="pl-8 pr-8 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 appearance-none cursor-pointer"
+                                        >
+                                            <option value="">All Tags</option>
+                                            {allTags.map(tag => (
+                                                <option key={tag} value={tag}>{tag}</option>
+                                            ))}
+                                        </select>
+                                        {selectedTagFilter && (
+                                            <button
+                                                onClick={() => setSelectedTagFilter(null)}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                                 <p className="text-sm text-slate-500">
                                     {filteredWorkflows.length} {filteredWorkflows.length === 1 ? 'workflow' : 'workflows'}
                                 </p>
@@ -4080,14 +4147,29 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 className="bg-white border border-slate-200 rounded-lg p-5 cursor-pointer group relative flex flex-col justify-between min-h-[200px]"
                             >
                                 <div className="flex-1">
-                                    <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-start justify-between mb-3">
                                         <div className="flex items-center gap-3 flex-1 min-w-0">
                                             <div className="p-2.5 bg-slate-50 rounded-lg flex-shrink-0 group-hover:bg-slate-100 transition-colors">
                                                 <Workflow size={18} className="text-slate-600" />
                                             </div>
-                                            <h3 className="text-base font-normal text-slate-900 group-hover:text-slate-700 transition-colors truncate flex-1">
-                                                {workflow.name}
-                                            </h3>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-base font-normal text-slate-900 group-hover:text-slate-700 transition-colors truncate">
+                                                    {workflow.name}
+                                                </h3>
+                                                {/* Tags - directly below title */}
+                                                {workflow.tags && workflow.tags.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                                        {workflow.tags.map((tag: string, idx: number) => (
+                                                            <span
+                                                                key={idx}
+                                                                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                                                            >
+                                                                {tag}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                         <button
                                             onClick={(e) => {
@@ -4175,6 +4257,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             />
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">
+                            <button
+                                onClick={() => setShowTagsModal(true)}
+                                disabled={!currentWorkflowId}
+                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                                title="Manage Tags"
+                            >
+                                <Tag size={18} className="text-slate-600" />
+                            </button>
                             <button
                                 onClick={saveWorkflow}
                                 disabled={isSaving}
@@ -4318,7 +4408,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             }
                                                             setExpandedFolders(newExpanded);
                                                         }}
-                                                        className="w-full flex items-center justify-between px-4 py-2 bg-[#F4F5F5] hover:bg-[#E8EAEA] transition-colors text-left"
+                                                        className={`w-full flex items-center justify-between px-4 py-2 ${getCategoryColors(folderName).bg} ${getCategoryColors(folderName).hover} transition-colors text-left`}
                                                     >
                                                         <div className="flex items-center gap-2.5">
                                                             <folder.icon size={14} className="text-slate-600 flex-shrink-0" />
@@ -9066,6 +9156,124 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700 transition-colors"
                             >
                                 Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Tags Modal */}
+            {showTagsModal && (
+                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={() => setShowTagsModal(false)}>
+                    <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+                        <div className="px-6 py-4 border-b border-slate-200">
+                            <h3 className="text-lg font-normal text-slate-900 flex items-center gap-2">
+                                <Tag size={20} className="text-slate-600" />
+                                Manage Tags
+                            </h3>
+                        </div>
+                        <div className="px-6 py-4">
+                            {/* Current Tags */}
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Current Tags</label>
+                                {workflowTags.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        {workflowTags.map((tag, idx) => (
+                                            <span
+                                                key={idx}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                                            >
+                                                {tag}
+                                                <button
+                                                    onClick={() => {
+                                                        setWorkflowTags(workflowTags.filter((_, i) => i !== idx));
+                                                    }}
+                                                    className="ml-1 hover:text-red-600 transition-colors"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-slate-500">No tags added yet</p>
+                                )}
+                            </div>
+
+                            {/* Add New Tag */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Add Tag</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={newTagInput}
+                                        onChange={(e) => setNewTagInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && newTagInput.trim()) {
+                                                e.preventDefault();
+                                                if (!workflowTags.includes(newTagInput.trim())) {
+                                                    setWorkflowTags([...workflowTags, newTagInput.trim()]);
+                                                    setNewTagInput('');
+                                                }
+                                            }
+                                        }}
+                                        placeholder="Enter tag name..."
+                                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            if (newTagInput.trim() && !workflowTags.includes(newTagInput.trim())) {
+                                                setWorkflowTags([...workflowTags, newTagInput.trim()]);
+                                                setNewTagInput('');
+                                            }
+                                        }}
+                                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                        Add
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
+                            <button
+                                onClick={() => {
+                                    setShowTagsModal(false);
+                                    setNewTagInput('');
+                                }}
+                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    // Save tags when closing modal
+                                    if (currentWorkflowId) {
+                                        try {
+                                            const res = await fetch(`${API_BASE}/workflows/${currentWorkflowId}`, {
+                                                method: 'PUT',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ 
+                                                    name: workflowName, 
+                                                    data: { nodes, connections },
+                                                    tags: workflowTags,
+                                                    lastEditedByName: user?.name || user?.email?.split('@')[0] || 'Unknown'
+                                                }),
+                                                credentials: 'include'
+                                            });
+                                            if (res.ok) {
+                                                await fetchWorkflows();
+                                                showToast('Tags updated successfully!', 'success');
+                                            }
+                                        } catch (error) {
+                                            console.error('Error saving tags:', error);
+                                        }
+                                    }
+                                    setShowTagsModal(false);
+                                    setNewTagInput('');
+                                }}
+                                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium"
+                            >
+                                Save
                             </button>
                         </div>
                     </div>

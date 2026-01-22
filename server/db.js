@@ -94,6 +94,7 @@ async function initDb() {
       organizationId TEXT,
       name TEXT NOT NULL,
       data TEXT NOT NULL,
+      tags TEXT,
       createdAt TEXT,
       updatedAt TEXT,
       FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
@@ -336,6 +337,13 @@ async function initDb() {
   }
   try {
     await db.exec(`ALTER TABLE workflows ADD COLUMN lastEditedByName TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add tags column to workflows table
+  try {
+    await db.exec(`ALTER TABLE workflows ADD COLUMN tags TEXT`);
   } catch (e) {
     // Column already exists, ignore
   }

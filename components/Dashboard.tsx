@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Entity } from '../types';
-import { Database, Sparkles, X, Info, Plus, Share2, ChevronDown, Copy, Check, Trash2, Link, ExternalLink, LayoutDashboard, Search, ArrowLeft, Calendar, Clock, ChevronRight } from 'lucide-react';
+import { Database, Sparkles, X, Info, Plus, Share2, ChevronDown, Copy, Check, Trash2, Link, ExternalLink, LayoutDashboard, Search, ArrowLeft, Calendar, Clock, ChevronRight, Sliders } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { API_BASE } from '../config';
@@ -129,6 +129,9 @@ const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSav
 export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onViewChange }) => {
     const { dashboardId: urlDashboardId } = useParams();
     const navigate = useNavigate();
+    
+    // Tab state
+    const [activeTab, setActiveTab] = useState<'dashboards' | 'interactive'>('dashboards');
     
     // Dashboard state
     const [dashboards, setDashboards] = useState<DashboardData[]>([]);
@@ -517,19 +520,66 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         d.name.toLowerCase().includes(dashboardSearchQuery.toLowerCase())
     );
 
+    // Interactive Dashboard state
+    const [interactiveDashboards, setInteractiveDashboards] = useState<any[]>([]);
+    const [selectedInteractiveDashboardId, setSelectedInteractiveDashboardId] = useState<string | null>(null);
+    const [scenarioVariables, setScenarioVariables] = useState<Record<string, any>>({});
+
     return (
         <div className="flex flex-col h-full bg-slate-50" data-tutorial="dashboard-content">
-            {!selectedDashboardId ? (
+            {/* Top Header with Tabs */}
+            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
+                <div className="flex items-center gap-6">
+                    <div>
+                        <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Dashboards</h1>
+                        <p className="text-[11px] text-slate-500">Create and manage your data visualizations</p>
+                    </div>
+                    <div className="h-8 w-px bg-slate-200"></div>
+                    {/* Tabs */}
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => {
+                                setActiveTab('dashboards');
+                                setSelectedDashboardId(null);
+                                setSelectedInteractiveDashboardId(null);
+                                navigate('/dashboard', { replace: true });
+                            }}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                activeTab === 'dashboards'
+                                    ? 'bg-slate-900 text-white'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                            }`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <LayoutDashboard size={16} />
+                                Dashboards
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => {
+                                setActiveTab('interactive');
+                                setSelectedDashboardId(null);
+                                setSelectedInteractiveDashboardId(null);
+                            }}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                activeTab === 'interactive'
+                                    ? 'bg-slate-900 text-white'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                            }`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <Sliders size={16} />
+                                Interactive Dashboards
+                            </div>
+                        </button>
+                    </div>
+                </div>
+                <div />
+            </header>
+
+            {activeTab === 'dashboards' && !selectedDashboardId ? (
                 /* Dashboards List View */
                 <>
-                    {/* Top Header */}
-                    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
-                        <div>
-                            <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Dashboards</h1>
-                            <p className="text-[11px] text-slate-500">Create and manage your data visualizations</p>
-                        </div>
-                        <div />
-                    </header>
 
                     {/* Content Area */}
                     <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
@@ -639,7 +689,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                         </div>
                     </div>
                 </>
-            ) : (
+            ) : activeTab === 'dashboards' && selectedDashboardId ? (
                 /* Dashboard Editor View */
                 <>
                     {/* Header */}
@@ -818,7 +868,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                         </div>
                     </div>
                 </>
-            )}
+            ) : activeTab === 'interactive' ? (
+                /* Interactive Dashboards View */
+                <InteractiveDashboardsView
+                    entities={entities}
+                    interactiveDashboards={interactiveDashboards}
+                    setInteractiveDashboards={setInteractiveDashboards}
+                    selectedInteractiveDashboardId={selectedInteractiveDashboardId}
+                    setSelectedInteractiveDashboardId={setSelectedInteractiveDashboardId}
+                    scenarioVariables={scenarioVariables}
+                    setScenarioVariables={setScenarioVariables}
+                    onNavigate={onNavigate}
+                />
+            ) : null}
 
             {/* Share Dashboard Modal */}
             {showShareModal && (
@@ -878,6 +940,331 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     </div>
                 </div>
             )}
+        </div>
+    );
+};
+
+// Interactive Dashboards Component
+interface InteractiveDashboardsViewProps {
+    entities: Entity[];
+    interactiveDashboards: any[];
+    setInteractiveDashboards: (dashboards: any[]) => void;
+    selectedInteractiveDashboardId: string | null;
+    setSelectedInteractiveDashboardId: (id: string | null) => void;
+    scenarioVariables: Record<string, any>;
+    setScenarioVariables: (vars: Record<string, any>) => void;
+    onNavigate?: (entityId: string) => void;
+}
+
+const InteractiveDashboardsView: React.FC<InteractiveDashboardsViewProps> = ({
+    entities,
+    interactiveDashboards,
+    setInteractiveDashboards,
+    selectedInteractiveDashboardId,
+    setSelectedInteractiveDashboardId,
+    scenarioVariables,
+    setScenarioVariables,
+    onNavigate
+}) => {
+    const [isCreating, setIsCreating] = useState(false);
+    const [newDashboardName, setNewDashboardName] = useState('');
+    const [selectedVariables, setSelectedVariables] = useState<string[]>([]);
+    const [variableValues, setVariableValues] = useState<Record<string, number>>({});
+
+    const selectedDashboard = interactiveDashboards.find(d => d.id === selectedInteractiveDashboardId);
+
+    const handleCreateInteractiveDashboard = async () => {
+        if (!newDashboardName.trim()) {
+            alert('Please enter a dashboard name');
+            return;
+        }
+
+        const id = generateUUID();
+        const newDashboard = {
+            id,
+            name: newDashboardName.trim(),
+            variables: selectedVariables,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+
+        setInteractiveDashboards([...interactiveDashboards, newDashboard]);
+        setSelectedInteractiveDashboardId(id);
+        setNewDashboardName('');
+        setIsCreating(false);
+        setSelectedVariables([]);
+    };
+
+    const handleAddVariable = (entityId: string, propertyId: string) => {
+        const key = `${entityId}_${propertyId}`;
+        if (!selectedVariables.includes(key)) {
+            setSelectedVariables([...selectedVariables, key]);
+            setVariableValues({ ...variableValues, [key]: 0 });
+        }
+    };
+
+    const handleUpdateVariable = (key: string, value: number) => {
+        setVariableValues({ ...variableValues, [key]: value });
+        setScenarioVariables({ ...scenarioVariables, [key]: value });
+    };
+
+    const getEntityPropertyName = (key: string) => {
+        const [entityId, propertyId] = key.split('_');
+        const entity = entities.find(e => e.id === entityId);
+        const property = entity?.properties?.find(p => p.id === propertyId);
+        return `${entity?.name || 'Unknown'}.${property?.name || 'Unknown'}`;
+    };
+
+    if (selectedInteractiveDashboardId && selectedDashboard) {
+        return (
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                <div className="max-w-7xl mx-auto space-y-6">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 className="text-xl font-normal text-slate-900 mb-1">{selectedDashboard.name}</h2>
+                            <p className="text-sm text-slate-500">Interactive dashboard for what-if scenarios</p>
+                        </div>
+                        <button
+                            onClick={() => setSelectedInteractiveDashboardId(null)}
+                            className="flex items-center gap-2 px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-md transition-colors text-sm"
+                        >
+                            <ArrowLeft size={14} />
+                            <span className="font-medium">Back</span>
+                        </button>
+                    </div>
+
+                    {/* Scenario Variables Panel */}
+                    <div className="bg-white rounded-lg border border-slate-200 p-6">
+                        <h3 className="text-base font-normal text-slate-900 mb-4 flex items-center gap-2">
+                            <Sliders size={16} className="text-slate-600" />
+                            Scenario Variables
+                        </h3>
+                        <div className="space-y-4">
+                            {selectedDashboard.variables && selectedDashboard.variables.length > 0 ? (
+                                selectedDashboard.variables.map((key: string) => (
+                                    <div key={key} className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg">
+                                        <div className="flex-1">
+                                            <label className="text-sm font-medium text-slate-700 mb-1 block">
+                                                {getEntityPropertyName(key)}
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={variableValues[key] || 0}
+                                                onChange={(e) => handleUpdateVariable(key, parseFloat(e.target.value) || 0)}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                                placeholder="Enter value"
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                const updatedVars = selectedDashboard.variables.filter((v: string) => v !== key);
+                                                setInteractiveDashboards(interactiveDashboards.map(d => 
+                                                    d.id === selectedDashboard.id 
+                                                        ? { ...d, variables: updatedVars }
+                                                        : d
+                                                ));
+                                                const newValues = { ...variableValues };
+                                                delete newValues[key];
+                                                setVariableValues(newValues);
+                                            }}
+                                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-sm text-slate-500 text-center py-4">
+                                    No variables added yet. Add variables from entities below.
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Add Variable Section */}
+                        <div className="mt-6 pt-6 border-t border-slate-200">
+                            <h4 className="text-sm font-medium text-slate-700 mb-3">Add Variable</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {entities.map(entity => (
+                                    <div key={entity.id} className="border border-slate-200 rounded-lg p-4">
+                                        <h5 className="text-sm font-medium text-slate-900 mb-2">{entity.name}</h5>
+                                        <div className="space-y-2">
+                                            {entity.properties?.filter(p => p.type === 'number' || p.type === 'integer').map(property => {
+                                                const key = `${entity.id}_${property.id}`;
+                                                const isSelected = selectedDashboard.variables?.includes(key);
+                                                return (
+                                                    <button
+                                                        key={property.id}
+                                                        onClick={() => {
+                                                            if (!isSelected) {
+                                                                handleAddVariable(entity.id, property.id);
+                                                                const updatedVars = [...(selectedDashboard.variables || []), key];
+                                                                setInteractiveDashboards(interactiveDashboards.map(d => 
+                                                                    d.id === selectedDashboard.id 
+                                                                        ? { ...d, variables: updatedVars }
+                                                                        : d
+                                                                ));
+                                                            }
+                                                        }}
+                                                        disabled={isSelected}
+                                                        className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${
+                                                            isSelected
+                                                                ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                                                                : 'bg-slate-50 hover:bg-slate-100 text-slate-700'
+                                                        }`}
+                                                    >
+                                                        {property.name} ({property.type})
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* What-If Scenarios */}
+                    <div className="bg-white rounded-lg border border-slate-200 p-6">
+                        <h3 className="text-base font-normal text-slate-900 mb-4">What-If Scenarios</h3>
+                        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                            <p className="text-sm text-slate-600 mb-4">
+                                Adjust the variables above to see how changes affect your data visualizations.
+                            </p>
+                            <div className="space-y-2">
+                                {Object.keys(scenarioVariables).length > 0 ? (
+                                    Object.entries(scenarioVariables).map(([key, value]) => (
+                                        <div key={key} className="flex items-center justify-between p-2 bg-white rounded">
+                                            <span className="text-sm text-slate-700">{getEntityPropertyName(key)}</span>
+                                            <span className="text-sm font-medium text-slate-900">{value}</span>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-sm text-slate-500 text-center py-4">
+                                        Add variables and adjust their values to create scenarios
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Placeholder for widgets/charts */}
+                    <div className="bg-white rounded-lg border border-slate-200 p-6">
+                        <h3 className="text-base font-normal text-slate-900 mb-4">Visualizations</h3>
+                        <div className="bg-slate-50 rounded-lg p-8 text-center border-2 border-dashed border-slate-300">
+                            <Database className="mx-auto text-slate-300 mb-3" size={40} />
+                            <p className="text-sm text-slate-500">
+                                Charts and visualizations will appear here based on your scenario variables
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+            <div className="max-w-7xl mx-auto">
+                {/* Toolbar */}
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 className="text-lg font-normal text-slate-900 mb-1">Interactive Dashboards</h2>
+                        <p className="text-sm text-slate-500">Create interactive dashboards for what-if scenario analysis</p>
+                    </div>
+                    <button
+                        onClick={() => setIsCreating(true)}
+                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                    >
+                        <Plus size={14} className="mr-2" />
+                        Create Interactive Dashboard
+                    </button>
+                </div>
+
+                {/* Create Modal */}
+                {isCreating && (
+                    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setIsCreating(false)}>
+                        <div className="bg-white rounded-lg border border-slate-200 shadow-xl p-6 w-[500px]" onClick={e => e.stopPropagation()}>
+                            <h3 className="text-lg font-normal text-slate-800 mb-4">Create Interactive Dashboard</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">Dashboard Name</label>
+                                    <input
+                                        type="text"
+                                        value={newDashboardName}
+                                        onChange={(e) => setNewDashboardName(e.target.value)}
+                                        placeholder="e.g., Sales Forecast Scenarios"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                        autoFocus
+                                    />
+                                </div>
+                                <div className="flex gap-2 justify-end pt-4 border-t border-slate-200">
+                                    <button
+                                        onClick={() => {
+                                            setIsCreating(false);
+                                            setNewDashboardName('');
+                                        }}
+                                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleCreateInteractiveDashboard}
+                                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium"
+                                    >
+                                        Create
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Dashboards Grid */}
+                {interactiveDashboards.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {interactiveDashboards.map((dashboard) => (
+                            <div
+                                key={dashboard.id}
+                                onClick={() => setSelectedInteractiveDashboardId(dashboard.id)}
+                                className="bg-white border border-slate-200 rounded-lg p-5 cursor-pointer group hover:shadow-md transition-shadow"
+                            >
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-50 to-teal-100 flex items-center justify-center">
+                                            <Sliders size={18} className="text-teal-600" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-base font-normal text-slate-900">{dashboard.name}</h3>
+                                            <p className="text-xs text-slate-500 mt-1">
+                                                {dashboard.variables?.length || 0} variables
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-4 pt-4 border-t border-slate-100">
+                                    <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <span className="opacity-0 group-hover:opacity-100 transition-opacity font-medium text-slate-900">Open dashboard</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-lg border border-slate-200 p-12 text-center">
+                        <Sliders className="mx-auto text-slate-300 mb-4" size={48} />
+                        <h3 className="text-base font-normal text-slate-700 mb-2">No Interactive Dashboards</h3>
+                        <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
+                            Create an interactive dashboard to explore what-if scenarios by adjusting variables and seeing how they affect your data.
+                        </p>
+                        <button
+                            onClick={() => setIsCreating(true)}
+                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium"
+                        >
+                            Create Your First Interactive Dashboard
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
