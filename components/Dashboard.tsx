@@ -1,12 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Entity } from '../types';
-import { Database, Sparkles, X, Info, Plus, Share2, ChevronDown, Copy, Check, Trash2, Link, ExternalLink, LayoutDashboard, Search, ArrowLeft, Calendar, Clock, ChevronRight, Sliders } from 'lucide-react';
+import { Database, Sparkles, X, Info, Plus, Share2, ChevronDown, Copy, Check, Trash2, Link, ExternalLink, LayoutDashboard, Search, ArrowLeft, Calendar, Clock, ChevronRight, Sliders, GripVertical, Maximize2, BarChart3, LineChart, PieChart, AreaChart, TrendingUp, Table2 } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { Tabs } from './Tabs';
 import { Pagination } from './Pagination';
 import { API_BASE } from '../config';
+import GridLayout, { Layout } from 'react-grid-layout';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
 
 // Generate UUID that works in non-HTTPS contexts
 const generateUUID = (): string => {
@@ -34,6 +37,10 @@ interface DashboardData {
 interface SavedWidget extends WidgetConfig {
     id: string;
     position?: number;
+    gridX?: number;
+    gridY?: number;
+    gridWidth?: number;
+    gridHeight?: number;
 }
 
 interface DashboardProps {
@@ -50,6 +57,49 @@ interface WidgetCardProps {
     onNavigate?: (entityId: string) => void;
     entities?: Entity[];
 }
+
+// Grid Widget Card Component (for use in GridLayout)
+const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = ({ widget, onRemove }) => {
+    const [showExplanation, setShowExplanation] = useState(false);
+    
+    return (
+        <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-full flex flex-col">
+            <div className="drag-handle cursor-move p-2 border-b border-slate-100 flex items-center justify-between group">
+                <div className="flex items-center gap-2">
+                    <GripVertical size={14} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
+                    <h3 className="text-sm font-medium text-slate-900">{widget.title}</h3>
+                </div>
+                <button
+                    onClick={onRemove}
+                    className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                    title="Delete Widget"
+                >
+                    <X size={14} />
+                </button>
+            </div>
+            <div className="p-4 flex-1 overflow-auto">
+                <p className="text-xs text-slate-500 mb-3">{widget.description}</p>
+                <DynamicChart config={widget} />
+                {widget.explanation && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                        <button
+                            onClick={() => setShowExplanation(!showExplanation)}
+                            className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-800 font-medium"
+                        >
+                            <Info size={12} />
+                            How did I prepare this?
+                        </button>
+                        {showExplanation && (
+                            <div className="mt-2 p-3 bg-slate-50 rounded-lg text-xs text-slate-700 leading-relaxed">
+                                {widget.explanation}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSaved, onNavigate, entities }) => {
     const [showExplanation, setShowExplanation] = useState(false);
@@ -169,6 +219,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     const [isGenerating, setIsGenerating] = useState(false);
     const generatedWidgetsRef = useRef<HTMLDivElement>(null);
     
+    // Grid layout state
+    const [layout, setLayout] = useState<Layout[]>([]);
+    const [isDragging, setIsDragging] = useState(false);
+    const [gridWidth, setGridWidth] = useState(1200);
+    
+    // Modal state for adding widgets
+    const [showAddWidgetModal, setShowAddWidgetModal] = useState(false);
+    
+    // Update grid width on window resize
+    useEffect(() => {
+        const updateGridWidth = () => {
+            if (typeof window !== 'undefined') {
+                const container = document.getElementById('dashboard-container');
+                if (container) {
+                    setGridWidth(container.clientWidth);
+                } else {
+                    setGridWidth(window.innerWidth - 320);
+                }
+            }
+        };
+        
+        updateGridWidth();
+        window.addEventListener('resize', updateGridWidth);
+        return () => window.removeEventListener('resize', updateGridWidth);
+    }, [selectedDashboardId]);
+    
     // Share state
     const [shareUrl, setShareUrl] = useState('');
     const [copied, setCopied] = useState(false);
@@ -230,17 +306,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             const res = await fetch(`${API_BASE}/dashboards/${dashboardId}/widgets`, { credentials: 'include' });
             const data = await res.json();
             if (Array.isArray(data)) {
-                setSavedWidgets(data.map((w: any) => ({
+                const widgets = data.map((w: any) => ({
                     ...w.config,
                     id: w.id,
-                    position: w.position
-                })));
+                    position: w.position,
+                    gridX: w.gridX || 0,
+                    gridY: w.gridY || 0,
+                    gridWidth: w.gridWidth || 4,
+                    gridHeight: w.gridHeight || 3
+                }));
+                setSavedWidgets(widgets);
+                
+                // Update layout for react-grid-layout
+                const newLayout = widgets.map((w: SavedWidget, index: number) => ({
+                    i: w.id,
+                    x: w.gridX || (index % 2) * 6,
+                    y: w.gridY || Math.floor(index / 2) * 3,
+                    w: w.gridWidth || 4,
+                    h: w.gridHeight || 3,
+                    minW: 2,
+                    minH: 2,
+                    maxW: 12,
+                    maxH: 8
+                }));
+                setLayout(newLayout);
             } else {
                 setSavedWidgets([]);
+                setLayout([]);
             }
         } catch (error) {
             console.error('Error fetching widgets:', error);
             setSavedWidgets([]);
+            setLayout([]);
         }
     };
 
@@ -416,8 +513,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const handleGenerateWidget = async (prompt: string, mentionedEntityIds: string[]) => {
+    const handleGenerateWidget = async (prompt: string, mentionedEntityIds: string[], visualizationType?: string) => {
         setIsGenerating(true);
+
+        // Enhance prompt with visualization type if selected
+        let enhancedPrompt = prompt;
+        if (visualizationType && visualizationType !== 'auto') {
+            enhancedPrompt = `${visualizationType} of ${prompt}`;
+        }
 
         // Save prompt as feedback for analytics
         try {
@@ -440,7 +543,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    prompt,
+                    prompt: enhancedPrompt,
                     mentionedEntityIds
                 }),
                 credentials: 'include'
@@ -460,7 +563,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         }
     };
 
-    const handleSaveWidget = async (widget: WidgetConfig) => {
+    const handleSaveWidget = async (widget: WidgetConfig, gridPosition?: { x: number; y: number; w: number; h: number }) => {
         if (!selectedDashboardId) {
             alert('Please select or create a dashboard first.');
             return;
@@ -475,14 +578,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     id,
                     title: widget.title,
                     description: widget.description,
-                    config: widget
+                    config: widget,
+                    gridX: gridPosition?.x || 0,
+                    gridY: gridPosition?.y || 0,
+                    gridWidth: gridPosition?.w || 4,
+                    gridHeight: gridPosition?.h || 3
                 }),
                 credentials: 'include'
             });
 
             if (res.ok) {
-                const savedWidget = await res.json();
-                setSavedWidgets(prev => [...prev, { ...widget, id: savedWidget.id, position: savedWidget.position }]);
+                await fetchWidgets(selectedDashboardId);
                 setGeneratedWidgets(prev => prev.filter(w => w !== widget));
             }
         } catch (error) {
@@ -500,11 +606,45 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     method: 'DELETE',
                     credentials: 'include'
                 });
-                setSavedWidgets(prev => prev.filter(w => w.id !== widgetId));
+                await fetchWidgets(selectedDashboardId!);
             } catch (error) {
                 console.error('Error deleting widget:', error);
             }
         }
+    };
+
+    // Handle layout change (drag & resize)
+    const handleLayoutChange = useCallback(async (newLayout: Layout[]) => {
+        setLayout(newLayout);
+        
+        // Update widget positions in backend
+        if (!selectedDashboardId || isDragging) return;
+        
+        for (const item of newLayout) {
+            try {
+                await fetch(`${API_BASE}/widgets/${item.i}/grid`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        gridX: item.x,
+                        gridY: item.y,
+                        gridWidth: item.w,
+                        gridHeight: item.h
+                    })
+                });
+            } catch (error) {
+                console.error('Error updating widget position:', error);
+            }
+        }
+    }, [selectedDashboardId, isDragging]);
+    
+    const handleDragStart = () => {
+        setIsDragging(true);
+    };
+    
+    const handleDragStop = () => {
+        setIsDragging(false);
     };
 
     const openShareModalIfShared = () => {
@@ -543,49 +683,53 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
 
     return (
         <div className="flex flex-col h-full bg-slate-50" data-tutorial="dashboard-content">
-            {/* Top Header */}
-            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
-                <div>
-                    <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Dashboards</h1>
-                    <p className="text-[11px] text-slate-500">Create and manage your data visualizations</p>
-                </div>
-                <div />
-            </header>
+            {/* Top Header - Only show when no dashboard is selected */}
+            {!selectedDashboardId && (
+                <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
+                    <div>
+                        <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Dashboards</h1>
+                        <p className="text-[11px] text-slate-500">Create and manage your data visualizations</p>
+                    </div>
+                    <div />
+                </header>
+            )}
 
             {/* Content with Tabs */}
             <div className="flex-1 flex flex-col overflow-hidden bg-white">
-                {/* Tabs */}
-                <div className="px-8 pt-6">
-                    <Tabs
-                        items={[
-                            { 
-                                id: 'dashboards', 
-                                label: 'Dashboards', 
-                                icon: LayoutDashboard,
-                                badge: dashboards.length
-                            },
-                            { 
-                                id: 'simulations', 
-                                label: 'Simulations', 
-                                icon: Sliders,
-                                badge: interactiveDashboards.length
-                            }
-                        ]}
-                        activeTab={activeTab}
-                        onChange={(tabId) => {
-                            if (tabId === 'dashboards') {
-                                setActiveTab('dashboards');
-                                setSelectedDashboardId(null);
-                                setSelectedInteractiveDashboardId(null);
-                                navigate('/dashboard', { replace: true });
-                            } else {
-                                setActiveTab('simulations');
-                                setSelectedDashboardId(null);
-                                setSelectedInteractiveDashboardId(null);
-                            }
-                        }}
-                    />
-                </div>
+                {/* Tabs - Only show when no dashboard is selected */}
+                {!selectedDashboardId && (
+                    <div className="px-8 pt-6">
+                        <Tabs
+                            items={[
+                                { 
+                                    id: 'dashboards', 
+                                    label: 'Dashboards', 
+                                    icon: LayoutDashboard,
+                                    badge: dashboards.length
+                                },
+                                { 
+                                    id: 'simulations', 
+                                    label: 'Simulations', 
+                                    icon: Sliders,
+                                    badge: interactiveDashboards.length
+                                }
+                            ]}
+                            activeTab={activeTab}
+                            onChange={(tabId) => {
+                                if (tabId === 'dashboards') {
+                                    setActiveTab('dashboards');
+                                    setSelectedDashboardId(null);
+                                    setSelectedInteractiveDashboardId(null);
+                                    navigate('/dashboard', { replace: true });
+                                } else {
+                                    setActiveTab('simulations');
+                                    setSelectedDashboardId(null);
+                                    setSelectedInteractiveDashboardId(null);
+                                }
+                            }}
+                        />
+                    </div>
+                )}
 
                 {/* Tab Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -764,7 +908,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
 
                     {/* Main Content */}
                     <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-                        <div className="max-w-7xl mx-auto space-y-6">
+                        <div className="max-w-7xl mx-auto space-y-6" id="dashboard-container">
 
                             {/* Dashboard Content */}
                             {selectedDashboard && (
@@ -822,52 +966,62 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                 )}
                             </div>
 
-                            {/* Saved Widgets Section */}
-                            {savedWidgets.length > 0 && (
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {/* Grid Layout for Widgets */}
+                            <div className="relative min-h-[400px]">
+                                {savedWidgets.length > 0 ? (
+                                    <GridLayout
+                                        className="layout"
+                                        layout={layout}
+                                        cols={12}
+                                        rowHeight={60}
+                                        width={gridWidth}
+                                        onLayoutChange={handleLayoutChange}
+                                        onDragStart={handleDragStart}
+                                        onDragStop={handleDragStop}
+                                        onResizeStop={handleLayoutChange}
+                                        isDraggable={true}
+                                        isResizable={true}
+                                        draggableHandle=".drag-handle"
+                                        margin={[16, 16]}
+                                        containerPadding={[0, 0]}
+                                    >
                                         {savedWidgets.map((widget) => (
-                                            <WidgetCard
+                                            <GridWidgetCard
                                                 key={widget.id}
                                                 widget={widget}
                                                 onRemove={() => removeWidget(widget.id)}
-                                                isSaved={true}
-                                                onNavigate={onNavigate}
-                                                entities={entities}
                                             />
                                         ))}
+                                    </GridLayout>
+                                ) : (
+                                    <div className="bg-white rounded-lg border-2 border-dashed border-slate-300 p-12 text-center">
+                                        <Database className="mx-auto text-slate-300 mb-3" size={40} />
+                                        <h3 className="text-base font-normal text-slate-700 mb-2">No widgets yet</h3>
+                                        <p className="text-xs text-slate-500 max-w-md mx-auto mb-4">
+                                            Click the + button to add widgets and create custom visualizations.
+                                        </p>
                                     </div>
-                                </div>
-                            )}
-
-                                    {/* AI Widget Generator */}
-                                    <div className="bg-white rounded-lg border border-slate-200 p-4">
-                                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-                                    <PromptInput
-                                        entities={entities}
-                                        onGenerate={handleGenerateWidget}
-                                        isGenerating={isGenerating}
-                                        placeholder="Describe a chart... e.g. 'Bar chart of @Customers by total orders'"
-                                        buttonLabel="Generate"
-                                        className="text-slate-800"
-                                    />
-                                </div>
+                                )}
                             </div>
 
-                                    {/* Generated Widgets Section */}
-                                    {generatedWidgets.length > 0 && (
-                                <div ref={generatedWidgetsRef} className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                            {/* Generated Widgets Preview Section (temporary, before adding to grid) */}
+                            {generatedWidgets.length > 0 && (
+                                <div ref={generatedWidgetsRef} className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500 mt-6">
                                     <h3 className="text-base font-normal text-slate-900 flex items-center gap-2">
                                         <Sparkles size={14} className="text-slate-500" />
                                         New Widgets
-                                        <span className="text-xs font-normal text-slate-500">(click + to save)</span>
+                                        <span className="text-xs font-normal text-slate-500">(click + to add to dashboard)</span>
                                     </h3>
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                         {generatedWidgets.map((widget, index) => (
                                             <WidgetCard
                                                 key={index}
                                                 widget={widget}
-                                                onSave={handleSaveWidget}
+                                                onSave={(w) => {
+                                                    // Find next available position in grid
+                                                    const maxY = layout.length > 0 ? Math.max(...layout.map(l => l.y + l.h)) : 0;
+                                                    handleSaveWidget(w, { x: 0, y: maxY, w: 4, h: 3 });
+                                                }}
                                                 onRemove={() => removeWidget('', true, index)}
                                                 onNavigate={onNavigate}
                                                 entities={entities}
@@ -877,16 +1031,99 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                 </div>
                             )}
 
-                                    {/* Empty State when no widgets */}
-                                    {savedWidgets.length === 0 && generatedWidgets.length === 0 && (
-                                <div className="bg-white rounded-lg border border-slate-200 p-10 text-center">
-                                    <Database className="mx-auto text-slate-300 mb-3" size={40} />
-                                    <h3 className="text-base font-normal text-slate-700 mb-2">No widgets yet</h3>
-                                    <p className="text-xs text-slate-500 max-w-md mx-auto">
-                                        Use the prompt below to create custom charts and visualizations from your data.
-                                    </p>
+                            {/* Floating Add Widget Button */}
+                            {selectedDashboard && (
+                                <button
+                                    onClick={() => setShowAddWidgetModal(true)}
+                                    className="fixed bottom-8 right-8 bg-slate-900 text-white rounded-full p-4 shadow-lg hover:bg-slate-800 transition-colors z-50 flex items-center gap-2 group"
+                                    title="Add Widget"
+                                >
+                                    <Plus size={20} className="group-hover:rotate-90 transition-transform duration-200" />
+                                    <span className="text-sm font-medium pr-2 hidden sm:inline">Add Widget</span>
+                                </button>
+                            )}
+
+                            {/* Add Widget Modal */}
+                            {showAddWidgetModal && (
+                                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => {
+                                    setShowAddWidgetModal(false);
+                                    setSelectedVisualizationType(''); // Reset when closing
+                                }}>
+                                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                                        <div className="bg-white border-b border-slate-200 px-6 py-5 shrink-0 flex items-center justify-between">
+                                            <div>
+                                                <h2 className="text-lg font-normal text-slate-900">Add Widget</h2>
+                                                <p className="text-xs text-slate-500 mt-1">Describe what you want to visualize and how</p>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    setShowAddWidgetModal(false);
+                                                    setSelectedVisualizationType(''); // Reset when closing
+                                                }}
+                                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                            >
+                                                <X size={18} />
+                                            </button>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                                            {/* Visualization Type Selector */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                    Visualization Type
+                                                </label>
+                                                <div className="relative">
+                                                    <select
+                                                        value={selectedVisualizationType}
+                                                        onChange={(e) => setSelectedVisualizationType(e.target.value)}
+                                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-300 appearance-none cursor-pointer"
+                                                    >
+                                                        <option value="auto">Auto (let AI decide)</option>
+                                                        <option value="Bar chart">Bar Chart</option>
+                                                        <option value="Line chart">Line Chart</option>
+                                                        <option value="Area chart">Area Chart</option>
+                                                        <option value="Pie chart">Pie Chart</option>
+                                                        <option value="Table">Table</option>
+                                                        <option value="Scatter plot">Scatter Plot</option>
+                                                        <option value="Heatmap">Heatmap</option>
+                                                        <option value="Gauge">Gauge</option>
+                                                        <option value="Funnel chart">Funnel Chart</option>
+                                                    </select>
+                                                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                                                <PromptInput
+                                                    entities={entities}
+                                                    onGenerate={(prompt, mentionedEntityIds) => {
+                                                        handleGenerateWidget(prompt, mentionedEntityIds, selectedVisualizationType);
+                                                        setShowAddWidgetModal(false);
+                                                        setSelectedVisualizationType(''); // Reset after generation
+                                                    }}
+                                                    isGenerating={isGenerating}
+                                                    placeholder="Describe your data... e.g. '@Customers by total orders' or 'Connect to workflow output SalesReport'"
+                                                    buttonLabel="Generate Widget"
+                                                    className="text-slate-800"
+                                                />
+                                            </div>
+                                            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                                <div className="flex items-start gap-3">
+                                                    <Info size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+                                                    <div className="text-xs text-blue-800">
+                                                        <p className="font-medium mb-1">Tips:</p>
+                                                        <ul className="list-disc list-inside space-y-1 text-blue-700">
+                                                            <li>Use @ to mention entities (e.g., @Customers)</li>
+                                                            <li>Use . to access attributes (e.g., @Customers.totalOrders)</li>
+                                                            <li>Describe the visualization type (bar chart, line chart, pie chart, etc.)</li>
+                                                            <li>You can connect to workflow outputs by mentioning the workflow name</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                    )}
+                            )}
                                 </>
                             )}
 
@@ -910,55 +1147,75 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
 
             {/* Share Dashboard Modal */}
             {showShareModal && (
-                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setShowShareModal(false)}>
-                    <div className="bg-white rounded-lg border border-slate-200 shadow-xl p-6 w-[450px]" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-normal text-slate-800 mb-4 flex items-center gap-2">
-                            <Share2 size={20} className="text-teal-600" />
-                            Share Dashboard
-                        </h3>
-                        <p className="text-sm text-slate-600 mb-4">
-                            Anyone with this link can view your dashboard without logging in.
-                        </p>
-                        <div className="flex gap-2 mb-4">
-                            <input
-                                type="text"
-                                value={shareUrl}
-                                readOnly
-                                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-600"
-                            />
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowShareModal(false)}>
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col" onClick={e => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="bg-white border-b border-slate-200 px-6 py-5 shrink-0 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-slate-50 rounded-lg">
+                                    <Share2 size={18} className="text-slate-600" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-normal text-slate-900">Share Dashboard</h2>
+                                    <p className="text-xs text-slate-500 mt-0.5">Anyone with this link can view your dashboard</p>
+                                </div>
+                            </div>
                             <button
-                                onClick={copyShareUrl}
-                                className={`px-3 py-2 rounded-lg flex items-center gap-1 text-sm font-medium transition-colors ${
-                                    copied 
-                                        ? 'bg-green-100 text-green-700' 
-                                        : 'bg-teal-600 text-white hover:bg-teal-700'
-                                }`}
+                                onClick={() => setShowShareModal(false)}
+                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                             >
-                                {copied ? <Check size={16} /> : <Copy size={16} />}
-                                {copied ? 'Copied!' : 'Copy'}
+                                <X size={18} />
                             </button>
                         </div>
-                        <div className="flex gap-2 mb-4">
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={shareUrl}
+                                    readOnly
+                                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                />
+                                <button
+                                    onClick={copyShareUrl}
+                                    className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors shrink-0 ${
+                                        copied 
+                                            ? 'bg-green-50 text-green-700 border border-green-200' 
+                                            : 'bg-slate-900 text-white hover:bg-slate-800'
+                                    }`}
+                                >
+                                    {copied ? <Check size={16} /> : <Copy size={16} />}
+                                    {copied ? 'Copied' : 'Copy'}
+                                </button>
+                            </div>
+                            
                             <a
                                 href={shareUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700"
+                                className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors"
                             >
                                 <ExternalLink size={14} />
-                                Open in new tab
+                                <span>Open in new tab</span>
                             </a>
                         </div>
-                        <div className="flex gap-2 justify-between border-t border-slate-100 pt-4">
-                            <button
-                                onClick={handleUnshareDashboard}
-                                className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium"
-                            >
-                                Stop Sharing
-                            </button>
+
+                        {/* Footer */}
+                        <div className="border-t border-slate-200 px-6 py-4 shrink-0 flex items-center justify-between gap-3">
+                            {selectedDashboard?.isPublic ? (
+                                <button
+                                    onClick={handleUnshareDashboard}
+                                    className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
+                                >
+                                    Stop Sharing
+                                </button>
+                            ) : (
+                                <div />
+                            )}
                             <button
                                 onClick={() => setShowShareModal(false)}
-                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium"
+                                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors"
                             >
                                 Done
                             </button>
