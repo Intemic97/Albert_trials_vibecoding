@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deployment Check</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .check-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+        .check-item.success {
+            border-left-color: #10b981;
+        }
+        .check-item.error {
+            border-left-color: #ef4444;
+        }
+        .check-item.warning {
+            border-left-color: #f59e0b;
+        }
+        pre {
+            background: #f3f4f6;
+            padding: 10px;
+            border-radius: 4px;
+            overflow: auto;
+            font-size: 12px;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Deployment Diagnostic Check</h1>
+    
+    <div id="checks"></div>
+    
+    <h2>Manual Checks:</h2>
+    <ol>
+        <li>Open browser console (F12) and check for errors</li>
+        <li>Check Network tab to see if JS/CSS files are loading (status 200)</li>
+        <li>Verify that <code>/api/auth/me</code> endpoint is accessible</li>
+        <li>Check server logs for any errors</li>
+        <li>Verify nginx/apache is configured for SPA routing (all routes serve index.html)</li>
+    </ol>
+    
+    <button onclick="runChecks()">Run Checks Again</button>
+    <button onclick="testAPI()">Test API Connection</button>
+    
+    <div id="api-result"></div>
+    
+    <script>
+        const API_BASE = window.location.origin + '/api';
+        
+        function addCheck(name, status, message, details = '') {
+            const checksDiv = document.getElementById('checks');
+            const div = document.createElement('div');
+            div.className = `check-item ${status}`;
+            div.innerHTML = `
+                <strong>${name}</strong>: ${message}
+                ${details ? `<pre>${details}</pre>` : ''}
+            `;
+            checksDiv.appendChild(div);
+        }
+        
+        async function testAPI() {
+            const resultDiv = document.getElementById('api-result');
+            resultDiv.innerHTML = '<div class="check-item">Testing API connection...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/me`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                resultDiv.innerHTML = `
+                    <div class="check-item success">
+                        <strong>API Test</strong>: Success!<br>
+                        Status: ${response.status}<br>
+                        Response: <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="check-item error">
+                        <strong>API Test</strong>: Failed!<br>
+                        Error: ${error.message}<br>
+                        API Base: ${API_BASE}
+                    </div>
+                `;
+            }
+        }
+        
+        function runChecks() {
+            document.getElementById('checks').innerHTML = '';
+            
+            // Check 1: Root element exists
+            const root = document.getElementById('root');
+            if (root) {
+                addCheck('Root Element', 'success', 'Found root element', `ID: ${root.id}`);
+            } else {
+                addCheck('Root Element', 'error', 'Root element not found!', 'The app cannot mount without #root element');
+            }
+            
+            // Check 2: Check for React
+            if (window.React) {
+                addCheck('React', 'success', 'React is loaded');
+            } else {
+                addCheck('React', 'error', 'React is not loaded', 'Check if React scripts are loading correctly');
+            }
+            
+            // Check 3: Check console errors
+            const originalError = console.error;
+            const errors = [];
+            console.error = function(...args) {
+                errors.push(args.join(' '));
+                originalError.apply(console, args);
+            };
+            
+            setTimeout(() => {
+                if (errors.length > 0) {
+                    addCheck('Console Errors', 'error', `Found ${errors.length} error(s)`, errors.join('\n'));
+                } else {
+                    addCheck('Console Errors', 'success', 'No console errors detected');
+                }
+                console.error = originalError;
+            }, 1000);
+            
+            // Check 4: Check if assets are loading
+            const scripts = Array.from(document.querySelectorAll('script[src]'));
+            const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"]'));
+            
+            addCheck('Scripts', scripts.length > 0 ? 'success' : 'warning', 
+                `Found ${scripts.length} script(s)`, 
+                scripts.map(s => s.src).join('\n'));
+            
+            addCheck('Stylesheets', styles.length > 0 ? 'success' : 'warning', 
+                `Found ${styles.length} stylesheet(s)`, 
+                styles.map(s => s.href).join('\n'));
+            
+            // Check 5: Check localStorage
+            try {
+                localStorage.setItem('test', 'test');
+                localStorage.removeItem('test');
+                addCheck('LocalStorage', 'success', 'LocalStorage is available');
+            } catch (e) {
+                addCheck('LocalStorage', 'warning', 'LocalStorage not available', e.message);
+            }
+            
+            // Check 6: Check API base
+            addCheck('API Base', 'info', `API Base URL: ${API_BASE}`, 'Verify this matches your backend URL');
+        }
+        
+        // Run checks on load
+        runChecks();
+    </script>
+</body>
+</html>
