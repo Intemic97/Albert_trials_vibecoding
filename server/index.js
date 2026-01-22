@@ -3140,7 +3140,7 @@ app.get('/api/dashboards/:id/widgets', authenticateToken, async (req, res) => {
 // Add widget to dashboard
 app.post('/api/dashboards/:id/widgets', authenticateToken, async (req, res) => {
     try {
-        const { id: widgetId, title, description, config } = req.body;
+        const { id: widgetId, title, description, config, gridX, gridY, gridWidth, gridHeight } = req.body;
         const now = new Date().toISOString();
         
         // Get max position
@@ -3148,14 +3148,25 @@ app.post('/api/dashboards/:id/widgets', authenticateToken, async (req, res) => {
         const position = (maxPos?.maxPos || 0) + 1;
         
         await db.run(
-            'INSERT INTO widgets (id, dashboardId, title, description, config, position, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [widgetId, req.params.id, title, description || '', JSON.stringify(config), position, now]
+            'INSERT INTO widgets (id, dashboardId, title, description, config, position, gridX, gridY, gridWidth, gridHeight, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [widgetId, req.params.id, title, description || '', JSON.stringify(config), position, gridX || 0, gridY || 0, gridWidth || 4, gridHeight || 3, now]
         );
         
         // Update dashboard updatedAt
         await db.run('UPDATE dashboards SET updatedAt = ? WHERE id = ?', [now, req.params.id]);
         
-        res.json({ id: widgetId, title, description, config, position, createdAt: now });
+        res.json({ 
+            id: widgetId, 
+            title, 
+            description, 
+            config, 
+            position, 
+            gridX: gridX || 0,
+            gridY: gridY || 0,
+            gridWidth: gridWidth || 4,
+            gridHeight: gridHeight || 3,
+            createdAt: now 
+        });
     } catch (error) {
         console.error('Error adding widget:', error);
         res.status(500).json({ error: 'Failed to add widget' });

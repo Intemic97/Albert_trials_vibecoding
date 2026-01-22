@@ -4026,47 +4026,28 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         return matchesSearch && matchesCategory;
     });
 
-    // Function to get subtle colors for each category - all uniform and sober
+    // Function to get subtle colors for each category
     const getCategoryColors = (categoryName: string): { bg: string; hover: string } => {
-        // All categories use the same sober color
-        return { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' };
-    };
-    
-    // Get icon color for item based on node type (matches canvas colors)
-    const getItemIconColor = (itemType: string): string => {
-        // Map node types to their icon colors (matching canvas node colors)
-        switch (itemType) {
-            case 'trigger':
-            case 'http':
-            case 'esios':
-            case 'join':
-            case 'webhook':
-                return 'text-cyan-600';
-            case 'action':
-            case 'saveRecords':
-            case 'mysql':
-            case 'sendEmail':
-            case 'sendSMS':
-                return 'text-blue-600';
-            case 'fetchData':
-            case 'addField':
-            case 'manualInput':
-            case 'output':
-            case 'sapFetch':
-            case 'excelInput':
-            case 'pdfInput':
-            case 'dataVisualization':
-                return 'text-indigo-600';
-            case 'humanApproval':
-            case 'python':
-            case 'climatiq':
-            case 'splitColumns':
-                return 'text-sky-600';
-            case 'condition':
-            case 'llm':
-            default:
-                return 'text-slate-600';
-        }
+        const colorMap: { [key: string]: { bg: string; hover: string } } = {
+            'Recents': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
+            'Control Flow': { bg: 'bg-blue-50/50', hover: 'hover:bg-blue-50' },
+            'Data and Variables': { bg: 'bg-purple-50/50', hover: 'hover:bg-purple-50' },
+            'String Operations': { bg: 'bg-cyan-50/50', hover: 'hover:bg-cyan-50' },
+            'Date and Time': { bg: 'bg-amber-50/50', hover: 'hover:bg-amber-50' },
+            'Output and Logging': { bg: 'bg-emerald-50/50', hover: 'hover:bg-emerald-50' },
+            'File & Folder Operations': { bg: 'bg-orange-50/50', hover: 'hover:bg-orange-50' },
+            'Excel / Spreadsheet': { bg: 'bg-green-50/50', hover: 'hover:bg-green-50' },
+            'CSV': { bg: 'bg-lime-50/50', hover: 'hover:bg-lime-50' },
+            'Database': { bg: 'bg-indigo-50/50', hover: 'hover:bg-indigo-50' },
+            'Web and API': { bg: 'bg-teal-50/50', hover: 'hover:bg-teal-50' },
+            'Email': { bg: 'bg-pink-50/50', hover: 'hover:bg-pink-50' },
+            'FTP/SFTP': { bg: 'bg-rose-50/50', hover: 'hover:bg-rose-50' },
+            'Security': { bg: 'bg-red-50/50', hover: 'hover:bg-red-50' },
+            'Code Block': { bg: 'bg-violet-50/50', hover: 'hover:bg-violet-50' },
+            'Exception Handling': { bg: 'bg-yellow-50/50', hover: 'hover:bg-yellow-50' },
+            'Advanced Logic': { bg: 'bg-fuchsia-50/50', hover: 'hover:bg-fuchsia-50' },
+        };
+        return colorMap[categoryName] || { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' };
     };
 
     // Get all unique tags from workflows
@@ -4247,19 +4228,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             </div>
                         ))}
 
-                        {/* Create New Card - Only show if no pagination or on last page with space */}
-                        {totalWorkflowPages <= 1 && (
-                            <div
-                                data-tutorial="create-workflow"
-                                onClick={createNewWorkflow}
-                                className="border border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center min-h-[200px] text-slate-400 cursor-pointer group"
-                            >
-                                <div className="p-4 bg-slate-100 rounded-full mb-3">
-                                    <Workflow size={24} />
-                                </div>
-                                <span className="font-medium">Create new workflow</span>
+                        {/* Create New Card */}
+                        <div
+                            data-tutorial="create-workflow"
+                            onClick={createNewWorkflow}
+                            className="border border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center min-h-[200px] text-slate-400 cursor-pointer group"
+                        >
+                            <div className="p-4 bg-slate-100 rounded-full mb-3">
+                                <Workflow size={24} />
                             </div>
-                        )}
+                            <span className="font-medium">Create new workflow</span>
+                        </div>
 
                         {filteredWorkflows.length === 0 && workflowSearchQuery !== '' && (
                             <div className="col-span-full text-center py-12 text-slate-500">
@@ -4479,7 +4458,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     onDragStart={(e) => handleDragStart(e, item)}
                                                                     className="flex items-center gap-2.5 px-4 py-1.5 pl-8 hover:bg-slate-50 cursor-grab transition-colors group"
                                                                 >
-                                                                    <item.icon size={13} className={`${getItemIconColor(item.type)} flex-shrink-0`} />
+                                                                    <item.icon size={13} className="text-slate-600 flex-shrink-0" />
                                                                     <span className="text-xs text-slate-700 group-hover:text-slate-900 transition-colors">{item.label}</span>
                                                                 </div>
                                                             ))}
