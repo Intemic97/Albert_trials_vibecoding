@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
     LayoutDashboard, 
     TrendingUp, 
@@ -12,6 +13,7 @@ import {
     Clock,
     Workflow,
     ChevronRight,
+    ChevronLeft,
     AlertCircle,
     Hash,
     Calculator,
@@ -19,11 +21,17 @@ import {
     Leaf,
     DollarSign,
     Target,
-    Info
+    Info,
+    Bot,
+    ArrowUpRight,
+    ArrowDownRight,
+    Activity,
+    Sparkles,
+    MessageSquare
 } from 'lucide-react';
 import { Entity } from '../types';
-import { ProfileMenu } from './ProfileMenu';
 import { API_BASE } from '../config';
+import { DynamicChart } from './DynamicChart';
 
 interface KPIConfig {
     id: string;
@@ -111,11 +119,14 @@ const DEFAULT_KPIS: KPIConfig[] = [
 ];
 
 export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = false, onViewChange }) => {
+    const navigate = useNavigate();
     const [kpis, setKpis] = useState<KPIConfig[]>([]);
     const [kpiValues, setKpiValues] = useState<Record<string, number | null>>({});
     const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
     const [isLoadingKpis, setIsLoadingKpis] = useState(true);
     const [isLoadingApprovals, setIsLoadingApprovals] = useState(true);
+    const [copilots, setCopilots] = useState<Array<{ id: string; title: string; updatedAt: string; messageCount?: number }>>([]);
+    const [isLoadingCopilots, setIsLoadingCopilots] = useState(true);
     
     // Modal states
     const [showAddKpiModal, setShowAddKpiModal] = useState(false);
@@ -133,7 +144,69 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
     useEffect(() => {
         loadKpis();
         loadPendingApprovals();
+        loadOverviewStats();
+        loadCopilots();
     }, []);
+
+    const loadCopilots = async () => {
+        try {
+            setIsLoadingCopilots(true);
+            const res = await fetch(`${API_BASE}/copilot/chats`, { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                const chats = data.chats || [];
+                setCopilots(chats.slice(0, 4).map((chat: any) => ({
+                    id: chat.id,
+                    title: chat.title || 'New Copilot',
+                    updatedAt: chat.updatedAt || chat.createdAt,
+                    messageCount: chat.messages?.length || 0
+                })));
+            }
+        } catch (error) {
+            console.error('Error loading copilots:', error);
+        } finally {
+            setIsLoadingCopilots(false);
+        }
+    };
+
+    const loadOverviewStats = async () => {
+        try {
+            setIsLoadingStats(true);
+            const res = await fetch(`${API_BASE}/overview/stats`, { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                console.log('[Overview] Stats loaded:', data);
+                // Ensure recentWorkflows is always an array
+                setOverviewStats({
+                    ...data,
+                    recentWorkflows: data.recentWorkflows || []
+                });
+            } else {
+                const errorData = await res.json().catch(() => ({}));
+                console.error('[Overview] Failed to load stats:', res.status, res.statusText, errorData);
+                // Set empty stats instead of null to show "No workflows yet"
+                setOverviewStats({
+                    activeWorkflows: 0,
+                    eventsTriggered: 0,
+                    eventsChange: 0,
+                    dailyExecutions: [],
+                    recentWorkflows: []
+                });
+            }
+        } catch (e) {
+            console.error('Error loading overview stats:', e);
+            // Set empty stats on error
+            setOverviewStats({
+                activeWorkflows: 0,
+                eventsTriggered: 0,
+                eventsChange: 0,
+                dailyExecutions: [],
+                recentWorkflows: []
+            });
+        } finally {
+            setIsLoadingStats(false);
+        }
+    };
 
     // Recalculate KPI values when KPIs or entities change
     useEffect(() => {
@@ -366,6 +439,90 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
         }
     };
 
+    const [overviewStats, setOverviewStats] = useState<{
+        activeWorkflows: number;
+        eventsTriggered: number;
+        eventsChange: number;
+        dailyExecutions: Array<{ date: string; count: number }>;
+        recentWorkflows: Array<{
+            id: string;
+            name: string;
+            executionCount: number;
+            lastExecutionAt: string | null;
+            status: string;
+        }>;
+    } | null>(null);
+    const [isLoadingStats, setIsLoadingStats] = useState(true);
+    
+    // Pagination for workflows table
+    const [workflowsPage, setWorkflowsPage] = useState(1);
+    const workflowsPerPage = 10;
+
+    // Generate chart data from daily executions
+    const getChartData = () => {
+        if (!overviewStats || !overviewStats.dailyExecutions.length) {
+            return {
+                type: 'area' as const,
+                title: 'Events Triggered vs Copilot Interactions',
+                description: 'Daily activity',
+                data: [],
+                xAxisKey: 'date',
+                dataKey: ['events', 'copilotInteractions'],
+                colors: ['#10b981', '#94a3b8']
+            };
+        }
+        
+        // Map dates to day names and prepare data
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const data = overviewStats.dailyExecutions.map(row => {
+            const date = new Date(row.date);
+            return {
+                date: dayNames[date.getDay()],
+                events: row.count,
+                copilotInteractions: 0
+            };
+        });
+        
+        return {
+            type: 'area' as const,
+            title: 'Events Triggered vs Copilot Interactions',
+            description: 'Daily activity',
+            data,
+            xAxisKey: 'date',
+            dataKey: ['events', 'copilotInteractions'],
+            colors: ['#10b981', '#94a3b8']
+        };
+    };
+
+    const overviewChartConfig = getChartData();
+
+    const formatTimeAgo = (dateString: string | null) => {
+        if (!dateString) return 'Never';
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        return `${diffDays}d ago`;
+    };
+
+    const severityStyles: Record<string, string> = {
+        critical: 'bg-red-50 text-red-700 border-red-200',
+        warning: 'bg-amber-50 text-amber-700 border-amber-200',
+        info: 'bg-slate-100 text-slate-600 border-slate-200'
+    };
+
+    const statusStyles: Record<string, string> = {
+        running: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        paused: 'bg-amber-50 text-amber-700 border-amber-200',
+        error: 'bg-red-50 text-red-700 border-red-200'
+    };
+
     // Show loading state when entities are being fetched
     if (entitiesLoading) {
         return (
@@ -373,18 +530,15 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                 {/* Header */}
                 <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-20 shrink-0">
                     <div className="flex items-center gap-3">
-                        <LayoutDashboard className="text-teal-600" size={24} />
-                        <h1 className="text-xl font-bold text-slate-800">Overview</h1>
+                        <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Overview</h1>
                     </div>
-                    <div className="flex items-center space-x-4">
-                        <ProfileMenu onNavigate={onViewChange} />
-                    </div>
+                    <div />
                 </header>
                 {/* Loading state */}
                 <div className="flex-1 flex items-center justify-center">
                     <div className="text-center">
                         <div className="w-12 h-12 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin mx-auto mb-4"></div>
-                        <p className="text-slate-500">Loading your data...</p>
+                        <p className="text-sm text-slate-500">Loading your data...</p>
                     </div>
                 </div>
             </div>
@@ -396,307 +550,230 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-20 shrink-0">
                 <div className="flex items-center gap-3">
-                    <LayoutDashboard className="text-teal-600" size={24} />
-                    <h1 className="text-xl font-bold text-slate-800">Overview</h1>
+                    <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Overview</h1>
                 </div>
-                <div className="flex items-center space-x-4">
-                    <ProfileMenu onNavigate={onViewChange} />
-                </div>
+                <div />
             </header>
 
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                <div className="max-w-7xl mx-auto space-y-8">
+                <div className="max-w-7xl mx-auto space-y-6">
                     
-                    {/* KPIs Section */}
                     <section>
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                                <TrendingUp size={20} className="text-teal-600" />
-                                Company KPIs
-                            </h2>
-                            {kpis.length < 6 && (
-                                <button
-                                    onClick={() => setShowAddKpiModal(true)}
-                                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-                                >
-                                    <Plus size={16} />
-                                    Add KPI
-                                </button>
-                            )}
-                        </div>
-
-                        {isLoadingKpis ? (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {[1, 2, 3].map(i => (
-                                    <div key={i} className="bg-white rounded-xl border border-slate-200 p-6 animate-pulse">
-                                        <div className="h-4 bg-slate-200 rounded w-1/2 mb-4"></div>
-                                        <div className="h-8 bg-slate-200 rounded w-3/4"></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {/* Active Workflows */}
+                            <div className="bg-white border border-slate-200 rounded-lg p-5">
+                                <div className="flex items-start justify-between">
+                                    <div className="w-10 h-10 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600">
+                                        <Workflow size={18} />
                                     </div>
-                                ))}
-                            </div>
-                        ) : kpis.length === 0 ? (
-                            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
-                                <Calculator className="mx-auto text-slate-300 mb-4" size={48} />
-                                <h3 className="text-lg font-semibold text-slate-600 mb-2">No KPIs configured</h3>
-                                <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
-                                    Add KPIs to monitor important metrics from your company based on your entity data.
-                                </p>
-                                <button
-                                    onClick={() => setShowAddKpiModal(true)}
-                                    className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-                                >
-                                    <Plus size={18} />
-                                    Create first KPI
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {kpis.map((kpi, index) => {
-                                    const colors = KPI_COLORS[index % KPI_COLORS.length] || KPI_COLORS[0];
-                                    const value = kpiValues[kpi.id] ?? null;
-                                    const needsConfig = !kpi.entityId;
-                                    
-                                    // Determine target status
-                                    const hasTarget = kpi.target !== undefined && kpi.target !== null;
-                                    const targetMet = hasTarget && value !== null && value <= kpi.target!;
-                                    const targetExceeded = hasTarget && value !== null && value > kpi.target!;
-                                    
-                                    // Choose icon based on KPI type
-                                    const getKpiIcon = () => {
-                                        if (kpi.icon === 'alert-triangle' || kpi.title.toLowerCase().includes('defect')) {
-                                            return <AlertTriangle size={20} className={colors.icon} />;
-                                        }
-                                        if (kpi.icon === 'dollar-sign' || kpi.title.toLowerCase().includes('cost')) {
-                                            return <DollarSign size={20} className={colors.icon} />;
-                                        }
-                                        if (kpi.icon === 'leaf' || kpi.title.toLowerCase().includes('environmental') || kpi.title.toLowerCase().includes('impact')) {
-                                            return <Leaf size={20} className={colors.icon} />;
-                                        }
-                                        return <Hash size={20} className={colors.icon} />;
-                                    };
-                                    
-                                    return (
-                                        <div key={kpi.id} className="flex flex-col">
-                                            <div 
-                                                className={`${colors.bg} ${colors.border} border rounded-xl p-6 relative group transition-shadow hover:shadow-md ${needsConfig ? 'cursor-pointer' : ''} flex-1`}
-                                                onClick={needsConfig ? () => openEditModal(kpi) : undefined}
-                                            >
-                                                {/* Action buttons */}
-                                                <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); openEditModal(kpi); }}
-                                                        className="p-1.5 hover:bg-white/50 rounded-lg transition-colors"
-                                                        title="Edit"
-                                                    >
-                                                        <Settings size={14} className="text-slate-500" />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleDeleteKpi(kpi.id); }}
-                                                        className="p-1.5 hover:bg-red-100 rounded-lg transition-colors"
-                                                        title="Delete"
-                                                    >
-                                                        <X size={14} className="text-red-500" />
-                                                    </button>
-                                                </div>
-                                                
-                                                <div className="flex items-start gap-3">
-                                                    <div className={`p-2 rounded-lg bg-white/60`}>
-                                                        {getKpiIcon()}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-medium text-slate-600 truncate">{kpi.title || 'Untitled'}</p>
-                                                        {needsConfig ? (
-                                                            <>
-                                                                <p className={`text-lg font-semibold text-slate-400 mt-1`}>
-                                                                    Not configured
-                                                                </p>
-                                                                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                                                                    <AlertCircle size={12} />
-                                                                    Click to configure
-                                                                </p>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <div className="flex items-baseline gap-2 mt-1">
-                                                                    <p className={`text-2xl font-bold ${colors.text}`}>
-                                                                        {formatValue(value, kpi.operation)}
-                                                                    </p>
-                                                                    {hasTarget && (
-                                                                        <span className={`text-xs font-medium flex items-center gap-1 ${targetMet ? 'text-green-600' : 'text-red-500'}`}>
-                                                                            {targetMet ? (
-                                                                                <TrendingDown size={12} />
-                                                                            ) : (
-                                                                                <TrendingUp size={12} />
-                                                                            )}
-                                                                            {targetMet ? 'On target' : 'Above target'}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                {hasTarget && (
-                                                                    <div className="flex items-center gap-1.5 mt-1">
-                                                                        <Target size={12} className="text-slate-400" />
-                                                                        <span className="text-xs text-slate-500">
-                                                                            Target: {formatValue(kpi.target!, kpi.operation)}
-                                                                        </span>
-                                                                    </div>
-                                                                )}
-                                                                <p className="text-xs text-slate-500 mt-1">
-                                                                    {getOperationLabel(kpi.operation)}{kpi.propertyName ? ` of ${kpi.propertyName}` : ''}
-                                                                </p>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {/* Description below the card */}
-                                            {kpi.description && (
-                                                <p className="text-xs text-slate-500 mt-2 px-1 flex items-start gap-1.5">
-                                                    <Info size={12} className="text-slate-400 mt-0.5 shrink-0" />
-                                                    <span>{kpi.description}</span>
-                                                </p>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                                
-                                {/* Add KPI Card (if less than 3) */}
-                                {kpis.length < 3 && (
-                                    <div className="flex flex-col">
-                                        <button
-                                            onClick={() => setShowAddKpiModal(true)}
-                                            className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-400 hover:border-teal-400 hover:text-teal-600 transition-colors min-h-[140px] flex-1"
-                                        >
-                                            <Plus size={24} className="mb-2" />
-                                            <span className="text-sm font-medium">Add KPI</span>
-                                        </button>
-                                        {/* Spacer for description area */}
-                                        <div className="h-[24px] mt-2"></div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </section>
-
-
-                    {/* Pending Approvals Section */}
-                    <section>
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                                <Bell size={20} className="text-orange-500" />
-                                Pending Approvals
-                                {pendingApprovals.length > 0 && (
-                                    <span className="px-2 py-0.5 text-xs font-bold bg-orange-100 text-orange-700 rounded-full">
-                                        {pendingApprovals.length}
-                                    </span>
-                                )}
-                            </h2>
-                        </div>
-
-                        {isLoadingApprovals ? (
-                            <div className="bg-white rounded-xl border border-slate-200 p-6 animate-pulse">
-                                <div className="space-y-4">
-                                    {[1, 2].map(i => (
-                                        <div key={i} className="flex items-center gap-4">
-                                            <div className="w-10 h-10 bg-slate-200 rounded-full"></div>
-                                            <div className="flex-1">
-                                                <div className="h-4 bg-slate-200 rounded w-1/2 mb-2"></div>
-                                                <div className="h-3 bg-slate-200 rounded w-1/3"></div>
-                                            </div>
-                                        </div>
-                                    ))}
+                                </div>
+                                <div className="mt-4">
+                                    <p className="text-xs text-slate-500 mb-1">Active Workflows</p>
+                                    <p className="text-2xl font-normal text-slate-900">
+                                        {isLoadingStats ? '...' : (overviewStats?.activeWorkflows || 0)}
+                                    </p>
                                 </div>
                             </div>
-                        ) : pendingApprovals.length === 0 ? (
-                            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
-                                <CheckCircle className="mx-auto text-green-400 mb-3" size={40} />
-                                <h3 className="text-lg font-semibold text-slate-600 mb-1">All caught up</h3>
-                                <p className="text-sm text-slate-500">
-                                    You have no pending Human in the Loop approvals
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-                                {pendingApprovals.map((approval) => (
-                                    <div key={approval.id} className="p-4 hover:bg-slate-50 transition-colors">
-                                        <div className="flex items-start gap-4">
-                                            <div className="p-2 bg-orange-100 rounded-lg shrink-0">
-                                                <Workflow size={20} className="text-orange-600" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <h4 className="font-semibold text-slate-800 truncate">
-                                                        {approval.workflowName}
-                                                    </h4>
-                                                    <span className="px-2 py-0.5 text-xs bg-slate-100 text-slate-600 rounded">
-                                                        {approval.nodeLabel}
-                                                    </span>
-                                                </div>
-                                                <p className="text-sm text-slate-500 flex items-center gap-2">
-                                                    <Clock size={12} />
-                                                    {new Date(approval.createdAt).toLocaleString()}
-                                                </p>
-                                                {approval.inputDataPreview && (
-                                                    <div className="mt-2 p-2 bg-slate-50 rounded text-xs text-slate-600 font-mono max-h-20 overflow-hidden">
-                                                        {JSON.stringify(approval.inputDataPreview, null, 2).slice(0, 150)}...
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="flex gap-2 shrink-0">
-                                                <button
-                                                    onClick={() => handleApproval(approval.id, 'reject')}
-                                                    className="px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1"
-                                                >
-                                                    <XCircle size={16} />
-                                                    Reject
-                                                </button>
-                                                <button
-                                                    onClick={() => handleApproval(approval.id, 'approve')}
-                                                    className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center gap-1"
-                                                >
-                                                    <CheckCircle size={16} />
-                                                    Approve
-                                                </button>
-                                            </div>
-                                        </div>
+                            
+                            {/* Events Triggered */}
+                            <div className="bg-white border border-slate-200 rounded-lg p-5">
+                                <div className="flex items-start justify-between">
+                                    <div className="w-10 h-10 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600">
+                                        <Activity size={18} />
                                     </div>
-                                ))}
+                                    {overviewStats && overviewStats.eventsChange !== 0 && (
+                                        <div className={`flex items-center gap-1 text-xs font-medium ${overviewStats.eventsChange > 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                            {overviewStats.eventsChange > 0 ? (
+                                                <ArrowUpRight size={12} />
+                                            ) : (
+                                                <ArrowDownRight size={12} />
+                                            )}
+                                            {overviewStats.eventsChange > 0 ? '+' : ''}{overviewStats.eventsChange.toFixed(1)}%
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="mt-4">
+                                    <p className="text-xs text-slate-500 mb-1">Events Triggered</p>
+                                    <p className="text-2xl font-normal text-slate-900">
+                                        {isLoadingStats ? '...' : (overviewStats?.eventsTriggered || 0).toLocaleString()}
+                                    </p>
+                                </div>
                             </div>
-                        )}
+                            
+                            {/* Copilot Sessions */}
+                            <div className="bg-white border border-slate-200 rounded-lg p-5">
+                                <div className="flex items-start justify-between">
+                                    <div className="w-10 h-10 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600">
+                                        <Bot size={18} />
+                                    </div>
+                                </div>
+                                <div className="mt-4">
+                                    <p className="text-xs text-slate-500 mb-1">Copilot Sessions</p>
+                                    <p className="text-2xl font-normal text-slate-900">—</p>
+                                </div>
+                            </div>
+                        </div>
                     </section>
 
-                    {/* Quick Actions */}
-                    <section>
-                        <h2 className="text-lg font-semibold text-slate-800 mb-4">Quick Actions</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <button
-                                onClick={() => onViewChange?.('workflows')}
-                                className="bg-white rounded-xl border border-slate-200 p-5 text-left hover:shadow-md hover:border-teal-300 transition-all group"
+                    <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <h2 className="text-base font-normal text-slate-900">Overview</h2>
+                                <div className="flex items-center gap-3 text-xs text-slate-500">
+                                    <div className="flex items-center gap-1">
+                                        <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                                        Events Triggered
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                                        Copilot Interactions
+                                    </div>
+                                </div>
+                            </div>
+                            <DynamicChart config={overviewChartConfig} />
+                        </div>
+
+                        <div className="bg-white border border-slate-200 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <h2 className="text-base font-normal text-slate-900">Your Copilots</h2>
+                                <button 
+                                    onClick={() => navigate('/copilots')}
+                                    className="text-xs text-slate-500 hover:text-slate-700"
+                                >
+                                    View all
+                                </button>
+                            </div>
+                            <div className="space-y-3">
+                                {isLoadingCopilots ? (
+                                    <div className="text-center py-4 text-sm text-slate-500">Loading...</div>
+                                ) : copilots.length > 0 ? (
+                                    copilots.map(copilot => (
+                                        <div key={copilot.id} className="flex items-start gap-3 border border-slate-100 rounded-lg p-3 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => navigate(`/copilots?chatId=${copilot.id}`)}>
+                                            <div className="p-2 bg-indigo-50 rounded-lg flex-shrink-0">
+                                                <Sparkles size={16} className="text-indigo-600" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-normal text-slate-900 truncate">{copilot.title}</p>
+                                                <p className="text-xs text-slate-500 truncate">{copilot.messageCount || 0} messages</p>
+                                                <p className="text-xs text-slate-400 mt-1">{formatTimeAgo(copilot.updatedAt)}</p>
+                                            </div>
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigate(`/copilots?chatId=${copilot.id}`);
+                                                }}
+                                                className="text-xs text-indigo-600 hover:text-indigo-700 flex-shrink-0"
+                                            >
+                                                Open
+                                            </button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-4 text-sm text-slate-500">
+                                        <p className="mb-2">No copilots yet</p>
+                                        <button
+                                            onClick={() => navigate('/copilots')}
+                                            className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                                        >
+                                            Create your first copilot
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="bg-white border border-slate-200 rounded-lg">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+                            <h2 className="text-base font-normal text-slate-900">Workflows</h2>
+                            <button 
+                                onClick={() => navigate('/logs')}
+                                className="text-xs text-slate-500 hover:text-slate-700 transition-colors"
                             >
-                                <Workflow size={24} className="text-teal-600 mb-3" />
-                                <h3 className="font-semibold text-slate-800 mb-1">Workflows</h3>
-                                <p className="text-sm text-slate-500">Manage and run automations</p>
-                                <ChevronRight size={16} className="text-slate-400 mt-3 group-hover:translate-x-1 transition-transform" />
-                            </button>
-                            <button
-                                onClick={() => onViewChange?.('database')}
-                                className="bg-white rounded-xl border border-slate-200 p-5 text-left hover:shadow-md hover:border-teal-300 transition-all group"
-                            >
-                                <TrendingUp size={24} className="text-blue-600 mb-3" />
-                                <h3 className="font-semibold text-slate-800 mb-1">Database</h3>
-                                <p className="text-sm text-slate-500">Explore and manage your entities</p>
-                                <ChevronRight size={16} className="text-slate-400 mt-3 group-hover:translate-x-1 transition-transform" />
-                            </button>
-                            <button
-                                onClick={() => onViewChange?.('dashboard')}
-                                className="bg-white rounded-xl border border-slate-200 p-5 text-left hover:shadow-md hover:border-teal-300 transition-all group"
-                            >
-                                <LayoutDashboard size={24} className="text-purple-600 mb-3" />
-                                <h3 className="font-semibold text-slate-800 mb-1">Dashboards</h3>
-                                <p className="text-sm text-slate-500">Visualize your data with charts</p>
-                                <ChevronRight size={16} className="text-slate-400 mt-3 group-hover:translate-x-1 transition-transform" />
+                                View all
                             </button>
                         </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                                <thead className="text-slate-500">
+                                    <tr className="border-b border-slate-100">
+                                        <th className="px-4 py-2 font-medium">Name</th>
+                                        <th className="px-4 py-2 font-medium">Status</th>
+                                        <th className="px-4 py-2 font-medium">Last Run</th>
+                                        <th className="px-4 py-2 font-medium">Data Points</th>
+                                        <th className="px-4 py-2 font-medium">Owner</th>
+                                        <th className="px-4 py-2 font-medium text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {isLoadingStats ? (
+                                        <tr>
+                                            <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
+                                                Loading workflows...
+                                            </td>
+                                        </tr>
+                                    ) : overviewStats && overviewStats.recentWorkflows && overviewStats.recentWorkflows.length > 0 ? (
+                                        overviewStats.recentWorkflows
+                                            .slice((workflowsPage - 1) * workflowsPerPage, workflowsPage * workflowsPerPage)
+                                            .map(workflow => (
+                                            <tr key={workflow.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                                                <td className="px-4 py-2 text-slate-900 font-medium">{workflow.name}</td>
+                                                <td className="px-4 py-2">
+                                                    <span className={`px-2 py-0.5 rounded-full border text-xs font-medium ${statusStyles[workflow.status] || statusStyles.paused}`}>
+                                                        {workflow.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-2 text-slate-600">{formatTimeAgo(workflow.lastExecutionAt)}</td>
+                                                <td className="px-4 py-2 text-slate-600">{workflow.executionCount.toLocaleString()}</td>
+                                                <td className="px-4 py-2 text-slate-600">—</td>
+                                                <td className="px-4 py-2 text-right">
+                                                    <button 
+                                                        onClick={() => navigate(`/workflow/${workflow.id}`)}
+                                                        className="text-xs text-emerald-600 hover:text-emerald-700"
+                                                    >
+                                                        Open
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
+                                                {overviewStats ? 'No workflows yet' : 'Failed to load workflows'}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                        {/* Pagination for Workflows */}
+                        {overviewStats && overviewStats.recentWorkflows && overviewStats.recentWorkflows.length > workflowsPerPage && (
+                            <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between">
+                                <div className="text-sm text-slate-600">
+                                    Showing {(workflowsPage - 1) * workflowsPerPage + 1} to {Math.min(workflowsPage * workflowsPerPage, overviewStats.recentWorkflows.length)} of {overviewStats.recentWorkflows.length}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setWorkflowsPage(prev => Math.max(1, prev - 1))}
+                                        disabled={workflowsPage === 1}
+                                        className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        <ChevronLeft size={16} />
+                                    </button>
+                                    <span className="text-sm text-slate-600 px-2">
+                                        Page {workflowsPage} of {Math.ceil(overviewStats.recentWorkflows.length / workflowsPerPage)}
+                                    </span>
+                                    <button
+                                        onClick={() => setWorkflowsPage(prev => Math.min(Math.ceil(overviewStats.recentWorkflows.length / workflowsPerPage), prev + 1))}
+                                        disabled={workflowsPage === Math.ceil(overviewStats.recentWorkflows.length / workflowsPerPage)}
+                                        className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        <ChevronRight size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </section>
 
                 </div>
@@ -709,7 +786,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                     onClick={() => { setShowAddKpiModal(false); setEditingKpi(null); resetForm(); }}
                 >
                     <div 
-                        className="bg-white rounded-xl shadow-xl p-6 w-[450px]" 
+                        className="bg-white rounded-lg border border-slate-200 shadow-xl p-6 w-[450px]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center gap-3 mb-6">
@@ -717,7 +794,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                 <Hash size={20} className="text-teal-600" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-slate-800">
+                                <h3 className="text-lg font-normal text-slate-800">
                                     {editingKpi ? 'Edit KPI' : 'New KPI'}
                                 </h3>
                                 <p className="text-sm text-slate-500">Configure a company metric</p>
@@ -761,7 +838,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                         setKpiEntityId(e.target.value);
                                         setKpiPropertyName('');
                                     }}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
                                 >
                                     <option value="">Select an entity...</option>
                                     {entities.map(entity => (
@@ -779,7 +856,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                         <select
                                             value={kpiPropertyName}
                                             onChange={(e) => setKpiPropertyName(e.target.value)}
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 appearance-none cursor-pointer hover:border-slate-300 transition-colors"
                                         >
                                             <option value="">Select a property...</option>
                                             {getNumericProperties(kpiEntityId).map(prop => (
@@ -835,14 +912,14 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                         <div className="flex gap-2 justify-end mt-6 pt-4 border-t border-slate-100">
                             <button
                                 onClick={() => { setShowAddKpiModal(false); setEditingKpi(null); resetForm(); }}
-                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                className="btn-3d btn-secondary-3d text-sm font-medium"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={editingKpi ? handleEditKpi : handleAddKpi}
                                 disabled={!kpiTitle || !kpiEntityId || (!kpiPropertyName && kpiOperation !== 'count')}
-                                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                                className="btn-3d btn-primary-3d disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
                             >
                                 {editingKpi ? 'Save changes' : 'Create KPI'}
                             </button>

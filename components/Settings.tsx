@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Plus, X, Search, Building, BookOpen, ToggleLeft, ToggleRight, Check, Zap, Crown, Sparkles, CreditCard, ExternalLink, Loader2, Building2, Link2, Unlink, Copy, CheckCircle, AlertCircle } from 'lucide-react';
-import { ProfileMenu, UserAvatar } from './ProfileMenu';
+import { UserAvatar } from './ProfileMenu';
 import { API_BASE } from '../config';
 
 // Slack icon component
@@ -467,30 +467,25 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
         <div className="flex flex-col h-full bg-slate-50" data-tutorial="settings-content">
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
-                <div className="flex items-center gap-3">
-                    <User className="text-teal-600" size={24} />
-                    <div>
-                        <h1 className="text-xl font-bold text-slate-800">Settings</h1>
-                        <p className="text-xs text-slate-500">Manage organization and preferences</p>
-                    </div>
+                <div>
+                    <h1 className="text-lg font-normal text-slate-900 tracking-tight">Settings</h1>
+                    <p className="text-[11px] text-slate-500 font-light">Manage organization and preferences</p>
                 </div>
-                <div className="flex items-center space-x-4">
-                    <ProfileMenu onNavigate={onViewChange} />
-                </div>
+                <div />
             </header>
 
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-5xl mx-auto">
-                    <h1 className="text-2xl font-bold text-slate-800 mb-6">Settings</h1>
+                    <h1 className="text-lg font-normal text-slate-900 mb-5">Settings</h1>
 
-                    <div className="flex gap-1 bg-slate-200/50 p-1 rounded-xl w-fit mb-8">
+                    <div className="flex gap-0.5 bg-slate-50 p-0.5 rounded-lg w-fit mb-6 border border-slate-200">
                         {['General', 'Team', 'Billing', 'Integrations'].map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab.toLowerCase() as any)}
-                                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === tab.toLowerCase()
-                                    ? 'bg-white text-teal-700 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === tab.toLowerCase()
+                                    ? 'bg-white text-slate-900'
+                                    : 'text-slate-500 hover:text-slate-700'
                                     }`}
                             >
                                 {tab}
@@ -502,12 +497,12 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                         <div className="space-y-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-lg font-semibold text-slate-800">Team Members</h2>
+                                    <h2 className="text-lg font-normal text-slate-800">Team Members</h2>
                                     <p className="text-slate-500 text-sm">Manage who has access to this organization.</p>
                                 </div>
                                 <button
                                     onClick={() => setIsInviting(true)}
-                                    className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-md transition-colors"
+                                    className="flex items-center btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
                                 >
                                     <Plus size={16} className="mr-2" />
                                     Invite Member
@@ -521,14 +516,14 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                 </div>
                             )}
 
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-50/50 border-b border-slate-100">
                                         <tr>
-                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">User</th>
-                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Role</th>
-                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Email</th>
-                                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                                            <th className="px-6 py-4 text-xs font-normal text-slate-500 uppercase tracking-wider">User</th>
+                                            <th className="px-6 py-4 text-xs font-normal text-slate-500 uppercase tracking-wider">Role</th>
+                                            <th className="px-6 py-4 text-xs font-normal text-slate-500 uppercase tracking-wider">Email</th>
+                                            <th className="px-6 py-4 text-xs font-normal text-slate-500 uppercase tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -572,27 +567,22 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
 
                     {activeTab === 'general' && (
                         <div className="space-y-6">
-                            <div>
-                                <h2 className="text-lg font-semibold text-slate-800">Preferences</h2>
-                                <p className="text-slate-500 text-sm">Customize your experience.</p>
+                            <div className="mb-5">
+                                <h2 className="text-base font-normal text-slate-900 tracking-tight mb-0.5">Preferences</h2>
+                                <p className="text-xs text-slate-500 font-light">Customize your experience.</p>
                             </div>
 
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
                                 {/* Tutorial Setting */}
-                                <div className="p-6 flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-3 bg-teal-50 rounded-xl">
-                                            <BookOpen className="w-6 h-6 text-teal-600" />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-medium text-slate-800">Product Tutorial</h3>
-                                            <p className="text-sm text-slate-500">
+                                <div className="p-5 flex items-center justify-between border-b border-slate-100 last:border-b-0">
+                                    <div className="flex-1">
+                                        <h3 className="text-sm font-medium text-slate-900 mb-0.5">Product Tutorial</h3>
+                                        <p className="text-xs text-slate-500 font-light">
                                                 {tutorialEnabled 
                                                     ? 'Tutorial will show on next page refresh'
                                                     : 'Enable to see the guided tour again'
                                                 }
-                                            </p>
-                                        </div>
+                                        </p>
                                     </div>
                                     <button
                                         onClick={() => {
@@ -608,21 +598,24 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                 }
                                             }
                                         }}
-                                        className="flex items-center"
+                                        className="relative inline-flex items-center focus:outline-none"
+                                        aria-label="Toggle tutorial"
                                     >
-                                        {tutorialEnabled ? (
-                                            <ToggleRight className="w-12 h-12 text-teal-500" />
-                                        ) : (
-                                            <ToggleLeft className="w-12 h-12 text-slate-300" />
-                                        )}
+                                        <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
+                                            tutorialEnabled ? 'bg-[rgb(91,121,128)]' : 'bg-slate-200'
+                                        }`}>
+                                            <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                                tutorialEnabled ? 'translate-x-5' : 'translate-x-0'
+                                            }`} />
+                                        </div>
                                     </button>
                                 </div>
                             </div>
 
                             {/* Company Information Section */}
-                            <div>
-                                <h2 className="text-lg font-semibold text-slate-800 mt-8 mb-2">Company Information</h2>
-                                <p className="text-slate-500 text-sm">Manage your company's core information.</p>
+                            <div className="mt-8 mb-5">
+                                <h2 className="text-base font-normal text-slate-900 tracking-tight mb-0.5">Company Information</h2>
+                                <p className="text-xs text-slate-500 font-light">Manage your company's core information.</p>
                             </div>
 
                             {feedback && (
@@ -632,21 +625,16 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                 </div>
                             )}
 
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+                            <div className="bg-white rounded-lg border border-slate-200 p-6">
                                 <div className="flex justify-between items-center mb-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-3 bg-teal-50 rounded-xl">
-                                            <Building2 className="w-6 h-6 text-teal-600" />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-medium text-slate-800">Company Profile</h3>
-                                            <p className="text-sm text-slate-500">Update your organization details. You can use them in Reports for faster document generation</p>
-                                        </div>
+                                    <div>
+                                        <h3 className="font-medium text-slate-800">Company Profile</h3>
+                                        <p className="text-sm text-slate-500 font-light">Update your organization details. You can use them in Reports for faster document generation</p>
                                     </div>
                                     <button
                                         onClick={updateCompanyInfo}
                                         disabled={isSavingCompany}
-                                        className="px-4 py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+                                        className="btn-3d btn-primary-3d text-sm text-white rounded-lg font-medium hover:bg-[#1e554f] transition-colors disabled:opacity-50 flex items-center gap-2"
                                     >
                                         {isSavingCompany ? (
                                             <>
@@ -756,14 +744,14 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                             {/* Header */}
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-lg font-semibold text-slate-800">Planes y Facturación</h2>
+                                    <h2 className="text-lg font-normal text-slate-800">Planes y Facturación</h2>
                                     <p className="text-slate-500 text-sm">Elige el plan que mejor se adapte a tus necesidades.</p>
                                 </div>
                                 {subscription?.hasStripeCustomer && (
                                     <button
                                         onClick={handleManageSubscription}
                                         disabled={isProcessingPayment}
-                                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+                                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white btn-3d btn-secondary-3d text-sm transition-colors disabled:opacity-50"
                                     >
                                         <CreditCard size={16} />
                                         Gestionar facturación
@@ -790,17 +778,15 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
 
                             {/* Current Plan Badge */}
                             {subscription && (
-                                <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-4 border border-slate-200">
+                                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <div className={`p-2.5 rounded-xl bg-gradient-to-br ${
-                                                pricingPlans.find(p => p.id === subscription.plan)?.gradient || 'from-slate-500 to-slate-600'
-                                            } text-white`}>
+                                            <div className="p-2.5 rounded-lg bg-[rgb(91,121,128)] text-white">
                                                 {pricingPlans.find(p => p.id === subscription.plan)?.icon}
                                             </div>
                                             <div>
                                                 <p className="text-sm text-slate-500">Plan actual</p>
-                                                <p className="font-semibold text-slate-800 capitalize">
+                                                <p className="font-normal text-slate-800 capitalize">
                                                     {pricingPlans.find(p => p.id === subscription.plan)?.name || 'Gratuito'}
                                                 </p>
                                             </div>
@@ -846,7 +832,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                 {/* Popular Badge */}
                                                 {plan.popular && !isCurrentPlan && (
                                                     <div className="absolute top-0 right-0">
-                                                        <div className="bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
+                                                        <div className="bg-[rgb(91,121,128)] text-white text-xs font-medium px-3 py-1 rounded-bl-lg">
                                                             POPULAR
                                                         </div>
                                                     </div>
@@ -855,7 +841,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                 {/* Current Plan Badge */}
                                                 {isCurrentPlan && (
                                                     <div className="absolute top-0 right-0">
-                                                        <div className="bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg flex items-center gap-1">
+                                                        <div className="bg-slate-900 text-white text-xs font-medium px-3 py-1 rounded-bl-lg flex items-center gap-1">
                                                             <Check size={12} />
                                                             ACTUAL
                                                         </div>
@@ -865,11 +851,11 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                 <div className="p-6">
                                                     {/* Plan Icon & Name */}
                                                     <div className="flex items-center gap-3 mb-4">
-                                                        <div className={`p-2.5 rounded-xl bg-gradient-to-br ${plan.gradient} text-white`}>
+                                                        <div className="p-2.5 rounded-lg bg-[rgb(91,121,128)] text-white">
                                                             {plan.icon}
                                                         </div>
                                                         <div>
-                                                            <h3 className="text-lg font-bold text-slate-800">{plan.name}</h3>
+                                                            <h3 className="text-base font-normal text-slate-900">{plan.name}</h3>
                                                             <p className="text-xs text-slate-500">{plan.description}</p>
                                                         </div>
                                                     </div>
@@ -877,7 +863,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                     {/* Price */}
                                                     <div className="mb-6">
                                                         <div className="flex items-baseline gap-1">
-                                                            <span className="text-4xl font-extrabold text-slate-900">{plan.price}</span>
+                                                            <span className="text-3xl font-normal text-slate-900">{plan.price}</span>
                                                             <span className="text-slate-500 font-medium">{plan.period}</span>
                                                         </div>
                                                     </div>
@@ -887,8 +873,8 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                         {plan.features.map((feature, idx) => (
                                                             <li key={idx} className="flex items-center gap-2.5">
                                                                 {feature.included ? (
-                                                                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
-                                                                        <Check className="w-3 h-3 text-emerald-600" />
+                                                                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgb(91,121,128)] flex items-center justify-center">
+                                                                        <Check className="w-3 h-3 text-white" />
                                                                     </div>
                                                                 ) : (
                                                                     <div className="flex-shrink-0 w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center">
@@ -906,14 +892,12 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                     <button
                                                         onClick={() => plan.id !== 'free' && handleUpgrade(plan.id)}
                                                         disabled={isDisabled || isProcessingPayment}
-                                                        className={`w-full py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 ${
+                                                        className={`w-full py-2.5 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
                                                             isCurrentPlan
                                                                 ? 'bg-slate-100 text-slate-500 cursor-default'
                                                                 : plan.id === 'free'
                                                                     ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
-                                                                    : plan.popular
-                                                                        ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-white hover:from-teal-600 hover:to-emerald-600 shadow-lg shadow-teal-500/25 hover:shadow-xl hover:shadow-teal-500/30'
-                                                                        : 'bg-slate-800 text-white hover:bg-slate-900'
+                                                                    : 'bg-[rgb(91,121,128)] text-white hover:bg-[#1e554f]'
                                                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                                                     >
                                                         {isProcessingPayment ? (
@@ -959,7 +943,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                             {/* Header */}
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-lg font-semibold text-slate-800">Integrations</h2>
+                                    <h2 className="text-lg font-normal text-slate-800">Integrations</h2>
                                     <p className="text-slate-500 text-sm">Connect external services to enhance your workspace.</p>
                                 </div>
                             </div>
@@ -977,17 +961,17 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                             )}
 
                             {/* Slack Integration Card */}
-                            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                                 <div className="p-6">
                                     <div className="flex items-start gap-4">
                                         {/* Slack Logo */}
-                                        <div className="w-12 h-12 bg-gradient-to-br from-[#E01E5A] via-[#ECB22E] to-[#2EB67D] rounded-xl flex items-center justify-center text-white shadow-lg">
+                                        <div className="w-12 h-12 bg-[rgb(91,121,128)] rounded-lg flex items-center justify-center text-white">
                                             <SlackIcon />
                                         </div>
                                         
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2">
-                                                <h3 className="text-lg font-semibold text-slate-800">Slack</h3>
+                                                <h3 className="text-lg font-normal text-slate-800">Slack</h3>
                                                 {slackConnected && (
                                                     <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full flex items-center gap-1">
                                                         <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
@@ -1038,7 +1022,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                 <div className="mt-4 space-y-4">
                                                     {/* Setup Instructions */}
                                                     <div className="bg-slate-50 rounded-lg p-4">
-                                                        <h4 className="text-sm font-semibold text-slate-700 mb-3">Setup Instructions</h4>
+                                                        <h4 className="text-sm font-normal text-slate-700 mb-3">Setup Instructions</h4>
                                                         <ol className="text-sm text-slate-600 space-y-2">
                                                             <li className="flex gap-2">
                                                                 <span className="flex-shrink-0 w-5 h-5 bg-slate-200 rounded-full flex items-center justify-center text-xs font-medium">1</span>
@@ -1105,7 +1089,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                     <button
                                                         onClick={connectSlack}
                                                         disabled={isConnectingSlack || !slackBotToken.trim()}
-                                                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        className="flex items-center gap-2 btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                         {isConnectingSlack ? (
                                                             <>
@@ -1127,8 +1111,8 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                             </div>
 
                             {/* More integrations coming soon */}
-                            <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-8 text-center">
-                                <div className="w-12 h-12 bg-slate-200 rounded-xl mx-auto flex items-center justify-center mb-3">
+                            <div className="bg-slate-50 border border-dashed border-slate-300 rounded-lg p-8 text-center">
+                                <div className="w-12 h-12 bg-slate-200 rounded-lg mx-auto flex items-center justify-center mb-3">
                                     <Sparkles size={24} className="text-slate-400" />
                                 </div>
                                 <h3 className="text-slate-700 font-medium mb-1">More integrations coming soon</h3>
@@ -1142,10 +1126,10 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
 
                 {/* Invite Modal */}
                 {isInviting && (
-                    <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="fixed inset-0 bg-[#256A65]/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-md overflow-hidden">
                             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                                <h3 className="font-semibold text-slate-800">Invite Team Member</h3>
+                                <h3 className="font-normal text-slate-800">Invite Team Member</h3>
                                 <button onClick={() => setIsInviting(false)} className="text-slate-400 hover:text-slate-600">
                                     <X size={20} />
                                 </button>
@@ -1180,7 +1164,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                     </button>
                                     <button
                                         type="submit"
-                                        className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-md transition-colors"
+                                        className="btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
                                     >
                                         Send Invitation
                                     </button>

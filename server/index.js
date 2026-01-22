@@ -11,7 +11,29 @@ const { initDb, openDb } = require('./db');
 const { WorkflowExecutor } = require('./workflowExecutor');
 const { gcsService } = require('./gcsService');
 const { prefectClient } = require('./prefectClient');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+// Load environment variables - Try multiple methods to ensure it loads
+const envPath = path.join(__dirname, '.env');
+console.log('[ENV] Attempting to load .env from:', envPath);
+console.log('[ENV] File exists:', require('fs').existsSync(envPath));
+
+// Method 1: Explicit path
+const result1 = require('dotenv').config({ path: envPath });
+if (result1.error) {
+    console.error('[ENV] Error loading .env:', result1.error);
+}
+
+// Method 2: Also try without explicit path (default behavior)
+if (!process.env.OPENAI_API_KEY) {
+    require('dotenv').config();
+}
+
+// Debug: Verificar que OPENAI_API_KEY se cargó correctamente
+const openaiKey = process.env.OPENAI_API_KEY;
+console.log('[ENV] OPENAI_API_KEY cargada:', openaiKey ? `✅ SÍ (length: ${openaiKey.length}, starts with: ${openaiKey.substring(0, 20)}...)` : '❌ NO - VARIABLE NO ENCONTRADA');
+if (!openaiKey) {
+    console.error('[ENV] ERROR: OPENAI_API_KEY no está configurada. Verifica el archivo .env');
+    console.error('[ENV] Variables disponibles:', Object.keys(process.env).filter(k => k.includes('API') || k.includes('KEY')).join(', '));
+}
 
 // Stripe configuration
 const Stripe = require('stripe');
@@ -27,7 +49,7 @@ const { register, login, logout, authenticateToken, getMe, getOrganizations, swi
 
 const app = express();
 const server = http.createServer(app);
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 // ==================== WEBSOCKET SETUP ====================
 const wss = new WebSocketServer({ server, path: '/ws' });
@@ -1517,7 +1539,7 @@ app.delete('/api/records/:id', authenticateToken, async (req, res) => {
 app.post('/api/database/ask', authenticateToken, async (req, res) => {
     console.log('[Database Assistant] Received question');
     try {
-        const { question, conversationHistory } = req.body;
+        const { question, conversationHistory, chatId, instructions, allowedEntities } = req.body;
         const orgId = req.user.orgId;
 
         if (!question) {
@@ -1528,8 +1550,35 @@ app.post('/api/database/ask', authenticateToken, async (req, res) => {
             return res.status(500).json({ error: 'OpenAI API Key not configured' });
         }
 
-        // Fetch all entities and their data for this organization
-        const entities = await db.all('SELECT * FROM entities WHERE organizationId = ?', [orgId]);
+        // If chatId is provided, try to load chat configuration
+        let chatInstructions = instructions;
+        let chatAllowedEntities = allowedEntities;
+        if (chatId) {
+            try {
+                const chat = await db.get(
+                    'SELECT instructions, allowedEntities FROM copilot_chats WHERE id = ? AND organizationId = ?',
+                    [chatId, orgId]
+                );
+                if (chat) {
+                    chatInstructions = chatInstructions || chat.instructions;
+                    chatAllowedEntities = chatAllowedEntities || (chat.allowedEntities ? JSON.parse(chat.allowedEntities) : null);
+                }
+            } catch (e) {
+                console.log('[Database Assistant] Could not load chat config:', e.message);
+            }
+        }
+
+        // Fetch entities - filter by allowedEntities if specified
+        let entitiesQuery = 'SELECT * FROM entities WHERE organizationId = ?';
+        let entitiesParams = [orgId];
+        
+        if (chatAllowedEntities && Array.isArray(chatAllowedEntities) && chatAllowedEntities.length > 0) {
+            const placeholders = chatAllowedEntities.map(() => '?').join(',');
+            entitiesQuery += ` AND id IN (${placeholders})`;
+            entitiesParams = [orgId, ...chatAllowedEntities];
+        }
+        
+        const entities = await db.all(entitiesQuery, entitiesParams);
         
         const databaseContext = {};
         
@@ -1596,10 +1645,16 @@ app.post('/api/database/ask', authenticateToken, async (req, res) => {
         const OpenAI = require('openai');
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+        // Build custom instructions
+        const customInstructions = chatInstructions 
+            ? `\n\nCUSTOM INSTRUCTIONS FOR THIS COPILOT:\n${chatInstructions}\n\nFollow these instructions when answering questions.`
+            : '';
+
         const systemPrompt = `You are a helpful database assistant for Intemic platform. You have access to the user's database and can answer questions about their data.
 
 DATABASE SCHEMA AND DATA:
 ${JSON.stringify(databaseContext, null, 2)}
+${customInstructions}
 
 INSTRUCTIONS:
 1. Answer questions about the data clearly and concisely
@@ -1611,6 +1666,7 @@ INSTRUCTIONS:
 7. If the question is ambiguous, ask for clarification
 8. You can perform calculations, aggregations, and comparisons on the data
 9. Always be helpful and provide context about where the data comes from
+${chatInstructions ? '10. Follow the custom instructions provided above for this specific copilot.' : ''}
 
 RESPONSE FORMAT:
 You must respond in valid JSON format with the following structure:
@@ -1636,13 +1692,28 @@ IMPORTANT:
             { role: 'user', content: question }
         ];
 
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages,
-            temperature: 0.3,
-            max_tokens: 1500,
-            response_format: { type: "json_object" }
-        });
+        console.log('[Database Assistant] Calling OpenAI API...');
+        console.log('[Database Assistant] API Key present:', !!process.env.OPENAI_API_KEY);
+        console.log('[Database Assistant] API Key length:', process.env.OPENAI_API_KEY?.length);
+        
+        let completion;
+        try {
+            completion = await openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages,
+                temperature: 0.3,
+                max_tokens: 1500,
+                response_format: { type: "json_object" }
+            });
+            console.log('[Database Assistant] OpenAI API call successful');
+        } catch (openaiError) {
+            console.error('[Database Assistant] OpenAI API Error:', openaiError.message);
+            console.error('[Database Assistant] OpenAI API Error details:', openaiError);
+            return res.status(500).json({ 
+                error: 'Failed to get response from OpenAI',
+                details: openaiError.message 
+            });
+        }
 
         const responseText = completion.choices[0]?.message?.content || '{}';
         let parsedResponse;
@@ -1670,7 +1741,12 @@ IMPORTANT:
 
     } catch (error) {
         console.error('[Database Assistant] Error:', error);
-        res.status(500).json({ error: 'Failed to process your question. Please try again.' });
+        console.error('[Database Assistant] Error stack:', error.stack);
+        console.error('[Database Assistant] Error name:', error.name);
+        res.status(500).json({ 
+            error: 'Failed to process your question. Please try again.',
+            details: error.message 
+        });
     }
 });
 
@@ -1688,15 +1764,34 @@ app.get('/api/copilot/chats', authenticateToken, async (req, res) => {
         );
 
         // Parse messages JSON for each chat
-        const parsedChats = chats.map(chat => ({
-            ...chat,
-            messages: JSON.parse(chat.messages || '[]')
-        }));
+        const parsedChats = chats.map(chat => {
+            try {
+                return {
+                    ...chat,
+                    messages: chat.messages ? JSON.parse(chat.messages) : [],
+                    instructions: chat.instructions || null,
+                    allowedEntities: chat.allowedEntities ? JSON.parse(chat.allowedEntities) : null,
+                    createdAt: chat.createdAt ? new Date(chat.createdAt) : new Date(),
+                    updatedAt: chat.updatedAt ? new Date(chat.updatedAt) : new Date()
+                };
+            } catch (parseError) {
+                console.error('[Copilot] Error parsing chat:', chat.id, parseError);
+                return {
+                    ...chat,
+                    messages: [],
+                    instructions: chat.instructions || null,
+                    allowedEntities: null,
+                    createdAt: chat.createdAt ? new Date(chat.createdAt) : new Date(),
+                    updatedAt: chat.updatedAt ? new Date(chat.updatedAt) : new Date()
+                };
+            }
+        });
 
         res.json({ chats: parsedChats });
     } catch (error) {
         console.error('[Copilot] Error loading chats:', error);
-        res.status(500).json({ error: 'Failed to load chats' });
+        console.error('[Copilot] Error stack:', error.stack);
+        res.status(500).json({ error: 'Failed to load chats', details: error.message });
     }
 });
 
@@ -1707,10 +1802,22 @@ app.post('/api/copilot/chats', authenticateToken, async (req, res) => {
         const orgId = req.user.orgId;
         const { id, title, messages, createdAt, updatedAt } = req.body;
 
+        const { instructions, allowedEntities } = req.body;
+        
         await db.run(
-            `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, createdAt, updatedAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [id, userId, orgId, title, JSON.stringify(messages), createdAt, updatedAt]
+            `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, instructions, allowedEntities, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id, 
+                userId, 
+                orgId, 
+                title, 
+                JSON.stringify(messages), 
+                instructions || null,
+                allowedEntities ? JSON.stringify(allowedEntities) : null,
+                createdAt, 
+                updatedAt
+            ]
         );
 
         res.json({ success: true, chatId: id });
@@ -1720,28 +1827,54 @@ app.post('/api/copilot/chats', authenticateToken, async (req, res) => {
     }
 });
 
-// Update a chat
+// Update a chat (or create if it doesn't exist - upsert)
 app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.sub;
         const orgId = req.user.orgId;
         const { chatId } = req.params;
-        const { title, messages, updatedAt } = req.body;
+        const { title, messages, updatedAt, createdAt } = req.body;
 
-        // Verify ownership
+        // Check if chat exists
         const chat = await db.get(
             'SELECT * FROM copilot_chats WHERE id = ? AND userId = ? AND organizationId = ?',
             [chatId, userId, orgId]
         );
 
+        const { instructions, allowedEntities } = req.body;
+        
         if (!chat) {
-            return res.status(404).json({ error: 'Chat not found' });
+            // Chat doesn't exist, create it (upsert behavior)
+            console.log('[Copilot] Chat not found, creating new chat:', chatId);
+            await db.run(
+                `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, instructions, allowedEntities, createdAt, updatedAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    chatId,
+                    userId,
+                    orgId,
+                    title,
+                    JSON.stringify(messages),
+                    instructions || null,
+                    allowedEntities ? JSON.stringify(allowedEntities) : null,
+                    createdAt || updatedAt || new Date().toISOString(),
+                    updatedAt || new Date().toISOString()
+                ]
+            );
+        } else {
+            // Chat exists, update it
+            await db.run(
+                `UPDATE copilot_chats SET title = ?, messages = ?, instructions = ?, allowedEntities = ?, updatedAt = ? WHERE id = ?`,
+                [
+                    title, 
+                    JSON.stringify(messages), 
+                    instructions || null,
+                    allowedEntities ? JSON.stringify(allowedEntities) : null,
+                    updatedAt, 
+                    chatId
+                ]
+            );
         }
-
-        await db.run(
-            `UPDATE copilot_chats SET title = ?, messages = ?, updatedAt = ? WHERE id = ?`,
-            [title, JSON.stringify(messages), updatedAt, chatId]
-        );
 
         res.json({ success: true });
     } catch (error) {
@@ -3025,14 +3158,21 @@ app.get('/api/dashboards/:id/widgets', authenticateToken, async (req, res) => {
         }
         
         const widgets = await db.all(
-            'SELECT id, title, description, config, position, createdAt FROM widgets WHERE dashboardId = ? ORDER BY position ASC',
+            `SELECT id, title, description, config, position, gridX, gridY, gridWidth, gridHeight, 
+             dataSource, workflowConnectionId, createdAt 
+             FROM widgets WHERE dashboardId = ? ORDER BY position ASC`,
             [req.params.id]
         );
         
         // Parse config JSON
         const parsedWidgets = widgets.map(w => ({
             ...w,
-            config: JSON.parse(w.config || '{}')
+            config: JSON.parse(w.config || '{}'),
+            gridX: w.gridX || 0,
+            gridY: w.gridY || 0,
+            gridWidth: w.gridWidth || 1,
+            gridHeight: w.gridHeight || 1,
+            dataSource: w.dataSource || 'entity'
         }));
         
         res.json(parsedWidgets);
@@ -3045,7 +3185,7 @@ app.get('/api/dashboards/:id/widgets', authenticateToken, async (req, res) => {
 // Add widget to dashboard
 app.post('/api/dashboards/:id/widgets', authenticateToken, async (req, res) => {
     try {
-        const { id: widgetId, title, description, config } = req.body;
+        const { id: widgetId, title, description, config, gridX, gridY, gridWidth, gridHeight } = req.body;
         const now = new Date().toISOString();
         
         // Get max position
@@ -3053,14 +3193,25 @@ app.post('/api/dashboards/:id/widgets', authenticateToken, async (req, res) => {
         const position = (maxPos?.maxPos || 0) + 1;
         
         await db.run(
-            'INSERT INTO widgets (id, dashboardId, title, description, config, position, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [widgetId, req.params.id, title, description || '', JSON.stringify(config), position, now]
+            'INSERT INTO widgets (id, dashboardId, title, description, config, position, gridX, gridY, gridWidth, gridHeight, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [widgetId, req.params.id, title, description || '', JSON.stringify(config), position, gridX || 0, gridY || 0, gridWidth || 4, gridHeight || 3, now]
         );
         
         // Update dashboard updatedAt
         await db.run('UPDATE dashboards SET updatedAt = ? WHERE id = ?', [now, req.params.id]);
         
-        res.json({ id: widgetId, title, description, config, position, createdAt: now });
+        res.json({ 
+            id: widgetId, 
+            title, 
+            description, 
+            config, 
+            position, 
+            gridX: gridX || 0,
+            gridY: gridY || 0,
+            gridWidth: gridWidth || 4,
+            gridHeight: gridHeight || 3,
+            createdAt: now 
+        });
     } catch (error) {
         console.error('Error adding widget:', error);
         res.status(500).json({ error: 'Failed to add widget' });
@@ -3102,13 +3253,19 @@ app.get('/api/shared/:token', async (req, res) => {
         }
         
         const widgets = await db.all(
-            'SELECT id, title, description, config, position FROM widgets WHERE dashboardId = ? ORDER BY position ASC',
+            `SELECT id, title, description, config, position, gridX, gridY, gridWidth, gridHeight, dataSource 
+             FROM widgets WHERE dashboardId = ? ORDER BY position ASC`,
             [dashboard.id]
         );
         
         const parsedWidgets = widgets.map(w => ({
             ...w,
-            config: JSON.parse(w.config || '{}')
+            config: JSON.parse(w.config || '{}'),
+            gridX: w.gridX || 0,
+            gridY: w.gridY || 0,
+            gridWidth: w.gridWidth || 1,
+            gridHeight: w.gridHeight || 1,
+            dataSource: w.dataSource || 'entity'
         }));
         
         res.json({
@@ -3121,11 +3278,828 @@ app.get('/api/shared/:token', async (req, res) => {
     }
 });
 
+// ==================== KNOWLEDGE BASE ENDPOINTS ====================
+
+// Get all knowledge documents
+app.get('/api/knowledge/documents', authenticateToken, async (req, res) => {
+    try {
+        const documents = await db.all(
+            `SELECT id, name, type, source, filePath, googleDriveId, googleDriveUrl, mimeType, fileSize, 
+             summary, tags, relatedEntityIds, uploadedBy, createdAt, updatedAt 
+             FROM knowledge_documents 
+             WHERE organizationId = ? 
+             ORDER BY updatedAt DESC`,
+            [req.user.orgId]
+        );
+        
+        // Parse JSON fields
+        const parsedDocs = documents.map(doc => ({
+            ...doc,
+            relatedEntityIds: doc.relatedEntityIds ? JSON.parse(doc.relatedEntityIds) : [],
+            tags: doc.tags ? doc.tags.split(',').filter(t => t) : []
+        }));
+        
+        res.json(parsedDocs);
+    } catch (error) {
+        console.error('Error fetching knowledge documents:', error);
+        res.status(500).json({ error: 'Failed to fetch documents' });
+    }
+});
+
+// Get single knowledge document
+app.get('/api/knowledge/documents/:id', authenticateToken, async (req, res) => {
+    try {
+        const doc = await db.get(
+            `SELECT * FROM knowledge_documents 
+             WHERE id = ? AND organizationId = ?`,
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!doc) {
+            return res.status(404).json({ error: 'Document not found' });
+        }
+        
+        // Parse JSON fields
+        doc.relatedEntityIds = doc.relatedEntityIds ? JSON.parse(doc.relatedEntityIds) : [];
+        doc.tags = doc.tags ? doc.tags.split(',').filter(t => t) : [];
+        doc.metadata = doc.metadata ? JSON.parse(doc.metadata) : {};
+        
+        res.json(doc);
+    } catch (error) {
+        console.error('Error fetching document:', error);
+        res.status(500).json({ error: 'Failed to fetch document' });
+    }
+});
+
+// Upload knowledge document
+const knowledgeUpload = multer({ 
+    dest: 'server/uploads/knowledge/',
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+});
+
+app.post('/api/knowledge/documents', authenticateToken, knowledgeUpload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const { name, tags, relatedEntityIds } = req.body;
+        const id = require('crypto').randomBytes(16).toString('hex');
+        const now = new Date().toISOString();
+        
+        // Extract text based on file type
+        let extractedText = '';
+        let summary = '';
+        
+        try {
+            if (req.file.mimetype === 'application/pdf') {
+                const pdfBuffer = require('fs').readFileSync(req.file.path);
+                const pdfData = await pdfParse(pdfBuffer);
+                extractedText = pdfData.text;
+            } else if (req.file.mimetype === 'text/plain' || req.file.mimetype === 'text/csv') {
+                extractedText = require('fs').readFileSync(req.file.path, 'utf-8');
+            } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                       req.file.mimetype === 'application/vnd.ms-excel') {
+                const workbook = XLSX.readFile(req.file.path);
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                extractedText = XLSX.utils.sheet_to_csv(worksheet);
+            }
+            
+            // Generate summary with OpenAI if text extracted
+            if (extractedText && extractedText.length > 100 && process.env.OPENAI_API_KEY) {
+                const OpenAI = require('openai');
+                const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+                
+                const summaryResponse = await openai.chat.completions.create({
+                    model: 'gpt-4o-mini',
+                    messages: [{
+                        role: 'user',
+                        content: `Resume este documento en máximo 3 frases:\n\n${extractedText.substring(0, 2000)}`
+                    }],
+                    max_tokens: 150
+                });
+                
+                summary = summaryResponse.choices[0].message.content.trim();
+            }
+        } catch (extractError) {
+            console.error('Error extracting text:', extractError);
+            // Continue without extracted text
+        }
+        
+        await db.run(
+            `INSERT INTO knowledge_documents 
+             (id, organizationId, name, type, source, filePath, mimeType, fileSize, extractedText, summary, tags, relatedEntityIds, uploadedBy, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id,
+                req.user.orgId,
+                name || req.file.originalname,
+                'file',
+                'upload',
+                req.file.path,
+                req.file.mimetype,
+                req.file.size,
+                extractedText,
+                summary,
+                tags || '',
+                relatedEntityIds ? JSON.stringify(JSON.parse(relatedEntityIds)) : '[]',
+                req.user.id,
+                now,
+                now
+            ]
+        );
+        
+        res.json({
+            id,
+            name: name || req.file.originalname,
+            type: 'file',
+            source: 'upload',
+            fileSize: req.file.size,
+            summary,
+            createdAt: now
+        });
+    } catch (error) {
+        console.error('Error uploading document:', error);
+        res.status(500).json({ error: 'Failed to upload document' });
+    }
+});
+
+// Delete knowledge document
+app.delete('/api/knowledge/documents/:id', authenticateToken, async (req, res) => {
+    try {
+        const doc = await db.get(
+            'SELECT filePath FROM knowledge_documents WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!doc) {
+            return res.status(404).json({ error: 'Document not found' });
+        }
+        
+        // Delete file if exists
+        if (doc.filePath && require('fs').existsSync(doc.filePath)) {
+            require('fs').unlinkSync(doc.filePath);
+        }
+        
+        await db.run('DELETE FROM knowledge_documents WHERE id = ?', [req.params.id]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting document:', error);
+        res.status(500).json({ error: 'Failed to delete document' });
+    }
+});
+
+// Search in knowledge documents
+app.post('/api/knowledge/search', authenticateToken, async (req, res) => {
+    try {
+        const { query } = req.body;
+        
+        if (!query || query.trim().length === 0) {
+            return res.json([]);
+        }
+        
+        // Simple text search in extractedText and name
+        const documents = await db.all(
+            `SELECT id, name, summary, extractedText, type, createdAt 
+             FROM knowledge_documents 
+             WHERE organizationId = ? 
+             AND (extractedText LIKE ? OR name LIKE ? OR summary LIKE ?)
+             ORDER BY updatedAt DESC
+             LIMIT 20`,
+            [req.user.orgId, `%${query}%`, `%${query}%`, `%${query}%`]
+        );
+        
+        res.json(documents);
+    } catch (error) {
+        console.error('Error searching documents:', error);
+        res.status(500).json({ error: 'Failed to search documents' });
+    }
+});
+
+// Relate document to entity
+app.post('/api/knowledge/documents/:id/relate', authenticateToken, async (req, res) => {
+    try {
+        const { entityId } = req.body;
+        
+        const doc = await db.get(
+            'SELECT relatedEntityIds FROM knowledge_documents WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!doc) {
+            return res.status(404).json({ error: 'Document not found' });
+        }
+        
+        const relatedIds = doc.relatedEntityIds ? JSON.parse(doc.relatedEntityIds) : [];
+        if (!relatedIds.includes(entityId)) {
+            relatedIds.push(entityId);
+        }
+        
+        await db.run(
+            'UPDATE knowledge_documents SET relatedEntityIds = ?, updatedAt = ? WHERE id = ?',
+            [JSON.stringify(relatedIds), new Date().toISOString(), req.params.id]
+        );
+        
+        res.json({ success: true, relatedEntityIds: relatedIds });
+    } catch (error) {
+        console.error('Error relating document:', error);
+        res.status(500).json({ error: 'Failed to relate document' });
+    }
+});
+
+// ==================== DASHBOARD-WORKFLOW CONNECTION ENDPOINTS ====================
+
+// Connect widget to workflow output
+app.post('/api/dashboards/:dashboardId/widgets/:widgetId/connect-workflow', authenticateToken, async (req, res) => {
+    try {
+        const { workflowId, nodeId, executionId, outputPath, refreshMode, refreshInterval } = req.body;
+        
+        // Verify dashboard belongs to user's org
+        const dashboard = await db.get(
+            'SELECT id FROM dashboards WHERE id = ? AND organizationId = ?',
+            [req.params.dashboardId, req.user.orgId]
+        );
+        
+        if (!dashboard) {
+            return res.status(404).json({ error: 'Dashboard not found' });
+        }
+        
+        // Verify widget belongs to dashboard
+        const widget = await db.get(
+            'SELECT id FROM widgets WHERE id = ? AND dashboardId = ?',
+            [req.params.widgetId, req.params.dashboardId]
+        );
+        
+        if (!widget) {
+            return res.status(404).json({ error: 'Widget not found' });
+        }
+        
+        const connectionId = require('crypto').randomBytes(16).toString('hex');
+        const now = new Date().toISOString();
+        
+        // Check if connection already exists
+        const existing = await db.get(
+            'SELECT id FROM dashboard_workflow_connections WHERE widgetId = ?',
+            [req.params.widgetId]
+        );
+        
+        if (existing) {
+            // Update existing connection
+            await db.run(
+                `UPDATE dashboard_workflow_connections 
+                 SET workflowId = ?, nodeId = ?, executionId = ?, outputPath = ?, refreshMode = ?, refreshInterval = ?, updatedAt = ?
+                 WHERE widgetId = ?`,
+                [workflowId, nodeId, executionId || null, outputPath || '', refreshMode || 'manual', refreshInterval || null, now, req.params.widgetId]
+            );
+            
+            // Update widget
+            await db.run(
+                'UPDATE widgets SET workflowConnectionId = ?, dataSource = ? WHERE id = ?',
+                [existing.id, 'workflow', req.params.widgetId]
+            );
+            
+            res.json({ success: true, connectionId: existing.id });
+        } else {
+            // Create new connection
+            await db.run(
+                `INSERT INTO dashboard_workflow_connections 
+                 (id, dashboardId, widgetId, workflowId, nodeId, executionId, outputPath, refreshMode, refreshInterval, createdAt, updatedAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [connectionId, req.params.dashboardId, req.params.widgetId, workflowId, nodeId, executionId || null, outputPath || '', refreshMode || 'manual', refreshInterval || null, now, now]
+            );
+            
+            // Update widget
+            await db.run(
+                'UPDATE widgets SET workflowConnectionId = ?, dataSource = ? WHERE id = ?',
+                [connectionId, 'workflow', req.params.widgetId]
+            );
+            
+            res.json({ success: true, connectionId });
+        }
+    } catch (error) {
+        console.error('Error connecting widget to workflow:', error);
+        res.status(500).json({ error: 'Failed to connect widget to workflow' });
+    }
+});
+
+// Get widget data from workflow execution
+app.get('/api/dashboards/:dashboardId/widgets/:widgetId/data', authenticateToken, async (req, res) => {
+    try {
+        // Get connection
+        const connection = await db.get(
+            `SELECT c.*, d.organizationId 
+             FROM dashboard_workflow_connections c
+             JOIN dashboards d ON c.dashboardId = d.id
+             WHERE c.widgetId = ? AND d.organizationId = ?`,
+            [req.params.widgetId, req.user.orgId]
+        );
+        
+        if (!connection) {
+            return res.status(404).json({ error: 'Widget not connected to workflow' });
+        }
+        
+        // Get execution data
+        let execution;
+        if (connection.executionId) {
+            execution = await db.get(
+                'SELECT * FROM workflow_executions WHERE id = ? AND organizationId = ?',
+                [connection.executionId, req.user.orgId]
+            );
+        } else {
+            // Get latest execution
+            execution = await db.get(
+                'SELECT * FROM workflow_executions WHERE workflowId = ? AND organizationId = ? ORDER BY createdAt DESC LIMIT 1',
+                [connection.workflowId, req.user.orgId]
+            );
+        }
+        
+        if (!execution) {
+            return res.status(404).json({ error: 'Workflow execution not found' });
+        }
+        
+        // Extract data based on outputPath
+        let data = null;
+        if (execution.nodeResults) {
+            const nodeResults = JSON.parse(execution.nodeResults);
+            if (connection.outputPath) {
+                // Navigate JSON path (e.g., "results.node1.outputData")
+                const parts = connection.outputPath.split('.');
+                data = nodeResults;
+                for (const part of parts) {
+                    if (data && typeof data === 'object') {
+                        data = data[part];
+                    } else {
+                        data = null;
+                        break;
+                    }
+                }
+            } else if (connection.nodeId && nodeResults[connection.nodeId]) {
+                data = nodeResults[connection.nodeId].outputData || nodeResults[connection.nodeId];
+            } else {
+                data = nodeResults;
+            }
+        } else if (execution.finalOutput) {
+            data = JSON.parse(execution.finalOutput);
+        }
+        
+        res.json({
+            data,
+            executionId: execution.id,
+            status: execution.status,
+            createdAt: execution.createdAt,
+            completedAt: execution.completedAt
+        });
+    } catch (error) {
+        console.error('Error fetching widget data:', error);
+        res.status(500).json({ error: 'Failed to fetch widget data' });
+    }
+});
+
+// Generate widget from workflow output with prompt
+app.post('/api/dashboards/:dashboardId/generate-widget-from-workflow', authenticateToken, async (req, res) => {
+    try {
+        const { workflowId, nodeId, executionId, prompt, mentionedEntityIds } = req.body;
+        
+        // Verify dashboard belongs to user's org
+        const dashboard = await db.get(
+            'SELECT id FROM dashboards WHERE id = ? AND organizationId = ?',
+            [req.params.dashboardId, req.user.orgId]
+        );
+        
+        if (!dashboard) {
+            return res.status(404).json({ error: 'Dashboard not found' });
+        }
+        
+        // Get execution data
+        let execution;
+        if (executionId) {
+            execution = await db.get(
+                'SELECT * FROM workflow_executions WHERE id = ? AND organizationId = ?',
+                [executionId, req.user.orgId]
+            );
+        } else {
+            execution = await db.get(
+                'SELECT * FROM workflow_executions WHERE workflowId = ? AND organizationId = ? ORDER BY createdAt DESC LIMIT 1',
+                [workflowId, req.user.orgId]
+            );
+        }
+        
+        if (!execution) {
+            return res.status(404).json({ error: 'Workflow execution not found' });
+        }
+        
+        // Extract data from execution
+        let workflowData = null;
+        if (execution.nodeResults) {
+            const nodeResults = JSON.parse(execution.nodeResults);
+            if (nodeId && nodeResults[nodeId]) {
+                workflowData = nodeResults[nodeId].outputData || nodeResults[nodeId];
+            } else {
+                workflowData = nodeResults;
+            }
+        } else if (execution.finalOutput) {
+            workflowData = JSON.parse(execution.finalOutput);
+        }
+        
+        if (!workflowData) {
+            return res.status(400).json({ error: 'No data available from workflow execution' });
+        }
+        
+        // Use existing generate-widget endpoint logic but with workflow data
+        // This will be handled by the existing generate-widget endpoint with workflow data context
+        // For now, return the data and let frontend handle widget generation
+        res.json({
+            workflowData,
+            executionId: execution.id,
+            nodeId
+        });
+    } catch (error) {
+        console.error('Error generating widget from workflow:', error);
+        res.status(500).json({ error: 'Failed to generate widget from workflow' });
+    }
+});
+
+// ==================== STANDARDS ENDPOINTS ====================
+
+// Get all standards
+app.get('/api/standards', authenticateToken, async (req, res) => {
+    try {
+        const standards = await db.all(
+            `SELECT id, name, code, category, description, version, status, effectiveDate, expiryDate, 
+             tags, relatedEntityIds, createdBy, createdAt, updatedAt 
+             FROM standards 
+             WHERE organizationId = ? 
+             ORDER BY updatedAt DESC`,
+            [req.user.orgId]
+        );
+        
+        const parsedStandards = standards.map(s => ({
+            ...s,
+            tags: s.tags ? s.tags.split(',').filter(t => t) : [],
+            relatedEntityIds: s.relatedEntityIds ? JSON.parse(s.relatedEntityIds) : []
+        }));
+        
+        res.json(parsedStandards);
+    } catch (error) {
+        console.error('Error fetching standards:', error);
+        res.status(500).json({ error: 'Failed to fetch standards' });
+    }
+});
+
+// Get single standard
+app.get('/api/standards/:id', authenticateToken, async (req, res) => {
+    try {
+        const standard = await db.get(
+            'SELECT * FROM standards WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!standard) {
+            return res.status(404).json({ error: 'Standard not found' });
+        }
+        
+        standard.tags = standard.tags ? standard.tags.split(',').filter(t => t) : [];
+        standard.relatedEntityIds = standard.relatedEntityIds ? JSON.parse(standard.relatedEntityIds) : [];
+        
+        res.json(standard);
+    } catch (error) {
+        console.error('Error fetching standard:', error);
+        res.status(500).json({ error: 'Failed to fetch standard' });
+    }
+});
+
+// Create standard
+app.post('/api/standards', authenticateToken, async (req, res) => {
+    try {
+        const { id, name, code, category, description, version, status, effectiveDate, expiryDate, content, tags, relatedEntityIds } = req.body;
+        const now = new Date().toISOString();
+        
+        await db.run(
+            `INSERT INTO standards 
+             (id, organizationId, name, code, category, description, version, status, effectiveDate, expiryDate, content, tags, relatedEntityIds, createdBy, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id,
+                req.user.orgId,
+                name,
+                code || null,
+                category || null,
+                description || null,
+                version || null,
+                status || 'active',
+                effectiveDate || null,
+                expiryDate || null,
+                content || null,
+                tags ? tags.join(',') : '',
+                relatedEntityIds ? JSON.stringify(relatedEntityIds) : '[]',
+                req.user.id,
+                now,
+                now
+            ]
+        );
+        
+        res.json({ id, name, createdAt: now });
+    } catch (error) {
+        console.error('Error creating standard:', error);
+        res.status(500).json({ error: 'Failed to create standard' });
+    }
+});
+
+// Update standard
+app.put('/api/standards/:id', authenticateToken, async (req, res) => {
+    try {
+        const { name, code, category, description, version, status, effectiveDate, expiryDate, content, tags, relatedEntityIds } = req.body;
+        const now = new Date().toISOString();
+        
+        await db.run(
+            `UPDATE standards 
+             SET name = ?, code = ?, category = ?, description = ?, version = ?, status = ?, 
+                 effectiveDate = ?, expiryDate = ?, content = ?, tags = ?, relatedEntityIds = ?, updatedAt = ?
+             WHERE id = ? AND organizationId = ?`,
+            [
+                name,
+                code || null,
+                category || null,
+                description || null,
+                version || null,
+                status || 'active',
+                effectiveDate || null,
+                expiryDate || null,
+                content || null,
+                tags ? tags.join(',') : '',
+                relatedEntityIds ? JSON.stringify(relatedEntityIds) : '[]',
+                now,
+                req.params.id,
+                req.user.orgId
+            ]
+        );
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating standard:', error);
+        res.status(500).json({ error: 'Failed to update standard' });
+    }
+});
+
+// Delete standard
+app.delete('/api/standards/:id', authenticateToken, async (req, res) => {
+    try {
+        await db.run('DELETE FROM standards WHERE id = ? AND organizationId = ?', [req.params.id, req.user.orgId]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting standard:', error);
+        res.status(500).json({ error: 'Failed to delete standard' });
+    }
+});
+
+// ==================== DATA CONNECTIONS ENDPOINTS ====================
+
+// Get all data connections
+app.get('/api/data-connections', authenticateToken, async (req, res) => {
+    try {
+        const connections = await db.all(
+            `SELECT id, name, type, description, status, lastTestedAt, lastError, createdBy, createdAt, updatedAt 
+             FROM data_connections 
+             WHERE organizationId = ? 
+             ORDER BY updatedAt DESC`,
+            [req.user.orgId]
+        );
+        
+        // Parse config JSON (but don't send sensitive data)
+        const parsedConnections = connections.map(c => {
+            let config = {};
+            try {
+                const fullConfig = JSON.parse(c.config || '{}');
+                // Only return non-sensitive config fields
+                config = {
+                    type: fullConfig.type,
+                    host: fullConfig.host ? '***' : undefined,
+                    port: fullConfig.port,
+                    database: fullConfig.database ? '***' : undefined,
+                    // Don't send passwords, tokens, etc.
+                };
+            } catch (e) {
+                // Invalid JSON, return empty
+            }
+            return {
+                ...c,
+                config
+            };
+        });
+        
+        res.json(parsedConnections);
+    } catch (error) {
+        console.error('Error fetching connections:', error);
+        res.status(500).json({ error: 'Failed to fetch connections' });
+    }
+});
+
+// Get single connection
+app.get('/api/data-connections/:id', authenticateToken, async (req, res) => {
+    try {
+        const connection = await db.get(
+            'SELECT * FROM data_connections WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!connection) {
+            return res.status(404).json({ error: 'Connection not found' });
+        }
+        
+        connection.config = connection.config ? JSON.parse(connection.config) : {};
+        
+        res.json(connection);
+    } catch (error) {
+        console.error('Error fetching connection:', error);
+        res.status(500).json({ error: 'Failed to fetch connection' });
+    }
+});
+
+// Create data connection
+app.post('/api/data-connections', authenticateToken, async (req, res) => {
+    try {
+        const { id, name, type, description, config, status } = req.body;
+        const now = new Date().toISOString();
+        
+        await db.run(
+            `INSERT INTO data_connections 
+             (id, organizationId, name, type, description, config, status, createdBy, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id,
+                req.user.orgId,
+                name,
+                type,
+                description || null,
+                JSON.stringify(config || {}),
+                status || 'inactive',
+                req.user.id,
+                now,
+                now
+            ]
+        );
+        
+        res.json({ id, name, createdAt: now });
+    } catch (error) {
+        console.error('Error creating connection:', error);
+        res.status(500).json({ error: 'Failed to create connection' });
+    }
+});
+
+// Update data connection
+app.put('/api/data-connections/:id', authenticateToken, async (req, res) => {
+    try {
+        const { name, type, description, config, status } = req.body;
+        const now = new Date().toISOString();
+        
+        await db.run(
+            `UPDATE data_connections 
+             SET name = ?, type = ?, description = ?, config = ?, status = ?, updatedAt = ?
+             WHERE id = ? AND organizationId = ?`,
+            [
+                name,
+                type,
+                description || null,
+                JSON.stringify(config || {}),
+                status || 'inactive',
+                now,
+                req.params.id,
+                req.user.orgId
+            ]
+        );
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating connection:', error);
+        res.status(500).json({ error: 'Failed to update connection' });
+    }
+});
+
+// Delete data connection
+app.delete('/api/data-connections/:id', authenticateToken, async (req, res) => {
+    try {
+        await db.run('DELETE FROM data_connections WHERE id = ? AND organizationId = ?', [req.params.id, req.user.orgId]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting connection:', error);
+        res.status(500).json({ error: 'Failed to delete connection' });
+    }
+});
+
+// Test data connection
+app.post('/api/data-connections/:id/test', authenticateToken, async (req, res) => {
+    try {
+        const connection = await db.get(
+            'SELECT * FROM data_connections WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!connection) {
+            return res.status(404).json({ error: 'Connection not found' });
+        }
+        
+        const config = JSON.parse(connection.config || '{}');
+        const now = new Date().toISOString();
+        
+        // Test connection based on type
+        let testResult = { success: false, message: 'Unknown connection type' };
+        
+        if (connection.type === 'mysql' || connection.type === 'postgresql') {
+            // Test database connection
+            try {
+                const mysql = require('mysql2/promise');
+                const conn = await mysql.createConnection({
+                    host: config.host,
+                    port: config.port || 3306,
+                    user: config.username,
+                    password: config.password,
+                    database: config.database,
+                    connectTimeout: 5000
+                });
+                await conn.execute('SELECT 1');
+                await conn.end();
+                testResult = { success: true, message: 'Connection successful' };
+                
+                await db.run(
+                    'UPDATE data_connections SET status = ?, lastTestedAt = ?, lastError = NULL, updatedAt = ? WHERE id = ?',
+                    ['active', now, now, req.params.id]
+                );
+            } catch (error) {
+                testResult = { success: false, message: error.message };
+                await db.run(
+                    'UPDATE data_connections SET status = ?, lastTestedAt = ?, lastError = ?, updatedAt = ? WHERE id = ?',
+                    ['inactive', now, error.message, now, req.params.id]
+                );
+            }
+        } else if (connection.type === 'api' || connection.type === 'rest') {
+            // Test API connection
+            try {
+                const response = await fetch(config.url, {
+                    method: config.method || 'GET',
+                    headers: config.headers || {},
+                    signal: AbortSignal.timeout(5000)
+                });
+                testResult = { success: response.ok, message: response.ok ? 'Connection successful' : `HTTP ${response.status}` };
+                
+                await db.run(
+                    'UPDATE data_connections SET status = ?, lastTestedAt = ?, lastError = NULL, updatedAt = ? WHERE id = ?',
+                    [response.ok ? 'active' : 'inactive', now, now, req.params.id]
+                );
+            } catch (error) {
+                testResult = { success: false, message: error.message };
+                await db.run(
+                    'UPDATE data_connections SET status = ?, lastTestedAt = ?, lastError = ?, updatedAt = ? WHERE id = ?',
+                    ['inactive', now, error.message, now, req.params.id]
+                );
+            }
+        }
+        
+        res.json(testResult);
+    } catch (error) {
+        console.error('Error testing connection:', error);
+        res.status(500).json({ error: 'Failed to test connection' });
+    }
+});
+
+// Update widget grid position
+app.put('/api/widgets/:id/grid', authenticateToken, async (req, res) => {
+    try {
+        const { gridX, gridY, gridWidth, gridHeight } = req.body;
+        
+        // Verify widget belongs to user's org
+        const widget = await db.get(`
+            SELECT w.id FROM widgets w 
+            JOIN dashboards d ON w.dashboardId = d.id 
+            WHERE w.id = ? AND d.organizationId = ?
+        `, [req.params.id, req.user.orgId]);
+        
+        if (!widget) {
+            return res.status(404).json({ error: 'Widget not found' });
+        }
+        
+        await db.run(
+            'UPDATE widgets SET gridX = ?, gridY = ?, gridWidth = ?, gridHeight = ? WHERE id = ?',
+            [gridX || 0, gridY || 0, gridWidth || 1, gridHeight || 1, req.params.id]
+        );
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating widget grid:', error);
+        res.status(500).json({ error: 'Failed to update widget grid' });
+    }
+});
+
 // Workflow Management Endpoints
 app.get('/api/workflows', authenticateToken, async (req, res) => {
     try {
-        const workflows = await db.all('SELECT id, name, createdAt, updatedAt, createdBy, createdByName, lastEditedBy, lastEditedByName FROM workflows WHERE organizationId = ? ORDER BY updatedAt DESC', [req.user.orgId]);
-        res.json(workflows);
+        const workflows = await db.all('SELECT id, name, createdAt, updatedAt, createdBy, createdByName, lastEditedBy, lastEditedByName, tags FROM workflows WHERE organizationId = ? ORDER BY updatedAt DESC', [req.user.orgId]);
+        // Parse tags JSON for each workflow
+        const parsedWorkflows = workflows.map(workflow => ({
+            ...workflow,
+            tags: workflow.tags ? JSON.parse(workflow.tags) : []
+        }));
+        res.json(parsedWorkflows);
     } catch (error) {
         console.error('Error fetching workflows:', error);
         res.status(500).json({ error: 'Failed to fetch workflows' });
@@ -3139,8 +4113,9 @@ app.get('/api/workflows/:id', authenticateToken, async (req, res) => {
         if (!workflow) {
             return res.status(404).json({ error: 'Workflow not found' });
         }
-        // Parse JSON data before sending
+        // Parse JSON data and tags before sending
         workflow.data = JSON.parse(workflow.data);
+        workflow.tags = workflow.tags ? JSON.parse(workflow.tags) : [];
         res.json(workflow);
     } catch (error) {
         console.error('Error fetching workflow:', error);
@@ -3150,17 +4125,17 @@ app.get('/api/workflows/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/workflows', authenticateToken, async (req, res) => {
     try {
-        const { name, data, createdByName } = req.body;
+        const { name, data, tags, createdByName } = req.body;
         const id = Math.random().toString(36).substr(2, 9);
         const now = new Date().toISOString();
 
-        // Store data as JSON string
+        // Store data and tags as JSON strings
         await db.run(
-            'INSERT INTO workflows (id, organizationId, name, data, createdAt, updatedAt, createdBy, createdByName) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, req.user.orgId, name, JSON.stringify(data), now, now, req.user.sub, createdByName || 'Unknown']
+            'INSERT INTO workflows (id, organizationId, name, data, tags, createdAt, updatedAt, createdBy, createdByName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, req.user.orgId, name, JSON.stringify(data), tags ? JSON.stringify(tags) : null, now, now, req.user.sub, createdByName || 'Unknown']
         );
 
-        res.json({ id, name, createdAt: now, updatedAt: now, createdBy: req.user.sub, createdByName: createdByName || 'Unknown' });
+        res.json({ id, name, tags: tags || [], createdAt: now, updatedAt: now, createdBy: req.user.sub, createdByName: createdByName || 'Unknown' });
     } catch (error) {
         console.error('Error saving workflow:', error);
         res.status(500).json({ error: 'Failed to save workflow' });
@@ -3170,12 +4145,12 @@ app.post('/api/workflows', authenticateToken, async (req, res) => {
 app.put('/api/workflows/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, data, lastEditedByName } = req.body;
+        const { name, data, tags, lastEditedByName } = req.body;
         const now = new Date().toISOString();
 
         await db.run(
-            'UPDATE workflows SET name = ?, data = ?, updatedAt = ?, lastEditedBy = ?, lastEditedByName = ? WHERE id = ? AND organizationId = ?',
-            [name, JSON.stringify(data), now, req.user.sub, lastEditedByName || 'Unknown', id, req.user.orgId]
+            'UPDATE workflows SET name = ?, data = ?, tags = ?, updatedAt = ?, lastEditedBy = ?, lastEditedByName = ? WHERE id = ? AND organizationId = ?',
+            [name, JSON.stringify(data), tags ? JSON.stringify(tags) : null, now, req.user.sub, lastEditedByName || 'Unknown', id, req.user.orgId]
         );
 
         res.json({ message: 'Workflow updated' });
@@ -3599,6 +4574,138 @@ app.get('/api/workflow/:id/executions', async (req, res) => {
     } catch (error) {
         console.error('Error fetching executions:', error);
         res.status(500).json({ error: 'Failed to fetch executions' });
+    }
+});
+
+// Overview statistics endpoint
+app.get('/api/overview/stats', authenticateToken, async (req, res) => {
+    try {
+        const orgId = req.user.orgId;
+        
+        // Get workflow count
+        const workflowCount = await db.get(
+            'SELECT COUNT(*) as count FROM workflows WHERE organizationId = ?',
+            [orgId]
+        );
+        
+        // Get total executions count (events triggered)
+        const executionsCount = await db.get(
+            'SELECT COUNT(*) as count FROM workflow_executions WHERE workflowId IN (SELECT id FROM workflows WHERE organizationId = ?)',
+            [orgId]
+        );
+        
+        // Get executions from last 7 days for chart
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        const dailyExecutions = await db.all(`
+            SELECT 
+                DATE(createdAt) as date,
+                COUNT(*) as count
+            FROM workflow_executions 
+            WHERE workflowId IN (SELECT id FROM workflows WHERE organizationId = ?)
+                AND createdAt >= ?
+            GROUP BY DATE(createdAt)
+            ORDER BY date ASC
+        `, [orgId, sevenDaysAgo.toISOString()]);
+        
+        // Get recent workflows with execution counts
+        let recentWorkflowsRaw = [];
+        try {
+            recentWorkflowsRaw = await db.all(`
+                SELECT 
+                    w.id,
+                    w.name,
+                    w.updatedAt,
+                    COALESCE(COUNT(e.id), 0) as executionCount,
+                    MAX(e.createdAt) as lastExecutionAt,
+                    COALESCE(SUM(CASE WHEN e.status = 'running' THEN 1 ELSE 0 END), 0) as runningCount,
+                    COALESCE(SUM(CASE WHEN e.status = 'completed' THEN 1 ELSE 0 END), 0) as completedCount,
+                    COALESCE(SUM(CASE WHEN e.status = 'failed' THEN 1 ELSE 0 END), 0) as failedCount
+                FROM workflows w
+                LEFT JOIN workflow_executions e ON w.id = e.workflowId
+                WHERE w.organizationId = ?
+                GROUP BY w.id, w.name, w.updatedAt
+                ORDER BY COALESCE(MAX(e.createdAt), w.updatedAt) DESC
+                LIMIT 10
+            `, [orgId]);
+        } catch (error) {
+            console.error('[Overview Stats] Error fetching workflows:', error);
+            // If query fails, try simpler query without joins
+            try {
+                recentWorkflowsRaw = await db.all(`
+                    SELECT 
+                        id,
+                        name,
+                        updatedAt
+                    FROM workflows 
+                    WHERE organizationId = ?
+                    ORDER BY updatedAt DESC
+                    LIMIT 10
+                `, [orgId]);
+                // Add default values
+                recentWorkflowsRaw = recentWorkflowsRaw.map(w => ({
+                    ...w,
+                    executionCount: 0,
+                    lastExecutionAt: null,
+                    runningCount: 0,
+                    completedCount: 0,
+                    failedCount: 0
+                }));
+            } catch (e) {
+                console.error('[Overview Stats] Error with fallback query:', e);
+                recentWorkflowsRaw = [];
+            }
+        }
+        
+        console.log('[Overview Stats] Found workflows:', recentWorkflowsRaw.length);
+        
+        // Calculate percentage changes (comparing last 7 days vs previous 7 days)
+        const fourteenDaysAgo = new Date();
+        fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+        
+        const recentExecutions = await db.get(`
+            SELECT COUNT(*) as count FROM workflow_executions 
+            WHERE workflowId IN (SELECT id FROM workflows WHERE organizationId = ?)
+                AND createdAt >= ? AND createdAt < ?
+        `, [orgId, sevenDaysAgo.toISOString(), new Date().toISOString()]);
+        
+        const previousExecutions = await db.get(`
+            SELECT COUNT(*) as count FROM workflow_executions 
+            WHERE workflowId IN (SELECT id FROM workflows WHERE organizationId = ?)
+                AND createdAt >= ? AND createdAt < ?
+        `, [orgId, fourteenDaysAgo.toISOString(), sevenDaysAgo.toISOString()]);
+        
+        const eventsChange = previousExecutions.count > 0 
+            ? ((recentExecutions.count - previousExecutions.count) / previousExecutions.count * 100).toFixed(1)
+            : recentExecutions.count > 0 ? '100.0' : '0.0';
+        
+        res.json({
+            activeWorkflows: workflowCount?.count || 0,
+            eventsTriggered: executionsCount?.count || 0,
+            eventsChange: parseFloat(eventsChange) || 0,
+            dailyExecutions: (dailyExecutions || []).map(row => ({
+                date: row.date,
+                count: row.count
+            })),
+            recentWorkflows: (recentWorkflowsRaw || []).map(w => ({
+                id: w.id,
+                name: w.name,
+                executionCount: w.executionCount || 0,
+                lastExecutionAt: w.lastExecutionAt || null,
+                status: w.runningCount > 0 ? 'running' : (w.failedCount > 0 ? 'error' : (w.completedCount > 0 ? 'paused' : 'paused'))
+            }))
+        });
+    } catch (error) {
+        console.error('Error fetching overview stats:', error);
+        // Return empty stats instead of error to prevent UI issues
+        res.json({
+            activeWorkflows: 0,
+            eventsTriggered: 0,
+            eventsChange: 0,
+            dailyExecutions: [],
+            recentWorkflows: []
+        });
     }
 });
 

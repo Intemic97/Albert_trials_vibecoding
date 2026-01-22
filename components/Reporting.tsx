@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Entity } from '../types';
 import { 
     Sparkles, FileText, FlaskConical, Clipboard, Wrench, AlertTriangle, Download,
@@ -10,13 +10,13 @@ import {
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { PromptInput } from './PromptInput';
-import { ProfileMenu } from './ProfileMenu';
 import { API_BASE } from '../config';
 
 interface ReportingProps {
     entities: Entity[];
     companyInfo?: any;
     onViewChange?: (view: string) => void;
+    view?: 'templates' | 'documents' | 'reports';
 }
 
 // Template section item (subsection)
@@ -90,8 +90,14 @@ const statusConfig = {
     ready_to_send: { label: 'Ready', color: 'text-teal-600', bg: 'bg-teal-50', borderColor: 'border-teal-200' }
 };
 
-export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onViewChange }) => {
+export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onViewChange, view = 'documents' }) => {
     const navigate = useNavigate();
+    const location = useLocation();
+    
+    // Determine view from URL if not provided
+    const currentView = view || (location.pathname.startsWith('/templates') ? 'templates' : 
+                                 location.pathname.startsWith('/documents') ? 'documents' : 
+                                 location.pathname.startsWith('/reports') ? 'reports' : 'documents');
     
     // Templates state
     const [templates, setTemplates] = useState<ReportTemplate[]>([]);
@@ -288,7 +294,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
             });
             if (res.ok) {
                 const { id } = await res.json();
-                navigate(`/reports/${id}`);
+                navigate(`/documents/${id}`);
             }
         } catch (error) {
             console.error('Error creating report:', error);
@@ -316,51 +322,62 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
         return iconMap[iconName] || FileText;
     };
 
+    // Get header info based on view
+    const getHeaderInfo = () => {
+        switch (currentView) {
+            case 'templates':
+                return { title: 'Templates', subtitle: 'Create and manage report templates' };
+            case 'documents':
+                return { title: 'Documents', subtitle: 'Create and manage your documents' };
+            case 'reports':
+                return { title: 'Reports', subtitle: 'View and manage generated reports' };
+            default:
+                return { title: 'Documents', subtitle: 'Create and manage your documents' };
+        }
+    };
+
+    const headerInfo = getHeaderInfo();
+
     return (
         <div className="flex flex-col h-full bg-slate-50 relative" data-tutorial="reports-content">
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
-                <div className="flex items-center gap-3">
-                    <Sparkles className="text-teal-600" size={24} />
-                    <div>
-                        <h1 className="text-xl font-bold text-slate-800">Reports</h1>
-                        <p className="text-xs text-slate-500">Create and manage your documents</p>
-                    </div>
+                <div>
+                    <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{headerInfo.title}</h1>
+                    <p className="text-[11px] text-slate-500">{headerInfo.subtitle}</p>
                 </div>
-                <div className="flex items-center space-x-4">
-                    <ProfileMenu onNavigate={onViewChange} />
-                </div>
+                <div />
             </header>
 
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                <div className="max-w-6xl mx-auto space-y-8">
+                <div className="max-w-6xl mx-auto space-y-6">
 
-                    {/* My Documents Section */}
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                        <div className="flex items-center gap-2 mb-4">
-                            <FileCheck className="text-teal-600" size={20} />
-                            <h2 className="text-lg font-semibold text-slate-800">My Documents</h2>
-                            <span className="text-xs text-slate-400 ml-2">{reports.length} document{reports.length !== 1 ? 's' : ''}</span>
+                    {/* Documents View */}
+                    {currentView === 'documents' && (
+                    <div className="bg-white rounded-lg border border-slate-200 p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <h2 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>My Documents</h2>
+                            <span className="text-xs text-slate-400 ml-1">{reports.length} document{reports.length !== 1 ? 's' : ''}</span>
                             <button
                                 onClick={() => setShowNewReportModal(true)}
-                                className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium transition-colors"
+                                className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                             >
-                                <Plus size={16} />
+                                <Plus size={14} />
                                 New Document
                             </button>
                         </div>
 
                         {/* Search Documents */}
                         {reports.length > 0 && (
-                            <div className="relative mb-4">
-                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <div className="relative mb-3">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input
                                     type="text"
                                     placeholder="Search by name, creator or reviewer..."
                                     value={documentsSearch}
                                     onChange={(e) => setDocumentsSearch(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                                    className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-300 focus:border-slate-300 outline-none placeholder:text-slate-400 hover:border-slate-300 transition-colors"
                                 />
                             </div>
                         )}
@@ -370,19 +387,19 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                 <Loader2 className="animate-spin text-teal-600" size={24} />
                             </div>
                         ) : reports.length === 0 ? (
-                            <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-lg">
-                                <FileText className="mx-auto text-slate-300" size={48} />
-                                <p className="text-slate-500 mt-2">No documents yet</p>
-                                <p className="text-slate-400 text-sm mt-1">Create your first document to get started</p>
+                            <div className="text-center py-10 border border-dashed border-slate-200 rounded-lg">
+                                <FileText className="mx-auto text-slate-300" size={40} />
+                                <p className="text-slate-500 mt-2 text-sm">No documents yet</p>
+                                <p className="text-slate-400 text-xs mt-1">Create your first document to get started</p>
                                 <button
                                     onClick={() => setShowNewReportModal(true)}
-                                    className="mt-4 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-colors"
+                                    className="mt-4 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
                                 >
                                     Create Document
                                 </button>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {reports
                                     .filter(report => {
                                         if (!documentsSearch.trim()) return true;
@@ -399,7 +416,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                         <div
                                             key={report.id}
                                             onClick={() => navigate(`/reports/${report.id}`)}
-                                            className={`group relative p-4 rounded-lg border-2 transition-all duration-200 hover:shadow-md cursor-pointer bg-white ${status.borderColor} hover:border-teal-400`}
+                                            className={`group relative p-4 rounded-lg border transition-colors cursor-pointer bg-white ${status.borderColor} hover:border-slate-400`}
                                         >
                                             {/* Status Badge */}
                                             <div className={`absolute top-3 right-3 px-2 py-0.5 text-xs font-medium rounded-full ${status.bg} ${status.color}`}>
@@ -415,7 +432,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                             </button>
 
                                             <div className="pr-16">
-                                                <h3 className="font-semibold text-slate-800 mb-1 truncate">
+                                                <h3 className="font-normal text-slate-800 mb-1 truncate" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                                                     {report.name}
                                                 </h3>
                                                 <p className="text-xs text-slate-500 mb-3">
@@ -451,32 +468,33 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                             </div>
                         )}
                     </div>
+                    )}
 
-                    {/* Templates Section */}
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                        <div className="flex items-center gap-2 mb-4">
-                            <FileText className="text-teal-600" size={20} />
-                            <h2 className="text-lg font-semibold text-slate-800">Report Templates</h2>
-                            <span className="text-xs text-slate-400 ml-2">Templates define the structure of your documents</span>
+                    {/* Templates View */}
+                    {currentView === 'templates' && (
+                    <div className="bg-white rounded-lg border border-slate-200 p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <h2 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Report Templates</h2>
+                            <span className="text-xs text-slate-400 ml-1">Templates define the structure of your documents</span>
                             <button
                                 onClick={handleCreateTemplate}
-                                className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium transition-colors"
+                                className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                             >
-                                <Plus size={16} />
+                                <Plus size={14} />
                                 New Template
                             </button>
                         </div>
 
                         {/* Search Templates */}
                         {templates.length > 0 && (
-                            <div className="relative mb-4">
-                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <div className="relative mb-3">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input
                                     type="text"
                                     placeholder="Search templates by name..."
                                     value={templatesSearch}
                                     onChange={(e) => setTemplatesSearch(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                                    className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-300 focus:border-slate-300 outline-none"
                                 />
                             </div>
                         )}
@@ -492,13 +510,13 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                 <p className="text-slate-400 text-sm mt-1">Create your first template to structure your documents</p>
                                 <button
                                     onClick={handleCreateTemplate}
-                                    className="mt-4 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-colors"
+                                    className="mt-4 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
                                 >
                                     Create Template
                                 </button>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                 {templates
                                     .filter(template => {
                                         if (!templatesSearch.trim()) return true;
@@ -534,7 +552,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                                     <IconComponent size={20} />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="font-semibold text-sm text-slate-800 truncate">
+                                                    <h3 className="font-normal text-sm text-slate-800 truncate" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                                                         {template.name}
                                                     </h3>
                                                     <p className="text-xs text-slate-500 line-clamp-2 mt-1">
@@ -551,6 +569,22 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                             </div>
                         )}
                     </div>
+                    )}
+
+                    {/* Reports View */}
+                    {currentView === 'reports' && (
+                    <div className="bg-white rounded-lg border border-slate-200 p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <h2 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Generated Reports</h2>
+                            <span className="text-xs text-slate-400 ml-1">View and manage completed reports</span>
+                        </div>
+                        <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-lg">
+                            <FileText className="mx-auto text-slate-300" size={48} />
+                            <p className="text-slate-500 mt-2">No reports yet</p>
+                            <p className="text-slate-400 text-sm mt-1">Generated reports will appear here</p>
+                        </div>
+                    </div>
+                    )}
                 </div>
             </div>
 
@@ -620,22 +654,22 @@ const NewReportModal: React.FC<NewReportModalProps> = ({ templates, orgUsers, on
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+            <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-lg">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-slate-800">New Document</h2>
+                <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+                    <h2 className="text-sm font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>New Document</h2>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="p-1.5 hover:bg-slate-100 rounded-md transition-colors"
                     >
                         <X size={20} className="text-slate-500" />
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="p-6 space-y-4">
+                <div className="p-5 space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                        <label className="block text-xs font-medium text-slate-600 mb-1">
                             Document Name *
                         </label>
                         <input
@@ -643,7 +677,7 @@ const NewReportModal: React.FC<NewReportModalProps> = ({ templates, orgUsers, on
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="e.g., Q4 Production Audit"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-300 focus:border-slate-300 outline-none"
                         />
                     </div>
 
@@ -721,7 +755,7 @@ const NewReportModal: React.FC<NewReportModalProps> = ({ templates, orgUsers, on
                     <button
                         onClick={handleSubmit}
                         disabled={isCreating || templates.length === 0}
-                        className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white rounded-lg font-medium transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:shadow-none"
                     >
                         {isCreating ? (
                             <>
@@ -830,15 +864,15 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <div className="bg-white rounded-lg border border-slate-200 shadow-lg w-full max-w-3xl max-h-[90vh] flex flex-col">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
-                    <h2 className="text-xl font-bold text-slate-800">
+                <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between shrink-0 bg-slate-50/50">
+                    <h2 className="text-sm font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                         {template ? 'Edit Template' : 'Create Template'}
                     </h2>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="p-1.5 hover:bg-slate-100 rounded-md transition-colors"
                     >
                         <X size={20} className="text-slate-500" />
                     </button>
@@ -1068,7 +1102,7 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                     <button
                         onClick={handleSubmit}
                         disabled={isSaving}
-                        className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white rounded-lg font-medium transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:shadow-none"
                     >
                         {isSaving ? (
                             <>

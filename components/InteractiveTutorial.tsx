@@ -458,7 +458,7 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                     </div>
 
                     {/* Title */}
-                    <h3 className="text-lg font-bold text-slate-800 mb-2">
+                    <h3 className="text-lg font-normal text-slate-800 mb-2">
                         {step.title}
                     </h3>
 

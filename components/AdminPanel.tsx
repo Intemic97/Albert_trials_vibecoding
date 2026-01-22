@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Users, Building2, GitBranch, LayoutDashboard, Database, Shield, ShieldCheck, ArrowLeft, RefreshCw, ChevronDown, ChevronUp, Briefcase, Target, Megaphone, CheckCircle2, Clock, MessageSquare, Trash2, Search, X } from 'lucide-react';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
-import { ProfileMenu } from './ProfileMenu';
 
 interface AdminStats {
     users: number;
@@ -156,93 +155,88 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
     return (
         <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
             {/* Header */}
-            <header className="bg-white border-b border-slate-200 px-6 py-4 flex-shrink-0">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <header className="h-16 bg-white border-b border-slate-200 px-8 shadow-sm flex-shrink-0">
+                <div className="max-w-7xl mx-auto flex items-center justify-between h-full">
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => onNavigate?.('entities')}
-                            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                            className="p-1.5 hover:bg-slate-100 rounded-md transition-colors"
                         >
-                            <ArrowLeft size={20} className="text-slate-600" />
+                            <ArrowLeft size={18} className="text-slate-600" />
                         </button>
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-gradient-to-br from-red-500 to-red-600 rounded-lg">
-                                <Shield size={24} className="text-white" />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold text-slate-800">Admin Panel</h1>
-                                <p className="text-sm text-slate-500">Platform administration</p>
-                            </div>
+                        <div>
+                            <h1 className="text-lg font-normal text-slate-900">Admin Panel</h1>
+                            <p className="text-[11px] text-slate-500">Platform administration</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={fetchData}
                             disabled={isRefreshing}
-                            className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                            className="p-1.5 hover:bg-slate-100 rounded-md transition-colors disabled:opacity-50"
                         >
-                            <RefreshCw size={20} className={`text-slate-600 ${isRefreshing ? 'animate-spin' : ''}`} />
+                            <RefreshCw size={18} className={`text-slate-600 ${isRefreshing ? 'animate-spin' : ''}`} />
                         </button>
-                        <ProfileMenu onNavigate={onNavigate} />
+                        <div />
                     </div>
                 </div>
             </header>
 
             <main className="flex-1 overflow-y-auto">
-                <div className="max-w-7xl mx-auto px-6 py-8">
+                <div className="max-w-7xl mx-auto px-6 py-6">
                 {/* Stats Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+                    <div className="bg-white rounded-lg border border-slate-200 p-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-blue-100 rounded-lg">
                                 <Users size={20} className="text-blue-600" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-slate-800">{stats?.users || 0}</p>
+                                <p className="text-2xl font-normal text-slate-800">{stats?.users || 0}</p>
                                 <p className="text-xs text-slate-500">Users</p>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <div className="bg-white rounded-lg border border-slate-200 p-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-purple-100 rounded-lg">
                                 <Building2 size={20} className="text-purple-600" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-slate-800">{stats?.organizations || 0}</p>
+                                <p className="text-2xl font-normal text-slate-800">{stats?.organizations || 0}</p>
                                 <p className="text-xs text-slate-500">Organizations</p>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <div className="bg-white rounded-lg border border-slate-200 p-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-teal-100 rounded-lg">
                                 <GitBranch size={20} className="text-teal-600" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-slate-800">{stats?.workflows || 0}</p>
+                                <p className="text-2xl font-normal text-slate-800">{stats?.workflows || 0}</p>
                                 <p className="text-xs text-slate-500">Workflows</p>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <div className="bg-white rounded-lg border border-slate-200 p-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-orange-100 rounded-lg">
                                 <LayoutDashboard size={20} className="text-orange-600" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-slate-800">{stats?.dashboards || 0}</p>
+                                <p className="text-2xl font-normal text-slate-800">{stats?.dashboards || 0}</p>
                                 <p className="text-xs text-slate-500">Dashboards</p>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <div className="bg-white rounded-lg border border-slate-200 p-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-green-100 rounded-lg">
                                 <Database size={20} className="text-green-600" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-slate-800">{stats?.entities || 0}</p>
+                                <p className="text-2xl font-normal text-slate-800">{stats?.entities || 0}</p>
                                 <p className="text-xs text-slate-500">Entities</p>
                             </div>
                         </div>
@@ -277,10 +271,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
 
                 {/* Users Table */}
                 {activeTab === 'users' && (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
                     <div className="px-6 py-4 border-b border-slate-200">
                         <div className="flex items-center justify-between gap-4">
-                            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                            <h2 className="text-lg font-normal text-slate-800 flex items-center gap-2">
                                 <Users size={20} className="text-slate-600" />
                                 Registered Users
                             </h2>
@@ -309,12 +303,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                         <table className="w-full">
                             <thead className="bg-slate-50">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">User</th>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Organizations</th>
-                                    <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Workflows</th>
-                                    <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Dashboards</th>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Registered</th>
-                                    <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Admin</th>
+                                    <th className="px-6 py-3 text-left text-xs font-normal text-slate-600 uppercase tracking-wider">User</th>
+                                    <th className="px-6 py-3 text-left text-xs font-normal text-slate-600 uppercase tracking-wider">Organizations</th>
+                                    <th className="px-6 py-3 text-center text-xs font-normal text-slate-600 uppercase tracking-wider">Workflows</th>
+                                    <th className="px-6 py-3 text-center text-xs font-normal text-slate-600 uppercase tracking-wider">Dashboards</th>
+                                    <th className="px-6 py-3 text-left text-xs font-normal text-slate-600 uppercase tracking-wider">Registered</th>
+                                    <th className="px-6 py-3 text-center text-xs font-normal text-slate-600 uppercase tracking-wider">Admin</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200">
@@ -349,7 +343,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                                                             className="w-10 h-10 rounded-full object-cover"
                                                         />
                                                     ) : (
-                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white font-semibold">
+                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white font-normal">
                                                             {u.name?.charAt(0).toUpperCase() || u.email.charAt(0).toUpperCase()}
                                                         </div>
                                                     )}
@@ -419,7 +413,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                                             <tr className="bg-slate-50">
                                                 <td colSpan={6} className="px-6 py-4">
                                                     <div className="ml-10">
-                                                        <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                                        <h4 className="text-sm font-normal text-slate-700 mb-3 flex items-center gap-2">
                                                             <Users size={16} />
                                                             Onboarding Information
                                                         </h4>
@@ -496,9 +490,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
 
                 {/* Node Feedback Table */}
                 {activeTab === 'feedback' && (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
                     <div className="px-6 py-4 border-b border-slate-200">
-                        <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                        <h2 className="text-lg font-normal text-slate-800 flex items-center gap-2">
                             <MessageSquare size={20} className="text-teal-600" />
                             Node Feedback
                         </h2>

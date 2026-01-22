@@ -109,7 +109,7 @@ export function ResetPassword() {
                         <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                             <XCircle className="w-8 h-8 text-red-400" />
                         </div>
-                        <h1 className="text-2xl font-bold text-white mb-2">Invalid or Expired Link</h1>
+                        <h1 className="text-2xl font-normal text-white mb-2">Invalid or Expired Link</h1>
                         <p className="text-slate-400 mb-6">{error}</p>
                         <p className="text-slate-500 text-sm mb-6">
                             Password reset links expire after 1 hour. Please request a new one.
@@ -143,7 +143,7 @@ export function ResetPassword() {
                         <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                             <CheckCircle className="w-8 h-8 text-emerald-400" />
                         </div>
-                        <h1 className="text-2xl font-bold text-white mb-2">Password Reset!</h1>
+                        <h1 className="text-2xl font-normal text-white mb-2">Password Reset!</h1>
                         <p className="text-slate-400 mb-6">
                             Your password has been successfully updated. You can now log in with your new password.
                         </p>
@@ -169,7 +169,7 @@ export function ResetPassword() {
                         <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
                             <KeyRound className="w-8 h-8 text-blue-400" />
                         </div>
-                        <h1 className="text-2xl font-bold text-white mb-2">Set New Password</h1>
+                        <h1 className="text-2xl font-normal text-white mb-2">Set New Password</h1>
                         <p className="text-slate-400">
                             Create a new password for <span className="text-white font-medium">{email}</span>
                         </p>

@@ -933,7 +933,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                 <ArrowLeft size={20} />
                             </button>
                             <div>
-                                <h1 className="text-xl font-bold text-slate-800">{report.name}</h1>
+                                <h1 className="text-xl font-normal text-slate-800">{report.name}</h1>
                                 <p className="text-sm text-slate-500">
                                     {report.templateName} • Created by {report.createdByName}
                                 </p>
@@ -1060,7 +1060,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 <aside className="w-72 bg-white border-r border-slate-200 overflow-y-auto shrink-0">
                     <div className="p-4">
                         <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-sm font-semibold text-slate-700">SECTIONS</h3>
+                            <h3 className="text-sm font-normal text-slate-700">SECTIONS</h3>
                             <button
                                 onClick={handleOpenTemplateModal}
                                 className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
@@ -1223,7 +1223,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                             printWindow.document.close();
                                             printWindow.print();
                                         }}
-                                        className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
+                                        className="flex items-center gap-2 px-3 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-medium"
                                     >
                                         <Download size={16} />
                                         Export as PDF
@@ -1243,7 +1243,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                             >
                                                 <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                                                     <div>
-                                                        <h2 className="text-lg font-semibold text-slate-800">
+                                                        <h2 className="text-lg font-normal text-slate-800">
                                                             {section.title}
                                                         </h2>
                                                         {section.content && (
@@ -1370,7 +1370,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                                 >
                                                                     <div className="flex items-start justify-between mb-2">
                                                                         <div className="flex items-center gap-2">
-                                                                            <div className="w-6 h-6 rounded-full bg-teal-600 flex items-center justify-center text-white text-xs font-semibold">
+                                                                            <div className="w-6 h-6 rounded-full bg-teal-600 flex items-center justify-center text-white text-xs font-normal">
                                                                                 {comment.userName.charAt(0).toUpperCase()}
                                                                             </div>
                                                                             <div>
@@ -1502,7 +1502,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                                         )}
                                                                     </div>
                                                                     {msg.role === 'user' && (
-                                                                        <div className="w-6 h-6 rounded-full bg-teal-600 flex items-center justify-center flex-shrink-0 text-white text-xs font-semibold">
+                                                                        <div className="w-6 h-6 rounded-full bg-teal-600 flex items-center justify-center flex-shrink-0 text-white text-xs font-normal">
                                                                             {user?.name?.charAt(0).toUpperCase()}
                                                                         </div>
                                                                     )}
@@ -1552,7 +1552,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                 <div className="flex items-center justify-between mb-4">
                                     <div>
-                                        <h2 className="text-lg font-semibold text-slate-800">Context Documents</h2>
+                                        <h2 className="text-lg font-normal text-slate-800">Context Documents</h2>
                                         <p className="text-sm text-slate-500">Upload PDFs to provide context for AI generation</p>
                                     </div>
                                 </div>
@@ -1625,7 +1625,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                                     <div className="flex items-start justify-between mb-4">
                                         <div>
-                                            <h2 className="text-lg font-semibold text-slate-800">
+                                            <h2 className="text-lg font-normal text-slate-800">
                                                 {selectedSection?.title || 'Select a section'}
                                             </h2>
                                             {selectedSection?.content && (
@@ -1674,14 +1674,14 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                     <Bot size={20} className="text-white" />
                                                 </div>
                                                 <div>
-                                                    <h3 className="font-semibold text-purple-900">AI Suggestion</h3>
+                                                    <h3 className="font-normal text-purple-900">AI Suggestion</h3>
                                                     <p className="text-xs text-purple-600">Review the suggested changes below</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     onClick={() => handleAcceptSuggestion(pendingSuggestion.messageId)}
-                                                    className="px-4 py-2 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium shadow-sm"
+                                                    className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-all shadow-sm hover:shadow-md flex items-center gap-2 text-sm font-medium"
                                                 >
                                                     <Check size={16} />
                                                     Accept
@@ -1709,7 +1709,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                     <div ref={generatedContentRef} className="bg-white rounded-xl shadow-sm border border-slate-200">
                                         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                                             <div>
-                                                <h3 className="font-semibold text-slate-800">Generated Content</h3>
+                                                <h3 className="font-normal text-slate-800">Generated Content</h3>
                                                 {sectionComments.filter(c => c.status === 'open').length > 0 && (
                                                     <p className="text-xs text-amber-600 mt-0.5">
                                                         {sectionComments.filter(c => c.status === 'open').length} comment{sectionComments.filter(c => c.status === 'open').length !== 1 ? 's' : ''} to address
@@ -2081,7 +2081,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                     {/* Section Header */}
                                     <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                                         <div>
-                                            <h2 className="text-lg font-semibold text-slate-800">
+                                            <h2 className="text-lg font-normal text-slate-800">
                                                 {selectedSection?.title || 'Select a section'}
                                             </h2>
                                             <p className="text-sm text-slate-500">
@@ -2661,7 +2661,7 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
-                    <h2 className="text-xl font-bold text-slate-800">Edit Template</h2>
+                    <h2 className="text-xl font-normal text-slate-800">Edit Template</h2>
                     <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
                         <X size={20} className="text-slate-500" />
                     </button>
@@ -2860,7 +2860,7 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                     <button
                         onClick={handleSubmit}
                         disabled={isSaving}
-                        className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                        className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 flex items-center gap-2"
                     >
                         {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                         Save Changes

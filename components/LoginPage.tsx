@@ -22,6 +22,19 @@ export function LoginPage() {
         orgName: ''
     });
 
+    const parseResponse = async (res: Response) => {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            try {
+                return await res.json();
+            } catch (error) {
+                return { error: 'Respuesta JSON invalida del servidor.' };
+            }
+        }
+        const text = await res.text();
+        return text ? { error: text } : { error: 'Respuesta vacia del servidor.' };
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
@@ -41,7 +54,7 @@ export function LoginPage() {
                 credentials: 'include'
             });
 
-            const data = await res.json();
+            const data = await parseResponse(res);
 
             if (!res.ok) {
                 // Check if this is a verification required error
@@ -83,7 +96,7 @@ export function LoginPage() {
                 credentials: 'include'
             });
 
-            const data = await res.json();
+            const data = await parseResponse(res);
 
             if (!res.ok) {
                 throw new Error(data.error || 'Failed to resend verification email');
@@ -109,7 +122,7 @@ export function LoginPage() {
                             </div>
                         </div>
                         
-                        <h1 className="text-2xl font-semibold text-gray-900 text-center mb-2">Check your email</h1>
+                        <h1 className="text-2xl font-normal text-gray-900 text-center mb-2">Check your email</h1>
                         <p className="text-gray-500 text-center mb-6">
                             We've sent a verification link to<br />
                             <span className="text-gray-900 font-medium">{verificationEmail}</span>
@@ -171,7 +184,7 @@ export function LoginPage() {
                     {/* Logo */}
                     <div className="mb-8">
                         <img
-                            src="/logo.png"
+                            src="/logo.svg"
                             alt="Intemic"
                             className="h-8 w-auto object-contain"
                         />
@@ -179,7 +192,7 @@ export function LoginPage() {
 
                     {/* Title */}
                     <div className="mb-6">
-                        <h1 className="text-xl font-semibold text-gray-900 mb-1">
+                        <h1 className="text-xl font-normal text-gray-900 mb-1">
                             {isLogin ? 'Sign in to your account' : 'Create your account'}
                         </h1>
                         <p className="text-sm text-[#1e3a5f]">

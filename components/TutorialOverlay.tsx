@@ -201,7 +201,7 @@ export function TutorialOverlay({ onComplete, onSkip }: TutorialOverlayProps) {
                     </div>
 
                     {/* Title */}
-                    <h2 className="text-2xl font-bold text-slate-800 text-center mb-3">
+                    <h2 className="text-2xl font-normal text-slate-800 text-center mb-3">
                         {step.title}
                     </h2>
 

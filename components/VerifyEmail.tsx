@@ -61,7 +61,7 @@ export function VerifyEmail() {
                                     <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
                                 </div>
                             </div>
-                            <h1 className="text-2xl font-bold text-white mb-2">Verifying your email...</h1>
+                            <h1 className="text-2xl font-normal text-white mb-2">Verifying your email...</h1>
                             <p className="text-slate-400">Please wait while we verify your email address.</p>
                         </>
                     )}
@@ -73,7 +73,7 @@ export function VerifyEmail() {
                                     <CheckCircle className="w-8 h-8 text-emerald-400" />
                                 </div>
                             </div>
-                            <h1 className="text-2xl font-bold text-white mb-2">Email Verified!</h1>
+                            <h1 className="text-2xl font-normal text-white mb-2">Email Verified!</h1>
                             <p className="text-slate-400 mb-6">
                                 {message}
                                 {email && (
@@ -100,7 +100,7 @@ export function VerifyEmail() {
                                     <XCircle className="w-8 h-8 text-red-400" />
                                 </div>
                             </div>
-                            <h1 className="text-2xl font-bold text-white mb-2">Verification Failed</h1>
+                            <h1 className="text-2xl font-normal text-white mb-2">Verification Failed</h1>
                             <p className="text-slate-400 mb-6">{message}</p>
                             <button
                                 onClick={() => navigate('/login')}
