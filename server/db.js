@@ -363,6 +363,30 @@ async function initDb() {
     );
   `);
 
+  // Create standards table
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS standards (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT NOT NULL,
+      name TEXT NOT NULL,
+      code TEXT,
+      category TEXT,
+      description TEXT,
+      version TEXT,
+      status TEXT DEFAULT 'active',
+      effectiveDate TEXT,
+      expiryDate TEXT,
+      content TEXT,
+      tags TEXT,
+      relatedEntityIds TEXT,
+      createdBy TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(createdBy) REFERENCES users(id)
+    );
+  `);
+
   // Migration: Add profilePhoto and companyRole columns to users table if they don't exist
   try {
     await db.exec(`ALTER TABLE users ADD COLUMN profilePhoto TEXT`);
