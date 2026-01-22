@@ -946,11 +946,6 @@ export const Copilots: React.FC = () => {
                     </button>
                     <div className="h-6 w-px bg-slate-200"></div>
                     <div className="flex items-center gap-2">
-<<<<<<< HEAD
-                        <h1 className="text-lg font-semibold text-slate-900">
-                            {currentChat?.title || 'New Chat'}
-                        </h1>
-=======
                         {isEditingTitle ? (
                             <input
                                 ref={titleInputRef}
@@ -984,7 +979,6 @@ export const Copilots: React.FC = () => {
                                 <span className="text-sm font-normal text-slate-800">Copilots</span>
                             )
                         )}
->>>>>>> Mateo2
                     </div>
                 </div>
                 {/* Edit Configuration Button */}
@@ -1031,13 +1025,8 @@ export const Copilots: React.FC = () => {
                             />
                         </div>
                         <button
-<<<<<<< HEAD
-                            onClick={createNewChat}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg transition-colors font-medium"
-=======
                             onClick={handleCreateCopilot}
                             className="w-full flex items-center justify-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
->>>>>>> Mateo2
                         >
                             <Sparkles size={14} className="mr-2" />
                             New Copilot
