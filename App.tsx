@@ -804,8 +804,18 @@ function AuthenticatedApp() {
     const currentSchema = editingSchema || activeEntity;
 
     if (isLoading) {
-        return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Loading...</div>;
+        console.log('[App] Still loading, showing loading screen');
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                    <p>Loading...</p>
+                </div>
+            </div>
+        );
     }
+    
+    console.log('[App] Loading complete. isAuthenticated:', isAuthenticated, 'user:', user);
 
     // These routes should be accessible regardless of authentication status
     const currentPath = location.pathname;

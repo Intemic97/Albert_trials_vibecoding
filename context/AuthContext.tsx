@@ -44,22 +44,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const checkAuth = async () => {
         try {
+            console.log('[Auth] Checking authentication...', API_BASE);
             const res = await fetch(`${API_BASE}/auth/me`, {
                 credentials: 'include'
             });
+            console.log('[Auth] Response status:', res.status);
             if (res.ok) {
                 const data = await res.json();
                 console.log('[Auth] User data from server:', data.user);
                 setUser(data.user);
                 fetchOrganizations();
             } else {
+                console.log('[Auth] Not authenticated, status:', res.status);
                 setUser(null);
                 setOrganizations([]);
             }
         } catch (error) {
-            console.error('Auth check failed:', error);
+            console.error('[Auth] Auth check failed:', error);
             setUser(null);
+            setOrganizations([]);
         } finally {
+            console.log('[Auth] Setting isLoading to false');
             setIsLoading(false);
         }
     };
