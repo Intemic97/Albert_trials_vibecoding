@@ -27,6 +27,7 @@ import { Copilots } from './components/Copilots';
 import { LogsAndAlerts } from './components/LogsAndAlerts';
 import { Connections } from './components/Connections';
 import { Documentation } from './components/Documentation';
+import { KnowledgeBase } from './components/KnowledgeBase';
 import { Tabs } from './components/Tabs';
 import { API_BASE } from './config';
 
