@@ -8128,23 +8128,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringSaveNodeId(null)}>
                                 <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
                                     <h3 className="text-lg font-bold text-slate-800 mb-4">Save to Database</h3>
-                                    
-                                    {/* Custom Title Input */}
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                                            Node Title (optional)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={nodeCustomTitle}
-                                            onChange={(e) => setNodeCustomTitle(e.target.value)}
-                                            placeholder="e.g., Save Customer Records"
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                                        />
-                                        <p className="text-xs text-slate-500 mt-1">
-                                            Describe what this step does in your workflow
-                                        </p>
-                                    </div>
 
                                     <div className="mb-4">
                                         <label className="block text-sm font-medium text-slate-700 mb-2">
