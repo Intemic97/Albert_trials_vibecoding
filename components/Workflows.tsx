@@ -8334,49 +8334,24 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     {/* Python Config Modal */}
                     {configuringPythonNodeId && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                            <div className="bg-white rounded-xl shadow-xl p-6 w-[600px] max-w-full">
+                            <div className="bg-white rounded-xl shadow-xl p-6 w-[600px] max-w-full max-h-[90vh] overflow-y-auto">
                                 <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                    <Code className="text-indigo-600" />
+                                    <Code className="text-slate-700" />
                                     Configure Python Code
                                 </h3>
 
                                 <div className="space-y-4">
-                                    {/* Custom Title Input */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                                            Node Title (optional)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={nodeCustomTitle}
-                                            onChange={(e) => setNodeCustomTitle(e.target.value)}
-                                            placeholder="e.g., Filter High Value Items"
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                                        />
-                                        <p className="text-xs text-slate-500 mt-1">
-                                            Describe what this Python code does
-                                        </p>
-                                    </div>
-
                                     {/* AI Assistant Section */}
                                     <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                                        <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-                                            <Sparkles size={14} className="text-indigo-500" />
-                                            Ask AI to write code
-                                        </label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                value={pythonAiPrompt}
-                                                onChange={(e) => setPythonAiPrompt(e.target.value)}
-                                                placeholder="e.g., Filter records where price > 100"
-                                                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm"
-                                                onKeyDown={(e) => e.key === 'Enter' && generatePythonCode()}
-                                            />
+                                        <div className="flex items-start justify-between gap-2 mb-2">
+                                            <label className="block text-sm font-medium text-slate-700 flex items-center gap-2">
+                                                <Sparkles size={14} className="text-slate-600" />
+                                                Ask AI to write code
+                                            </label>
                                             <button
                                                 onClick={generatePythonCode}
                                                 disabled={isGeneratingCode || !pythonAiPrompt.trim()}
-                                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium whitespace-nowrap flex items-center gap-2"
+                                                className="px-3 py-1.5 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm font-medium whitespace-nowrap flex items-center gap-1.5"
                                             >
                                                 {isGeneratingCode ? (
                                                     <>
@@ -8391,6 +8366,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 )}
                                             </button>
                                         </div>
+                                        <input
+                                            type="text"
+                                            value={pythonAiPrompt}
+                                            onChange={(e) => setPythonAiPrompt(e.target.value)}
+                                            placeholder="e.g., Filter records where price > 100"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none text-sm"
+                                            onKeyDown={(e) => e.key === 'Enter' && generatePythonCode()}
+                                        />
                                     </div>
 
                                     {/* Code Editor */}
@@ -8402,7 +8385,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             <textarea
                                                 value={pythonCode}
                                                 onChange={(e) => setPythonCode(e.target.value)}
-                                                className="w-full px-4 py-3 bg-slate-900 text-slate-50 font-mono text-sm rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-64 resize-none"
+                                                className="w-full px-4 py-3 bg-slate-900 text-slate-50 font-mono text-sm rounded-lg focus:ring-2 focus:ring-slate-500 outline-none h-64 resize-none"
                                                 spellCheck={false}
                                             />
                                             <div className="absolute top-2 right-2 text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded">
@@ -8435,7 +8418,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </button>
                                     <button
                                         onClick={savePythonConfig}
-                                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                                        className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors"
                                     >
                                         Save
                                     </button>
