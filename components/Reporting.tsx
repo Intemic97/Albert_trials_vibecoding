@@ -320,12 +320,9 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
         <div className="flex flex-col h-full bg-slate-50 relative" data-tutorial="reports-content">
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
-                <div className="flex items-center gap-3">
-                    <Sparkles className="text-teal-600" size={24} />
-                    <div>
-                        <h1 className="text-xl font-bold text-slate-800">Reports</h1>
-                        <p className="text-xs text-slate-500">Create and manage your documents</p>
-                    </div>
+                <div>
+                    <h1 className="text-xl font-bold text-slate-800">Reports</h1>
+                    <p className="text-sm text-slate-500">Create and manage your documents</p>
                 </div>
                 <div className="flex items-center space-x-4">
                     <ProfileMenu onNavigate={onViewChange} />

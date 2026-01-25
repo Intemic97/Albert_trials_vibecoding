@@ -884,8 +884,7 @@ function AuthenticatedApp() {
                                         <ArrowLeft size={20} />
                                     </button>
                                     <div>
-                                        <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                            <Database size={20} className="text-teal-600" />
+                                        <h1 className="text-xl font-bold text-slate-800">
                                             {activeEntity.name}
                                         </h1>
                                         <p className="text-xs text-slate-500">Managing structure properties</p>
@@ -893,7 +892,7 @@ function AuthenticatedApp() {
                                 </div>
                             ) : (
                                 <div>
-                                    <h1 className="text-2xl font-bold text-slate-800">Your database</h1>
+                                    <h1 className="text-xl font-bold text-slate-800">Your database</h1>
                                     <p className="text-sm text-slate-500">View and manage your different entities</p>
                                 </div>
                             )}

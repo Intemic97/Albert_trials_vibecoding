@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut, Bot, Smartphone, BarChart3 } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut, Bot, Smartphone, BarChart3, Cpu, Radio } from 'lucide-react';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
@@ -23,7 +23,7 @@ const generateUUID = (): string => {
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook' | 'sapFetch';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook' | 'sapFetch' | 'opcua' | 'mqtt';
     label: string;
     x: number;
     y: number;
@@ -117,6 +117,31 @@ interface WorkflowNode {
         sapBaseApiUrl?: string;
         sapServicePath?: string;
         sapEntity?: string;
+        // For Schedule nodes:
+        scheduleInterval?: string;  // e.g., '5m', '1h', '1d'
+        scheduleIntervalValue?: string;  // numeric value
+        scheduleIntervalUnit?: 'minutes' | 'hours' | 'days';
+        scheduleEnabled?: boolean;
+        scheduleType?: 'interval' | 'specific';  // interval = every X time, specific = at specific time
+        scheduleTime?: string;  // HH:MM format for specific time
+        scheduleRepeat?: 'daily' | 'weekly' | 'none';  // Repeat pattern for specific time
+        // For OPC UA nodes:
+        opcuaEndpointUrl?: string;
+        opcuaNodeId?: string;
+        opcuaUsername?: string;
+        opcuaPassword?: string;
+        opcuaSecurityMode?: 'None' | 'Sign' | 'SignAndEncrypt';
+        opcuaSecurityPolicy?: string;
+        opcuaPollInterval?: string;
+        // For MQTT nodes:
+        mqttBrokerUrl?: string;
+        mqttPort?: string;
+        mqttTopic?: string;
+        mqttUsername?: string;
+        mqttPassword?: string;
+        mqttClientId?: string;
+        mqttQos?: '0' | '1' | '2';
+        mqttCleanSession?: boolean;
         // Custom node name
         customName?: string;
     };
@@ -138,7 +163,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook' | 'sapFetch';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook' | 'sapFetch' | 'opcua' | 'mqtt';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -156,6 +181,8 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'http', label: 'HTTP Request', icon: Globe, description: 'Fetch data from an external API', category: 'Data' },
     { type: 'mysql', label: 'MySQL', icon: Database, description: 'Query data from MySQL database', category: 'Data' },
     { type: 'sapFetch', label: 'SAP S/4HANA', icon: Database, description: 'Read data from SAP S/4HANA OData API', category: 'Data' },
+    { type: 'opcua', label: 'OPC UA', icon: Cpu, description: 'Connect to OPC UA server and read data', category: 'Data' },
+    { type: 'mqtt', label: 'MQTT', icon: Radio, description: 'Subscribe to MQTT topics and receive messages', category: 'Data' },
     { type: 'esios', label: 'Energy Prices', icon: Zap, description: 'Fetch prices from Red Eléctrica', category: 'Data' },
     { type: 'climatiq', label: 'Emission Factors', icon: Leaf, description: 'Search CO2 emission factors', category: 'Data' },
     { type: 'manualInput', label: 'Manual Data Input', icon: Edit, description: 'Define a variable with a value', category: 'Data' },
@@ -550,6 +577,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [isRunning, setIsRunning] = useState(false);
     const [configuringNodeId, setConfiguringNodeId] = useState<string | null>(null);
     const [selectedEntityId, setSelectedEntityId] = useState<string>('');
+    const [nodeCustomTitle, setNodeCustomTitle] = useState<string>(''); // General state for node custom titles
     const [viewingDataNodeId, setViewingDataNodeId] = useState<string | null>(null);
     const [configuringConditionNodeId, setConfiguringConditionNodeId] = useState<string | null>(null);
     const [conditionField, setConditionField] = useState<string>('');
@@ -666,6 +694,36 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [isGeneratingWidget, setIsGeneratingWidget] = useState<boolean>(false);
     const [showWidgetExplanation, setShowWidgetExplanation] = useState<boolean>(false);
     const [showEmailSmtpSettings, setShowEmailSmtpSettings] = useState<boolean>(false);
+
+    // Schedule Node State
+    const [configuringScheduleNodeId, setConfiguringScheduleNodeId] = useState<string | null>(null);
+    const [scheduleIntervalValue, setScheduleIntervalValue] = useState<string>('5');
+    const [scheduleIntervalUnit, setScheduleIntervalUnit] = useState<'minutes' | 'hours' | 'days'>('minutes');
+    const [scheduleEnabled, setScheduleEnabled] = useState<boolean>(true);
+    const [scheduleType, setScheduleType] = useState<'interval' | 'specific'>('interval');
+    const [scheduleTime, setScheduleTime] = useState<string>('09:00');
+    const [scheduleRepeat, setScheduleRepeat] = useState<'daily' | 'weekly' | 'none'>('daily');
+
+    // OPC UA Node State
+    const [configuringOpcuaNodeId, setConfiguringOpcuaNodeId] = useState<string | null>(null);
+    const [opcuaEndpointUrl, setOpcuaEndpointUrl] = useState<string>('opc.tcp://localhost:4840');
+    const [opcuaNodeId, setOpcuaNodeId] = useState<string>('ns=2;s=Temperature');
+    const [opcuaUsername, setOpcuaUsername] = useState<string>('');
+    const [opcuaPassword, setOpcuaPassword] = useState<string>('');
+    const [opcuaSecurityMode, setOpcuaSecurityMode] = useState<'None' | 'Sign' | 'SignAndEncrypt'>('None');
+    const [opcuaSecurityPolicy, setOpcuaSecurityPolicy] = useState<string>('None');
+    const [opcuaPollInterval, setOpcuaPollInterval] = useState<string>('5000');
+
+    // MQTT Node State
+    const [configuringMqttNodeId, setConfiguringMqttNodeId] = useState<string | null>(null);
+    const [mqttBrokerUrl, setMqttBrokerUrl] = useState<string>('mqtt://localhost');
+    const [mqttPort, setMqttPort] = useState<string>('1883');
+    const [mqttTopic, setMqttTopic] = useState<string>('sensors/#');
+    const [mqttUsername, setMqttUsername] = useState<string>('');
+    const [mqttPassword, setMqttPassword] = useState<string>('');
+    const [mqttClientId, setMqttClientId] = useState<string>('');
+    const [mqttQos, setMqttQos] = useState<'0' | '1' | '2'>('0');
+    const [mqttCleanSession, setMqttCleanSession] = useState<boolean>(true);
 
     // Unsaved Changes Confirmation
     const [showExitConfirmation, setShowExitConfirmation] = useState<boolean>(false);
@@ -1057,6 +1115,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (node && node.type === 'fetchData') {
             setConfiguringNodeId(nodeId);
             setSelectedEntityId(node.config?.entityId || '');
+            setNodeCustomTitle(node.config?.customName || '');
         }
     };
 
@@ -1064,13 +1123,25 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (!configuringNodeId || !selectedEntityId) return;
 
         const entity = entities.find(e => e.id === selectedEntityId);
+        const defaultLabel = entity?.name || 'Fetch Data';
+        const finalLabel = nodeCustomTitle.trim() || defaultLabel;
+        
         setNodes(prev => prev.map(n =>
             n.id === configuringNodeId
-                ? { ...n, config: { entityId: selectedEntityId, entityName: entity?.name || '' } }
+                ? { 
+                    ...n, 
+                    label: finalLabel,
+                    config: { 
+                        entityId: selectedEntityId, 
+                        entityName: entity?.name || '',
+                        customName: nodeCustomTitle.trim() || undefined
+                    } 
+                }
                 : n
         ));
         setConfiguringNodeId(null);
         setSelectedEntityId('');
+        setNodeCustomTitle('');
     };
 
     // Node Feedback Functions
@@ -1128,22 +1199,27 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             setConditionOperator(node.config?.conditionOperator || 'isText');
             setConditionValue(node.config?.conditionValue || '');
             setConditionProcessingMode(node.config?.processingMode || 'batch');
+            setNodeCustomTitle(node.config?.customName || '');
         }
     };
 
     const saveConditionConfig = () => {
         if (!configuringConditionNodeId || !conditionField) return;
 
+        const finalLabel = nodeCustomTitle.trim() || 'If / Else';
+        
         setNodes(prev => prev.map(n =>
             n.id === configuringConditionNodeId
                 ? {
                     ...n,
+                    label: finalLabel,
                     config: {
                         ...n.config,
                         conditionField,
                         conditionOperator,
                         conditionValue,
-                        processingMode: conditionProcessingMode
+                        processingMode: conditionProcessingMode,
+                        customName: nodeCustomTitle.trim() || undefined
                     }
                 }
                 : n
@@ -1153,6 +1229,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setConditionOperator('isText');
         setConditionValue('');
         setConditionProcessingMode('batch');
+        setNodeCustomTitle('');
     };
 
     const openAddFieldConfig = (nodeId: string) => {
@@ -1532,6 +1609,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (node && node.type === 'saveRecords') {
             setConfiguringSaveNodeId(nodeId);
             setSaveEntityId(node.config?.entityId || '');
+            setNodeCustomTitle(node.config?.customName || '');
         }
     };
 
@@ -1539,13 +1617,25 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (!configuringSaveNodeId || !saveEntityId) return;
 
         const entity = entities.find(e => e.id === saveEntityId);
+        const defaultLabel = `Save to ${entity?.name || 'Database'}`;
+        const finalLabel = nodeCustomTitle.trim() || defaultLabel;
+        
         setNodes(prev => prev.map(n =>
             n.id === configuringSaveNodeId
-                ? { ...n, config: { entityId: saveEntityId, entityName: entity?.name || '' } }
+                ? { 
+                    ...n, 
+                    label: finalLabel,
+                    config: { 
+                        entityId: saveEntityId, 
+                        entityName: entity?.name || '',
+                        customName: nodeCustomTitle.trim() || undefined
+                    } 
+                }
                 : n
         ));
         setConfiguringSaveNodeId(null);
         setSaveEntityId('');
+        setNodeCustomTitle('');
     };
 
     const openEquipmentConfig = async (nodeId: string) => {
@@ -1564,22 +1654,27 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             setLlmContextEntities(node.config?.llmContextEntities || []);
             setLlmIncludeInput(node.config?.llmIncludeInput !== undefined ? node.config.llmIncludeInput : true);
             setLlmProcessingMode(node.config?.processingMode || 'batch');
+            setNodeCustomTitle(node.config?.customName || '');
         }
     };
 
     const saveLLMConfig = () => {
         if (!configuringLLMNodeId) return;
 
+        const finalLabel = nodeCustomTitle.trim() || 'AI Generation';
+        
         setNodes(prev => prev.map(n =>
             n.id === configuringLLMNodeId
                 ? {
                     ...n,
+                    label: finalLabel,
                     config: {
                         ...n.config,
                         llmPrompt,
                         llmContextEntities,
                         llmIncludeInput,
-                        processingMode: llmProcessingMode
+                        processingMode: llmProcessingMode,
+                        customName: nodeCustomTitle.trim() || undefined
                     }
                 }
                 : n
@@ -1589,6 +1684,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setLlmContextEntities([]);
         setLlmIncludeInput(true);
         setLlmProcessingMode('batch');
+        setNodeCustomTitle('');
     };
 
     const openPythonConfig = (nodeId: string) => {
@@ -1596,17 +1692,27 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (node) {
             setPythonCode(node.config?.pythonCode || 'def process(data):\n    # Modify data here\n    return data');
             setPythonAiPrompt(node.config?.pythonAiPrompt || '');
+            setNodeCustomTitle(node.config?.customName || '');
             setConfiguringPythonNodeId(nodeId);
         }
     };
 
     const savePythonConfig = () => {
         if (configuringPythonNodeId) {
+            const finalLabel = nodeCustomTitle.trim() || 'Python Code';
+            
             setNodes(nodes.map(n => n.id === configuringPythonNodeId ? {
                 ...n,
-                config: { ...n.config, pythonCode, pythonAiPrompt }
+                label: finalLabel,
+                config: { 
+                    ...n.config, 
+                    pythonCode, 
+                    pythonAiPrompt,
+                    customName: nodeCustomTitle.trim() || undefined
+                }
             } : n));
             setConfiguringPythonNodeId(null);
+            setNodeCustomTitle('');
         }
     };
 
@@ -1771,6 +1877,84 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setConfiguringMySQLNodeId(null);
     };
 
+    const openOpcuaConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'opcua') {
+            setConfiguringOpcuaNodeId(nodeId);
+            setOpcuaEndpointUrl(node.config?.opcuaEndpointUrl || 'opc.tcp://localhost:4840');
+            setOpcuaNodeId(node.config?.opcuaNodeId || 'ns=2;s=Temperature');
+            setOpcuaUsername(node.config?.opcuaUsername || '');
+            setOpcuaPassword(node.config?.opcuaPassword || '');
+            setOpcuaSecurityMode(node.config?.opcuaSecurityMode || 'None');
+            setOpcuaSecurityPolicy(node.config?.opcuaSecurityPolicy || 'None');
+            setOpcuaPollInterval(node.config?.opcuaPollInterval || '5000');
+        }
+    };
+
+    const saveOpcuaConfig = () => {
+        if (!configuringOpcuaNodeId || !opcuaEndpointUrl.trim() || !opcuaNodeId.trim()) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringOpcuaNodeId
+                ? {
+                    ...n,
+                    label: opcuaNodeId ? `OPC UA: ${opcuaNodeId}` : 'OPC UA',
+                    config: {
+                        ...n.config,
+                        opcuaEndpointUrl,
+                        opcuaNodeId,
+                        opcuaUsername: opcuaUsername || undefined,
+                        opcuaPassword: opcuaPassword || undefined,
+                        opcuaSecurityMode,
+                        opcuaSecurityPolicy,
+                        opcuaPollInterval
+                    }
+                }
+                : n
+        ));
+        setConfiguringOpcuaNodeId(null);
+    };
+
+    const openMqttConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'mqtt') {
+            setConfiguringMqttNodeId(nodeId);
+            setMqttBrokerUrl(node.config?.mqttBrokerUrl || 'mqtt://localhost');
+            setMqttPort(node.config?.mqttPort || '1883');
+            setMqttTopic(node.config?.mqttTopic || 'sensors/#');
+            setMqttUsername(node.config?.mqttUsername || '');
+            setMqttPassword(node.config?.mqttPassword || '');
+            setMqttClientId(node.config?.mqttClientId || '');
+            setMqttQos(node.config?.mqttQos || '0');
+            setMqttCleanSession(node.config?.mqttCleanSession !== undefined ? node.config.mqttCleanSession : true);
+        }
+    };
+
+    const saveMqttConfig = () => {
+        if (!configuringMqttNodeId || !mqttBrokerUrl.trim() || !mqttTopic.trim()) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringMqttNodeId
+                ? {
+                    ...n,
+                    label: mqttTopic ? `MQTT: ${mqttTopic}` : 'MQTT',
+                    config: {
+                        ...n.config,
+                        mqttBrokerUrl,
+                        mqttPort,
+                        mqttTopic,
+                        mqttUsername: mqttUsername || undefined,
+                        mqttPassword: mqttPassword || undefined,
+                        mqttClientId: mqttClientId || undefined,
+                        mqttQos,
+                        mqttCleanSession
+                    }
+                }
+                : n
+        ));
+        setConfiguringMqttNodeId(null);
+    };
+
     const openEmailConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
         if (node && node.type === 'sendEmail') {
@@ -1923,6 +2107,80 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setConfiguringVisualizationNodeId(null);
         setGeneratedWidget(null);
         setVisualizationPrompt('');
+    };
+
+    const openScheduleConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        // Check if it's a schedule node (either by label or by having schedule config)
+        if (node && node.type === 'trigger' && (node.label === 'Schedule' || node.label.startsWith('Schedule:') || node.config?.scheduleInterval)) {
+            setConfiguringScheduleNodeId(nodeId);
+            setScheduleIntervalValue(node.config?.scheduleIntervalValue || '5');
+            setScheduleIntervalUnit(node.config?.scheduleIntervalUnit || 'minutes');
+            setScheduleEnabled(node.config?.scheduleEnabled ?? true);
+            setScheduleType(node.config?.scheduleType || 'interval');
+            setScheduleTime(node.config?.scheduleTime || '09:00');
+            setScheduleRepeat(node.config?.scheduleRepeat || 'daily');
+        }
+    };
+
+    const saveScheduleConfig = () => {
+        if (!configuringScheduleNodeId) return;
+
+        let defaultLabel = '';
+        
+        if (scheduleType === 'interval') {
+            const interval = `${scheduleIntervalValue}${scheduleIntervalUnit.charAt(0)}`;
+            defaultLabel = `Schedule: Every ${scheduleIntervalValue} ${scheduleIntervalUnit}`;
+            
+            setNodes(prev => prev.map(n =>
+                n.id === configuringScheduleNodeId
+                    ? {
+                        ...n,
+                        label: defaultLabel,
+                        config: {
+                            ...n.config,
+                            scheduleInterval: interval,
+                            scheduleIntervalValue,
+                            scheduleIntervalUnit,
+                            scheduleEnabled,
+                            scheduleType: 'interval'
+                        }
+                    }
+                    : n
+            ));
+        } else {
+            // Specific time schedule
+            const repeatText = scheduleRepeat === 'daily' ? 'Daily' : scheduleRepeat === 'weekly' ? 'Weekly' : '';
+            defaultLabel = `Schedule: ${repeatText} at ${scheduleTime}`;
+            
+            setNodes(prev => prev.map(n =>
+                n.id === configuringScheduleNodeId
+                    ? {
+                        ...n,
+                        label: defaultLabel,
+                        config: {
+                            ...n.config,
+                            scheduleType: 'specific',
+                            scheduleTime,
+                            scheduleRepeat,
+                            scheduleEnabled
+                        }
+                    }
+                    : n
+            ));
+        }
+        
+        closeScheduleConfig();
+    };
+
+    const closeScheduleConfig = () => {
+        setConfiguringScheduleNodeId(null);
+        setScheduleIntervalValue('5');
+        setScheduleIntervalUnit('minutes');
+        setScheduleEnabled(true);
+        setScheduleType('interval');
+        setScheduleTime('09:00');
+        setScheduleRepeat('daily');
     };
 
     const openEsiosConfig = (nodeId: string) => {
@@ -2732,6 +2990,51 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         }
                     } else {
                         result = 'SAP connection not configured';
+                    }
+                    break;
+                case 'opcua':
+                    if (node.config?.opcuaEndpointUrl && node.config?.opcuaNodeId) {
+                        try {
+                            // TODO: Implement OPC UA connection when backend endpoint is ready
+                            // For now, return a placeholder message
+                            result = `OPC UA configured: ${node.config.opcuaNodeId}`;
+                            nodeData = [{
+                                _note: 'OPC UA integration pending backend implementation',
+                                endpoint: node.config.opcuaEndpointUrl,
+                                nodeId: node.config.opcuaNodeId,
+                                securityMode: node.config.opcuaSecurityMode,
+                                pollInterval: node.config.opcuaPollInterval
+                            }];
+                        } catch (error) {
+                            console.error('OPC UA error:', error);
+                            result = `Error: ${error.message || 'Failed to connect to OPC UA'}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'OPC UA connection not configured';
+                    }
+                    break;
+                case 'mqtt':
+                    if (node.config?.mqttBrokerUrl && node.config?.mqttTopic) {
+                        try {
+                            // TODO: Implement MQTT subscription when backend endpoint is ready
+                            // For now, return a placeholder message
+                            result = `MQTT configured: ${node.config.mqttTopic}`;
+                            nodeData = [{
+                                _note: 'MQTT integration pending backend implementation',
+                                broker: node.config.mqttBrokerUrl,
+                                port: node.config.mqttPort,
+                                topic: node.config.mqttTopic,
+                                qos: node.config.mqttQos,
+                                clientId: node.config.mqttClientId || 'auto-generated'
+                            }];
+                        } catch (error) {
+                            console.error('MQTT error:', error);
+                            result = `Error: ${error.message || 'Failed to subscribe to MQTT'}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'MQTT connection not configured';
                     }
                     break;
                 case 'sendEmail':
@@ -3884,6 +4187,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'http': return 'bg-cyan-100 text-cyan-600';
             case 'mysql': return 'bg-blue-100 text-blue-600';
             case 'sapFetch': return 'bg-indigo-100 text-indigo-600';
+            case 'opcua': return 'bg-slate-100 text-slate-600';
+            case 'mqtt': return 'bg-purple-100 text-purple-600';
             case 'esios': return 'bg-yellow-100 text-yellow-600';
             case 'climatiq': return 'bg-green-100 text-green-600';
             case 'join': return 'bg-cyan-100 text-cyan-600';
@@ -3917,7 +4222,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     {/* Top Header */}
                     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
                         <div>
-                            <h1 className="text-2xl font-bold text-slate-800">Workflows</h1>
+                            <h1 className="text-xl font-bold text-slate-800">Workflows</h1>
                             <p className="text-sm text-slate-500">Manage and execute your automation workflows</p>
                         </div>
                         <div className="flex items-center space-x-4">
@@ -4546,6 +4851,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openMySQLConfig(node.id);
                                             } else if (node.type === 'sapFetch') {
                                                 openSAPConfig(node.id);
+                                            } else if (node.type === 'opcua') {
+                                                openOpcuaConfig(node.id);
+                                            } else if (node.type === 'mqtt') {
+                                                openMqttConfig(node.id);
                                             } else if (node.type === 'sendEmail') {
                                                 openEmailConfig(node.id);
                                             } else if (node.type === 'sendSMS') {
@@ -4566,6 +4875,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openExcelConfig(node.id);
                                             } else if (node.type === 'pdfInput') {
                                                 openPdfConfig(node.id);
+                                            } else if (node.type === 'trigger' && (node.label === 'Schedule' || node.label.startsWith('Schedule:') || node.config?.scheduleInterval)) {
+                                                openScheduleConfig(node.id);
                                             }
                                         }}
                                         onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
@@ -5114,6 +5425,24 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringNodeId(null)}>
                                 <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
                                     <h3 className="text-lg font-bold text-slate-800 mb-4">Configure Fetch Data</h3>
+                                    
+                                    {/* Custom Title Input */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Node Title (optional)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={nodeCustomTitle}
+                                            onChange={(e) => setNodeCustomTitle(e.target.value)}
+                                            placeholder="e.g., Get Customer Orders"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+                                        />
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Describe what this step does in your workflow
+                                        </p>
+                                    </div>
+
                                     <div className="mb-4">
                                         <label className="block text-sm font-medium text-slate-700 mb-2">
                                             Select Entity
@@ -5286,6 +5615,123 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-medium"
                                         >
                                             Close
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Schedule Configuration Modal */}
+                        {configuringScheduleNodeId && (
+                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={closeScheduleConfig}>
+                                <div className="bg-white rounded-lg shadow-xl p-6 w-[500px]" onClick={(e) => e.stopPropagation()}>
+                                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                        <Workflow className="text-teal-600" size={20} />
+                                        Schedule Configuration
+                                    </h3>
+                                    
+                                    <div className="space-y-6">
+                                        {/* Schedule Type Selector */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-3">
+                                                Schedule Type
+                                            </label>
+                                            <div className="flex gap-3">
+                                                <button
+                                                    onClick={() => setScheduleType('interval')}
+                                                    className={`flex-1 px-4 py-3 rounded-lg border-2 text-sm font-medium transition-colors ${
+                                                        scheduleType === 'interval'
+                                                            ? 'border-teal-500 bg-teal-50 text-teal-700'
+                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                    Every X time
+                                                </button>
+                                                <button
+                                                    onClick={() => setScheduleType('specific')}
+                                                    className={`flex-1 px-4 py-3 rounded-lg border-2 text-sm font-medium transition-colors ${
+                                                        scheduleType === 'specific'
+                                                            ? 'border-teal-500 bg-teal-50 text-teal-700'
+                                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                    Specific time
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Interval Configuration */}
+                                        {scheduleType === 'interval' && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                    Run every:
+                                                </label>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        value={scheduleIntervalValue}
+                                                        onChange={(e) => setScheduleIntervalValue(e.target.value)}
+                                                        className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                        placeholder="5"
+                                                    />
+                                                    <select
+                                                        value={scheduleIntervalUnit}
+                                                        onChange={(e) => setScheduleIntervalUnit(e.target.value as 'minutes' | 'hours' | 'days')}
+                                                        className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                    >
+                                                        <option value="minutes">Minutes</option>
+                                                        <option value="hours">Hours</option>
+                                                        <option value="days">Days</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Specific Time Configuration */}
+                                        {scheduleType === 'specific' && (
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                        Time:
+                                                    </label>
+                                                    <input
+                                                        type="time"
+                                                        value={scheduleTime}
+                                                        onChange={(e) => setScheduleTime(e.target.value)}
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                        Repeat:
+                                                    </label>
+                                                    <select
+                                                        value={scheduleRepeat}
+                                                        onChange={(e) => setScheduleRepeat(e.target.value as 'daily' | 'weekly' | 'none')}
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                    >
+                                                        <option value="none">Once (no repeat)</option>
+                                                        <option value="daily">Every day</option>
+                                                        <option value="weekly">Every week</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex gap-2 justify-end mt-6">
+                                        <button
+                                            onClick={closeScheduleConfig}
+                                            className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveScheduleConfig}
+                                            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium"
+                                        >
+                                            Save Schedule
                                         </button>
                                     </div>
                                 </div>
@@ -5555,6 +6001,320 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             onClick={saveSAPConfig}
                                             disabled={!sapBaseApiUrl.trim() || !sapEntity.trim()}
                                             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
+                                        >
+                                            Save
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* OPC UA Configuration Modal */}
+                        {configuringOpcuaNodeId && (
+                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringOpcuaNodeId(null)}>
+                                <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                    <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                                        <Cpu className="text-slate-600" size={20} />
+                                        OPC UA
+                                    </h3>
+                                    <p className="text-sm text-slate-500 mb-4">Connect to OPC UA server and read data</p>
+                                    
+                                    <div className="space-y-4">
+                                        {/* Connection Settings */}
+                                        <div className="border-b border-slate-200 pb-3">
+                                            <h4 className="text-sm font-semibold text-slate-700 mb-3">Connection</h4>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Endpoint URL
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={opcuaEndpointUrl}
+                                                        onChange={(e) => setOpcuaEndpointUrl(e.target.value)}
+                                                        placeholder="opc.tcp://localhost:4840"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Node ID
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={opcuaNodeId}
+                                                        onChange={(e) => setOpcuaNodeId(e.target.value)}
+                                                        placeholder="ns=2;s=Temperature"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 text-sm"
+                                                    />
+                                                    <p className="text-xs text-slate-500 mt-1">Example: ns=2;s=Temperature or ns=3;i=1001</p>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Poll Interval (ms)
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={opcuaPollInterval}
+                                                        onChange={(e) => setOpcuaPollInterval(e.target.value)}
+                                                        placeholder="5000"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Security Settings */}
+                                        <div className="border-b border-slate-200 pb-3">
+                                            <h4 className="text-sm font-semibold text-slate-700 mb-3">Security</h4>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Security Mode
+                                                    </label>
+                                                    <select
+                                                        value={opcuaSecurityMode}
+                                                        onChange={(e) => setOpcuaSecurityMode(e.target.value as 'None' | 'Sign' | 'SignAndEncrypt')}
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 text-sm"
+                                                    >
+                                                        <option value="None">None</option>
+                                                        <option value="Sign">Sign</option>
+                                                        <option value="SignAndEncrypt">Sign and Encrypt</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Security Policy
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={opcuaSecurityPolicy}
+                                                        onChange={(e) => setOpcuaSecurityPolicy(e.target.value)}
+                                                        placeholder="None"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Authentication */}
+                                        <div>
+                                            <h4 className="text-sm font-semibold text-slate-700 mb-3">Authentication (Optional)</h4>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Username
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={opcuaUsername}
+                                                        onChange={(e) => setOpcuaUsername(e.target.value)}
+                                                        placeholder="admin"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Password
+                                                    </label>
+                                                    <input
+                                                        type="password"
+                                                        value={opcuaPassword}
+                                                        onChange={(e) => setOpcuaPassword(e.target.value)}
+                                                        placeholder="********"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Feedback Link */}
+                                    <div className="mt-4 pt-2 border-t border-slate-100">
+                                        <button
+                                            onClick={() => openFeedbackPopup('opcua', 'OPC UA')}
+                                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                        >
+                                            <MessageSquare size={14} />
+                                            What would you like this node to do?
+                                        </button>
+                                    </div>
+
+                                    <div className="flex gap-2 justify-end mt-6">
+                                        <button
+                                            onClick={() => setConfiguringOpcuaNodeId(null)}
+                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveOpcuaConfig}
+                                            disabled={!opcuaEndpointUrl.trim() || !opcuaNodeId.trim()}
+                                            className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50 text-sm font-medium"
+                                        >
+                                            Save
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* MQTT Configuration Modal */}
+                        {configuringMqttNodeId && (
+                            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringMqttNodeId(null)}>
+                                <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                    <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                                        <Radio className="text-purple-600" size={20} />
+                                        MQTT
+                                    </h3>
+                                    <p className="text-sm text-slate-500 mb-4">Subscribe to MQTT topics and receive messages</p>
+                                    
+                                    <div className="space-y-4">
+                                        {/* Broker Settings */}
+                                        <div className="border-b border-slate-200 pb-3">
+                                            <h4 className="text-sm font-semibold text-slate-700 mb-3">Broker</h4>
+                                            <div className="space-y-3">
+                                                <div className="grid grid-cols-3 gap-3">
+                                                    <div className="col-span-2">
+                                                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                            Broker URL
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={mqttBrokerUrl}
+                                                            onChange={(e) => setMqttBrokerUrl(e.target.value)}
+                                                            placeholder="mqtt://localhost"
+                                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                            Port
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={mqttPort}
+                                                            onChange={(e) => setMqttPort(e.target.value)}
+                                                            placeholder="1883"
+                                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Client ID (Optional)
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={mqttClientId}
+                                                        onChange={(e) => setMqttClientId(e.target.value)}
+                                                        placeholder="Auto-generated if empty"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Topic Settings */}
+                                        <div className="border-b border-slate-200 pb-3">
+                                            <h4 className="text-sm font-semibold text-slate-700 mb-3">Topic</h4>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Topic
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={mqttTopic}
+                                                        onChange={(e) => setMqttTopic(e.target.value)}
+                                                        placeholder="sensors/#"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                                    />
+                                                    <p className="text-xs text-slate-500 mt-1">Use # for multi-level wildcard, + for single-level</p>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        QoS Level
+                                                    </label>
+                                                    <select
+                                                        value={mqttQos}
+                                                        onChange={(e) => setMqttQos(e.target.value as '0' | '1' | '2')}
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                                    >
+                                                        <option value="0">0 - At most once</option>
+                                                        <option value="1">1 - At least once</option>
+                                                        <option value="2">2 - Exactly once</option>
+                                                    </select>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="mqttCleanSession"
+                                                        checked={mqttCleanSession}
+                                                        onChange={(e) => setMqttCleanSession(e.target.checked)}
+                                                        className="w-4 h-4 text-purple-600 border-slate-300 rounded focus:ring-purple-500"
+                                                    />
+                                                    <label htmlFor="mqttCleanSession" className="text-sm font-medium text-slate-700">
+                                                        Clean Session
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Authentication */}
+                                        <div>
+                                            <h4 className="text-sm font-semibold text-slate-700 mb-3">Authentication (Optional)</h4>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Username
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={mqttUsername}
+                                                        onChange={(e) => setMqttUsername(e.target.value)}
+                                                        placeholder="username"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                        Password
+                                                    </label>
+                                                    <input
+                                                        type="password"
+                                                        value={mqttPassword}
+                                                        onChange={(e) => setMqttPassword(e.target.value)}
+                                                        placeholder="********"
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Feedback Link */}
+                                    <div className="mt-4 pt-2 border-t border-slate-100">
+                                        <button
+                                            onClick={() => openFeedbackPopup('mqtt', 'MQTT')}
+                                            className="text-sm text-teal-600 hover:text-teal-700 hover:underline flex items-center gap-1"
+                                        >
+                                            <MessageSquare size={14} />
+                                            What would you like this node to do?
+                                        </button>
+                                    </div>
+
+                                    <div className="flex gap-2 justify-end mt-6">
+                                        <button
+                                            onClick={() => setConfiguringMqttNodeId(null)}
+                                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveMqttConfig}
+                                            disabled={!mqttBrokerUrl.trim() || !mqttTopic.trim()}
+                                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm font-medium"
                                         >
                                             Save
                                         </button>
@@ -6526,6 +7286,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
                                         <h3 className="text-lg font-bold text-slate-800 mb-4">Configure Condition</h3>
                                         <div className="space-y-4">
+                                            {/* Custom Title Input */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                    Node Title (optional)
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={nodeCustomTitle}
+                                                    onChange={(e) => setNodeCustomTitle(e.target.value)}
+                                                    placeholder="e.g., Check if Price > 100"
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
+                                                />
+                                                <p className="text-xs text-slate-500 mt-1">
+                                                    Describe what this condition checks
+                                                </p>
+                                            </div>
+
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-700 mb-2">
                                                     Field Name
@@ -7351,6 +8128,24 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setConfiguringSaveNodeId(null)}>
                                 <div className="bg-white rounded-lg shadow-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
                                     <h3 className="text-lg font-bold text-slate-800 mb-4">Save to Database</h3>
+                                    
+                                    {/* Custom Title Input */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Node Title (optional)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={nodeCustomTitle}
+                                            onChange={(e) => setNodeCustomTitle(e.target.value)}
+                                            placeholder="e.g., Save Customer Records"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                                        />
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Describe what this step does in your workflow
+                                        </p>
+                                    </div>
+
                                     <div className="mb-4">
                                         <label className="block text-sm font-medium text-slate-700 mb-2">
                                             Select Entity
@@ -7393,6 +8188,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <h3 className="text-lg font-bold text-slate-800 mb-4">Configure AI Generation</h3>
 
                                 <div className="space-y-4">
+                                    {/* Custom Title Input */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Node Title (optional)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={nodeCustomTitle}
+                                            onChange={(e) => setNodeCustomTitle(e.target.value)}
+                                            placeholder="e.g., Generate Product Description"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+                                        />
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Describe what this AI step does in your workflow
+                                        </p>
+                                    </div>
+
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">
                                             Prompt
@@ -7529,6 +8341,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 </h3>
 
                                 <div className="space-y-4">
+                                    {/* Custom Title Input */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Node Title (optional)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={nodeCustomTitle}
+                                            onChange={(e) => setNodeCustomTitle(e.target.value)}
+                                            placeholder="e.g., Filter High Value Items"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                        />
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Describe what this Python code does
+                                        </p>
+                                    </div>
+
                                     {/* AI Assistant Section */}
                                     <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                                         <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
