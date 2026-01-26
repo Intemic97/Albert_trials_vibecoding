@@ -63,21 +63,27 @@ const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = 
     const [showExplanation, setShowExplanation] = useState(false);
     
     return (
-        <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-full flex flex-col">
-            <div className="drag-handle cursor-move p-2 border-b border-slate-100 flex items-center justify-between group">
-                <div className="flex items-center gap-2">
-                    <GripVertical size={14} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
-                    <h3 className="text-sm font-medium text-slate-900">{widget.title}</h3>
+        <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-full flex flex-col overflow-hidden relative">
+            {/* Drag Handle - Entire header is draggable */}
+            <div className="drag-handle cursor-move p-2 border-b border-slate-100 flex items-center justify-between group hover:bg-slate-50 transition-colors select-none">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <GripVertical size={14} className="text-slate-400 group-hover:text-slate-600 transition-colors flex-shrink-0" />
+                    <h3 className="text-sm font-medium text-slate-900 truncate">{widget.title}</h3>
                 </div>
                 <button
-                    onClick={onRemove}
-                    className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        onRemove();
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0 z-10"
                     title="Delete Widget"
                 >
                     <X size={14} />
                 </button>
             </div>
-            <div className="p-4 flex-1 overflow-auto">
+            <div className="p-4 flex-1 overflow-auto min-h-0">
                 <p className="text-xs text-slate-500 mb-3">{widget.description}</p>
                 <DynamicChart config={widget} />
                 {widget.explanation && (
@@ -97,6 +103,7 @@ const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = 
                     </div>
                 )}
             </div>
+            {/* Resize handle indicator - CSS from react-resizable will handle this */}
         </div>
     );
 };
@@ -234,16 +241,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             if (typeof window !== 'undefined') {
                 const container = document.getElementById('dashboard-container');
                 if (container) {
-                    setGridWidth(container.clientWidth);
+                    // Subtract padding (32px total: 16px on each side)
+                    setGridWidth(container.clientWidth - 32);
                 } else {
+                    // Fallback: sidebar (240px) + padding (32px) + margins
                     setGridWidth(window.innerWidth - 320);
                 }
             }
         };
         
-        updateGridWidth();
-        window.addEventListener('resize', updateGridWidth);
-        return () => window.removeEventListener('resize', updateGridWidth);
+        // Initial calculation
+        const timeoutId = setTimeout(updateGridWidth, 100);
+        
+        // Update on resize with debounce
+        let resizeTimeout: NodeJS.Timeout;
+        const handleResize = () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(updateGridWidth, 150);
+        };
+        
+        window.addEventListener('resize', handleResize);
+        return () => {
+            clearTimeout(timeoutId);
+            clearTimeout(resizeTimeout);
+            window.removeEventListener('resize', handleResize);
+        };
     }, [selectedDashboardId]);
     
     // Share state
@@ -321,14 +343,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 // Update layout for react-grid-layout
                 const newLayout = widgets.map((w: SavedWidget, index: number) => ({
                     i: w.id,
-                    x: w.gridX || (index % 2) * 6,
-                    y: w.gridY || Math.floor(index / 2) * 3,
-                    w: w.gridWidth || 4,
-                    h: w.gridHeight || 3,
+                    x: w.gridX ?? (index % 2) * 6,
+                    y: w.gridY ?? Math.floor(index / 2) * 3,
+                    w: w.gridWidth ?? 4,
+                    h: w.gridHeight ?? 3,
                     minW: 2,
                     minH: 2,
                     maxW: 12,
-                    maxH: 8
+                    maxH: 10,
+                    isResizable: true,
+                    isDraggable: true
                 }));
                 setLayout(newLayout);
             } else {
@@ -614,39 +638,73 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         }
     };
 
-    // Handle layout change (drag & resize)
+    // Handle layout change (drag & resize) with debouncing
     const handleLayoutChange = useCallback(async (newLayout: Layout[]) => {
         setLayout(newLayout);
         
         // Update widget positions in backend
-        if (!selectedDashboardId || isDragging) return;
+        if (!selectedDashboardId) return;
         
-        for (const item of newLayout) {
-            try {
-                await fetch(`${API_BASE}/widgets/${item.i}/grid`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        gridX: item.x,
-                        gridY: item.y,
-                        gridWidth: item.w,
-                        gridHeight: item.h
-                    })
-                });
-            } catch (error) {
-                console.error('Error updating widget position:', error);
-            }
+        // Don't save during active drag/resize - wait for stop
+        if (isDragging) {
+            return;
         }
+        
+        // Debounce API calls to avoid too many requests
+        const timeoutId = setTimeout(async () => {
+            for (const item of newLayout) {
+                try {
+                    await fetch(`${API_BASE}/widgets/${item.i}/grid`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            gridX: item.x,
+                            gridY: item.y,
+                            gridWidth: item.w,
+                            gridHeight: item.h
+                        })
+                    });
+                } catch (error) {
+                    console.error('Error updating widget position:', error);
+                }
+            }
+        }, 300);
+        
+        return () => clearTimeout(timeoutId);
     }, [selectedDashboardId, isDragging]);
     
     const handleDragStart = () => {
         setIsDragging(true);
     };
     
-    const handleDragStop = () => {
+    const handleDragStop = useCallback((layout: Layout[]) => {
         setIsDragging(false);
-    };
+        // Force save layout after drag stops
+        setLayout(layout);
+        if (selectedDashboardId) {
+            // Save immediately after drag stops
+            setTimeout(async () => {
+                for (const item of layout) {
+                    try {
+                        await fetch(`${API_BASE}/widgets/${item.i}/grid`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                gridX: item.x,
+                                gridY: item.y,
+                                gridWidth: item.w,
+                                gridHeight: item.h
+                            })
+                        });
+                    } catch (error) {
+                        console.error('Error updating widget position:', error);
+                    }
+                }
+            }, 100);
+        }
+    }, [selectedDashboardId]);
 
     const openShareModalIfShared = () => {
         if (selectedDashboard?.shareToken) {
@@ -968,23 +1026,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                             </div>
 
                             {/* Grid Layout for Widgets */}
-                            <div className="relative min-h-[400px]">
+                            <div id="dashboard-container" className="relative min-h-[400px] w-full">
                                 {savedWidgets.length > 0 ? (
                                     <GridLayout
                                         className="layout"
                                         layout={layout}
                                         cols={12}
                                         rowHeight={60}
-                                        width={gridWidth}
+                                        width={gridWidth || 1200}
                                         onLayoutChange={handleLayoutChange}
                                         onDragStart={handleDragStart}
                                         onDragStop={handleDragStop}
-                                        onResizeStop={handleLayoutChange}
+                                        onResizeStart={() => setIsDragging(true)}
+                                        onResizeStop={(layout) => {
+                                            setIsDragging(false);
+                                            handleLayoutChange(layout);
+                                        }}
                                         isDraggable={true}
                                         isResizable={true}
                                         draggableHandle=".drag-handle"
                                         margin={[16, 16]}
-                                        containerPadding={[0, 0]}
+                                        containerPadding={[16, 16]}
+                                        compactType={null}
+                                        preventCollision={false}
+                                        useCSSTransforms={true}
                                     >
                                         {savedWidgets.map((widget) => (
                                             <GridWidgetCard

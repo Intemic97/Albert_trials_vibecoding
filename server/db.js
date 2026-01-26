@@ -125,6 +125,41 @@ async function initDb() {
       FOREIGN KEY(dashboardId) REFERENCES dashboards(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS simulations (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT,
+      name TEXT NOT NULL,
+      description TEXT,
+      baseDatasetId TEXT,
+      baseDatasetName TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS scenarios (
+      id TEXT PRIMARY KEY,
+      simulationId TEXT,
+      name TEXT NOT NULL,
+      description TEXT,
+      variables TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(simulationId) REFERENCES simulations(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS list_items (
+      id TEXT PRIMARY KEY,
+      scenarioId TEXT,
+      label TEXT NOT NULL,
+      value TEXT,
+      type TEXT NOT NULL,
+      formula TEXT,
+      metadata TEXT,
+      createdAt TEXT,
+      FOREIGN KEY(scenarioId) REFERENCES scenarios(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS pending_approvals (
       id TEXT PRIMARY KEY,
       organizationId TEXT,
