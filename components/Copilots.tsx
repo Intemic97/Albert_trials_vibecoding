@@ -128,7 +128,7 @@ export const Copilots: React.FC = () => {
             chats.forEach(chat => {
                 if (chat.messages.length > 0) {
                     // Use keepalive to ensure the request completes even after unmount
-                    fetch(`${API_BASE}/api/copilot/chats/${chat.id}`, {
+                    fetch(`${API_BASE}/copilot/chats/${chat.id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
@@ -161,7 +161,7 @@ export const Copilots: React.FC = () => {
 
     const loadChats = async () => {
         try {
-            const response = await fetch(`${API_BASE}/api/copilot/chats`, {
+            const response = await fetch(`${API_BASE}/copilot/chats`, {
                 credentials: 'include'
             });
             if (response.ok) {
@@ -201,7 +201,7 @@ export const Copilots: React.FC = () => {
 
     const saveChat = async (chat: Chat) => {
         try {
-            await fetch(`${API_BASE}/api/copilot/chats/${chat.id}`, {
+            await fetch(`${API_BASE}/copilot/chats/${chat.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -243,7 +243,7 @@ export const Copilots: React.FC = () => {
 
         // Save to backend
         try {
-            await fetch(`${API_BASE}/api/copilot/chats`, {
+            await fetch(`${API_BASE}/copilot/chats`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -264,7 +264,7 @@ export const Copilots: React.FC = () => {
 
     const deleteChat = async (chatId: string) => {
         try {
-            await fetch(`${API_BASE}/api/copilot/chats/${chatId}`, {
+            await fetch(`${API_BASE}/copilot/chats/${chatId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
