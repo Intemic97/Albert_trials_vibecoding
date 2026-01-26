@@ -3237,7 +3237,7 @@ app.post('/api/workflows/:id/request-access', authenticateToken, async (req, res
         }
         
         // Get user information
-        const user = await db.get('SELECT email, name FROM users WHERE sub = ?', [req.user.sub]);
+        const user = await db.get('SELECT email, name FROM users WHERE id = ?', [req.user.sub]);
         const userName = user?.name || user?.email?.split('@')[0] || 'Unknown User';
         const userEmail = user?.email || 'Unknown';
         
@@ -4129,6 +4129,65 @@ app.post('/api/billing/create-portal-session', authenticateToken, async (req, re
     } catch (error) {
         console.error('Error creating portal session:', error);
         res.status(500).json({ error: 'Failed to create portal session' });
+    }
+});
+
+// Request quotation endpoint (sends email to sales team)
+app.post('/api/request-quotation', authenticateToken, async (req, res) => {
+    try {
+        const { useCase } = req.body;
+
+        if (!useCase || !useCase.trim()) {
+            return res.status(400).json({ error: 'Use case is required' });
+        }
+
+        const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.sub]);
+        const org = await db.get('SELECT * FROM organizations WHERE id = ?', [req.user.orgId]);
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Import Resend
+        const { Resend } = require('resend');
+        const resend = new Resend(process.env.RESEND_API_KEY);
+
+        // Send email to sales team
+        const emailHtml = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #14b8a6;">Nueva solicitud de cotización</h2>
+                <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <p><strong>Usuario:</strong> ${user.name}</p>
+                    <p><strong>Email:</strong> ${user.email}</p>
+                    <p><strong>Organización:</strong> ${org ? org.name : 'N/A'}</p>
+                    <p><strong>Plan actual:</strong> ${org ? org.subscriptionPlan || 'free' : 'N/A'}</p>
+                </div>
+                <div style="margin: 20px 0;">
+                    <h3 style="color: #334155;">Caso de uso:</h3>
+                    <p style="white-space: pre-wrap; background-color: #f8fafc; padding: 15px; border-radius: 8px;">${useCase}</p>
+                </div>
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 12px;">
+                    <p>Este email fue generado automáticamente desde la plataforma Intemic.</p>
+                </div>
+            </div>
+        `;
+
+        await resend.emails.send({
+            from: 'Intemic Platform <onboarding@resend.dev>',
+            to: ['a.mestre@intemic.com', 'm.alcazar@intemic.com'],
+            subject: `Nueva solicitud de cotización - ${user.email}`,
+            html: emailHtml
+        });
+
+        console.log('Quotation request email sent to sales team for user:', user.email);
+
+        res.json({ 
+            success: true, 
+            message: 'Quotation request sent successfully' 
+        });
+    } catch (error) {
+        console.error('Error sending quotation request:', error);
+        res.status(500).json({ error: 'Failed to send quotation request' });
     }
 });
 
