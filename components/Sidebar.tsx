@@ -20,8 +20,7 @@ import {
   ChevronDown,
   ChevronUp,
   FileCheck,
-  Clipboard,
-  Sliders
+  Clipboard
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -302,7 +301,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
           <div className="space-y-0.5">
             <NavItem icon={Home} label="Overview" view="overview" active={activeView === 'overview'} />
             <NavItem icon={LayoutDashboard} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
-            <NavItem icon={Sliders} label="Simulations" view="simulations" active={activeView === 'simulations'} />
           </div>
 
           <SectionLabel label="Data Modeling" />

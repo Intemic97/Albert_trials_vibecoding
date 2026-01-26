@@ -147,8 +147,8 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         try {
             const formData = new FormData();
             formData.append('file', file);
-            formData.append('createEntity', 'true');
             formData.append('entityName', newEntityName.trim() || file.name.replace(/\.[^/.]+$/, ''));
+            formData.append('entityDescription', newEntityDescription.trim() || '');
 
             const res = await fetch(`${API_BASE}/entities/upload`, {
                 method: 'POST',

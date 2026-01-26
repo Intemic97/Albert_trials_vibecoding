@@ -1251,6 +1251,126 @@ app.delete('/api/entities/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// POST upload CSV/Excel to create entity with data
+app.post('/api/entities/upload', authenticateToken, upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const { entityName, entityDescription } = req.body;
+        
+        if (!entityName || !entityName.trim()) {
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({ error: 'Entity name is required' });
+        }
+
+        const filePath = req.file.path;
+        const ext = path.extname(req.file.originalname).toLowerCase();
+        let headers = [];
+        let data = [];
+
+        // Parse file based on extension
+        if (ext === '.csv') {
+            const Papa = require('papaparse');
+            const fileContent = fs.readFileSync(filePath, 'utf8');
+            const parseResult = Papa.parse(fileContent, {
+                header: true,
+                skipEmptyLines: true,
+                dynamicTyping: true
+            });
+            headers = parseResult.meta.fields || [];
+            data = parseResult.data;
+        } else if (ext === '.xlsx' || ext === '.xls') {
+            const workbook = XLSX.readFile(filePath);
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+            
+            if (jsonData.length > 0) {
+                headers = Object.keys(jsonData[0]);
+                data = jsonData;
+            }
+        } else {
+            fs.unlinkSync(filePath);
+            return res.status(400).json({ error: 'Unsupported file format. Please upload .csv, .xlsx, or .xls files.' });
+        }
+
+        // Clean up uploaded file
+        fs.unlinkSync(filePath);
+
+        if (headers.length === 0 || data.length === 0) {
+            return res.status(400).json({ error: 'File is empty or has no valid data' });
+        }
+
+        // Create entity
+        const entityId = Math.random().toString(36).substr(2, 9);
+        const now = new Date().toISOString();
+
+        await db.run(
+            'INSERT INTO entities (id, organizationId, name, description, author, lastEdited) VALUES (?, ?, ?, ?, ?, ?)',
+            [entityId, req.user.orgId, entityName.trim(), entityDescription || '', req.user.username, now]
+        );
+
+        // Create properties based on headers
+        const properties = [];
+        for (const header of headers) {
+            const propId = Math.random().toString(36).substr(2, 9);
+            
+            // Detect property type from first data row
+            let propType = 'text';
+            const firstValue = data[0]?.[header];
+            if (typeof firstValue === 'number') {
+                propType = 'number';
+            }
+
+            await db.run(
+                'INSERT INTO properties (id, entityId, name, type, defaultValue, relatedEntityId) VALUES (?, ?, ?, ?, ?, ?)',
+                [propId, entityId, header, propType, '', null]
+            );
+
+            properties.push({ id: propId, name: header, type: propType });
+        }
+
+        // Create records and values
+        for (const row of data) {
+            const recordId = Math.random().toString(36).substr(2, 9);
+            await db.run(
+                'INSERT INTO records (id, entityId, createdAt) VALUES (?, ?, ?)',
+                [recordId, entityId, now]
+            );
+
+            // Insert values for each property
+            for (const prop of properties) {
+                const value = row[prop.name];
+                if (value !== undefined && value !== null && value !== '') {
+                    const valueId = Math.random().toString(36).substr(2, 9);
+                    await db.run(
+                        'INSERT INTO record_values (id, recordId, propertyId, value) VALUES (?, ?, ?, ?)',
+                        [valueId, recordId, prop.id, String(value)]
+                    );
+                }
+            }
+        }
+
+        res.json({
+            success: true,
+            entityId,
+            entityName: entityName.trim(),
+            propertiesCount: properties.length,
+            recordsCount: data.length,
+            message: `Entity "${entityName.trim()}" created with ${properties.length} properties and ${data.length} records`
+        });
+
+    } catch (error) {
+        console.error('Error uploading entity file:', error);
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        res.status(500).json({ error: 'Failed to upload and process file' });
+    }
+});
+
 // POST add property
 app.post('/api/properties', authenticateToken, async (req, res) => {
     const { id, entityId, name, type, defaultValue, relatedEntityId } = req.body;

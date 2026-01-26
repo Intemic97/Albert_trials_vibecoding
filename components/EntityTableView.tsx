@@ -262,9 +262,7 @@ export const EntityTableView: React.FC<EntityTableViewProps> = ({ entity, entiti
                         <tr className="bg-slate-50 border-b border-slate-200">
                             {/* Dynamic Property Columns */}
                             {entity.properties.map((property, index) => (
-                                <th key={property.id} className={`text-left px-4 py-3 border-r border-slate-200 min-w-[180px] relative group ${
-                                    index === 0 ? 'sticky left-0 bg-slate-50 z-10 min-w-[200px]' : ''
-                                }`}>
+                                <th key={property.id} className="text-left px-4 py-3 border-r border-slate-200 min-w-[180px] relative group">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             {renderPropertyIcon(property.type)}
@@ -338,9 +336,7 @@ export const EntityTableView: React.FC<EntityTableViewProps> = ({ entity, entiti
                                 <tr key={record.id} className="border-b border-slate-100 hover:bg-slate-50/50 group">
                                     {/* Dynamic Property Cells */}
                                     {entity.properties.map((property, index) => (
-                                        <td key={property.id} className={`px-4 py-3 border-r border-slate-100 ${
-                                            index === 0 ? 'sticky left-0 bg-white group-hover:bg-slate-50/50' : ''
-                                        }`}>
+                                        <td key={property.id} className="px-4 py-3 border-r border-slate-100">
                                             {property.type === 'file' ? (
                                                 <div className="text-sm text-slate-600">
                                                     {getCellValue(record, property.id) ? (

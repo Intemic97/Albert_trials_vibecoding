@@ -6993,8 +6993,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 <span>Showing first {MAX_PREVIEW_ROWS} of {totalRows.toLocaleString()} rows for performance</span>
                                                             </div>
                                                         )}
-                                                        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-                                                            <table className="w-full text-sm">
+                                                        <div className="bg-white rounded-lg border border-slate-200 overflow-x-auto shadow-sm">
+                                                            <table className="w-full text-sm min-w-max">
                                                                 <thead className="bg-slate-100 sticky top-0">
                                                                     <tr>
                                                                         {Object.keys(displayData[0]).map(key => (
