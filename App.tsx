@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams, Navi
 import { Sidebar } from './components/Sidebar';
 import { TopNav } from './components/TopNav';
 import { EntityCard } from './components/EntityCard';
+import { EntityTableView } from './components/EntityTableView';
 import { Reporting } from './components/Reporting';
 import { ReportEditor } from './components/ReportEditor';
 import { Dashboard } from './components/Dashboard';
@@ -170,27 +171,22 @@ function AuthenticatedApp() {
         }
     }, [user?.onboardingCompleted]);
 
-    // New Property State
-    const [isAddingProp, setIsAddingProp] = useState(false);
-    const [newPropName, setNewPropName] = useState('');
-    const [newPropType, setNewPropType] = useState<PropertyType>('text');
-    const [newPropRelationId, setNewPropRelationId] = useState<string>('');
-
     // New Entity State
     const [isCreatingEntity, setIsCreatingEntity] = useState(false);
     const [newEntityName, setNewEntityName] = useState('');
     const [newEntityDescription, setNewEntityDescription] = useState('');
 
-    // Records State
-    const [activeTab, setActiveTab] = useState<'structure' | 'data'>('structure');
+    // Legacy state variables (kept for backward compatibility with old functions)
     const [records, setRecords] = useState<any[]>([]);
+    const [newRecordValues, setNewRecordValues] = useState<Record<string, any>>({});
     const [isAddingRecord, setIsAddingRecord] = useState(false);
     const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
-    const [newRecordValues, setNewRecordValues] = useState<Record<string, any>>({});
-
-    // Relations State
     const [relatedData, setRelatedData] = useState<Record<string, { entity: Entity, records: any[] }>>({});
     const [incomingData, setIncomingData] = useState<Record<string, { sourceEntity: Entity, sourceProperty: Property, records: any[] }>>({});
+    const [newPropName, setNewPropName] = useState('');
+    const [newPropType, setNewPropType] = useState<PropertyType>('text');
+    const [newPropRelationId, setNewPropRelationId] = useState<string>('');
+    const [isAddingProp, setIsAddingProp] = useState(false);
 
     // Side Panel State
     const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
@@ -268,13 +264,8 @@ function AuthenticatedApp() {
     }, [isAuthenticated]);
 
     // Fetch Records when active entity or tab changes
-    useEffect(() => {
-        if (activeEntityId && activeTab === 'data') {
-            fetchRecords();
-            fetchRelatedData();
-            fetchIncomingData();
-        }
-    }, [activeEntityId, activeTab]);
+    // Entity table view now handles all record fetching and management
+    // useEffect removed as it's no longer needed
 
     const fetchEntities = async () => {
         setEntitiesLoading(true);
@@ -919,7 +910,6 @@ function AuthenticatedApp() {
                             onNavigate={(entityId) => {
                                 setActiveEntityId(entityId);
                                 navigate('/database');
-                                setActiveTab('data');
                             }}
                             onViewChange={handleNavigate}
                         />
@@ -1055,7 +1045,6 @@ function AuthenticatedApp() {
                                                         entity={entity}
                                                         onClick={(e) => {
                                                             setActiveEntityId(e.id);
-                                                            setActiveTab('data');
                                                         }}
                                                         onDelete={handleDeleteEntity}
                                                     />
@@ -1076,637 +1065,18 @@ function AuthenticatedApp() {
                                 </div>
                             )}
 
-                            {/* DETAIL VIEW */}
+                            {/* DETAIL VIEW - Notion-style Table */}
                             {activeEntity && (
-                                <div className="max-w-6xl mx-auto space-y-8">
-
-                                    {/* Tab Switcher */}
-                                    <Tabs
-                                        items={[
-                                            { id: 'structure', label: 'Structure & Properties' },
-                                            { id: 'data', label: 'Data Records' }
-                                        ]}
-                                        activeTab={activeTab}
-                                        onChange={(tabId) => setActiveTab(tabId as 'structure' | 'data')}
+                                <div className="max-w-7xl mx-auto">
+                                    <EntityTableView 
+                                        entity={activeEntity}
+                                        entities={entities}
+                                        onUpdate={fetchEntities}
                                     />
-
-                                    {/* STRUCTURE TAB */}
-                                    {activeTab === 'structure' && (
-                                        <>
-                                            {/* Overview Panel */}
-                                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                                <h2 className="text-lg font-normal text-slate-800 mb-4">Structure Overview</h2>
-                                                <div className="grid grid-cols-2 gap-6">
-                                                    <div>
-                                                        <label className="block text-xs font-normal text-slate-500 uppercase tracking-wide mb-1">Description</label>
-                                                        <p className="text-slate-700">{activeEntity.description || 'No description provided.'}</p>
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-normal text-slate-500 uppercase tracking-wide mb-1">Metadata</label>
-                                                        <div className="text-sm text-slate-600 space-y-1">
-                                                            <p>Created by: <span className="font-medium text-slate-800">{activeEntity.author}</span></p>
-                                                            <p>Last modified: <span className="font-medium text-slate-800">{activeEntity.lastEdited}</span></p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Properties Panel */}
-                                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                                                    <div>
-                                                        <h2 className="text-lg font-normal text-slate-800">Properties</h2>
-                                                        <p className="text-sm text-slate-500">Define the data structure for this entity.</p>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => setIsAddingProp(true)}
-                                                        className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-sm transition-colors"
-                                                    >
-                                                        <Plus size={16} className="mr-2" />
-                                                        Add Property
-                                                    </button>
-                                                </div>
-                                                {/* Property List */}
-                                                <div className="divide-y divide-slate-100">
-                                                    {activeEntity.properties.length === 0 ? (
-                                                        <div className="p-12 text-center text-slate-500">
-                                                            No properties defined yet. Click "Add Property" to start modeling.
-                                                        </div>
-                                                    ) : (
-                                                        activeEntity.properties.map(prop => (
-                                                            <div key={prop.id} className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between group">
-                                                                <div className="flex items-center space-x-4">
-                                                                    <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center border border-slate-200">
-                                                                        {renderIconForType(prop.type)}
-                                                                    </div>
-                                                                    <div>
-                                                                        <h3 className="text-sm font-normal text-slate-800">{prop.name}</h3>
-                                                                        <p className="text-xs text-slate-500 flex items-center mt-0.5">
-                                                                            <span className="uppercase tracking-wider font-normal mr-2">{prop.type}</span>
-                                                                            {prop.type === 'relation' && (
-                                                                                <span className="bg-teal-100 text-teal-800 px-1.5 rounded text-[10px]">
-                                                                                    → {getRelatedEntityName(prop.relatedEntityId)}
-                                                                                </span>
-                                                                            )}
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex items-center space-x-4">
-                                                                    <div className="text-xs text-right text-slate-400 mr-4">
-                                                                        Example Value:<br />
-                                                                        <span className="text-slate-600 font-mono">
-                                                                            {prop.type === 'relation' ? 'ID-REF-123' : prop.type === 'file' ? 'document.pdf' : prop.defaultValue}
-                                                                        </span>
-                                                                    </div>
-                                                                    <button
-                                                                        onClick={() => deleteProperty(prop.id)}
-                                                                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                                                    >
-                                                                        <Trash2 size={16} />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        ))
-                                                    )}
-                                                </div>
-
-                                                {/* Add Property Form Area */}
-                                                {isAddingProp && (
-                                                    <div className="p-6 bg-slate-50 border-t border-slate-200 animate-in fade-in slide-in-from-top-4 duration-200">
-                                                        <h3 className="text-sm font-normal text-slate-800 mb-4">New Property</h3>
-                                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                                                            <div className="md:col-span-4">
-                                                                <label className="block text-xs font-normal text-slate-500 mb-1">Name</label>
-                                                                <input
-                                                                    autoFocus
-                                                                    type="text"
-                                                                    value={newPropName}
-                                                                    onChange={(e) => setNewPropName(e.target.value)}
-                                                                    placeholder="e.g. Serial Number"
-                                                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                                                                />
-                                                            </div>
-                                                            <div className="md:col-span-3">
-                                                                <label className="block text-xs font-normal text-slate-500 mb-1">Type</label>
-                                                                <select
-                                                                    value={newPropType}
-                                                                    onChange={(e) => setNewPropType(e.target.value as PropertyType)}
-                                                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                                                                >
-                                                                    <option value="text">Text</option>
-                                                                    <option value="number">Number</option>
-                                                                    <option value="json">JSON</option>
-                                                                    <option value="relation">Relation</option>
-                                                                    <option value="file">File</option>
-                                                                </select>
-                                                            </div>
-
-                                                            {newPropType === 'relation' && (
-                                                                <div className="md:col-span-3">
-                                                                    <label className="block text-xs font-normal text-slate-500 mb-1">Related Structure</label>
-                                                                    <select
-                                                                        value={newPropRelationId}
-                                                                        onChange={(e) => setNewPropRelationId(e.target.value)}
-                                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                                                                    >
-                                                                        <option value="">Select entity...</option>
-                                                                        {entities
-                                                                            .filter(e => e.id !== activeEntity.id) // Prevent self-reference for simplicity
-                                                                            .map(e => (
-                                                                                <option key={e.id} value={e.id}>{e.name}</option>
-                                                                            ))}
-                                                                    </select>
-                                                                </div>
-                                                            )}
-
-                                                            <div className="md:col-span-2 flex space-x-2">
-                                                                <button
-                                                                    onClick={handleAddProperty}
-                                                                    disabled={!newPropName || (newPropType === 'relation' && !newPropRelationId)}
-                                                                    className="flex-1 py-2 bg-slate-800 text-white rounded-md text-sm font-medium hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                >
-                                                                    Save
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => setIsAddingProp(false)}
-                                                                    className="px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-md text-sm font-medium hover:bg-slate-50"
-                                                                >
-                                                                    Cancel
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
-
-                                    {/* DATA TAB */}
-                                    {activeTab === 'data' && (
-                                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                                                <div>
-                                                    <h2 className="text-lg font-normal text-slate-800">Data Records</h2>
-                                                    <p className="text-sm text-slate-500">Manage the actual data for this entity.</p>
-                                                </div>
-                                                <div className="relative group/addrecord">
-                                                    <button
-                                                        onClick={() => {
-                                                            setEditingRecordId(null);
-                                                            setNewRecordValues({});
-                                                            setIsAddingRecord(true);
-                                                        }}
-                                                        disabled={activeEntity.properties.length === 0}
-                                                        className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
-                                                    >
-                                                        <Plus size={16} className="mr-2" />
-                                                        Add Record
-                                                    </button>
-                                                    {activeEntity.properties.length === 0 && (
-                                                        <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/addrecord:opacity-100 transition-opacity pointer-events-none z-50">
-                                                            Add properties to your entity to start adding records
-                                                            <div className="absolute bottom-full right-4 border-4 border-transparent border-b-slate-900"></div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-left border-collapse">
-                                                    <thead>
-                                                        <tr className="bg-slate-50 border-b border-slate-200">
-                                                            {activeEntity.properties.map(prop => (
-                                                                <th key={prop.id} className="px-6 py-3 text-xs font-normal text-slate-500 uppercase tracking-wider">
-                                                                    {prop.name}
-                                                                </th>
-                                                            ))}
-                                                            {/* Incoming Relations Headers */}
-                                                            {Object.values(incomingData).map(({ sourceEntity, sourceProperty }) => (
-                                                                <th key={sourceProperty.id} className="px-6 py-3 text-xs font-normal text-teal-600 uppercase tracking-wider bg-teal-50/50">
-                                                                    {sourceEntity.name} ({sourceProperty.name})
-                                                                </th>
-                                                            ))}
-                                                            <th className="px-6 py-3 text-right">Actions</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-slate-100">
-                                                        {records.length === 0 ? (
-                                                            <tr>
-                                                                <td colSpan={Math.max(activeEntity.properties.length, 1) + 1 + Object.keys(incomingData).length} className="p-12 text-center text-slate-500">
-                                                                    {activeEntity.properties.length === 0 
-                                                                        ? 'Add properties to your entity first, then you can start adding records.'
-                                                                        : 'No records found. Click "Add Record" to create one.'}
-                                                                </td>
-                                                            </tr>
-                                                        ) : (
-                                                            records.map(record => (
-                                                                <tr key={record.id} className="hover:bg-slate-50 transition-colors group">
-                                                                    {activeEntity.properties.map(prop => (
-                                                                        <td key={prop.id} className="px-6 py-4 text-sm text-slate-700">
-                                                                            {renderCellValue(prop, record.values[prop.id])}
-                                                                        </td>
-                                                                    ))}
-                                                                    {/* Incoming Relations Cells */}
-                                                                    {Object.values(incomingData).map(({ sourceEntity, sourceProperty, records: sourceRecords }) => {
-                                                                        const linkedRecords = sourceRecords.filter(r => {
-                                                                            const val = r.values[sourceProperty.id];
-                                                                            if (!val) return false;
-                                                                            try {
-                                                                                const ids = JSON.parse(val);
-                                                                                return Array.isArray(ids) && ids.includes(record.id);
-                                                                            } catch {
-                                                                                return val === record.id;
-                                                                            }
-                                                                        });
-
-                                                                        return (
-                                                                            <td key={sourceProperty.id} className="px-6 py-4 text-sm text-slate-700 bg-teal-50/10">
-                                                                                <div className="flex flex-wrap gap-1">
-                                                                                    {linkedRecords.length > 0 ? linkedRecords.map(lr => (
-                                                                                        <button
-                                                                                            key={lr.id}
-                                                                                            onClick={() => handleRecordClick(lr, sourceEntity)}
-                                                                                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200 hover:bg-indigo-200 transition-colors"
-                                                                                        >
-                                                                                            {getRecordDisplayName(lr, sourceEntity)}
-                                                                                        </button>
-                                                                                    )) : <span className="text-slate-400 text-xs italic">None</span>}
-                                                                                </div>
-                                                                            </td>
-                                                                        );
-                                                                    })}
-                                                                    <td className="px-6 py-4 text-right">
-                                                                        <button
-                                                                            onClick={() => handleEditRecord(record)}
-                                                                            className="p-2 text-slate-300 hover:text-teal-500 hover:bg-teal-50 rounded transition-colors opacity-0 group-hover:opacity-100 mr-2"
-                                                                        >
-                                                                            <Pencil size={16} />
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => deleteRecord(record.id)}
-                                                                            className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                                                        >
-                                                                            <Trash2 size={16} />
-                                                                        </button>
-                                                                    </td>
-                                                                </tr>
-                                                            ))
-                                                        )}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             )}
+
                         </div>
-
-                        {/* Side Panel for Record Details */}
-                        {selectedRecord && selectedRecordEntity && (
-                            <div className="absolute inset-y-0 right-0 w-96 bg-white shadow-2xl border-l border-slate-200 z-50 flex flex-col">
-                                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                                    <div>
-                                        <h2 className="text-lg font-normal text-slate-800">
-                                            {getRecordDisplayName(selectedRecord, selectedRecordEntity)}
-                                        </h2>
-                                        <p className="text-xs text-slate-500 uppercase tracking-wider font-normal mt-1">
-                                            {selectedRecordEntity.name}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <button
-                                            onClick={() => {
-                                                handleEditRecord(selectedRecord, selectedRecordEntity);
-                                                setSelectedRecord(null);
-                                            }}
-                                            className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-full transition-colors"
-                                        >
-                                            <Pencil size={20} />
-                                        </button>
-                                        <button
-                                            onClick={() => setSelectedRecord(null)}
-                                            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors"
-                                        >
-                                            <X size={20} />
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                                    {selectedRecordEntity.properties.map(prop => (
-                                        <div key={prop.id}>
-                                            <label className="block text-xs font-normal text-slate-500 uppercase tracking-wide mb-1">
-                                                {prop.name}
-                                            </label>
-                                            <div className="text-sm text-slate-800 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                                {prop.type === 'relation' ? (
-                                                    renderCellValue(prop, selectedRecord.values[prop.id])
-                                                ) : (
-                                                    selectedRecord.values[prop.id] || '-'
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    <div className="pt-4 border-t border-slate-100">
-                                        <label className="block text-xs font-normal text-slate-400 uppercase tracking-wide mb-1">
-                                            Record ID
-                                        </label>
-                                        <p className="text-xs font-mono text-slate-400">{selectedRecord.id}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Create Entity Modal */}
-                        {isCreatingEntity && (
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-                                <div className="bg-white rounded-lg border border-slate-200 shadow-lg w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden">
-                                    <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/50">
-                                        <h2 className="text-sm font-normal text-slate-900">Create New Entity</h2>
-                                    </div>
-
-                                    <div className="p-5 space-y-4">
-                                        <div>
-                                            <label className="block text-xs font-medium text-slate-600 mb-1">Entity Name</label>
-                                            <input
-                                                autoFocus
-                                                type="text"
-                                                value={newEntityName}
-                                                onChange={(e) => setNewEntityName(e.target.value)}
-                                                placeholder="e.g. Products"
-                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-slate-300 focus:outline-none"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
-                                            <textarea
-                                                value={newEntityDescription}
-                                                onChange={(e) => setNewEntityDescription(e.target.value)}
-                                                placeholder="Describe what this entity represents..."
-                                                rows={3}
-                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-slate-300 focus:outline-none resize-none"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-200 bg-slate-50/50">
-                                        <button
-                                            onClick={() => setIsCreatingEntity(false)}
-                                            className="px-3 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={handleCreateEntity}
-                                            disabled={!newEntityName.trim()}
-                                            className="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                        >
-                                            Create Entity
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Add/Edit Record Modal */}
-                        {isAddingRecord && currentSchema && (
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-                                <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
-                                    <h2 className="text-xl font-normal text-slate-800 mb-4">{editingRecordId ? 'Edit Record' : 'Add New Record'}</h2>
-
-                                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                                        {currentSchema.properties.map(prop => {
-                                            if (prop.type === 'relation' && prop.relatedEntityId) {
-                                                const relatedInfo = relatedData[prop.relatedEntityId];
-                                                return (
-                                                    <div key={prop.id}>
-                                                        <label className="block text-sm font-medium text-slate-700 mb-1">{prop.name}</label>
-                                                        <select
-                                                            multiple
-                                                            value={newRecordValues[prop.id] || []}
-                                                            onChange={(e) => {
-                                                                const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-                                                                setNewRecordValues({ ...newRecordValues, [prop.id]: selectedOptions });
-                                                            }}
-                                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-300 focus:border-slate-300 focus:outline-none min-h-[100px] appearance-none cursor-pointer hover:border-slate-300 transition-colors"
-                                                        >
-                                                            {relatedInfo?.records.map(rec => (
-                                                                <option key={rec.id} value={rec.id}>
-                                                                    {getRecordDisplayName(rec, relatedInfo.entity)}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                        <p className="text-xs text-slate-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
-                                                    </div>
-                                                );
-                                            }
-                                            if (prop.type === 'file') {
-                                                const currentFile = newRecordValues[prop.id];
-                                                let fileInfo = null;
-                                                try {
-                                                    fileInfo = currentFile ? JSON.parse(currentFile) : null;
-                                                } catch (e) {}
-                                                
-                                                return (
-                                                    <div key={prop.id}>
-                                                        <label className="block text-sm font-medium text-slate-700 mb-1">{prop.name}</label>
-                                                        <div className="space-y-2">
-                                                            {fileInfo && (
-                                                                <div className="flex items-center gap-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
-                                                                    <Paperclip size={16} className="text-purple-500" />
-                                                                    <span className="text-sm text-purple-800 truncate flex-1">
-                                                                        {fileInfo.originalName || fileInfo.filename}
-                                                                    </span>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setNewRecordValues({ ...newRecordValues, [prop.id]: '' })}
-                                                                        className="p-1 hover:bg-purple-200 rounded transition-colors"
-                                                                    >
-                                                                        <X size={14} className="text-purple-600" />
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                            <div className="relative">
-                                                                <input
-                                                                    type="file"
-                                                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.jpg,.jpeg,.png,.gif"
-                                                                    onChange={(e) => {
-                                                                        const file = e.target.files?.[0];
-                                                                        if (file) handleFileUpload(prop.id, file);
-                                                                    }}
-                                                                    className="hidden"
-                                                                    id={`file-input-${prop.id}`}
-                                                                    disabled={uploadingFiles[prop.id]}
-                                                                />
-                                                                <label
-                                                                    htmlFor={`file-input-${prop.id}`}
-                                                                    className={`flex items-center justify-center gap-2 w-full px-3 py-2 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-colors ${uploadingFiles[prop.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                                >
-                                                                    {uploadingFiles[prop.id] ? (
-                                                                        <>
-                                                                            <Loader2 size={16} className="animate-spin text-purple-500" />
-                                                                            <span className="text-sm text-slate-500">Uploading...</span>
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <Paperclip size={16} className="text-slate-400" />
-                                                                            <span className="text-sm text-slate-500">
-                                                                                {fileInfo ? 'Replace file' : 'Choose file'}
-                                                                            </span>
-                                                                        </>
-                                                                    )}
-                                                                </label>
-                                                            </div>
-                                                            <p className="text-xs text-slate-500">PDF, Word, Excel, images, or text files (max 50MB)</p>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            }
-                                            return (
-                                                <div key={prop.id}>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">{prop.name}</label>
-                                                    {prop.type === 'json' ? (
-                                                        <textarea
-                                                            value={newRecordValues[prop.id] || ''}
-                                                            onChange={(e) => setNewRecordValues({ ...newRecordValues, [prop.id]: e.target.value })}
-                                                            placeholder={`Enter valid JSON for ${prop.name}...`}
-                                                            rows={4}
-                                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none font-mono text-sm"
-                                                        />
-                                                    ) : (
-                                                        <input
-                                                            type={prop.type === 'number' ? 'number' : 'text'}
-                                                            value={newRecordValues[prop.id] || ''}
-                                                            onChange={(e) => setNewRecordValues({ ...newRecordValues, [prop.id]: e.target.value })}
-                                                            placeholder={`Enter ${prop.name}...`}
-                                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                                                        />
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-
-                                        {/* Incoming Relations Section */}
-                                        {Object.keys(incomingData).length > 0 && (
-                                            <>
-                                                <div className="border-t border-slate-200 pt-4 mt-4">
-                                                    <p className="text-xs font-normal text-indigo-600 uppercase tracking-wide mb-3">
-                                                        Incoming Relations
-                                                    </p>
-                                                </div>
-                                                {Object.entries(incomingData).map(([propId, { sourceEntity, sourceProperty, records: sourceRecords }]) => (
-                                                    <div key={propId}>
-                                                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                                                            {sourceEntity.name} <span className="text-slate-400 font-normal">({sourceProperty.name})</span>
-                                                        </label>
-                                                        <select
-                                                            multiple
-                                                            value={editingIncomingSelections[propId] || []}
-                                                            onChange={(e) => {
-                                                                const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-                                                                setEditingIncomingSelections(prev => ({
-                                                                    ...prev,
-                                                                    [propId]: selectedOptions
-                                                                }));
-                                                            }}
-                                                            className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none min-h-[100px]"
-                                                        >
-                                                            {sourceRecords.map(rec => (
-                                                                <option key={rec.id} value={rec.id}>
-                                                                    {getRecordDisplayName(rec, sourceEntity)}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                        <p className="text-xs text-slate-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
-                                                    </div>
-                                                ))}
-                                            </>
-                                        )}
-                                    </div>
-
-                                    <div className="flex justify-end space-x-3 mt-6">
-                                        <button
-                                            onClick={() => { setIsAddingRecord(false); setNewRecordValues({}); setEditingRecordId(null); setEditingSchema(null); setEditingIncomingSelections({}); }}
-                                            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={handleSaveRecord}
-                                            className="px-4 py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 transition-colors"
-                                        >
-                                            {editingRecordId ? 'Save Changes' : 'Add Record'}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Edit Incoming Relation Modal */}
-                        {editingIncomingRelation && (
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-                                <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
-                                    <h2 className="text-xl font-normal text-slate-800 mb-2">
-                                        Edit Relation
-                                    </h2>
-                                    <p className="text-sm text-slate-500 mb-4">
-                                        Select which <span className="font-medium text-indigo-600">{editingIncomingRelation.sourceEntity.name}</span> records 
-                                        should link to this record via <span className="font-medium">{editingIncomingRelation.sourceProperty.name}</span>
-                                    </p>
-
-                                    <div className="max-h-[300px] overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-                                        {editingIncomingRelation.sourceRecords.length === 0 ? (
-                                            <div className="p-4 text-center text-slate-500 text-sm">
-                                                No records available in {editingIncomingRelation.sourceEntity.name}
-                                            </div>
-                                        ) : (
-                                            editingIncomingRelation.sourceRecords.map(record => {
-                                                const isSelected = editingIncomingRelation.selectedSourceRecordIds.includes(record.id);
-                                                return (
-                                                    <label
-                                                        key={record.id}
-                                                        className={`flex items-center p-3 cursor-pointer hover:bg-slate-50 transition-colors ${isSelected ? 'bg-indigo-50' : ''}`}
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isSelected}
-                                                            onChange={(e) => {
-                                                                setEditingIncomingRelation(prev => {
-                                                                    if (!prev) return null;
-                                                                    const newIds = e.target.checked
-                                                                        ? [...prev.selectedSourceRecordIds, record.id]
-                                                                        : prev.selectedSourceRecordIds.filter(id => id !== record.id);
-                                                                    return { ...prev, selectedSourceRecordIds: newIds };
-                                                                });
-                                                            }}
-                                                            className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
-                                                        />
-                                                        <span className={`ml-3 text-sm ${isSelected ? 'text-indigo-800 font-medium' : 'text-slate-700'}`}>
-                                                            {getRecordDisplayName(record, editingIncomingRelation.sourceEntity)}
-                                                        </span>
-                                                    </label>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-
-                                    <div className="flex justify-end space-x-3 mt-6">
-                                        <button
-                                            onClick={() => setEditingIncomingRelation(null)}
-                                            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={saveIncomingRelationChanges}
-                                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
-                                        >
-                                            Save Changes
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
                     </div>
                     </EntityDetailWrapper>
                     } />

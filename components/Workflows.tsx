@@ -2463,11 +2463,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             }
 
             try {
-                const res = await fetch(`${API_BASE}/entities/${node.config.entityId}/records`, { credentials: 'include' });
-                const records = await res.json();
+                // Find entity ID (handle both ID and name for backwards compatibility)
+                let entityId = node.config.entityId;
+                const entity = entities.find(e => e.id === entityId || e.name === entityId);
+                if (entity) {
+                    entityId = entity.id; // Ensure we use the ID
+                }
 
-                // Flatten data using entity schema
-                const entity = entities.find(e => e.id === node.config?.entityId);
+                const res = await fetch(`${API_BASE}/entities/${entityId}/records`, { credentials: 'include' });
+                if (!res.ok) {
+                    throw new Error(`Failed to fetch records: ${res.status}`);
+                }
+                const records = await res.json();
                 nodeData = records.map((record: any) => {
                     const flattened: any = {
                         id: record.id,
@@ -2572,7 +2579,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 // Remove id to let database generate it
                                 const { id, ...recordWithoutId } = record;
 
-                                const response = await fetch(`${API_BASE}/entities/${node.config.entityId}/records`, {
+                                // Find entity ID (handle both ID and name for backwards compatibility)
+                                let entityId = node.config.entityId;
+                                const saveEntity = entities.find(e => e.id === entityId || e.name === entityId);
+                                if (saveEntity) {
+                                    entityId = saveEntity.id; // Ensure we use the ID
+                                }
+
+                                const response = await fetch(`${API_BASE}/entities/${entityId}/records`, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify(recordWithoutId),
@@ -6869,27 +6883,27 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             if (!hasInput && !hasOutput && !hasOutputA && !hasOutputB) return null;
 
                             return (
-                                <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none" onClick={() => setViewingDataNodeId(null)}>
-                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md max-w-4xl max-h-[80vh] overflow-hidden flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
-                                        <div className="flex items-center justify-between mb-4">
+                                <div className="fixed inset-0 flex items-center justify-center z-50 p-8 pointer-events-none bg-slate-900/40" onClick={() => setViewingDataNodeId(null)}>
+                                    <div className="bg-slate-50 rounded-xl border border-slate-300 shadow-2xl w-full max-w-md max-w-4xl max-h-[85vh] overflow-hidden flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                                        <div className="flex items-center justify-between px-6 pt-6 pb-4">
                                             <h3 className="text-lg font-normal text-slate-800">
                                                 {node.label} - Data Preview
                                             </h3>
                                             <button
                                                 onClick={() => setViewingDataNodeId(null)}
-                                                className="p-1 hover:bg-slate-100 rounded"
+                                                className="p-1.5 hover:bg-slate-200 rounded transition-colors"
                                             >
-                                                <X size={20} />
+                                                <X size={20} className="text-slate-600" />
                                             </button>
                                         </div>
 
                                         {/* Tabs - different for splitColumns */}
                                         {isSplitColumnsNode ? (
-                                            <div className="flex gap-2 mb-4 border-b">
+                                            <div className="flex gap-2 px-6 pb-0 border-b border-slate-300">
                                                 {hasInput && (
                                                     <button
                                                         onClick={() => setSplitViewTab('input')}
-                                                        className={`px-4 py-2 font-medium transition-all ${splitViewTab === 'input'
+                                                        className={`px-4 py-2.5 font-medium transition-all text-sm ${splitViewTab === 'input'
                                                             ? 'text-emerald-600 border-b-2 border-emerald-600'
                                                             : 'text-slate-600 hover:text-slate-800'
                                                             }`}
@@ -6900,7 +6914,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 {hasOutputA && (
                                                     <button
                                                         onClick={() => setSplitViewTab('outputA')}
-                                                        className={`px-4 py-2 font-medium transition-all ${splitViewTab === 'outputA'
+                                                        className={`px-4 py-2.5 font-medium transition-all text-sm ${splitViewTab === 'outputA'
                                                             ? 'text-blue-600 border-b-2 border-blue-600'
                                                             : 'text-slate-600 hover:text-slate-800'
                                                             }`}
@@ -6914,7 +6928,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 {hasOutputB && (
                                                     <button
                                                         onClick={() => setSplitViewTab('outputB')}
-                                                        className={`px-4 py-2 font-medium transition-all ${splitViewTab === 'outputB'
+                                                        className={`px-4 py-2.5 font-medium transition-all text-sm ${splitViewTab === 'outputB'
                                                             ? 'text-purple-600 border-b-2 border-purple-600'
                                                             : 'text-slate-600 hover:text-slate-800'
                                                             }`}
@@ -6927,11 +6941,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 )}
                                             </div>
                                         ) : (
-                                            <div className="flex gap-2 mb-4 border-b">
+                                            <div className="flex gap-2 px-6 pb-0 border-b border-slate-300">
                                                 {hasInput && (
                                                     <button
                                                         onClick={() => setDataViewTab('input')}
-                                                        className={`px-4 py-2 font-medium transition-all ${dataViewTab === 'input'
+                                                        className={`px-4 py-2.5 font-medium transition-all text-sm ${dataViewTab === 'input'
                                                             ? 'text-emerald-600 border-b-2 border-emerald-600'
                                                             : 'text-slate-600 hover:text-slate-800'
                                                             }`}
@@ -6942,7 +6956,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 {hasOutput && (
                                                     <button
                                                         onClick={() => setDataViewTab('output')}
-                                                        className={`px-4 py-2 font-medium transition-all ${dataViewTab === 'output'
+                                                        className={`px-4 py-2.5 font-medium transition-all text-sm ${dataViewTab === 'output'
                                                             ? 'text-emerald-600 border-b-2 border-emerald-600'
                                                             : 'text-slate-600 hover:text-slate-800'
                                                             }`}
@@ -6953,7 +6967,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </div>
                                         )}
 
-                                        <div className="overflow-auto flex-1">
+                                        <div className="overflow-auto flex-1 px-6 pb-6 pt-4">
                                             {(() => {
                                                 let displayData: any[];
                                                 if (isSplitColumnsNode) {
@@ -6974,36 +6988,38 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 return displayData && displayData.length > 0 ? (
                                                     <>
                                                         {isLimited && (
-                                                            <div className="bg-slate-50 border border-slate-200 text-slate-800 px-4 py-2 rounded-lg mb-3 text-xs flex items-center gap-2">
+                                                            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2.5 rounded-lg mb-4 text-xs flex items-center gap-2">
                                                                 <span>⚠️</span>
                                                                 <span>Showing first {MAX_PREVIEW_ROWS} of {totalRows.toLocaleString()} rows for performance</span>
                                                             </div>
                                                         )}
-                                                        <table className="w-full text-sm">
-                                                            <thead className="bg-slate-100 sticky top-0">
-                                                                <tr>
-                                                                    {Object.keys(displayData[0]).map(key => (
-                                                                        <th key={key} className="px-4 py-2 text-left font-normal text-slate-700 border-b">
-                                                                            {key}
-                                                                        </th>
-                                                                    ))}
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {limitedData.map((record: any, idx: number) => (
-                                                                    <tr key={idx} className="border-b hover:bg-slate-50">
-                                                                        {Object.values(record).map((value: any, vidx: number) => (
-                                                                            <td key={vidx} className="px-4 py-2">
-                                                                                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                                                                            </td>
+                                                        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+                                                            <table className="w-full text-sm">
+                                                                <thead className="bg-slate-100 sticky top-0">
+                                                                    <tr>
+                                                                        {Object.keys(displayData[0]).map(key => (
+                                                                            <th key={key} className="px-4 py-3 text-left font-medium text-slate-700 border-b border-slate-200 text-xs">
+                                                                                {key}
+                                                                            </th>
                                                                         ))}
                                                                     </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
+                                                                </thead>
+                                                                <tbody className="bg-white">
+                                                                    {limitedData.map((record: any, idx: number) => (
+                                                                        <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                                                            {Object.values(record).map((value: any, vidx: number) => (
+                                                                                <td key={vidx} className="px-4 py-3 text-slate-700">
+                                                                                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                                                                </td>
+                                                                            ))}
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
                                                     </>
                                                 ) : (
-                                                    <p className="text-slate-500 text-center py-8">No data available</p>
+                                                    <p className="text-slate-500 text-center py-12 bg-white rounded-lg border border-slate-200">No data available</p>
                                                 );
                                             })()}
                                         </div>
