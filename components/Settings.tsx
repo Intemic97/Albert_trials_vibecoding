@@ -828,15 +828,15 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                         <div className="flex items-center justify-between mb-8">
                                             <div>
                                                 <p className="text-sm text-slate-500 mb-2">Plan actual</p>
-                                                <p className="text-3xl font-bold text-slate-800 capitalize">
+                                                <p className="text-xl font-semibold text-slate-800 capitalize">
                                                     {pricingPlans.find(p => p.id === subscription.plan)?.name || 'Gratuito'}
                                                 </p>
                                             </div>
                                             <button
                                                 onClick={() => setShowQuotationModal(true)}
-                                                className="px-6 py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-semibold hover:from-teal-600 hover:to-emerald-600 shadow-lg shadow-teal-500/25 hover:shadow-xl hover:shadow-teal-500/30 transition-all duration-200 flex items-center gap-2"
+                                                className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors shadow-sm font-medium"
                                             >
-                                                <Zap size={18} />
+                                                <Crown size={18} />
                                                 Upgrade
                                             </button>
                                         </div>
@@ -1099,10 +1099,10 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                 {showQuotationModal && (
                     <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-teal-50 to-emerald-50">
+                            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                                 <div className="flex items-center gap-2">
-                                    <Zap className="text-teal-600" size={20} />
-                                    <h3 className="font-semibold text-slate-800">Solicitar cotización</h3>
+                                    <Crown className="text-slate-600" size={20} />
+                                    <h3 className="font-semibold text-slate-800">Request Quotation</h3>
                                 </div>
                                 <button onClick={() => setShowQuotationModal(false)} className="text-slate-400 hover:text-slate-600">
                                     <X size={20} />
@@ -1111,18 +1111,18 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                             <form onSubmit={handleRequestQuotation} className="p-6">
                                 <div className="mb-6">
                                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                                        Describe tu caso de uso
+                                        Describe your use case
                                     </label>
                                     <textarea
                                         required
                                         rows={6}
                                         value={useCase}
                                         onChange={(e) => setUseCase(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all resize-none"
-                                        placeholder="Cuéntanos qué necesitas: número de usuarios, volumen de workflows, integraciones específicas, etc."
+                                        className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none transition-all resize-none"
+                                        placeholder="Tell us what you need: number of users, workflow volume, specific integrations, etc."
                                     />
                                     <p className="mt-2 text-xs text-slate-500">
-                                        Proporciona tantos detalles como sea posible para ayudarnos a crear una propuesta personalizada para ti.
+                                        Provide as much detail as possible to help us create a personalized proposal for you.
                                     </p>
                                 </div>
                                 <div className="flex justify-end gap-3">
@@ -1132,22 +1132,22 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                         className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium transition-colors"
                                         disabled={isSendingQuotation}
                                     >
-                                        Cancelar
+                                        Cancel
                                     </button>
                                     <button
                                         type="submit"
                                         disabled={isSendingQuotation}
-                                        className="px-6 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-lg text-sm font-semibold shadow-lg hover:from-teal-600 hover:to-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                        className="px-6 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-semibold shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                     >
                                         {isSendingQuotation ? (
                                             <>
                                                 <Loader2 className="w-4 h-4 animate-spin" />
-                                                Enviando...
+                                                Sending...
                                             </>
                                         ) : (
                                             <>
                                                 <Mail size={16} />
-                                                Solicitar cotización
+                                                Request quotation
                                             </>
                                         )}
                                     </button>
