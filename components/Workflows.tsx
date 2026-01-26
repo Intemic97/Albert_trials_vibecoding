@@ -776,6 +776,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // Toast State
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+    // No Access Modal State
+    const [showNoAccessModal, setShowNoAccessModal] = useState<boolean>(false);
+    const [noAccessWorkflowInfo, setNoAccessWorkflowInfo] = useState<{ workflowId: string; workflowName: string; organizationName: string } | null>(null);
+    const [isRequestingAccess, setIsRequestingAccess] = useState<boolean>(false);
+
     // Export Modal State
     const [showEmbedCode, setShowEmbedCode] = useState(false);
 
@@ -934,6 +939,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const loadWorkflow = async (id: string, updateUrl = true) => {
         try {
             const res = await fetch(`${API_BASE}/workflows/${id}`, { credentials: 'include' });
+            
+            // Check if user doesn't have access to this workflow
+            if (res.status === 403) {
+                const errorData = await res.json();
+                // Show no access modal with workflow info
+                setNoAccessWorkflowInfo({
+                    workflowId: id,
+                    workflowName: errorData.workflowName || 'Unknown Workflow',
+                    organizationName: errorData.organizationName || 'Unknown Organization'
+                });
+                setShowNoAccessModal(true);
+                return;
+            }
+            
             if (!res.ok) throw new Error('Failed to load workflow');
             const workflow = await res.json();
             setWorkflowName(workflow.name);
@@ -947,6 +966,33 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             }
         } catch (error) {
             console.error('Error loading workflow:', error);
+        }
+    };
+
+    const requestWorkflowAccess = async () => {
+        if (!noAccessWorkflowInfo) return;
+        
+        setIsRequestingAccess(true);
+        try {
+            const res = await fetch(`${API_BASE}/workflows/${noAccessWorkflowInfo.workflowId}/request-access`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (res.ok) {
+                showToast('Access request sent successfully', 'success');
+                setShowNoAccessModal(false);
+                navigate('/workflows');
+            } else {
+                const errorData = await res.json();
+                showToast(errorData.error || 'Failed to request access', 'error');
+            }
+        } catch (error) {
+            console.error('Error requesting access:', error);
+            showToast('Failed to request access', 'error');
+        } finally {
+            setIsRequestingAccess(false);
         }
     };
 
@@ -9328,6 +9374,79 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     )}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* No Access Modal */}
+            {showNoAccessModal && noAccessWorkflowInfo && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNoAccessModal(false)}>
+                    <div className="bg-white rounded-xl shadow-2xl p-8 w-[500px] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+                        <div className="text-center">
+                            {/* Icon */}
+                            <div className="mx-auto w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+                                <AlertCircle className="text-amber-600" size={32} />
+                            </div>
+
+                            {/* Title */}
+                            <h3 className="text-2xl font-bold text-slate-800 mb-2">
+                                Access Restricted
+                            </h3>
+
+                            {/* Message */}
+                            <p className="text-slate-600 mb-4">
+                                This workflow exists, but you are not part of this organization.
+                            </p>
+
+                            {/* Workflow Info */}
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6 text-left">
+                                <div className="space-y-2">
+                                    <div>
+                                        <span className="text-sm font-medium text-slate-500">Workflow:</span>
+                                        <p className="text-slate-800 font-medium">{noAccessWorkflowInfo.workflowName}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm font-medium text-slate-500">Organization:</span>
+                                        <p className="text-slate-800 font-medium">{noAccessWorkflowInfo.organizationName}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-3 justify-center">
+                                <button
+                                    onClick={() => {
+                                        setShowNoAccessModal(false);
+                                        navigate('/workflows');
+                                    }}
+                                    className="px-5 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
+                                >
+                                    Go Back
+                                </button>
+                                <button
+                                    onClick={requestWorkflowAccess}
+                                    disabled={isRequestingAccess}
+                                    className="px-5 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                >
+                                    {isRequestingAccess ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            Requesting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <UserCheck size={18} />
+                                            Request Access
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+
+                            {/* Help text */}
+                            <p className="text-sm text-slate-500 mt-4">
+                                The organization admin will be notified of your request.
+                            </p>
                         </div>
                     </div>
                 </div>

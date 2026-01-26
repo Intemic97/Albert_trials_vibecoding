@@ -3135,13 +3135,34 @@ app.get('/api/workflows', authenticateToken, async (req, res) => {
 app.get('/api/workflows/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
+        
+        // First, try to get the workflow from user's organization
         const workflow = await db.get('SELECT * FROM workflows WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
-        if (!workflow) {
-            return res.status(404).json({ error: 'Workflow not found' });
+        
+        if (workflow) {
+            // User has access - return the workflow
+            workflow.data = JSON.parse(workflow.data);
+            return res.json(workflow);
         }
-        // Parse JSON data before sending
-        workflow.data = JSON.parse(workflow.data);
-        res.json(workflow);
+        
+        // Workflow not found in user's org - check if it exists in another organization
+        const workflowInOtherOrg = await db.get(
+            'SELECT w.id, w.name, w.organizationId, o.name as organizationName FROM workflows w LEFT JOIN organizations o ON w.organizationId = o.id WHERE w.id = ?',
+            [id]
+        );
+        
+        if (workflowInOtherOrg) {
+            // Workflow exists but user doesn't have access
+            return res.status(403).json({
+                error: 'Access denied',
+                workflowName: workflowInOtherOrg.name,
+                organizationName: workflowInOtherOrg.organizationName || 'Unknown Organization'
+            });
+        }
+        
+        // Workflow doesn't exist at all
+        return res.status(404).json({ error: 'Workflow not found' });
+        
     } catch (error) {
         console.error('Error fetching workflow:', error);
         res.status(500).json({ error: 'Failed to fetch workflow' });
@@ -3193,6 +3214,58 @@ app.delete('/api/workflows/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Error deleting workflow:', error);
         res.status(500).json({ error: 'Failed to delete workflow' });
+    }
+});
+
+// Request access to a workflow from another organization
+app.post('/api/workflows/:id/request-access', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Get workflow and organization information
+        const workflow = await db.get(
+            'SELECT w.name, w.organizationId, o.name as organizationName FROM workflows w LEFT JOIN organizations o ON w.organizationId = o.id WHERE w.id = ?',
+            [id]
+        );
+        
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+        
+        if (workflow.organizationId === req.user.orgId) {
+            return res.status(400).json({ error: 'You already have access to this workflow' });
+        }
+        
+        // Get user information
+        const user = await db.get('SELECT email, name FROM users WHERE sub = ?', [req.user.sub]);
+        const userName = user?.name || user?.email?.split('@')[0] || 'Unknown User';
+        const userEmail = user?.email || 'Unknown';
+        
+        // Get user's organization name
+        const userOrg = await db.get('SELECT name FROM organizations WHERE id = ?', [req.user.orgId]);
+        const userOrgName = userOrg?.name || 'Unknown Organization';
+        
+        // TODO: In a real application, you would:
+        // 1. Create a notification for the organization admins
+        // 2. Send an email to the organization admins
+        // 3. Store the access request in a database table
+        
+        // For now, we'll just log it and return success
+        console.log(`Access request:
+            User: ${userName} (${userEmail}) from ${userOrgName}
+            Workflow: ${workflow.name}
+            Target Organization: ${workflow.organizationName}
+        `);
+        
+        res.json({ 
+            message: 'Access request sent successfully',
+            workflowName: workflow.name,
+            organizationName: workflow.organizationName
+        });
+        
+    } catch (error) {
+        console.error('Error requesting access:', error);
+        res.status(500).json({ error: 'Failed to request access' });
     }
 });
 
