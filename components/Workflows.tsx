@@ -4232,9 +4232,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         <div
                             data-tutorial="create-workflow"
                             onClick={createNewWorkflow}
-                            className="border border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center min-h-[200px] text-slate-400 cursor-pointer group"
+                            className="border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center min-h-[200px] text-slate-400 hover:border-teal-500 hover:text-teal-600 hover:bg-teal-50 transition-all cursor-pointer group"
                         >
-                            <div className="p-4 bg-slate-100 rounded-full mb-3">
+                            <div className="p-4 bg-slate-100 rounded-full mb-3 group-hover:bg-white">
                                 <Workflow size={24} />
                             </div>
                             <span className="font-medium">Create new workflow</span>

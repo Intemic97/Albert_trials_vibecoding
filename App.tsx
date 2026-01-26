@@ -27,6 +27,7 @@ import { Copilots } from './components/Copilots';
 import { LogsAndAlerts } from './components/LogsAndAlerts';
 import { Connections } from './components/Connections';
 import { Documentation } from './components/Documentation';
+import { KnowledgeBase } from './components/KnowledgeBase';
 import { Tabs } from './components/Tabs';
 import { API_BASE } from './config';
 
@@ -48,6 +49,29 @@ export default function App() {
 function SharedDashboardWrapper() {
     const { shareToken } = useParams();
     return <SharedDashboard shareToken={shareToken || ''} />;
+}
+
+// Wrapper component to handle entity detail routing
+function EntityDetailWrapper({ 
+    children, 
+    onEntityIdChange 
+}: { 
+    children: React.ReactNode; 
+    onEntityIdChange: (id: string | null) => void;
+}) {
+    const { entityId } = useParams<{ entityId: string }>();
+    
+    useEffect(() => {
+        if (entityId) {
+            onEntityIdChange(entityId);
+        }
+        return () => {
+            // Clean up when leaving the route
+            onEntityIdChange(null);
+        };
+    }, [entityId, onEntityIdChange]);
+    
+    return <>{children}</>;
 }
 
 function AuthenticatedApp() {
@@ -943,16 +967,21 @@ function AuthenticatedApp() {
                                 setActiveEntityId(entityId);
                                 navigate(`/database/${entityId}`);
                             }}
+                            onRefreshEntities={fetchEntities}
                         />
                     } />
                     <Route path="/database/:entityId" element={
+                    <EntityDetailWrapper onEntityIdChange={setActiveEntityId}>
                     <div data-tutorial="database-content" className="contents">
                         {/* Top Header */}
                         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
                             {activeEntity ? (
                                 <div className="flex items-center">
                                     <button
-                                        onClick={() => setActiveEntityId(null)}
+                                        onClick={() => {
+                                            setActiveEntityId(null);
+                                            navigate('/database');
+                                        }}
                                         className="mr-4 p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500"
                                     >
                                         <ArrowLeft size={20} />
@@ -1058,7 +1087,7 @@ function AuthenticatedApp() {
                                             { id: 'data', label: 'Data Records' }
                                         ]}
                                         activeTab={activeTab}
-                                        onChange={setActiveTab}
+                                        onChange={(tabId) => setActiveTab(tabId as 'structure' | 'data')}
                                     />
 
                                     {/* STRUCTURE TAB */}
@@ -1679,6 +1708,7 @@ function AuthenticatedApp() {
                         )}
 
                     </div>
+                    </EntityDetailWrapper>
                     } />
                 </Routes>
                 </main>

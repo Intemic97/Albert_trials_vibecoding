@@ -88,23 +88,28 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
     const [isProcessingPayment, setIsProcessingPayment] = useState(false);
     const [billingFeedback, setBillingFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     
+    // Upgrade modal state
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const [useCase, setUseCase] = useState('');
+    const [isSendingRequest, setIsSendingRequest] = useState(false);
+    
     // Pricing plans configuration
     const pricingPlans: PricingPlan[] = [
         {
             id: 'free',
-            name: 'Gratuito',
+            name: 'Free',
             price: '0€',
             priceValue: 0,
-            period: '/mes',
-            description: 'Perfecto para empezar y explorar',
+            period: '/month',
+            description: 'Perfect to start and explore',
             icon: <Sparkles className="w-6 h-6" />,
             gradient: 'from-slate-500 to-slate-600',
             features: [
-                { text: '3 workflows activos', included: true },
-                { text: '100 ejecuciones/mes', included: true },
-                { text: '1 usuario', included: true },
-                { text: 'Soporte por email', included: true },
-                { text: 'Integraciones avanzadas', included: false },
+                { text: '3 active workflows', included: true },
+                { text: '100 executions/month', included: true },
+                { text: '1 user', included: true },
+                { text: 'Email support', included: true },
+                { text: 'Advanced integrations', included: false },
                 { text: 'API access', included: false },
             ]
         },
@@ -113,17 +118,17 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
             name: 'Pro',
             price: '15€',
             priceValue: 15,
-            period: '/mes',
-            description: 'Para equipos en crecimiento',
+            period: '/month',
+            description: 'For growing teams',
             icon: <Zap className="w-6 h-6" />,
             popular: true,
             gradient: 'from-teal-500 to-emerald-600',
             features: [
-                { text: 'Workflows ilimitados', included: true },
-                { text: '5.000 ejecuciones/mes', included: true },
-                { text: 'Hasta 5 usuarios', included: true },
-                { text: 'Soporte prioritario', included: true },
-                { text: 'Integraciones avanzadas', included: true },
+                { text: 'Unlimited workflows', included: true },
+                { text: '5,000 executions/month', included: true },
+                { text: 'Up to 5 users', included: true },
+                { text: 'Priority support', included: true },
+                { text: 'Advanced integrations', included: true },
                 { text: 'API access', included: false },
             ]
         },
@@ -132,17 +137,17 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
             name: 'Business',
             price: '45€',
             priceValue: 45,
-            period: '/mes',
-            description: 'Para empresas y equipos grandes',
+            period: '/month',
+            description: 'For companies and large teams',
             icon: <Crown className="w-6 h-6" />,
             gradient: 'from-violet-500 to-purple-600',
             features: [
-                { text: 'Workflows ilimitados', included: true },
-                { text: 'Ejecuciones ilimitadas', included: true },
-                { text: 'Usuarios ilimitados', included: true },
-                { text: 'Soporte 24/7 dedicado', included: true },
-                { text: 'Integraciones avanzadas', included: true },
-                { text: 'API access completo', included: true },
+                { text: 'Unlimited workflows', included: true },
+                { text: 'Unlimited executions', included: true },
+                { text: 'Unlimited users', included: true },
+                { text: '24/7 dedicated support', included: true },
+                { text: 'Advanced integrations', included: true },
+                { text: 'Full API access', included: true },
             ]
         }
     ];
@@ -153,14 +158,14 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
         const billingStatus = urlParams.get('billing');
         
         if (billingStatus === 'success') {
-            setBillingFeedback({ type: 'success', message: '¡Pago completado con éxito! Tu plan ha sido actualizado.' });
+            setBillingFeedback({ type: 'success', message: 'Payment completed successfully! Your plan has been updated.' });
             setActiveTab('billing');
             // Clean URL
             window.history.replaceState({}, '', '/settings');
             // Refresh subscription data
             fetchSubscription();
         } else if (billingStatus === 'cancelled') {
-            setBillingFeedback({ type: 'error', message: 'El pago fue cancelado.' });
+            setBillingFeedback({ type: 'error', message: 'Payment was cancelled.' });
             setActiveTab('billing');
             window.history.replaceState({}, '', '/settings');
         }
@@ -207,10 +212,10 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                 // Redirect to Stripe Checkout
                 window.location.href = data.url;
             } else {
-                setBillingFeedback({ type: 'error', message: data.error || 'Error al procesar el pago' });
+                setBillingFeedback({ type: 'error', message: data.error || 'Error processing payment' });
             }
         } catch (error) {
-            setBillingFeedback({ type: 'error', message: 'Error de conexión. Por favor, inténtalo de nuevo.' });
+            setBillingFeedback({ type: 'error', message: 'Connection error. Please try again.' });
         } finally {
             setIsProcessingPayment(false);
         }
@@ -229,12 +234,45 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
             if (res.ok && data.url) {
                 window.location.href = data.url;
             } else {
-                setBillingFeedback({ type: 'error', message: data.error || 'Error al abrir el portal de facturación' });
+                setBillingFeedback({ type: 'error', message: data.error || 'Error opening billing portal' });
             }
         } catch (error) {
-            setBillingFeedback({ type: 'error', message: 'Error de conexión' });
+            setBillingFeedback({ type: 'error', message: 'Connection error' });
         } finally {
             setIsProcessingPayment(false);
+        }
+    };
+
+    const handleRequestQuotation = async () => {
+        if (!useCase.trim()) {
+            setBillingFeedback({ type: 'error', message: 'Please describe your use case' });
+            return;
+        }
+
+        setIsSendingRequest(true);
+        setBillingFeedback(null);
+
+        try {
+            const res = await fetch(`${API_BASE}/billing/request-quotation`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ useCase }),
+                credentials: 'include'
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                setBillingFeedback({ type: 'success', message: 'Request sent! We\'ll get back to you soon.' });
+                setShowUpgradeModal(false);
+                setUseCase('');
+            } else {
+                setBillingFeedback({ type: 'error', message: data.error || 'Failed to send request' });
+            }
+        } catch (error) {
+            setBillingFeedback({ type: 'error', message: 'Connection error. Please try again.' });
+        } finally {
+            setIsSendingRequest(false);
         }
     };
 
@@ -479,11 +517,12 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                     <h1 className="text-lg font-normal text-slate-900 mb-5">Settings</h1>
 
                     <div className="flex gap-0.5 bg-slate-50 p-0.5 rounded-lg w-fit mb-6 border border-slate-200">
-                        {['General', 'Team', 'Billing', 'Integrations'].map((tab) => (
+                        {['General', 'Team', 'Plan', 'Integrations'].map((tab) => (
                             <button
                                 key={tab}
-                                onClick={() => setActiveTab(tab.toLowerCase() as any)}
-                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === tab.toLowerCase()
+                                onClick={() => setActiveTab(tab === 'Plan' ? 'billing' : tab.toLowerCase() as any)}
+                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                    (tab === 'Plan' && activeTab === 'billing') || (activeTab === tab.toLowerCase())
                                     ? 'bg-white text-slate-900'
                                     : 'text-slate-500 hover:text-slate-700'
                                     }`}
@@ -744,20 +783,9 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                             {/* Header */}
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-lg font-normal text-slate-800">Planes y Facturación</h2>
-                                    <p className="text-slate-500 text-sm">Elige el plan que mejor se adapte a tus necesidades.</p>
+                                    <h2 className="text-lg font-normal text-slate-800">Plan</h2>
+                                    <p className="text-slate-500 text-sm">Manage your current plan and request upgrades.</p>
                                 </div>
-                                {subscription?.hasStripeCustomer && (
-                                    <button
-                                        onClick={handleManageSubscription}
-                                        disabled={isProcessingPayment}
-                                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white btn-3d btn-secondary-3d text-sm transition-colors disabled:opacity-50"
-                                    >
-                                        <CreditCard size={16} />
-                                        Gestionar facturación
-                                        <ExternalLink size={14} />
-                                    </button>
-                                )}
                             </div>
 
                             {/* Billing Feedback */}
@@ -776,165 +804,58 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                 </div>
                             )}
 
-                            {/* Current Plan Badge */}
-                            {subscription && (
-                                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2.5 rounded-lg bg-[rgb(91,121,128)] text-white">
-                                                {pricingPlans.find(p => p.id === subscription.plan)?.icon}
-                                            </div>
-                                            <div>
-                                                <p className="text-sm text-slate-500">Plan actual</p>
-                                                <p className="font-normal text-slate-800 capitalize">
-                                                    {pricingPlans.find(p => p.id === subscription.plan)?.name || 'Gratuito'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        {subscription.currentPeriodEnd && subscription.plan !== 'free' && (
-                                            <div className="text-right">
-                                                <p className="text-sm text-slate-500">Próxima facturación</p>
-                                                <p className="font-medium text-slate-700">
-                                                    {new Date(subscription.currentPeriodEnd).toLocaleDateString('es-ES', {
-                                                        day: 'numeric',
-                                                        month: 'long',
-                                                        year: 'numeric'
-                                                    })}
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Pricing Cards */}
+                            {/* Current Plan Card */}
                             {isLoadingSubscription ? (
                                 <div className="flex items-center justify-center py-16">
                                     <Loader2 className="w-8 h-8 text-teal-500 animate-spin" />
                                 </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    {pricingPlans.map((plan) => {
-                                        const isCurrentPlan = subscription?.plan === plan.id;
-                                        const isDisabled = isPlanDisabled(plan.id);
-                                        
-                                        return (
-                                            <div
-                                                key={plan.id}
-                                                className={`relative bg-white rounded-2xl border-2 transition-all duration-300 overflow-hidden ${
-                                                    isCurrentPlan 
-                                                        ? 'border-teal-500 shadow-lg shadow-teal-500/10' 
-                                                        : plan.popular 
-                                                            ? 'border-teal-200 hover:border-teal-400 hover:shadow-lg' 
-                                                            : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
-                                                }`}
-                                            >
-                                                {/* Popular Badge */}
-                                                {plan.popular && !isCurrentPlan && (
-                                                    <div className="absolute top-0 right-0">
-                                                        <div className="bg-[rgb(91,121,128)] text-white text-xs font-medium px-3 py-1 rounded-bl-lg">
-                                                            POPULAR
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* Current Plan Badge */}
-                                                {isCurrentPlan && (
-                                                    <div className="absolute top-0 right-0">
-                                                        <div className="bg-slate-900 text-white text-xs font-medium px-3 py-1 rounded-bl-lg flex items-center gap-1">
-                                                            <Check size={12} />
-                                                            ACTUAL
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                <div className="p-6">
-                                                    {/* Plan Icon & Name */}
-                                                    <div className="flex items-center gap-3 mb-4">
-                                                        <div className="p-2.5 rounded-lg bg-[rgb(91,121,128)] text-white">
-                                                            {plan.icon}
-                                                        </div>
-                                                        <div>
-                                                            <h3 className="text-base font-normal text-slate-900">{plan.name}</h3>
-                                                            <p className="text-xs text-slate-500">{plan.description}</p>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Price */}
-                                                    <div className="mb-6">
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className="text-3xl font-normal text-slate-900">{plan.price}</span>
-                                                            <span className="text-slate-500 font-medium">{plan.period}</span>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Features */}
-                                                    <ul className="space-y-3 mb-6">
-                                                        {plan.features.map((feature, idx) => (
-                                                            <li key={idx} className="flex items-center gap-2.5">
-                                                                {feature.included ? (
-                                                                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgb(91,121,128)] flex items-center justify-center">
-                                                                        <Check className="w-3 h-3 text-white" />
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center">
-                                                                        <X className="w-3 h-3 text-slate-400" />
-                                                                    </div>
-                                                                )}
-                                                                <span className={`text-sm ${feature.included ? 'text-slate-700' : 'text-slate-400'}`}>
-                                                                    {feature.text}
-                                                                </span>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-
-                                                    {/* CTA Button */}
-                                                    <button
-                                                        onClick={() => plan.id !== 'free' && handleUpgrade(plan.id)}
-                                                        disabled={isDisabled || isProcessingPayment}
-                                                        className={`w-full py-2.5 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
-                                                            isCurrentPlan
-                                                                ? 'bg-slate-100 text-slate-500 cursor-default'
-                                                                : plan.id === 'free'
-                                                                    ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
-                                                                    : 'bg-[rgb(91,121,128)] text-white hover:bg-[#1e554f]'
-                                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
-                                                    >
-                                                        {isProcessingPayment ? (
-                                                            <>
-                                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                                Procesando...
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                {!isCurrentPlan && plan.id !== 'free' && <CreditCard size={16} />}
-                                                                {getPlanButtonText(plan.id)}
-                                                            </>
-                                                        )}
-                                                    </button>
-                                                </div>
+                            ) : subscription && (
+                                <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-3 rounded-lg bg-[rgb(91,121,128)] text-white">
+                                                <CreditCard size={24} />
                                             </div>
-                                        );
-                                    })}
+                                            <div>
+                                                <p className="text-sm text-slate-500 mb-1">Current plan</p>
+                                                <p className="text-2xl font-normal text-slate-800 capitalize">
+                                                    {pricingPlans.find(p => p.id === subscription.plan)?.name || 'Free'}
+                                                </p>
+                                                {subscription.currentPeriodEnd && subscription.plan !== 'free' && (
+                                                    <p className="text-sm text-slate-500 mt-1">
+                                                        Next billing: {new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', {
+                                                            day: 'numeric',
+                                                            month: 'long',
+                                                            year: 'numeric'
+                                                        })}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowUpgradeModal(true)}
+                                            className="flex items-center gap-2 px-4 py-2 bg-[#1e3a5f] hover:bg-[#15324d] text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                                        >
+                                            <Crown size={18} />
+                                            Upgrade
+                                        </button>
+                                    </div>
+
+                                    {subscription?.hasStripeCustomer && subscription.plan !== 'free' && (
+                                        <div className="mt-6 pt-6 border-t border-slate-200">
+                                            <button
+                                                onClick={handleManageSubscription}
+                                                disabled={isProcessingPayment}
+                                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                                            >
+                                                <CreditCard size={16} />
+                                                Manage billing
+                                                <ExternalLink size={14} />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
-
-                            {/* Payment Security Note */}
-                            <div className="flex items-center justify-center gap-2 text-sm text-slate-500 pt-4">
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                                </svg>
-                                <span>Pagos seguros procesados por</span>
-                                <svg className="h-5" viewBox="0 0 60 25" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path fillRule="evenodd" clipRule="evenodd" d="M59.64 14.28C59.64 9.54 57.44 6 53.46 6C49.46 6 46.92 9.54 46.92 14.24C46.92 19.76 49.88 22.5 54.1 22.5C56.18 22.5 57.74 22.02 58.96 21.34V17.56C57.74 18.2 56.34 18.6 54.6 18.6C52.9 18.6 51.4 18.02 51.2 15.92H59.6C59.6 15.68 59.64 14.72 59.64 14.28ZM51.14 12.54C51.14 10.52 52.32 9.68 53.44 9.68C54.52 9.68 55.64 10.52 55.64 12.54H51.14Z" fill="#635BFF"/>
-                                    <path fillRule="evenodd" clipRule="evenodd" d="M40.32 6C38.58 6 37.48 6.82 36.86 7.38L36.62 6.28H32.54V25L36.94 24.04V21.56C37.58 22.02 38.52 22.5 39.92 22.5C42.94 22.5 45.64 20.1 45.64 14.06C45.62 8.56 42.88 6 40.32 6ZM39.24 18.42C38.28 18.42 37.7 18.1 37.3 17.68L37.28 10.96C37.72 10.48 38.32 10.18 39.24 10.18C40.76 10.18 41.8 11.92 41.8 14.28C41.8 16.7 40.78 18.42 39.24 18.42Z" fill="#635BFF"/>
-                                    <path fillRule="evenodd" clipRule="evenodd" d="M27.56 5.02L31.98 4.06V0.14L27.56 1.08V5.02Z" fill="#635BFF"/>
-                                    <path d="M31.98 6.28H27.56V22.22H31.98V6.28Z" fill="#635BFF"/>
-                                    <path fillRule="evenodd" clipRule="evenodd" d="M23.04 7.7L22.76 6.28H18.74V22.22H23.14V11.32C24.16 9.98 25.88 10.24 26.44 10.44V6.28C25.86 6.06 23.98 5.72 23.04 7.7Z" fill="#635BFF"/>
-                                    <path fillRule="evenodd" clipRule="evenodd" d="M14.14 2.3L9.82 3.24L9.8 17.76C9.8 20.48 11.78 22.5 14.48 22.5C15.96 22.5 17.04 22.24 17.64 21.92V18.06C17.06 18.3 14.12 19.14 14.12 16.42V10.36H17.64V6.28H14.12L14.14 2.3Z" fill="#635BFF"/>
-                                    <path fillRule="evenodd" clipRule="evenodd" d="M4.42 10.96C4.42 10.24 5 9.94 5.96 9.94C7.36 9.94 9.14 10.38 10.54 11.14V6.96C9 6.32 7.48 6.06 5.96 6.06C2.38 6.06 0 7.96 0 10.96C0 15.62 6.4 14.86 6.4 16.88C6.4 17.74 5.68 18.04 4.66 18.04C3.12 18.04 1.14 17.42 0 16.54V20.76C1.44 21.44 2.9 21.72 4.66 21.72C8.32 21.72 10.84 19.86 10.84 16.84C10.82 11.78 4.42 12.7 4.42 10.96Z" fill="#635BFF"/>
-                                </svg>
-                            </div>
                         </div>
                     )}
 
@@ -1170,6 +1091,77 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Upgrade Modal */}
+                {showUpgradeModal && (
+                    <div className="fixed inset-0 bg-[#256A65]/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-lg overflow-hidden">
+                            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-2 rounded-lg bg-[#1e3a5f] text-white">
+                                        <Crown size={18} />
+                                    </div>
+                                    <h3 className="font-normal text-slate-800">Request Upgrade</h3>
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        setShowUpgradeModal(false);
+                                        setUseCase('');
+                                    }} 
+                                    className="text-slate-400 hover:text-slate-600"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            <div className="p-6">
+                                <p className="text-sm text-slate-600 mb-4">
+                                    Tell us about your use case and we'll get back to you with a personalized quote.
+                                </p>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        Describe your use case
+                                    </label>
+                                    <textarea
+                                        value={useCase}
+                                        onChange={(e) => setUseCase(e.target.value)}
+                                        rows={6}
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all resize-none"
+                                        placeholder="E.g., We need to manage 100+ workflows with a team of 15 people, with unlimited executions..."
+                                    />
+                                </div>
+                                <div className="flex justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowUpgradeModal(false);
+                                            setUseCase('');
+                                        }}
+                                        className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleRequestQuotation}
+                                        disabled={isSendingRequest || !useCase.trim()}
+                                        className="flex items-center gap-2 px-4 py-2 bg-[#1e3a5f] hover:bg-[#15324d] text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {isSendingRequest ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                Sending...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Mail size={16} />
+                                                Request quotation
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}

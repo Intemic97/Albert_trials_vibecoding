@@ -5138,6 +5138,92 @@ app.post('/api/billing/create-portal-session', authenticateToken, async (req, re
     }
 });
 
+// Request quotation for plan upgrade
+app.post('/api/billing/request-quotation', authenticateToken, async (req, res) => {
+    try {
+        const { useCase } = req.body;
+
+        if (!useCase || !useCase.trim()) {
+            return res.status(400).json({ error: 'Use case is required' });
+        }
+
+        // Get user information
+        const user = await db.get('SELECT email, name FROM users WHERE id = ?', [req.user.userId]);
+        const org = await db.get('SELECT name FROM organizations WHERE id = ?', [req.user.orgId]);
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Email content
+        const subject = 'Nueva solicitud de upgrade de plan - Intemic';
+        const emailBody = `
+Nueva solicitud de upgrade de plan
+
+Usuario: ${user.name || 'N/A'}
+Email: ${user.email}
+Organización: ${org?.name || 'N/A'}
+
+Caso de uso:
+${useCase}
+
+---
+Este email fue enviado automáticamente desde la plataforma Intemic.
+        `.trim();
+
+        // Try to send email if SMTP is configured
+        try {
+            const nodemailer = require('nodemailer');
+            
+            // Check if SMTP credentials are available in environment variables
+            const smtpHost = process.env.SMTP_HOST;
+            const smtpPort = process.env.SMTP_PORT || 587;
+            const smtpUser = process.env.SMTP_USER;
+            const smtpPass = process.env.SMTP_PASS;
+
+            if (smtpUser && smtpPass) {
+                const transporter = nodemailer.createTransport({
+                    host: smtpHost || 'smtp.gmail.com',
+                    port: parseInt(smtpPort),
+                    secure: parseInt(smtpPort) === 465,
+                    auth: {
+                        user: smtpUser,
+                        pass: smtpPass
+                    }
+                });
+
+                await transporter.sendMail({
+                    from: smtpUser,
+                    to: 'a.mestre@intemic.com, m.alcazar@intemic.com',
+                    subject: subject,
+                    text: emailBody,
+                    html: emailBody.replace(/\n/g, '<br>')
+                });
+
+                console.log('Quotation request email sent successfully');
+            } else {
+                // If no SMTP configured, just log it
+                console.log('=== QUOTATION REQUEST (SMTP not configured) ===');
+                console.log('To: a.mestre@intemic.com, m.alcazar@intemic.com');
+                console.log('Subject:', subject);
+                console.log('Body:', emailBody);
+                console.log('===============================================');
+            }
+        } catch (emailError) {
+            console.error('Failed to send email, logging instead:', emailError);
+            console.log('=== QUOTATION REQUEST ===');
+            console.log('User:', user.email);
+            console.log('Use case:', useCase);
+            console.log('========================');
+        }
+
+        res.json({ success: true, message: 'Quotation request sent successfully' });
+    } catch (error) {
+        console.error('Error processing quotation request:', error);
+        res.status(500).json({ error: 'Failed to process quotation request' });
+    }
+});
+
 // ==================== REPORT TEMPLATES ENDPOINTS ====================
 
 // Get all templates for organization

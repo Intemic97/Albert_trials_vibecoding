@@ -1,5 +1,3 @@
-<<<<<<< Updated upstream
-=======
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Database, Plus, Search, Filter, X, FileText, Shield, Upload, FileSpreadsheet, Loader2, File, Download, Trash2, Eye, Link as LinkIcon, Copy, Check } from 'lucide-react';
@@ -12,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 interface KnowledgeBaseProps {
     entities: Entity[];
     onNavigate: (entityId: string) => void;
+    onRefreshEntities?: () => Promise<void>;
 }
 
 interface Standard {
@@ -28,7 +27,7 @@ interface Standard {
     relatedEntityIds?: string[];
 }
 
-export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNavigate }) => {
+export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNavigate, onRefreshEntities }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useAuth();
@@ -123,8 +122,10 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             setIsCreatingEntity(false);
             setUploadMode('manual');
             
-            // Reload entities by navigating away and back, or trigger a refresh
-            window.location.reload();
+            // Refresh entities list
+            if (onRefreshEntities) {
+                await onRefreshEntities();
+            }
         } catch (error) {
             console.error('Error creating entity:', error);
             alert('Failed to create entity');
@@ -165,8 +166,10 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                     fileInputRef.current.value = '';
                 }
                 
-                // Reload entities
-                window.location.reload();
+                // Refresh entities list
+                if (onRefreshEntities) {
+                    await onRefreshEntities();
+                }
             } else {
                 const error = await res.json();
                 alert(error.error || 'Failed to create entity from file');
@@ -189,7 +192,10 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                 method: 'DELETE',
                 credentials: 'include'
             });
-            window.location.reload();
+            // Refresh entities list
+            if (onRefreshEntities) {
+                await onRefreshEntities();
+            }
         } catch (error) {
             console.error('Error deleting entity:', error);
             alert('Failed to delete entity');
@@ -1006,4 +1012,3 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         </div>
     );
 };
->>>>>>> Stashed changes

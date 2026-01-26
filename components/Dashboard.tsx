@@ -894,10 +894,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                             {totalDashboardPages <= 1 && (
                                 <div
                                     onClick={handleCreateDashboard}
-                                    className="border border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center min-h-[200px] text-slate-400 cursor-pointer group"
+                                    className="border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center min-h-[200px] text-slate-400 hover:border-teal-500 hover:text-teal-600 hover:bg-teal-50 transition-all cursor-pointer group"
                                 >
-                                    <div className="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center mb-4">
-                                        <Plus size={24} className="text-slate-400" />
+                                    <div className="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center mb-4 group-hover:bg-white">
+                                        <Plus size={24} />
                                     </div>
                                     <span className="font-medium text-sm">Create new dashboard</span>
                                 </div>
