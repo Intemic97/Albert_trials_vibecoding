@@ -10,6 +10,87 @@ import GridLayout, { Layout } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
+// Custom styles to ensure resize handles are visible
+const gridLayoutStyles = `
+  .react-grid-item {
+    transition: none !important;
+  }
+  .react-grid-item > .react-resizable-handle {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    z-index: 1000;
+  }
+  .react-grid-item > .react-resizable-handle::after {
+    content: "";
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    width: 5px;
+    height: 5px;
+    border-right: 2px solid rgba(0, 0, 0, 0.4);
+    border-bottom: 2px solid rgba(0, 0, 0, 0.4);
+  }
+  .react-grid-item > .react-resizable-handle-se {
+    bottom: 0;
+    right: 0;
+    cursor: se-resize;
+  }
+  .react-grid-item > .react-resizable-handle-s {
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    cursor: s-resize;
+  }
+  .react-grid-item > .react-resizable-handle-e {
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: e-resize;
+  }
+  .react-grid-item > .react-resizable-handle-w {
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: w-resize;
+  }
+  .react-grid-item > .react-resizable-handle-n {
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    cursor: n-resize;
+  }
+  .react-grid-item > .react-resizable-handle-ne {
+    top: 0;
+    right: 0;
+    cursor: ne-resize;
+  }
+  .react-grid-item > .react-resizable-handle-nw {
+    top: 0;
+    left: 0;
+    cursor: nw-resize;
+  }
+  .react-grid-item > .react-resizable-handle-sw {
+    bottom: 0;
+    left: 0;
+    cursor: sw-resize;
+  }
+  .react-grid-item:hover > .react-resizable-handle {
+    background: rgba(59, 130, 246, 0.1);
+  }
+`;
+
+// Inject styles
+if (typeof document !== 'undefined') {
+    const styleId = 'grid-layout-custom-styles';
+    if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = gridLayoutStyles;
+        document.head.appendChild(style);
+    }
+}
+
 // Generate UUID that works in non-HTTPS contexts
 const generateUUID = (): string => {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -62,9 +143,9 @@ const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = 
     const [showExplanation, setShowExplanation] = useState(false);
     
     return (
-        <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-full flex flex-col relative overflow-hidden">
+        <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-full flex flex-col relative" style={{ overflow: 'visible', height: '100%' }}>
             {/* Drag Handle - Entire header is draggable */}
-            <div className="drag-handle cursor-move p-2 border-b border-slate-100 flex items-center justify-between group hover:bg-slate-50 transition-colors select-none flex-shrink-0" style={{ pointerEvents: 'auto', touchAction: 'none' }}>
+            <div className="drag-handle cursor-move p-1.5 border-b border-slate-100 flex items-center justify-between group hover:bg-slate-50 transition-colors select-none flex-shrink-0" style={{ pointerEvents: 'auto', touchAction: 'none' }}>
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                     <GripVertical size={14} className="text-slate-400 group-hover:text-slate-600 transition-colors flex-shrink-0" />
                     <h3 className="text-sm font-medium text-slate-900 truncate">{widget.title}</h3>
@@ -82,17 +163,17 @@ const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = 
                     <X size={14} />
                 </button>
             </div>
-            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <div className="flex-1 flex flex-col min-h-0" style={{ overflow: 'auto' }}>
                 {widget.description && (
-                    <div className="px-4 pt-3 pb-2 flex-shrink-0">
+                    <div className="px-3 pt-2 pb-1 flex-shrink-0">
                         <p className="text-xs text-slate-500">{widget.description}</p>
                     </div>
                 )}
-                <div className="flex-1 min-h-0 px-4 pb-4 overflow-hidden">
+                <div className="flex-1 min-h-0 px-3 pb-3" style={{ overflow: 'auto' }}>
                     <DynamicChart config={widget} />
                 </div>
                 {widget.explanation && (
-                    <div className="px-4 pb-3 pt-2 border-t border-slate-100 flex-shrink-0">
+                    <div className="px-3 pb-2 pt-1 border-t border-slate-100 flex-shrink-0">
                         <button
                             onClick={() => setShowExplanation(!showExplanation)}
                             className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-800 font-medium"
@@ -101,7 +182,7 @@ const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = 
                             How did I prepare this?
                         </button>
                         {showExplanation && (
-                            <div className="mt-2 p-3 bg-slate-50 rounded-lg text-xs text-slate-700 leading-relaxed">
+                            <div className="mt-2 p-2 bg-slate-50 rounded-lg text-xs text-slate-700 leading-relaxed">
                                 {widget.explanation}
                             </div>
                         )}
@@ -286,6 +367,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             fetchWidgets(selectedDashboardId);
         } else {
             setSavedWidgets([]);
+            setLayout([]);
         }
     }, [selectedDashboardId]);
 
@@ -354,7 +436,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     maxH: 20,
                     isResizable: true,
                     isDraggable: true,
-                    resizeHandles: ['se', 's', 'e', 'sw', 'nw', 'ne', 'n', 'w']
+                    static: false
                 }));
                 setLayout(newLayout);
             } else {
@@ -640,7 +722,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         }
     };
 
-    // Handle layout change (drag & resize) with debouncing
     const handleLayoutChange = useCallback(async (newLayout: Layout[]) => {
         setLayout(newLayout);
         
@@ -675,7 +756,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         
         return () => clearTimeout(timeoutId);
     }, [selectedDashboardId, isDragging]);
-    
+
     const handleDragStart = () => {
         setIsDragging(true);
     };
@@ -1036,6 +1117,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                         useCSSTransforms={true}
                                         resizeHandles={['se', 's', 'e', 'sw', 'nw', 'ne', 'n', 'w']}
                                         allowOverlap={false}
+                                        style={{ position: 'relative' }}
                                     >
                                         {savedWidgets.map((widget) => (
                                             <GridWidgetCard
