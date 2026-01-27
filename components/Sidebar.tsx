@@ -12,7 +12,6 @@ import {
   FileText,
   Home,
   Sparkles,
-  Activity,
   Plug,
   HelpCircle,
   BookOpen,
@@ -316,9 +315,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
             <NavItem icon={FileCheck} label="Documents" view="documents" active={activeView === 'documents'} />
           </div>
 
-          <SectionLabel label="Operations" />
+          <SectionLabel label="Configuration" />
           <div className="space-y-0.5">
-            <NavItem icon={Activity} label="Executions" view="logs" active={activeView === 'logs'} />
             <NavItem icon={Plug} label="Connections" view="connections" active={activeView === 'connections'} />
           </div>
 

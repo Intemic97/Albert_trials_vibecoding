@@ -234,6 +234,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     // Modal state for adding widgets
     const [showAddWidgetModal, setShowAddWidgetModal] = useState(false);
     const [selectedVisualizationType, setSelectedVisualizationType] = useState<string>('');
+    const [widgetPrompt, setWidgetPrompt] = useState<string>('');
+    const [widgetMentionedEntityIds, setWidgetMentionedEntityIds] = useState<string[]>([]);
     
     // Update grid width on window resize
     useEffect(() => {
@@ -1115,8 +1117,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                     setShowAddWidgetModal(false);
                                     setSelectedVisualizationType(''); // Reset when closing
                                 }}>
-                                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-                                        <div className="bg-white border-b border-slate-200 px-6 py-5 shrink-0 flex items-center justify-between">
+                                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                        <div className="bg-white border-b border-slate-200 px-6 py-5 shrink-0 flex items-center justify-between rounded-t-xl">
                                             <div>
                                                 <h2 className="text-lg font-normal text-slate-900">Add Widget</h2>
                                                 <p className="text-xs text-slate-500 mt-1">Describe what you want to visualize and how</p>
@@ -1166,10 +1168,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                                         setShowAddWidgetModal(false);
                                                         setSelectedVisualizationType(''); // Reset after generation
                                                     }}
+                                                    onChange={(prompt, mentionedIds) => {
+                                                        setWidgetPrompt(prompt);
+                                                        setWidgetMentionedEntityIds(mentionedIds);
+                                                    }}
                                                     isGenerating={isGenerating}
                                                     placeholder="Describe your data... e.g. '@Customers by total orders' or 'Connect to workflow output SalesReport'"
                                                     buttonLabel="Generate Widget"
                                                     className="text-slate-800"
+                                                    hideButton={true}
                                                 />
                                             </div>
                                             <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
@@ -1186,6 +1193,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                                     </div>
                                                 </div>
                                             </div>
+                                        </div>
+                                        
+                                        {/* Footer with Generate Button */}
+                                        <div className="border-t border-slate-200 px-6 py-4 bg-slate-50 shrink-0 flex justify-end">
+                                            <button
+                                                onClick={() => {
+                                                    if (widgetPrompt.trim()) {
+                                                        handleGenerateWidget(widgetPrompt, widgetMentionedEntityIds, selectedVisualizationType);
+                                                        setShowAddWidgetModal(false);
+                                                        setSelectedVisualizationType('');
+                                                        setWidgetPrompt('');
+                                                        setWidgetMentionedEntityIds([]);
+                                                    }
+                                                }}
+                                                disabled={isGenerating || !widgetPrompt.trim()}
+                                                className="btn-3d btn-primary-3d text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                            >
+                                                {isGenerating ? (
+                                                    <>
+                                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                        Generating...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Sparkles size={16} />
+                                                        Generate
+                                                    </>
+                                                )}
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
