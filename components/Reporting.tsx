@@ -5,7 +5,7 @@ import { Entity } from '../types';
 import { 
     Sparkles, FileText, FlaskConical, Clipboard, Wrench, AlertTriangle, Download,
     Plus, Trash2, Edit3, X, ChevronDown, ChevronRight, GripVertical, Save, Loader2,
-    Clock, User, Calendar, FileCheck, MoreVertical, Search
+    Clock, User, Calendar, FileCheck, MoreVertical, Search, Bot, Send
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -85,9 +85,9 @@ const iconMap: Record<string, React.ComponentType<{ size?: number; className?: s
 };
 
 const statusConfig = {
-    draft: { label: 'Draft', color: 'text-amber-600', bg: 'bg-amber-50', borderColor: 'border-amber-200' },
-    review: { label: 'In Review', color: 'text-blue-600', bg: 'bg-blue-50', borderColor: 'border-blue-200' },
-    ready_to_send: { label: 'Ready', color: 'text-teal-600', bg: 'bg-teal-50', borderColor: 'border-teal-200' }
+    draft: { label: 'Draft', color: 'text-amber-700', bg: 'bg-amber-50', borderColor: 'border-slate-200' },
+    review: { label: 'In Review', color: 'text-slate-700', bg: 'bg-slate-50', borderColor: 'border-slate-200' },
+    ready_to_send: { label: 'Ready', color: 'text-slate-700', bg: 'bg-slate-50', borderColor: 'border-slate-200' }
 };
 
 export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onViewChange, view = 'documents' }) => {
@@ -117,6 +117,12 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
     // Search/filter state
     const [documentsSearch, setDocumentsSearch] = useState('');
     const [templatesSearch, setTemplatesSearch] = useState('');
+    
+    // AI Template Assistant state
+    const [showAiAssistant, setShowAiAssistant] = useState(false);
+    const [aiPrompt, setAiPrompt] = useState('');
+    const [isGeneratingTemplate, setIsGeneratingTemplate] = useState(false);
+    const [aiGeneratedTemplate, setAiGeneratedTemplate] = useState<ReportTemplate | null>(null);
 
     // Fetch all data on mount
     useEffect(() => {
@@ -205,6 +211,97 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
     const handleCreateTemplate = () => {
         setEditingTemplate(null);
         setShowTemplateModal(true);
+    };
+
+    const handleCreateWithAI = () => {
+        setShowAiAssistant(true);
+        setAiPrompt('');
+        setAiGeneratedTemplate(null);
+    };
+
+    const handleGenerateTemplate = async () => {
+        if (!aiPrompt.trim() || isGeneratingTemplate) return;
+
+        setIsGeneratingTemplate(true);
+        try {
+            const res = await fetch(`${API_BASE}/report-templates/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ prompt: aiPrompt })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                const generatedTemplate: ReportTemplate = {
+                    ...data,
+                    sections: transformSectionsToNested(data.sections || [])
+                };
+                setAiGeneratedTemplate(generatedTemplate);
+            } else if (res.status === 404) {
+                // Fallback: Create a basic template structure from the prompt
+                const words = aiPrompt.toLowerCase().split(' ');
+                const templateName = aiPrompt.split('.')[0].trim() || 'AI Generated Template';
+                const sections: TemplateSection[] = [
+                    {
+                        title: 'Overview',
+                        content: '',
+                        items: [],
+                        isExpanded: true
+                    }
+                ];
+
+                // Try to extract sections from prompt
+                if (words.includes('section') || words.includes('sections')) {
+                    // Simple heuristic: look for common section keywords
+                    const sectionKeywords = ['introduction', 'overview', 'summary', 'analysis', 'conclusion', 'recommendations', 'findings'];
+                    sectionKeywords.forEach(keyword => {
+                        if (words.includes(keyword)) {
+                            sections.push({
+                                title: keyword.charAt(0).toUpperCase() + keyword.slice(1),
+                                content: '',
+                                items: [],
+                                isExpanded: true
+                            });
+                        }
+                    });
+                }
+
+                const fallbackTemplate: ReportTemplate = {
+                    id: 'temp-' + Date.now(),
+                    name: templateName,
+                    description: `Template generated from: ${aiPrompt.substring(0, 100)}...`,
+                    icon: 'Sparkles',
+                    sections: sections.length > 1 ? sections : [
+                        {
+                            title: 'Main Content',
+                            content: '',
+                            items: [],
+                            isExpanded: true
+                        }
+                    ]
+                };
+                setAiGeneratedTemplate(fallbackTemplate);
+            } else {
+                const errorText = await res.text();
+                alert(`Error generating template: ${errorText || 'Please try again.'}`);
+            }
+        } catch (error) {
+            console.error('Error generating template:', error);
+            alert('Error generating template. Please try again.');
+        } finally {
+            setIsGeneratingTemplate(false);
+        }
+    };
+
+    const handleUseGeneratedTemplate = () => {
+        if (aiGeneratedTemplate) {
+            setEditingTemplate(aiGeneratedTemplate);
+            setShowAiAssistant(false);
+            setShowTemplateModal(true);
+            setAiPrompt('');
+            setAiGeneratedTemplate(null);
+        }
     };
 
     const handleEditTemplate = async (template: ReportTemplate, e: React.MouseEvent) => {
@@ -351,17 +448,20 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
 
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                <div className="max-w-6xl mx-auto space-y-6">
+                <div className="max-w-7xl mx-auto">
 
                     {/* Documents View */}
                     {currentView === 'documents' && (
-                    <div className="bg-white rounded-lg border border-slate-200 p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                            <h2 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>My Documents</h2>
-                            <span className="text-xs text-slate-400 ml-1">{reports.length} document{reports.length !== 1 ? 's' : ''}</span>
+                    <div className="space-y-6">
+                        {/* Header Section */}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>My Documents</h2>
+                                <p className="text-xs text-slate-500 mt-1">{reports.length} document{reports.length !== 1 ? 's' : ''}</p>
+                            </div>
                             <button
                                 onClick={() => setShowNewReportModal(true)}
-                                className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                             >
                                 <Plus size={14} />
                                 New Document
@@ -370,31 +470,32 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
 
                         {/* Search Documents */}
                         {reports.length > 0 && (
-                            <div className="relative mb-3">
+                            <div className="relative">
                                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input
                                     type="text"
                                     placeholder="Search by name, creator or reviewer..."
                                     value={documentsSearch}
                                     onChange={(e) => setDocumentsSearch(e.target.value)}
-                                    className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-300 focus:border-slate-300 outline-none placeholder:text-slate-400 hover:border-slate-300 transition-colors"
+                                    className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-300 focus:border-slate-300 outline-none placeholder:text-slate-400 hover:border-slate-300 transition-colors"
                                 />
                             </div>
                         )}
 
                         {reportsLoading ? (
-                            <div className="flex items-center justify-center py-12">
-                                <Loader2 className="animate-spin text-teal-600" size={24} />
+                            <div className="flex items-center justify-center py-16">
+                                <Loader2 className="animate-spin text-slate-400" size={24} />
                             </div>
                         ) : reports.length === 0 ? (
-                            <div className="text-center py-10 border border-dashed border-slate-200 rounded-lg">
-                                <FileText className="mx-auto text-slate-300" size={40} />
-                                <p className="text-slate-500 mt-2 text-sm">No documents yet</p>
+                            <div className="bg-white rounded-lg border border-dashed border-slate-200 p-12 text-center">
+                                <FileText className="mx-auto text-slate-300" size={48} />
+                                <p className="text-slate-600 mt-4 text-sm font-medium">No documents yet</p>
                                 <p className="text-slate-400 text-xs mt-1">Create your first document to get started</p>
                                 <button
                                     onClick={() => setShowNewReportModal(true)}
-                                    className="mt-4 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
+                                    className="mt-6 flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
                                 >
+                                    <Plus size={16} />
                                     Create Document
                                 </button>
                             </div>
@@ -416,50 +517,58 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                         <div
                                             key={report.id}
                                             onClick={() => navigate(`/reports/${report.id}`)}
-                                            className={`group relative p-4 rounded-lg border transition-colors cursor-pointer bg-white ${status.borderColor} hover:border-slate-400`}
+                                            className="group relative bg-white border border-slate-200 rounded-lg p-5 cursor-pointer flex flex-col justify-between min-h-[200px] hover:border-slate-300 hover:shadow-sm transition-all"
                                         >
-                                            {/* Status Badge */}
-                                            <div className={`absolute top-3 right-3 px-2 py-0.5 text-xs font-medium rounded-full ${status.bg} ${status.color}`}>
-                                                {status.label}
+                                            {/* Header with Status and Actions */}
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div className="flex-1 min-w-0 pr-12">
+                                                    <h3 className="text-base font-normal text-slate-900 group-hover:text-slate-700 transition-colors truncate mb-1" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                        {report.name}
+                                                    </h3>
+                                                    <p className="text-xs text-slate-500 truncate">
+                                                        {report.templateName}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                    {/* Status Badge */}
+                                                    <div className={`px-2 py-0.5 text-xs font-medium rounded ${status.bg} ${status.color}`}>
+                                                        {status.label}
+                                                    </div>
+                                                    {/* Delete Button */}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteReport(report.id, e);
+                                                        }}
+                                                        className="text-slate-300 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
                                             </div>
 
-                                            {/* Delete Button */}
-                                            <button
-                                                onClick={(e) => handleDeleteReport(report.id, e)}
-                                                className="absolute top-3 right-20 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-
-                                            <div className="pr-16">
-                                                <h3 className="font-normal text-slate-800 mb-1 truncate" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
-                                                    {report.name}
-                                                </h3>
-                                                <p className="text-xs text-slate-500 mb-3">
-                                                    {report.templateName}
-                                                </p>
-                                            </div>
-
-                                            <div className="space-y-2 text-sm">
-                                                <div className="flex items-center gap-2 text-slate-600">
-                                                    <User size={14} className="text-slate-400" />
-                                                    <span className="truncate">Creator: {report.createdByName}</span>
+                                            {/* Content */}
+                                            <div className="flex-1 space-y-3">
+                                                <div className="flex items-center gap-2 text-xs text-slate-600">
+                                                    <User size={12} className="text-slate-400" />
+                                                    <span className="truncate">{report.createdByName}</span>
                                                 </div>
                                                 {report.reviewerName && (
-                                                    <div className="flex items-center gap-2 text-slate-600">
-                                                        <User size={14} className="text-blue-400" />
-                                                        <span className="truncate">Reviewer: {report.reviewerName}</span>
+                                                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                                                        <User size={12} className="text-slate-400" />
+                                                        <span className="truncate">{report.reviewerName}</span>
                                                     </div>
                                                 )}
                                                 {report.deadline && (
-                                                    <div className="flex items-center gap-2 text-slate-600">
-                                                        <Calendar size={14} className="text-amber-500" />
+                                                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                                                        <Calendar size={12} className="text-slate-400" />
                                                         <span>{new Date(report.deadline).toLocaleDateString()}</span>
                                                     </div>
                                                 )}
                                             </div>
 
-                                            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+                                            {/* Footer */}
+                                            <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
                                                 <span>Updated {new Date(report.updatedAt).toLocaleDateString()}</span>
                                             </div>
                                         </div>
@@ -472,51 +581,64 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
 
                     {/* Templates View */}
                     {currentView === 'templates' && (
-                    <div className="bg-white rounded-lg border border-slate-200 p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                            <h2 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Report Templates</h2>
-                            <span className="text-xs text-slate-400 ml-1">Templates define the structure of your documents</span>
-                            <button
-                                onClick={handleCreateTemplate}
-                                className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
-                            >
-                                <Plus size={14} />
-                                New Template
-                            </button>
+                    <div className="space-y-6">
+                        {/* Header Section */}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Report Templates</h2>
+                                <p className="text-xs text-slate-500 mt-1">Templates define the structure of your documents</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleCreateWithAI}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                >
+                                    <Bot size={14} />
+                                    Create with AI
+                                </button>
+                                <button
+                                    onClick={handleCreateTemplate}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                >
+                                    <Plus size={14} />
+                                    New Template
+                                </button>
+                            </div>
                         </div>
 
                         {/* Search Templates */}
                         {templates.length > 0 && (
-                            <div className="relative mb-3">
+                            <div className="relative">
                                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input
                                     type="text"
                                     placeholder="Search templates by name..."
                                     value={templatesSearch}
                                     onChange={(e) => setTemplatesSearch(e.target.value)}
-                                    className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-300 focus:border-slate-300 outline-none"
+                                    className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-300 focus:border-slate-300 outline-none placeholder:text-slate-400 hover:border-slate-300 transition-colors"
                                 />
                             </div>
                         )}
 
                         {templatesLoading ? (
-                            <div className="flex items-center justify-center py-12">
-                                <Loader2 className="animate-spin text-teal-600" size={24} />
+                            <div className="flex items-center justify-center py-16">
+                                <Loader2 className="animate-spin text-slate-400" size={24} />
                             </div>
                         ) : templates.length === 0 ? (
-                            <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-lg">
+                            <div className="bg-white rounded-lg border border-dashed border-slate-200 p-12 text-center">
                                 <FileText className="mx-auto text-slate-300" size={48} />
-                                <p className="text-slate-500 mt-2">No templates yet</p>
-                                <p className="text-slate-400 text-sm mt-1">Create your first template to structure your documents</p>
+                                <p className="text-slate-600 mt-4 text-sm font-medium">No templates yet</p>
+                                <p className="text-slate-400 text-xs mt-1">Create your first template to structure your documents</p>
                                 <button
                                     onClick={handleCreateTemplate}
-                                    className="mt-4 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
+                                    className="mt-6 flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
                                 >
+                                    <Plus size={16} />
                                     Create Template
                                 </button>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                 {templates
                                     .filter(template => {
                                         if (!templatesSearch.trim()) return true;
@@ -524,44 +646,71 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                     })
                                     .map((template) => {
                                     const IconComponent = getIconComponent(template.icon);
+                                    const totalItems = template.sections.reduce((sum, section) => sum + section.items.length, 0);
                                     return (
                                         <div
                                             key={template.id}
-                                            className="group relative p-4 rounded-lg border border-slate-200 bg-white hover:border-teal-300 hover:shadow-sm transition-all"
+                                            className="group relative bg-white border border-slate-200 rounded-lg p-5 hover:border-slate-300 hover:shadow-md transition-all cursor-pointer flex flex-col"
+                                            onClick={(e) => {
+                                                if (!(e.target as HTMLElement).closest('button')) {
+                                                    handleEditTemplate(template, e);
+                                                }
+                                            }}
                                         >
                                             {/* Action buttons */}
-                                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                                 <button
                                                     onClick={(e) => handleEditTemplate(template, e)}
-                                                    className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md text-slate-600 transition-colors"
+                                                    className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-md text-slate-600 transition-colors shadow-sm"
                                                     title="Edit template"
                                                 >
                                                     <Edit3 size={14} />
                                                 </button>
                                                 <button
                                                     onClick={(e) => handleDeleteTemplate(template.id, e)}
-                                                    className="p-1.5 bg-red-50 hover:bg-red-100 rounded-md text-red-600 transition-colors"
+                                                    className="p-1.5 bg-white border border-red-200 hover:bg-red-50 rounded-md text-red-600 transition-colors shadow-sm"
                                                     title="Delete template"
                                                 >
                                                     <Trash2 size={14} />
                                                 </button>
                                             </div>
 
-                                            <div className="flex items-start gap-3">
-                                                <div className="w-10 h-10 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
-                                                    <IconComponent size={20} />
+                                            {/* Header with icon and title */}
+                                            <div className="flex items-start gap-3 pr-12 mb-3">
+                                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center shrink-0 group-hover:from-slate-100 group-hover:to-slate-200 transition-all">
+                                                    <IconComponent size={20} className="text-slate-600" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="font-normal text-sm text-slate-800 truncate" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                    <h3 className="font-normal text-sm text-slate-900 group-hover:text-slate-700 transition-colors leading-tight" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                                                         {template.name}
                                                     </h3>
-                                                    <p className="text-xs text-slate-500 line-clamp-2 mt-1">
-                                                        {template.description}
-                                                    </p>
-                                                    <p className="text-xs text-slate-400 mt-2">
-                                                        {template.sections.length} section{template.sections.length !== 1 ? 's' : ''}
-                                                    </p>
                                                 </div>
+                                            </div>
+
+                                            {/* Description */}
+                                            {template.description && (
+                                                <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">
+                                                    {template.description}
+                                                </p>
+                                            )}
+                                            
+                                            {/* Footer stats */}
+                                            <div className="mt-auto pt-3 border-t border-slate-100 flex items-center gap-3 text-xs text-slate-500">
+                                                <div className="flex items-center gap-1.5">
+                                                    <FileText size={12} className="text-slate-400" />
+                                                    <span className="font-medium text-slate-600">{template.sections.length}</span>
+                                                    <span>section{template.sections.length !== 1 ? 's' : ''}</span>
+                                                </div>
+                                                {totalItems > 0 && (
+                                                    <>
+                                                        <span className="text-slate-300">•</span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Clipboard size={12} className="text-slate-400" />
+                                                            <span className="font-medium text-slate-600">{totalItems}</span>
+                                                            <span>item{totalItems !== 1 ? 's' : ''}</span>
+                                                        </div>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     );
@@ -573,15 +722,16 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
 
                     {/* Reports View */}
                     {currentView === 'reports' && (
-                    <div className="bg-white rounded-lg border border-slate-200 p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                            <h2 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Generated Reports</h2>
-                            <span className="text-xs text-slate-400 ml-1">View and manage completed reports</span>
+                    <div className="space-y-6">
+                        {/* Header Section */}
+                        <div>
+                            <h2 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Generated Reports</h2>
+                            <p className="text-xs text-slate-500 mt-1">View and manage completed reports</p>
                         </div>
-                        <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-lg">
+                        <div className="bg-white rounded-lg border border-dashed border-slate-200 p-12 text-center">
                             <FileText className="mx-auto text-slate-300" size={48} />
-                            <p className="text-slate-500 mt-2">No reports yet</p>
-                            <p className="text-slate-400 text-sm mt-1">Generated reports will appear here</p>
+                            <p className="text-slate-600 mt-4 text-sm font-medium">No reports yet</p>
+                            <p className="text-slate-400 text-xs mt-1">Generated reports will appear here</p>
                         </div>
                     </div>
                     )}
@@ -610,6 +760,125 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                     onSave={handleCreateReport}
                     onClose={() => setShowNewReportModal(false)}
                 />
+            )}
+
+            {/* AI Template Assistant Modal */}
+            {showAiAssistant && (
+                <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-black/40 backdrop-blur-sm pointer-events-none" onClick={() => setShowAiAssistant(false)}>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-2xl pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-slate-200">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                    <Bot size={18} className="text-slate-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                        Create Template with AI
+                                    </h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">Describe the template you want to create</p>
+                                </div>
+                                <button
+                                    onClick={() => setShowAiAssistant(false)}
+                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="px-6 py-4">
+                            {!aiGeneratedTemplate ? (
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            What kind of report template do you need?
+                                        </label>
+                                        <textarea
+                                            value={aiPrompt}
+                                            onChange={(e) => setAiPrompt(e.target.value)}
+                                            placeholder="Example: Create a production quality report template with sections for batch records, quality checks, deviations, and corrective actions..."
+                                            rows={5}
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 resize-none placeholder:text-slate-400 hover:border-slate-300 transition-colors"
+                                            autoFocus
+                                        />
+                                        <p className="text-xs text-slate-500 mt-2">
+                                            Be specific about sections, structure, and content you want included
+                                        </p>
+                                    </div>
+
+                                    <div className="flex gap-2 justify-end">
+                                        <button
+                                            onClick={() => setShowAiAssistant(false)}
+                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleGenerateTemplate}
+                                            disabled={!aiPrompt.trim() || isGeneratingTemplate}
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {isGeneratingTemplate ? (
+                                                <>
+                                                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                    Generating...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Sparkles size={14} />
+                                                    Generate Template
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                                        <div className="flex items-start gap-3 mb-3">
+                                            <div className="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0">
+                                                {React.createElement(getIconComponent(aiGeneratedTemplate.icon), { size: 20, className: "text-slate-600" })}
+                                            </div>
+                                            <div className="flex-1">
+                                                <h4 className="text-sm font-medium text-slate-900 mb-1">{aiGeneratedTemplate.name}</h4>
+                                                {aiGeneratedTemplate.description && (
+                                                    <p className="text-xs text-slate-600">{aiGeneratedTemplate.description}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="text-xs text-slate-500">
+                                            <span className="font-medium">{aiGeneratedTemplate.sections.length}</span> sections •{' '}
+                                            <span className="font-medium">
+                                                {aiGeneratedTemplate.sections.reduce((sum, s) => sum + s.items.length, 0)}
+                                            </span>{' '}
+                                            items
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-2 justify-end">
+                                        <button
+                                            onClick={() => {
+                                                setAiGeneratedTemplate(null);
+                                                setAiPrompt('');
+                                            }}
+                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        >
+                                            Try Again
+                                        </button>
+                                        <button
+                                            onClick={handleUseGeneratedTemplate}
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                        >
+                                            Use This Template
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

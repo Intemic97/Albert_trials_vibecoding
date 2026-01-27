@@ -43,13 +43,18 @@
     .react-grid-item {
       transition: all 200ms ease;
       transition-property: left, top, width, height;
+      position: relative;
+      overflow: visible !important;
+    }
+    .react-grid-item > * {
+      overflow: hidden;
     }
     .react-grid-item.cssTransforms {
       transition-property: transform, width, height;
     }
     .react-grid-item.resizing {
       transition: none;
-      z-index: 1;
+      z-index: 100;
       will-change: width, height;
     }
     .react-grid-item.react-draggable-dragging {
@@ -73,22 +78,106 @@
       border-radius: 0.5rem;
     }
     .react-resizable-handle {
-      position: absolute;
-      width: 20px;
-      height: 20px;
-      bottom: 0;
-      right: 0;
-      background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNiIgaGVpZ2h0PSI2IiB2aWV3Qm94PSIwIDAgNiA2IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Im0wIDZoNnYtNnoiIGZpbGw9IiM5NDk0OTQiLz48L3N2Zz4=');
-      background-position: bottom right;
-      padding: 0 3px 3px 0;
-      background-repeat: no-repeat;
-      background-origin: content-box;
-      box-sizing: border-box;
-      cursor: se-resize;
+      position: absolute !important;
+      box-sizing: border-box !important;
+      background: rgba(148, 163, 184, 0.4) !important;
+      opacity: 0 !important;
+      transition: opacity 0.15s ease !important;
+      z-index: 1000 !important;
+      pointer-events: auto !important;
+      -webkit-user-select: none !important;
+      -moz-user-select: none !important;
+      -ms-user-select: none !important;
+      user-select: none !important;
+      border: 2px solid rgba(148, 163, 184, 0.6) !important;
+    }
+    .react-grid-item:hover .react-resizable-handle {
+      opacity: 1 !important;
+      background: rgba(148, 163, 184, 0.6) !important;
+    }
+    .react-grid-item.resizing .react-resizable-handle {
+      opacity: 1 !important;
+      background: rgba(59, 130, 246, 0.8) !important;
+      border-color: rgb(59, 130, 246) !important;
+      z-index: 1001 !important;
     }
     .react-resizable-handle:hover {
-      background-color: rgb(203, 213, 225);
-      border-radius: 0 0 0.5rem 0;
+      background-color: rgba(71, 85, 105, 0.8) !important;
+      border-color: rgb(71, 85, 105) !important;
+      opacity: 1 !important;
+    }
+    /* Specific handles for different directions */
+    .react-resizable-handle-se {
+      bottom: 0 !important;
+      right: 0 !important;
+      cursor: se-resize !important;
+      width: 24px !important;
+      height: 24px !important;
+      border-radius: 0 0 0.5rem 0 !important;
+    }
+    .react-resizable-handle-s {
+      bottom: 0 !important;
+      left: 0 !important;
+      cursor: s-resize !important;
+      width: 100% !important;
+      height: 10px !important;
+      border-left: none !important;
+      border-right: none !important;
+    }
+    .react-resizable-handle-e {
+      right: 0 !important;
+      top: 0 !important;
+      cursor: e-resize !important;
+      width: 10px !important;
+      height: 100% !important;
+      border-top: none !important;
+      border-bottom: none !important;
+    }
+    .react-resizable-handle-w {
+      left: 0 !important;
+      top: 0 !important;
+      cursor: w-resize !important;
+      width: 10px !important;
+      height: 100% !important;
+      border-top: none !important;
+      border-bottom: none !important;
+    }
+    .react-resizable-handle-n {
+      top: 0 !important;
+      left: 0 !important;
+      cursor: n-resize !important;
+      width: 100% !important;
+      height: 10px !important;
+      border-left: none !important;
+      border-right: none !important;
+    }
+    .react-resizable-handle-sw {
+      bottom: 0 !important;
+      left: 0 !important;
+      cursor: sw-resize !important;
+      width: 24px !important;
+      height: 24px !important;
+      border-radius: 0 0 0 0.5rem !important;
+    }
+    .react-resizable-handle-nw {
+      top: 0 !important;
+      left: 0 !important;
+      cursor: nw-resize !important;
+      width: 24px !important;
+      height: 24px !important;
+      border-radius: 0.5rem 0 0 0 !important;
+    }
+    .react-resizable-handle-ne {
+      top: 0 !important;
+      right: 0 !important;
+      cursor: ne-resize !important;
+      width: 24px !important;
+      height: 24px !important;
+      border-radius: 0 0.5rem 0 0 !important;
+    }
+    .react-resizable-handle.resizing {
+      opacity: 1 !important;
+      background-color: rgba(59, 130, 246, 0.8) !important;
     }
   </style>
 </head>

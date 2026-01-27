@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut, Bot, Smartphone, BarChart3, User, Calendar, ChevronRight, ChevronDown, ChevronUp, Plus, Folder, Shield, Terminal, Tag } from 'lucide-react';
+import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut, Bot, Smartphone, BarChart3, User, Calendar, ChevronRight, ChevronDown, ChevronUp, Plus, Folder, Shield, Terminal, Tag, MoreVertical, Webhook, FlaskConical, TrendingUp, Bell, FileCheck } from 'lucide-react';
 import { NodeConfigSidePanel } from './NodeConfigSidePanel';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { PromptInput } from './PromptInput';
@@ -27,7 +27,7 @@ const generateUUID = (): string => {
 
 interface WorkflowNode {
     id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook' | 'sapFetch' | 'opcua' | 'mqtt' | 'agent' | 'limsFetch' | 'statisticalAnalysis' | 'alertAgent' | 'pdfReport';
     label: string;
     x: number;
     y: number;
@@ -123,6 +123,24 @@ interface WorkflowNode {
         sapEntity?: string;
         // Custom node name
         customName?: string;
+        // For LIMS Fetch nodes:
+        limsServerUrl?: string;
+        limsApiKey?: string;
+        limsEndpoint?: string;
+        limsQuery?: string;
+        // For Statistical Analysis nodes:
+        statisticalMethod?: 'pca' | 'spc' | 'regression' | 'goldenBatch';
+        statisticalParams?: string; // JSON string with parameters
+        goldenBatchId?: string;
+        // For Alert Agent nodes:
+        alertConditions?: string; // JSON string with conditions
+        alertSeverity?: 'critical' | 'warning' | 'info';
+        alertActions?: string[]; // ['email', 'sms', 'webhook', 'stop']
+        alertRecipients?: string; // Comma-separated emails/phones
+        // For PDF Report nodes:
+        pdfTemplate?: string;
+        pdfReportData?: string; // JSON string with data structure
+        pdfOutputPath?: string;
     };
     executionResult?: string;
     data?: any;
@@ -142,7 +160,7 @@ interface Connection {
 }
 
 interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook' | 'sapFetch';
+    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook' | 'sapFetch' | 'opcua' | 'mqtt' | 'agent' | 'limsFetch' | 'statisticalAnalysis' | 'alertAgent' | 'pdfReport';
     label: string;
     icon: React.ElementType;
     description: string;
@@ -160,19 +178,24 @@ const DRAGGABLE_ITEMS: DraggableItem[] = [
     { type: 'http', label: 'HTTP Request', icon: Globe, description: 'Fetch data from an external API', category: 'Data' },
     { type: 'mysql', label: 'MySQL', icon: Database, description: 'Query data from MySQL database', category: 'Data' },
     { type: 'sapFetch', label: 'SAP S/4HANA', icon: Database, description: 'Read data from SAP S/4HANA OData API', category: 'Data' },
+    { type: 'limsFetch', label: 'LIMS Connector', icon: FlaskConical, description: 'Fetch data from Laboratory Information Management System', category: 'Data' },
     { type: 'esios', label: 'Energy Prices', icon: Zap, description: 'Fetch prices from Red Eléctrica', category: 'Data' },
     { type: 'climatiq', label: 'Emission Factors', icon: Leaf, description: 'Search CO2 emission factors', category: 'Data' },
     { type: 'manualInput', label: 'Manual Data Input', icon: Edit, description: 'Define a variable with a value', category: 'Data' },
     { type: 'condition', label: 'If / Else', icon: AlertCircle, description: 'Branch based on conditions', category: 'Logic' },
     { type: 'join', label: 'Join', icon: GitMerge, description: 'Combine data from two sources', category: 'Logic' },
     { type: 'splitColumns', label: 'Split by Columns', icon: Columns, description: 'Split dataset by columns into two outputs', category: 'Logic' },
+    { type: 'agent', label: 'AI Agent', icon: Bot, description: 'Autonomous AI agent that can execute workflows and make decisions', category: 'Logic' },
     { type: 'llm', label: 'AI Generation', icon: Sparkles, description: 'Generate text using AI', category: 'Logic' },
     { type: 'python', label: 'Python Code', icon: Code, description: 'Run Python script', category: 'Logic' },
+    { type: 'statisticalAnalysis', label: 'Statistical Analysis', icon: TrendingUp, description: 'Perform PCA, SPC, or compare with golden batch', category: 'Logic' },
+    { type: 'alertAgent', label: 'Alert Agent', icon: Bell, description: 'Configure deterministic alerts with conditions and actions', category: 'Logic' },
     { type: 'addField', label: 'Add Field', icon: CheckCircle, description: 'Add a new field to data', category: 'Logic' },
     { type: 'humanApproval', label: 'Human in the Loop', icon: UserCheck, description: 'Wait for user approval to continue', category: 'Logic' },
     { type: 'sendEmail', label: 'Send Email', icon: Mail, description: 'Send an email notification', category: 'Actions' },
     { type: 'sendSMS', label: 'Send SMS', icon: Smartphone, description: 'Send an SMS text message via Twilio', category: 'Actions' },
     { type: 'dataVisualization', label: 'Data Visualization', icon: BarChart3, description: 'Generate charts from data using AI', category: 'Actions' },
+    { type: 'pdfReport', label: 'PDF Report Generator', icon: FileCheck, description: 'Generate structured PDF reports from data', category: 'Actions' },
     { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },
     { type: 'output', label: 'Output', icon: LogOut, description: 'Display workflow output data', category: 'Actions' },
     { type: 'comment', label: 'Comment', icon: MessageSquare, description: 'Add a note or comment', category: 'Other' },
@@ -697,6 +720,32 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [selectedApproverUserId, setSelectedApproverUserId] = useState<string>('');
     const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(false);
 
+    // LIMS Fetch Node State
+    const [configuringLIMSNodeId, setConfiguringLIMSNodeId] = useState<string | null>(null);
+    const [limsServerUrl, setLimsServerUrl] = useState<string>('');
+    const [limsApiKey, setLimsApiKey] = useState<string>('');
+    const [limsEndpoint, setLimsEndpoint] = useState<string>('materials');
+    const [limsQuery, setLimsQuery] = useState<string>('');
+
+    // Statistical Analysis Node State
+    const [configuringStatisticalNodeId, setConfiguringStatisticalNodeId] = useState<string | null>(null);
+    const [statisticalMethod, setStatisticalMethod] = useState<'pca' | 'spc' | 'regression' | 'goldenBatch'>('goldenBatch');
+    const [statisticalParams, setStatisticalParams] = useState<string>('{}');
+    const [goldenBatchId, setGoldenBatchId] = useState<string>('');
+
+    // Alert Agent Node State
+    const [configuringAlertAgentNodeId, setConfiguringAlertAgentNodeId] = useState<string | null>(null);
+    const [alertConditions, setAlertConditions] = useState<string>('[]');
+    const [alertSeverity, setAlertSeverity] = useState<'critical' | 'warning' | 'info'>('warning');
+    const [alertActions, setAlertActions] = useState<string[]>(['email']);
+    const [alertRecipients, setAlertRecipients] = useState<string>('');
+
+    // PDF Report Node State
+    const [configuringPdfReportNodeId, setConfiguringPdfReportNodeId] = useState<string | null>(null);
+    const [pdfTemplate, setPdfTemplate] = useState<string>('standard');
+    const [pdfReportData, setPdfReportData] = useState<string>('{}');
+    const [pdfOutputPath, setPdfOutputPath] = useState<string>('');
+
     const [dataViewTab, setDataViewTab] = useState<'input' | 'output'>('output');
     const [splitViewTab, setSplitViewTab] = useState<'input' | 'outputA' | 'outputB'>('outputA');
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
@@ -731,6 +780,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
     // Toast State
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | null>(null);
 
     // Export Modal State
     const [showEmbedCode, setShowEmbedCode] = useState(false);
@@ -771,8 +821,43 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
     const showToast = (message: string, type: 'success' | 'error' = 'success') => {
         setToast({ message, type });
-        setTimeout(() => setToast(null), 3000);
+        setTimeout(() => setToast(null), 4000);
     };
+
+    // Auto-save functionality
+    useEffect(() => {
+        if (!currentWorkflowId || !hasUnsavedChanges) return;
+        
+        const autoSaveTimer = setTimeout(async () => {
+            if (workflowName.trim()) {
+                setAutoSaveStatus('saving');
+                try {
+                    const data = { nodes, connections };
+                    const res = await fetch(`${API_BASE}/workflows/${currentWorkflowId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            name: workflowName, 
+                            data,
+                            tags: workflowTags,
+                            lastEditedByName: user?.name || user?.email?.split('@')[0] || 'Unknown'
+                        }),
+                        credentials: 'include'
+                    });
+                    if (res.ok) {
+                        setAutoSaveStatus('saved');
+                        setHasUnsavedChanges(false);
+                        setTimeout(() => setAutoSaveStatus(null), 2000);
+                    }
+                } catch (error) {
+                    console.error('Auto-save failed:', error);
+                    setAutoSaveStatus(null);
+                }
+            }
+        }, 2000); // Auto-save after 2 seconds of inactivity
+
+        return () => clearTimeout(autoSaveTimer);
+    }, [nodes, connections, workflowName, workflowTags, currentWorkflowId, hasUnsavedChanges]);
 
     // Generate shareable URL and embed code
     const getShareableUrl = () => {
@@ -1035,6 +1120,50 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     useEffect(() => {
         fetchWorkflows();
     }, []);
+
+    // Auto-hide completed status tags after 5 seconds
+    useEffect(() => {
+        const completedNodes = nodes.filter(n => n.status === 'completed');
+        
+        if (completedNodes.length > 0) {
+            const timers = completedNodes.map(node => {
+                return setTimeout(() => {
+                    setNodes(prev => prev.map(n => 
+                        n.id === node.id && n.status === 'completed' 
+                            ? { ...n, status: 'idle' as const }
+                            : n
+                    ));
+                }, 5000); // Ocultar después de 5 segundos
+            });
+
+            return () => {
+                timers.forEach(timer => clearTimeout(timer));
+            };
+        }
+    }, [nodes]);
+    
+    // Set correct tab when opening data preview modal
+    useEffect(() => {
+        if (!viewingDataNodeId) return;
+        
+        const node = nodes.find(n => n.id === viewingDataNodeId);
+        if (!node) return;
+        
+        const isSplitColumnsNode = node.type === 'splitColumns';
+        if (isSplitColumnsNode) return; // Split columns has its own tab logic
+        
+        // Check what data is available
+        const hasInput = node.inputData !== undefined && node.inputData !== null;
+        const hasOutput = (node.outputData !== undefined && node.outputData !== null) || 
+                         (node.data !== undefined && node.data !== null);
+        
+        // Set tab to output if available, otherwise input
+        if (hasOutput) {
+            setDataViewTab('output');
+        } else if (hasInput) {
+            setDataViewTab('input');
+        }
+    }, [viewingDataNodeId, nodes]);
     
     // Debug: Measure heights when canvas view is active
     useEffect(() => {
@@ -2207,6 +2336,126 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         }
     };
 
+    // LIMS Fetch Node Functions
+    const openLIMSConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'limsFetch') {
+            setConfiguringLIMSNodeId(nodeId);
+            setLimsServerUrl(node.config?.limsServerUrl || '');
+            setLimsApiKey(node.config?.limsApiKey || '');
+            setLimsEndpoint(node.config?.limsEndpoint || 'materials');
+            setLimsQuery(node.config?.limsQuery || '');
+        }
+    };
+
+    const saveLIMSConfig = () => {
+        if (!configuringLIMSNodeId) return;
+        setNodes(prev => prev.map(n =>
+            n.id === configuringLIMSNodeId
+                ? {
+                    ...n,
+                    config: {
+                        ...n.config,
+                        limsServerUrl,
+                        limsApiKey,
+                        limsEndpoint,
+                        limsQuery
+                    }
+                }
+                : n
+        ));
+        setConfiguringLIMSNodeId(null);
+    };
+
+    // Statistical Analysis Node Functions
+    const openStatisticalConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'statisticalAnalysis') {
+            setConfiguringStatisticalNodeId(nodeId);
+            setStatisticalMethod(node.config?.statisticalMethod || 'goldenBatch');
+            setStatisticalParams(node.config?.statisticalParams || '{}');
+            setGoldenBatchId(node.config?.goldenBatchId || '');
+        }
+    };
+
+    const saveStatisticalConfig = () => {
+        if (!configuringStatisticalNodeId) return;
+        setNodes(prev => prev.map(n =>
+            n.id === configuringStatisticalNodeId
+                ? {
+                    ...n,
+                    config: {
+                        ...n.config,
+                        statisticalMethod,
+                        statisticalParams,
+                        goldenBatchId
+                    }
+                }
+                : n
+        ));
+        setConfiguringStatisticalNodeId(null);
+    };
+
+    // Alert Agent Node Functions
+    const openAlertAgentConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'alertAgent') {
+            setConfiguringAlertAgentNodeId(nodeId);
+            setAlertConditions(node.config?.alertConditions || '[]');
+            setAlertSeverity(node.config?.alertSeverity || 'warning');
+            setAlertActions(node.config?.alertActions || ['email']);
+            setAlertRecipients(node.config?.alertRecipients || '');
+        }
+    };
+
+    const saveAlertAgentConfig = () => {
+        if (!configuringAlertAgentNodeId) return;
+        setNodes(prev => prev.map(n =>
+            n.id === configuringAlertAgentNodeId
+                ? {
+                    ...n,
+                    config: {
+                        ...n.config,
+                        alertConditions,
+                        alertSeverity,
+                        alertActions,
+                        alertRecipients
+                    }
+                }
+                : n
+        ));
+        setConfiguringAlertAgentNodeId(null);
+    };
+
+    // PDF Report Node Functions
+    const openPdfReportConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'pdfReport') {
+            setConfiguringPdfReportNodeId(nodeId);
+            setPdfTemplate(node.config?.pdfTemplate || 'standard');
+            setPdfReportData(node.config?.pdfReportData || '{}');
+            setPdfOutputPath(node.config?.pdfOutputPath || '');
+        }
+    };
+
+    const savePdfReportConfig = () => {
+        if (!configuringPdfReportNodeId) return;
+        setNodes(prev => prev.map(n =>
+            n.id === configuringPdfReportNodeId
+                ? {
+                    ...n,
+                    config: {
+                        ...n.config,
+                        pdfTemplate,
+                        pdfReportData,
+                        pdfOutputPath
+                    }
+                }
+                : n
+        ));
+        setConfiguringPdfReportNodeId(null);
+    };
+
     const openHumanApprovalConfig = async (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
         if (node && node.type === 'humanApproval') {
@@ -2810,6 +3059,196 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         }
                     } else {
                         result = 'SAP connection not configured';
+                    }
+                    break;
+                case 'limsFetch':
+                    if (node.config?.limsServerUrl && node.config?.limsApiKey) {
+                        try {
+                            const response = await fetch(`${API_BASE}/lims/fetch`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    serverUrl: node.config.limsServerUrl,
+                                    apiKey: node.config.limsApiKey,
+                                    endpoint: node.config.limsEndpoint || 'materials',
+                                    query: node.config.limsQuery || ''
+                                }),
+                                credentials: 'include'
+                            });
+                            if (response.ok) {
+                                const data = await response.json();
+                                nodeData = Array.isArray(data) ? data : [data];
+                                result = `Fetched ${nodeData.length} records from LIMS`;
+                            } else {
+                                const errorData = await response.json();
+                                result = `Error: ${errorData.error || 'Failed to fetch from LIMS'}`;
+                                nodeData = [{ error: errorData.error || 'Failed to fetch from LIMS' }];
+                            }
+                        } catch (error: any) {
+                            result = `Error: ${error.message}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'LIMS not configured';
+                    }
+                    break;
+                case 'statisticalAnalysis':
+                    if (node.config?.statisticalMethod) {
+                        try {
+                            const params = node.config.statisticalParams ? JSON.parse(node.config.statisticalParams) : {};
+                            const response = await fetch(`${API_BASE}/statistical/analyze`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    method: node.config.statisticalMethod,
+                                    inputData: inputData,
+                                    params: params,
+                                    goldenBatchId: node.config.goldenBatchId || null
+                                }),
+                                credentials: 'include'
+                            });
+                            if (response.ok) {
+                                const data = await response.json();
+                                nodeData = data.results || [data];
+                                result = `Analysis completed: ${node.config.statisticalMethod}`;
+                            } else {
+                                const errorData = await response.json();
+                                result = `Error: ${errorData.error || 'Statistical analysis failed'}`;
+                                nodeData = [{ error: errorData.error || 'Statistical analysis failed' }];
+                            }
+                        } catch (error: any) {
+                            result = `Error: ${error.message}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'Statistical analysis not configured';
+                    }
+                    break;
+                case 'alertAgent':
+                    if (node.config?.alertConditions) {
+                        try {
+                            const conditions = JSON.parse(node.config.alertConditions);
+                            let alertTriggered = false;
+                            let alertMessage = '';
+
+                            // Evaluate conditions
+                            if (inputData) {
+                                const data = Array.isArray(inputData) ? inputData : [inputData];
+                                for (const condition of conditions) {
+                                    const field = condition.field;
+                                    const operator = condition.operator;
+                                    const value = condition.value;
+                                    
+                                    for (const record of data) {
+                                        const fieldValue = record[field];
+                                        let matches = false;
+                                        
+                                        switch (operator) {
+                                            case '>':
+                                                matches = Number(fieldValue) > Number(value);
+                                                break;
+                                            case '<':
+                                                matches = Number(fieldValue) < Number(value);
+                                                break;
+                                            case '>=':
+                                                matches = Number(fieldValue) >= Number(value);
+                                                break;
+                                            case '<=':
+                                                matches = Number(fieldValue) <= Number(value);
+                                                break;
+                                            case '==':
+                                                matches = String(fieldValue) === String(value);
+                                                break;
+                                            case '!=':
+                                                matches = String(fieldValue) !== String(value);
+                                                break;
+                                        }
+                                        
+                                        if (matches) {
+                                            alertTriggered = true;
+                                            alertMessage = condition.message || `Alert: ${field} ${operator} ${value}`;
+                                            break;
+                                        }
+                                    }
+                                    if (alertTriggered) break;
+                                }
+                            }
+
+                            if (alertTriggered) {
+                                // Execute alert actions
+                                const actions = node.config.alertActions || ['email'];
+                                const recipients = node.config.alertRecipients?.split(',').map(r => r.trim()) || [];
+                                
+                                for (const action of actions) {
+                                    if (action === 'email' && recipients.length > 0) {
+                                        // Send email alert
+                                        await fetch(`${API_BASE}/send-email`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                to: recipients.filter(r => r.includes('@')).join(','),
+                                                subject: `[${node.config.alertSeverity?.toUpperCase()}] ${alertMessage}`,
+                                                body: alertMessage
+                                            }),
+                                            credentials: 'include'
+                                        });
+                                    } else if (action === 'sms' && recipients.length > 0) {
+                                        // Send SMS alert
+                                        await fetch(`${API_BASE}/send-sms`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                to: recipients.filter(r => !r.includes('@')).join(','),
+                                                body: alertMessage
+                                            }),
+                                            credentials: 'include'
+                                        });
+                                    }
+                                }
+                                
+                                result = `Alert triggered: ${alertMessage}`;
+                                nodeData = [{ alert: true, message: alertMessage, severity: node.config.alertSeverity }];
+                            } else {
+                                result = 'No alerts triggered';
+                                nodeData = [{ alert: false }];
+                            }
+                        } catch (error: any) {
+                            result = `Error: ${error.message}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'Alert agent not configured';
+                    }
+                    break;
+                case 'pdfReport':
+                    if (node.config?.pdfTemplate) {
+                        try {
+                            const reportData = node.config.pdfReportData ? JSON.parse(node.config.pdfReportData) : inputData;
+                            const response = await fetch(`${API_BASE}/pdf/generate`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    template: node.config.pdfTemplate,
+                                    data: reportData,
+                                    outputPath: node.config.pdfOutputPath || ''
+                                }),
+                                credentials: 'include'
+                            });
+                            if (response.ok) {
+                                const data = await response.json();
+                                nodeData = [{ pdfPath: data.path, pdfUrl: data.url }];
+                                result = `PDF report generated: ${data.path || data.url}`;
+                            } else {
+                                const errorData = await response.json();
+                                result = `Error: ${errorData.error || 'PDF generation failed'}`;
+                                nodeData = [{ error: errorData.error || 'PDF generation failed' }];
+                            }
+                        } catch (error: any) {
+                            result = `Error: ${error.message}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'PDF report not configured';
                     }
                     break;
                 case 'sendEmail':
@@ -3856,6 +4295,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
         setNodes(prev => [...prev, newNode]);
         setDraggingItem(null);
+        setHasUnsavedChanges(true);
         
         // Send node add to other users
         sendNodeAdd(newNode);
@@ -3868,7 +4308,56 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         
         // Send node delete to other users
         sendNodeDelete(id);
+        setHasUnsavedChanges(true);
     };
+
+    // Duplicate node function
+    const duplicateNode = (id: string) => {
+        const nodeToDuplicate = nodes.find(n => n.id === id);
+        if (!nodeToDuplicate) return;
+
+        const newNode: WorkflowNode = {
+            ...nodeToDuplicate,
+            id: generateUUID(),
+            x: nodeToDuplicate.x + 50,
+            y: nodeToDuplicate.y + 50,
+            status: 'idle',
+            executionResult: undefined,
+            data: undefined,
+            inputData: undefined,
+            outputData: undefined,
+            conditionResult: undefined
+        };
+
+        setNodes(prev => [...prev, newNode]);
+        sendNodeAdd(newNode);
+        setHasUnsavedChanges(true);
+        showToast('Node duplicated', 'success');
+    };
+
+    // Track selected node for duplication
+    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ctrl/Cmd + D to duplicate selected node
+            if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedNodeId) {
+                e.preventDefault();
+                duplicateNode(selectedNodeId);
+            }
+            // Ctrl/Cmd + S to save
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                if (currentWorkflowId && workflowName.trim()) {
+                    saveWorkflow();
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedNodeId, nodes, currentWorkflowId, workflowName]);
 
     // Quick connect component function
     const handleQuickConnect = (componentType: string) => {
@@ -3897,6 +4386,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         // Add node
         setNodes(prev => [...prev, newNode]);
         sendNodeAdd(newNode);
+        setHasUnsavedChanges(true);
 
         // Create connection
         const newConnection: Connection = {
@@ -3905,6 +4395,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             toNodeId: newNode.id
         };
         setConnections(prev => [...prev, newConnection]);
+        setHasUnsavedChanges(true);
         sendConnectionAdd(newConnection);
 
         // Close modal
@@ -3963,6 +4454,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 inputPort: finalInputPort
             };
             setConnections(prev => [...prev, newConnection]);
+            setHasUnsavedChanges(true);
             
             // Send connection add to other users
             sendConnectionAdd(newConnection);
@@ -3973,14 +4465,113 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     };
 
     const getNodeColor = (type: string, status?: string) => {
-        if (status === 'running') return 'bg-white border border-yellow-400/60 text-slate-900 shadow-sm';
-        if (status === 'completed') return 'bg-white border border-[#256A65]/60 text-slate-900 shadow-sm';
-        if (status === 'error') return 'bg-white border border-red-400/60 text-slate-900 shadow-sm';
-        if (status === 'waiting') return 'bg-white border border-orange-400/60 text-slate-900 shadow-sm';
+        // Todos los nodos tienen el mismo estilo base - diseño consistente y limpio
+        const baseStyle = 'bg-white text-slate-900';
+        
+        if (status === 'completed') return `${baseStyle} border-2 border-green-200 shadow-md`;
+        if (status === 'running') return `${baseStyle} border border-slate-200 shadow-md`;
+        if (status === 'error') return `${baseStyle} border border-red-100 shadow-md`;
+        if (status === 'waiting') return `${baseStyle} border border-slate-200 shadow-md`;
 
-        // Idle/not executed nodes are white
-        if (type === 'comment') return 'bg-amber-50 border border-amber-300/60 text-amber-900';
-        return 'bg-white border border-slate-300 text-slate-700';
+        // Idle/not executed nodes - diseño consistente
+        return `${baseStyle} border border-slate-200 shadow-sm`;
+    };
+
+    // Función para verificar si un nodo está configurado
+    const isNodeConfigured = (node: WorkflowNode): boolean => {
+        switch (node.type) {
+            case 'fetchData':
+                return !!node.config?.entityId;
+            case 'condition':
+                return !!node.config?.conditionField;
+            case 'addField':
+                return !!node.config?.conditionField;
+            case 'saveRecords':
+                return !!node.config?.entityId;
+            case 'llm':
+                return !!node.config?.llmPrompt;
+            case 'python':
+                return !!node.config?.pythonCode;
+            case 'join':
+                return !!node.config?.joinStrategy;
+            case 'splitColumns':
+                return (node.config?.columnsOutputA?.length || 0) > 0 || (node.config?.columnsOutputB?.length || 0) > 0;
+            case 'excelInput':
+                return !!node.config?.fileName;
+            case 'pdfInput':
+                return !!node.config?.pdfText;
+            case 'manualInput':
+                return !!node.config?.inputVarName;
+            case 'http':
+                return !!node.config?.httpUrl;
+            case 'webhook':
+                return true; // Webhooks siempre están configurados
+            case 'mysql':
+                return !!node.config?.mysqlQuery;
+            case 'sapFetch':
+                return true; // SAP siempre está configurado
+            case 'limsFetch':
+                return !!(node.config?.limsServerUrl && node.config?.limsApiKey);
+            case 'statisticalAnalysis':
+                return !!node.config?.statisticalMethod;
+            case 'alertAgent':
+                return !!node.config?.alertConditions;
+            case 'pdfReport':
+                return !!node.config?.pdfTemplate;
+            case 'sendEmail':
+                return !!node.config?.emailTo;
+            case 'sendSMS':
+                return !!node.config?.smsTo;
+            case 'dataVisualization':
+                return !!node.config?.generatedWidget;
+            case 'esios':
+                return !!node.config?.esiosArchiveId;
+            case 'climatiq':
+                return !!node.config?.climatiqFactor;
+            case 'humanApproval':
+                return !!node.config?.assignedUserId;
+            case 'comment':
+                return !!node.config?.commentText;
+            case 'trigger':
+            case 'action':
+            case 'output':
+            case 'agent':
+            case 'opcua':
+            case 'mqtt':
+                return true; // Estos tipos siempre están configurados
+            default:
+                return false;
+        }
+    };
+
+    // Función para obtener el tag que se muestra arriba del nodo
+    // Solo se muestra si NO hay información en la sección de feedback (executionResult o not configured)
+    const getNodeTopTag = (node: WorkflowNode): { label: string; color: string; icon: React.ElementType } | null => {
+        // Si hay executionResult o no está configurado, NO mostrar el tag arriba (se muestra abajo en feedback)
+        const hasFeedback = node.executionResult || !isNodeConfigured(node);
+        if (hasFeedback) {
+            return null;
+        }
+        
+        // Si tiene estado de ejecución y no hay feedback, mostrar el estado arriba
+        if (node.status && node.status !== 'idle') {
+            // Los errores siempre se muestran arriba si no hay feedback
+            if (node.status === 'error') {
+                return { label: 'Error', color: 'bg-red-50 border-red-200 text-red-700', icon: XCircle };
+            }
+            
+            // Otros estados solo si está configurado
+            if (isNodeConfigured(node)) {
+                const statusMap: { [key: string]: { label: string; color: string; icon: React.ElementType } } = {
+                    'completed': { label: 'Completed', color: 'bg-green-50 border-green-200 text-green-700', icon: CheckCircle },
+                    'running': { label: 'Running', color: 'bg-yellow-50 border-yellow-200 text-yellow-700', icon: Play },
+                    'waiting': { label: 'Waiting', color: 'bg-orange-50 border-orange-200 text-orange-700', icon: Clock }
+                };
+                return statusMap[node.status] || null;
+            }
+        }
+        
+        return null;
     };
 
     // Get icon for node type (matches sidebar icons)
@@ -3989,34 +4580,47 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         return item?.icon || Workflow;
     };
 
-    // Get icon background color for node type
+    // Get icon background color for node type - Usa los mismos colores que el sidebar
     const getNodeIconBg = (type: string) => {
+        // Devuelve solo el color de texto como en el sidebar, sin fondo ni bordes
+        return getNodeIconColor(type);
+    };
+
+    // Get icon text color for node type (for palette items)
+    const getNodeIconColor = (type: string): string => {
         switch (type) {
-            case 'trigger': return 'bg-gradient-to-br from-cyan-50 to-cyan-100 text-cyan-700 border border-cyan-200';
-            case 'action': return 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 border border-blue-200';
-            case 'condition': return 'bg-gradient-to-br from-slate-50 to-slate-100 text-slate-700 border border-slate-200';
-            case 'fetchData': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
-            case 'humanApproval': return 'bg-gradient-to-br from-sky-50 to-sky-100 text-sky-700 border border-sky-200';
-            case 'addField': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
-            case 'saveRecords': return 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 border border-blue-200';
-            case 'llm': return 'bg-gradient-to-br from-slate-50 to-slate-100 text-slate-700 border border-slate-200';
-            case 'python': return 'bg-gradient-to-br from-sky-50 to-sky-100 text-sky-700 border border-sky-200';
-            case 'manualInput': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
-            case 'output': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
-            case 'http': return 'bg-gradient-to-br from-cyan-50 to-cyan-100 text-cyan-700 border border-cyan-200';
-            case 'mysql': return 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 border border-blue-200';
-            case 'sapFetch': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
-            case 'esios': return 'bg-gradient-to-br from-cyan-50 to-cyan-100 text-cyan-700 border border-cyan-200';
-            case 'climatiq': return 'bg-gradient-to-br from-sky-50 to-sky-100 text-sky-700 border border-sky-200';
-            case 'join': return 'bg-gradient-to-br from-cyan-50 to-cyan-100 text-cyan-700 border border-cyan-200';
-            case 'splitColumns': return 'bg-gradient-to-br from-sky-50 to-sky-100 text-sky-700 border border-sky-200';
-            case 'excelInput': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
-            case 'pdfInput': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
-            case 'sendEmail': return 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 border border-blue-200';
-            case 'sendSMS': return 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 border border-blue-200';
-            case 'dataVisualization': return 'bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200';
-            case 'webhook': return 'bg-gradient-to-br from-cyan-50 to-cyan-100 text-cyan-700 border border-cyan-200';
-            default: return 'bg-gradient-to-br from-slate-50 to-slate-100 text-slate-700 border border-slate-200';
+            case 'trigger': return 'text-cyan-600';
+            case 'action': return 'text-blue-600';
+            case 'condition': return 'text-slate-600';
+            case 'fetchData': return 'text-indigo-600';
+            case 'humanApproval': return 'text-sky-600';
+            case 'addField': return 'text-indigo-600';
+            case 'saveRecords': return 'text-blue-600';
+            case 'llm': return 'text-slate-600';
+            case 'python': return 'text-sky-600';
+            case 'manualInput': return 'text-indigo-600';
+            case 'output': return 'text-indigo-600';
+            case 'http': return 'text-cyan-600';
+            case 'mysql': return 'text-blue-600';
+            case 'sapFetch': return 'text-indigo-600';
+            case 'limsFetch': return 'text-purple-600';
+            case 'statisticalAnalysis': return 'text-emerald-600';
+            case 'alertAgent': return 'text-orange-600';
+            case 'pdfReport': return 'text-red-600';
+            case 'esios': return 'text-cyan-600';
+            case 'climatiq': return 'text-sky-600';
+            case 'join': return 'text-cyan-600';
+            case 'splitColumns': return 'text-sky-600';
+            case 'excelInput': return 'text-indigo-600';
+            case 'pdfInput': return 'text-indigo-600';
+            case 'sendEmail': return 'text-blue-600';
+            case 'sendSMS': return 'text-blue-600';
+            case 'dataVisualization': return 'text-indigo-600';
+            case 'webhook': return 'text-cyan-600';
+            case 'agent': return 'text-purple-600';
+            case 'opcua': return 'text-indigo-600';
+            case 'mqtt': return 'text-cyan-600';
+            default: return 'text-slate-600';
         }
     };
 
@@ -4030,22 +4634,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const getCategoryColors = (categoryName: string): { bg: string; hover: string } => {
         const colorMap: { [key: string]: { bg: string; hover: string } } = {
             'Recents': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
-            'Control Flow': { bg: 'bg-blue-50/50', hover: 'hover:bg-blue-50' },
-            'Data and Variables': { bg: 'bg-purple-50/50', hover: 'hover:bg-purple-50' },
-            'String Operations': { bg: 'bg-cyan-50/50', hover: 'hover:bg-cyan-50' },
-            'Date and Time': { bg: 'bg-amber-50/50', hover: 'hover:bg-amber-50' },
-            'Output and Logging': { bg: 'bg-emerald-50/50', hover: 'hover:bg-emerald-50' },
-            'File & Folder Operations': { bg: 'bg-orange-50/50', hover: 'hover:bg-orange-50' },
-            'Excel / Spreadsheet': { bg: 'bg-green-50/50', hover: 'hover:bg-green-50' },
-            'CSV': { bg: 'bg-lime-50/50', hover: 'hover:bg-lime-50' },
-            'Database': { bg: 'bg-indigo-50/50', hover: 'hover:bg-indigo-50' },
-            'Web and API': { bg: 'bg-teal-50/50', hover: 'hover:bg-teal-50' },
-            'Email': { bg: 'bg-pink-50/50', hover: 'hover:bg-pink-50' },
-            'FTP/SFTP': { bg: 'bg-rose-50/50', hover: 'hover:bg-rose-50' },
-            'Security': { bg: 'bg-red-50/50', hover: 'hover:bg-red-50' },
-            'Code Block': { bg: 'bg-violet-50/50', hover: 'hover:bg-violet-50' },
-            'Exception Handling': { bg: 'bg-yellow-50/50', hover: 'hover:bg-yellow-50' },
-            'Advanced Logic': { bg: 'bg-fuchsia-50/50', hover: 'hover:bg-fuchsia-50' },
+            'Triggers': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
+            'Data Sources': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
+            'Data Operations': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
+            'Control Flow': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
+            'Models': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
+            'Agents': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
+            'Code': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
+            'Output & Logging': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
+            'Notifications': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
+            'Advanced': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
         };
         return colorMap[categoryName] || { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' };
     };
@@ -4292,11 +4890,27 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                 <Tag size={18} className="text-slate-600" />
                             </button>
+                            {/* Auto-save indicator */}
+                            {autoSaveStatus && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
+                                    {autoSaveStatus === 'saving' ? (
+                                        <>
+                                            <span className="animate-spin">⟳</span>
+                                            <span className="text-slate-600">Saving...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle size={14} className="text-emerald-600" />
+                                            <span className="text-emerald-600">Saved</span>
+                                        </>
+                                    )}
+                                </div>
+                            )}
                             <button
                                 onClick={saveWorkflow}
                                 disabled={isSaving}
                                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
-                                title="Save"
+                                title="Save (Ctrl+S)"
                             >
                                 {isSaving ? <span className="animate-spin">⟳</span> : <Save size={18} className="text-slate-600" />}
                             </button>
@@ -4365,29 +4979,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <div ref={sidebarScrollRef} className="flex-1 overflow-y-auto bg-white custom-scrollbar" style={{ minHeight: 0, height: 0, flex: '1 1 0%' }}>
                                     {/* Folder Structure */}
                                     {(() => {
-                                        // Organize items into folders
+                                        // Organize items into folders - reorganized for better clarity
                                         const folderStructure: { [key: string]: { icon: React.ElementType, items: DraggableItem[] } } = {
                                             'Recents': { icon: Clock, items: [] },
-                                            'Control Flow': { icon: GitMerge, items: DRAGGABLE_ITEMS.filter(i => ['condition', 'join', 'splitColumns'].includes(i.type)) },
-                                            'Data and Variables': { icon: Database, items: DRAGGABLE_ITEMS.filter(i => ['fetchData', 'manualInput', 'saveRecords', 'esios', 'climatiq'].includes(i.type)) },
-                                            'String Operations': { icon: MessageSquare, items: [] },
-                                            'Date and Time': { icon: Calendar, items: [] },
-                                            'Output and Logging': { icon: LogOut, items: DRAGGABLE_ITEMS.filter(i => ['output', 'comment', 'dataVisualization'].includes(i.type)) },
-                                            'File & Folder Operations': { icon: FolderOpen, items: DRAGGABLE_ITEMS.filter(i => ['pdfInput'].includes(i.type)) },
-                                            'Excel / Spreadsheet': { icon: FileSpreadsheet, items: DRAGGABLE_ITEMS.filter(i => ['excelInput'].includes(i.type)) },
-                                            'CSV': { icon: FileSpreadsheet, items: [] },
-                                            'Database': { icon: Database, items: DRAGGABLE_ITEMS.filter(i => ['mysql', 'sapFetch'].includes(i.type)) },
-                                            'Web and API': { icon: Globe, items: DRAGGABLE_ITEMS.filter(i => ['http', 'webhook'].includes(i.type)) },
-                                            'Email': { icon: Mail, items: DRAGGABLE_ITEMS.filter(i => ['sendEmail', 'sendSMS'].includes(i.type)) },
-                                            'FTP/SFTP': { icon: FolderOpen, items: [] },
-                                            'Security': { icon: Shield, items: [] },
-                                            'Code Block': { icon: Code, items: DRAGGABLE_ITEMS.filter(i => ['python', 'llm'].includes(i.type)) },
-                                            'Exception Handling': { icon: AlertCircle, items: [] },
-                                            'Advanced Logic': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['humanApproval', 'addField', 'action'].includes(i.type)) },
+                                            'Triggers': { icon: Play, items: DRAGGABLE_ITEMS.filter(i => ['trigger', 'webhook'].includes(i.type)) },
+                                            'Data Sources': { icon: Database, items: DRAGGABLE_ITEMS.filter(i => ['fetchData', 'excelInput', 'pdfInput', 'http', 'mysql', 'sapFetch', 'limsFetch', 'opcua', 'mqtt', 'esios', 'climatiq'].includes(i.type)) },
+                                            'Data Operations': { icon: GitMerge, items: DRAGGABLE_ITEMS.filter(i => ['saveRecords', 'manualInput', 'join', 'splitColumns', 'addField'].includes(i.type)) },
+                                            'Control Flow': { icon: AlertCircle, items: DRAGGABLE_ITEMS.filter(i => ['condition', 'humanApproval', 'alertAgent'].includes(i.type)) },
+                                            'Models': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['llm', 'dataVisualization', 'statisticalAnalysis'].includes(i.type)) },
+                                            'Agents': { icon: Bot, items: DRAGGABLE_ITEMS.filter(i => ['agent'].includes(i.type)) },
+                                            'Code': { icon: Code, items: DRAGGABLE_ITEMS.filter(i => ['python'].includes(i.type)) },
+                                            'Output & Logging': { icon: LogOut, items: DRAGGABLE_ITEMS.filter(i => ['output', 'comment'].includes(i.type)) },
+                                            'Notifications': { icon: Mail, items: DRAGGABLE_ITEMS.filter(i => ['sendEmail', 'sendSMS', 'pdfReport'].includes(i.type)) },
+                                            'Advanced': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['action'].includes(i.type)) },
                                         };
 
-                                        // Add triggers to Recents (as example)
-                                        folderStructure['Recents'].items = DRAGGABLE_ITEMS.filter(i => ['trigger', 'webhook'].includes(i.type));
+                                        // Add recently used items to Recents (empty for now, can be populated dynamically)
+                                        folderStructure['Recents'].items = [];
                                         
                                         // Filter folders based on search and remove empty folders
                                         const visibleFolders = Object.entries(folderStructure).filter(([folderName, folder]) => {
@@ -4458,7 +5066,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     onDragStart={(e) => handleDragStart(e, item)}
                                                                     className="flex items-center gap-2.5 px-4 py-1.5 pl-8 hover:bg-slate-50 cursor-grab transition-colors group"
                                                                 >
-                                                                    <item.icon size={13} className="text-slate-600 flex-shrink-0" />
+                                                                    <item.icon size={13} className={`${getNodeIconColor(item.type)} flex-shrink-0`} />
                                                                     <span className="text-xs text-slate-700 group-hover:text-slate-900 transition-colors">{item.label}</span>
                                                                 </div>
                                                             ))}
@@ -4694,38 +5302,72 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         if (!fromNode || !toNode) return null;
 
                                         // Calculate line positions (from right of fromNode to left of toNode)
-                                        const x1 = fromNode.x + 96; // Half width of node (192px / 2)
+                                        // IMPORTANT: Nodes use transform: translate(-50%, -50%), so node.x and node.y are the CENTER of the node
+                                        const NODE_WIDTH = 320;
+                                        const NODE_HALF_WIDTH = NODE_WIDTH / 2; // 160px
                                         
-                                        // For condition and splitColumns nodes, adjust Y position based on output type
-                                        // Connectors use top-[28px] and top-[calc(100%-28px)]
-                                        // Since nodes use translate(-50%, -50%), we need to offset from center
-                                        let y1 = fromNode.y;
-                                        if (fromNode.type === 'condition') {
-                                            // Use fixed offset of 28px from center to match connector positions
-                                            if (conn.outputType === 'true') {
-                                                y1 = fromNode.y - 28; // TRUE connector position
-                                            } else if (conn.outputType === 'false') {
-                                                y1 = fromNode.y + 28; // FALSE connector position
-                                            }
-                                        } else if (fromNode.type === 'splitColumns') {
-                                            // Use fixed offset of 28px from center to match connector positions
-                                            if (conn.outputType === 'A') {
-                                                y1 = fromNode.y - 28; // Output A position
-                                            } else if (conn.outputType === 'B') {
-                                                y1 = fromNode.y + 28; // Output B position
+                                        // Conector visual: w-5 h-5 (20px) con border-2
+                                        // El círculo visible tiene 20px de diámetro
+                                        // El contenedor tiene translate-x-1/2 o -translate-x-1/2 que mueve 50% del tamaño del contenedor
+                                        // El contenedor tiene el tamaño del círculo (20px) porque el hit area con inset-0 se ajusta al padre
+                                        // Por lo tanto, translate mueve 10px (50% de 20px)
+                                        const CONNECTOR_SIZE = 20; // w-5 h-5 = 20px (tamaño del círculo visible)
+                                        const CONNECTOR_RADIUS = CONNECTOR_SIZE / 2; // 10px (centro del círculo)
+                                        
+                                        // OUTPUT CONNECTORS (right side of fromNode)
+                                        // right-0 = borde derecho del nodo = node.x + 160
+                                        // translate-x-1/2 mueve el contenedor 10px a la derecha (50% de 20px)
+                                        // Centro del círculo = node.x + 160 + 10
+                                        const x1 = fromNode.x + NODE_HALF_WIDTH + CONNECTOR_RADIUS;
+                                        
+                                        // Calculate Y1 - connectors are positioned relative to node center
+                                        // top-1/2 = centro vertical del nodo = node.y
+                                        // -translate-y-1/2 mueve el contenedor -10px verticalmente (50% de 20px)
+                                        // Centro del círculo = node.y - 10
+                                        let y1 = fromNode.y - CONNECTOR_RADIUS;
+                                        
+                                        if (fromNode.type === 'condition' || fromNode.type === 'splitColumns') {
+                                            const estimatedHalfHeight = 65; // Aproximadamente 130px de altura total
+                                            
+                                            if ((fromNode.type === 'condition' && conn.outputType === 'true') ||
+                                                (fromNode.type === 'splitColumns' && conn.outputType === 'A')) {
+                                                // Top connector: top:28px + translate(50%, -50%)
+                                                // top:28px desde el borde superior = node.y - 65 + 28
+                                                // translate-y-1/2 mueve -10px → node.y - 65 + 28 - 10
+                                                y1 = fromNode.y - estimatedHalfHeight + 28 - CONNECTOR_RADIUS;
+                                            } else if ((fromNode.type === 'condition' && conn.outputType === 'false') ||
+                                                       (fromNode.type === 'splitColumns' && conn.outputType === 'B')) {
+                                                // Bottom connector: bottom:28px + translate(50%, 50%)
+                                                // bottom:28px desde el borde inferior = node.y + 65 - 28
+                                                // translate-y-1/2 mueve +10px → node.y + 65 - 28 + 10
+                                                y1 = fromNode.y + estimatedHalfHeight - 28 + CONNECTOR_RADIUS;
                                             }
                                         }
                                         
-                                        const x2 = toNode.x - 96;
+                                        // INPUT CONNECTORS (left side of toNode)
+                                        // left-0 = borde izquierdo del nodo = node.x - 160
+                                        // -translate-x-1/2 mueve el contenedor -10px a la izquierda (50% de 20px)
+                                        // Centro del círculo = node.x - 160 - 10
+                                        const x2 = toNode.x - NODE_HALF_WIDTH - CONNECTOR_RADIUS;
                                         
-                                        // For join nodes, adjust Y position based on input port
-                                        let y2 = toNode.y;
+                                        // Calculate Y2
+                                        // top-1/2 = centro vertical del nodo = node.y
+                                        // -translate-y-1/2 mueve el contenedor -10px verticalmente (50% de 20px)
+                                        // Centro del círculo = node.y - 10
+                                        let y2 = toNode.y - CONNECTOR_RADIUS;
+                                        
                                         if (toNode.type === 'join') {
-                                            // Use fixed offset of 28px from center to match connector positions
+                                            const estimatedHalfHeight = 65; // Altura aproximada del nodo join / 2
                                             if (conn.inputPort === 'A') {
-                                                y2 = toNode.y - 28; // Input A position
+                                                // Input A: top:60px + translate(-50%, -50%)
+                                                // top:60px desde el borde superior = node.y - 65 + 60
+                                                // translate-y-1/2 mueve -10px → node.y - 65 + 60 - 10
+                                                y2 = toNode.y - estimatedHalfHeight + 60 - CONNECTOR_RADIUS;
                                             } else if (conn.inputPort === 'B') {
-                                                y2 = toNode.y + 28; // Input B position
+                                                // Input B: top:90px + translate(-50%, -50%)
+                                                // top:90px desde el borde superior = node.y - 65 + 90
+                                                // translate-y-1/2 mueve -10px → node.y - 65 + 90 - 10
+                                                y2 = toNode.y - estimatedHalfHeight + 90 - CONNECTOR_RADIUS;
                                             }
                                         }
 
@@ -4815,7 +5457,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         pointerEvents: 'none'
                                                     }}
                                                 />
-                                                {/* End point circle (replaces arrow) - same size as connector circles (w-4 h-4 = 16px, so r=8) */}
+                                                {/* End point circle (replaces arrow) - perfectly aligned with connector point */}
+                                                {/* Connector circles are w-5 h-5 (20px) with border-2 (2px border on each side = 4px total) */}
+                                                {/* Inner circle diameter = 20px - 4px = 16px, so radius = 8px */}
+                                                {/* The visual center of the connector is at (x2, y2) */}
+                                                {/* We match the inner circle radius for perfect visual alignment */}
+                                                {/* Using r="8" to match the inner filled area of the connector circle */}
                                                 <circle
                                                     cx={x2}
                                                     cy={y2}
@@ -4823,7 +5470,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     fill={strokeColor}
                                                     stroke="white"
                                                     strokeWidth="2"
-                                                    style={{ pointerEvents: 'none' }}
+                                                    style={{ 
+                                                        pointerEvents: 'none',
+                                                        shapeRendering: 'geometricPrecision',
+                                                        // Ensure perfect pixel alignment
+                                                        transform: 'translate(0, 0)'
+                                                    }}
                                                 />
                                                 {/* Delete button on hover */}
                                                 {!isRunning && hoveredConnection === conn.id && (
@@ -4896,6 +5548,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             // Don't trigger on connector points or delete button
                                             if ((e.target as HTMLElement).closest('.connector-point, button')) return;
                                             
+                                            // Select node for duplication
+                                            setSelectedNodeId(node.id);
+                                            
                                             // Don't open modal if node was dragged
                                             if (nodeDragged) return;
 
@@ -4908,6 +5563,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openAddFieldConfig(node.id);
                                             } else if (node.type === 'saveRecords') {
                                                 openSaveRecordsConfig(node.id);
+                                            } else if (node.type === 'agent') {
+                                                openAgentConfig(node.id);
                                             } else if (node.type === 'llm') {
                                                 openLLMConfig(node.id);
                                             } else if (node.type === 'python') {
@@ -4922,6 +5579,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openMySQLConfig(node.id);
                                             } else if (node.type === 'sapFetch') {
                                                 openSAPConfig(node.id);
+                                            } else if (node.type === 'limsFetch') {
+                                                openLIMSConfig(node.id);
+                                            } else if (node.type === 'statisticalAnalysis') {
+                                                openStatisticalConfig(node.id);
+                                            } else if (node.type === 'alertAgent') {
+                                                openAlertAgentConfig(node.id);
+                                            } else if (node.type === 'pdfReport') {
+                                                openPdfReportConfig(node.id);
                                             } else if (node.type === 'sendEmail') {
                                                 openEmailConfig(node.id);
                                             } else if (node.type === 'sendSMS') {
@@ -4950,17 +5615,31 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             left: node.x,
                                             top: node.y,
                                             transform: 'translate(-50%, -50%)', // Center on drop point
-                                            width: '192px', // Enforce fixed width (w-48)
+                                            width: '320px', // Nodo aún más ancho para mejor legibilidad
+                                            minHeight: 'auto', // Altura mínima automática
                                             cursor: (node.data || ['fetchData', 'condition', 'addField', 'saveRecords', 'llm'].includes(node.type)) ? 'grab' : 'default',
-                                            zIndex: 10,
-                                            // Fixed height for nodes with dual connectors to ensure consistent positioning
-                                            ...(node.type === 'condition' || node.type === 'join' || node.type === 'splitColumns' ? { minHeight: '112px' } : {})
+                                            zIndex: 10
                                         }}
-                                        className={`flex flex-col p-4 rounded-xl border shadow-sm w-48 group relative select-none backdrop-blur-sm ${draggingNodeId === node.id ? '' : 'transition-all duration-300'} ${getNodeColor(node.type, node.status)} ${node.status === 'completed' ? 'ring-2 ring-[#256A65]/30' : ''}`}
+                                        className={`flex flex-col rounded-xl shadow-md group relative select-none ${draggingNodeId === node.id ? '' : 'transition-all duration-200'} ${getNodeColor(node.type, node.status)} hover:shadow-lg ${node.status === 'completed' ? 'hover:border-green-300' : 'hover:border-slate-300'}`}
                                     >
-                                        {/* Hover Action Buttons - Above Node */}
+                                        {/* Top Tag - Not Configured o Estado de Ejecución - Centrado arriba, sin solaparse */}
+                                        {getNodeTopTag(node) && (
+                                            <div 
+                                                className={`absolute -top-10 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-xs font-medium whitespace-nowrap z-20 ${getNodeTopTag(node)!.color} shadow-md max-w-[calc(100%-80px)]`}
+                                                style={{ 
+                                                    transform: 'translate(-50%, 0)',
+                                                    pointerEvents: 'none'
+                                                }}
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                            >
+                                                {React.createElement(getNodeTopTag(node)!.icon, { size: 13 })}
+                                                <span className="truncate">{getNodeTopTag(node)!.label}</span>
+                                            </div>
+                                        )}
+
+                                        {/* Hover Action Buttons - Top right */}
                                         <div 
-                                            className="absolute -top-7 left-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all bg-white rounded-md shadow-sm border border-slate-200 p-0.5"
+                                            className="absolute -top-9 right-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all z-30"
                                             onMouseDown={(e) => e.stopPropagation()}
                                         >
                                             <button
@@ -4968,232 +5647,374 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     e.stopPropagation();
                                                     handleRunNode(node.id);
                                                 }}
-                                                className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-[#256A65] transition-all"
+                                                className="p-2 bg-white hover:bg-slate-50 rounded-lg shadow-md border border-slate-200 text-slate-600 hover:text-[#256A65] transition-all"
                                                 title="Run Node"
                                             >
-                                                <Play size={12} fill="currentColor" />
+                                                <Play size={14} fill="currentColor" />
                                             </button>
-                                            {((node.data && Array.isArray(node.data) && node.data.length > 0) || 
-                                              (node.type === 'splitColumns' && node.data && (node.data.outputA?.length > 0 || node.data.outputB?.length > 0))) && (
+                                            {((node.data && (Array.isArray(node.data) && node.data.length > 0 || (typeof node.data === 'object' && node.data !== null))) ||
+                                              (node.inputData && (Array.isArray(node.inputData) && node.inputData.length > 0 || (typeof node.inputData === 'object' && node.inputData !== null))) ||
+                                              (node.outputData && (Array.isArray(node.outputData) && node.outputData.length > 0 || (typeof node.outputData === 'object' && node.outputData !== null))) ||
+                                              (node.type === 'splitColumns' && node.outputData && (node.outputData.outputA?.length > 0 || node.outputData.outputB?.length > 0))) && (
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setViewingDataNodeId(node.id);
                                                     }}
-                                                    className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-slate-800 transition-all"
+                                                    className="p-2 bg-white hover:bg-slate-50 rounded-lg shadow-md border border-slate-200 text-slate-600 hover:text-slate-800 transition-all"
                                                     title="View Data"
                                                 >
-                                                    <Database size={12} />
+                                                    <Database size={14} />
                                                 </button>
                                             )}
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
+                                                    duplicateNode(node.id);
+                                                }}
+                                                className="p-2 bg-white hover:bg-blue-50 rounded-lg shadow-md border border-slate-200 text-slate-600 hover:text-blue-600 transition-all"
+                                                title="Duplicate Node (Ctrl+D)"
+                                            >
+                                                <Copy size={14} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
                                                     removeNode(node.id);
                                                 }}
-                                                className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-red-500 transition-all"
+                                                className="p-2 bg-white hover:bg-red-50 rounded-lg shadow-md border border-slate-200 text-slate-600 hover:text-red-600 transition-all"
                                                 title="Delete Node"
                                             >
-                                                <X size={12} />
+                                                <X size={14} />
                                             </button>
                                         </div>
 
                                         {/* Node Content */}
-                                        {node.type === 'comment' ? (
-                                            /* Comment Node Special Layout */
-                                            <div className="flex flex-col">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs font-normal">
-                                                        A
-                                                    </div>
-                                                    <span className="text-xs text-slate-500">Comment</span>
+                                        <div className="flex flex-col p-5 min-w-0">
+                                            {node.type === 'comment' ? (
+                                                /* Comment Node Special Layout */
+                                                <div className="flex flex-col">
+                                                    <textarea
+                                                        value={node.config?.commentText || ''}
+                                                        onChange={(e) => {
+                                                            const newText = e.target.value;
+                                                            setNodes(prev => prev.map(n =>
+                                                                n.id === node.id
+                                                                    ? { ...n, config: { ...n.config, commentText: newText } }
+                                                                    : n
+                                                            ));
+                                                        }}
+                                                        placeholder="Write a comment..."
+                                                        className="w-full p-3 text-sm bg-transparent border-none resize-none focus:outline-none text-slate-700 min-h-[60px] rounded-lg hover:bg-slate-50 transition-colors"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
                                                 </div>
-                                                <textarea
-                                                    value={node.config?.commentText || ''}
-                                                    onChange={(e) => {
-                                                        const newText = e.target.value;
-                                                        setNodes(prev => prev.map(n =>
-                                                            n.id === node.id
-                                                                ? { ...n, config: { ...n.config, commentText: newText } }
-                                                                : n
-                                                        ));
-                                                    }}
-                                                    placeholder="Write a comment..."
-                                                    className="w-full p-2 text-xs bg-transparent border-none resize-none focus:outline-none text-slate-700 min-h-[40px]"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
+                                            ) : (
+                                                /* Regular Node Layout - Estructura Reorganizada */
+                                                <>
+                                                    {/* Sección 1: Header - Solo Título e Icono - Alineado a la izquierda */}
+                                                    <div className="flex items-center gap-4 py-2">
+                                                        {/* Node Icon */}
+                                                        {node.type === 'humanApproval' && node.config?.assignedUserId ? (
+                                                            <div className="flex-shrink-0">
+                                                                <UserAvatar 
+                                                                    name={node.config.assignedUserName} 
+                                                                    profilePhoto={node.config.assignedUserPhoto} 
+                                                                    size="sm" 
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="p-2.5 rounded-lg flex-shrink-0 flex items-center justify-center">
+                                                                {React.createElement(getNodeIcon(node.type), { size: 20, className: getNodeIconBg(node.type) })}
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Title */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <h3 className="text-xl font-normal text-slate-900 break-words leading-snug" title={node.label} style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                                {node.label}
+                                                            </h3>
+                                                        </div>
+
+                                                        {/* Options Menu - Posicionado absolutamente */}
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                // Abrir menú de opciones o configurar nodo
+                                                                if (node.type === 'fetchData') {
+                                                                    openNodeConfig(node.id);
+                                                                } else if (node.type === 'condition') {
+                                                                    openConditionConfig(node.id);
+                                                                } else if (node.type === 'addField') {
+                                                                    openAddFieldConfig(node.id);
+                                                                } else if (node.type === 'saveRecords') {
+                                                                    openSaveConfig(node.id);
+                                                                } else if (node.type === 'llm') {
+                                                                    openLLMConfig(node.id);
+                                                                } else if (node.type === 'python') {
+                                                                    openPythonConfig(node.id);
+                                                                } else if (node.type === 'join') {
+                                                                    openJoinConfig(node.id);
+                                                                } else if (node.type === 'splitColumns') {
+                                                                    openSplitColumnsConfig(node.id);
+                                                                } else if (node.type === 'excelInput') {
+                                                                    openExcelConfig(node.id);
+                                                                } else if (node.type === 'pdfInput') {
+                                                                    openPdfConfig(node.id);
+                                                                } else if (node.type === 'manualInput') {
+                                                                    openManualInputConfig(node.id);
+                                                                } else if (node.type === 'http') {
+                                                                    openHttpConfig(node.id);
+                                                                } else if (node.type === 'webhook') {
+                                                                    openWebhookConfig(node.id);
+                                                                } else if (node.type === 'mysql') {
+                                                                    openMySQLConfig(node.id);
+                                                                } else if (node.type === 'sapFetch') {
+                                                                    openSAPConfig(node.id);
+                                                                } else if (node.type === 'limsFetch') {
+                                                                    openLIMSConfig(node.id);
+                                                                } else if (node.type === 'statisticalAnalysis') {
+                                                                    openStatisticalConfig(node.id);
+                                                                } else if (node.type === 'alertAgent') {
+                                                                    openAlertAgentConfig(node.id);
+                                                                } else if (node.type === 'pdfReport') {
+                                                                    openPdfReportConfig(node.id);
+                                                                } else if (node.type === 'sendEmail') {
+                                                                    openEmailConfig(node.id);
+                                                                } else if (node.type === 'sendSMS') {
+                                                                    openSMSConfig(node.id);
+                                                                } else if (node.type === 'dataVisualization') {
+                                                                    openVisualizationConfig(node.id);
+                                                                } else if (node.type === 'esios') {
+                                                                    openEsiosConfig(node.id);
+                                                                } else if (node.type === 'climatiq') {
+                                                                    openClimatiqConfig(node.id);
+                                                                } else if (node.type === 'humanApproval') {
+                                                                    openHumanApprovalConfig(node.id);
+                                                                }
+                                                            }}
+                                                            className="absolute top-2 right-2 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                                            title="Configure"
+                                                        >
+                                                            <MoreVertical size={16} />
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Human Approval Waiting UI - Sección de Datos Relevantes */}
+                                                    {node.type === 'humanApproval' && node.status === 'waiting' && (
+                                                        <div className="mb-4 space-y-3 pt-4 border-t border-slate-100">
+                                                            <div className="text-xs text-orange-700 font-medium flex items-center gap-2">
+                                                                <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                                                                Waiting for approval...
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleApproval(true);
+                                                                    }}
+                                                                    className="flex-1 px-4 py-2 bg-[#256A65] hover:bg-[#1e554f] text-white text-xs font-medium rounded-lg transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-1.5"
+                                                                >
+                                                                    <Check size={14} />
+                                                                    Accept
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleApproval(false);
+                                                                    }}
+                                                                    className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-1.5"
+                                                                >
+                                                                    <X size={14} />
+                                                                    Reject
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+
+                                        {/* Node Details - Consistent styling */}
+                                        {node.type === 'fetchData' && node.config?.entityName && (
+                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
+                                                <p className="text-xs text-slate-600 break-words leading-relaxed">
+                                                    <span className="font-medium">{node.config.entityName}</span>
+                                                    {node.data && (
+                                                        <span className="ml-2 text-slate-500">• {node.data.length} records</span>
+                                                    )}
+                                                </p>
                                             </div>
-                                        ) : (
-                                            /* Regular Node Layout */
-                                            <>
-                                                <div className="flex items-center gap-2.5">
-                                                    {/* Node Icon */}
-                                                    {node.type === 'humanApproval' && node.config?.assignedUserId ? (
-                                                        <div className="flex-shrink-0">
-                                                            <UserAvatar 
-                                                                name={node.config.assignedUserName} 
-                                                                profilePhoto={node.config.assignedUserPhoto} 
-                                                                size="sm" 
-                                                            />
-                                                        </div>
-                                                    ) : (
-                                                        <div className={`p-2 rounded-lg flex-shrink-0 shadow-sm transition-transform group-hover:scale-110 ${getNodeIconBg(node.type)}`}>
-                                                            {React.createElement(getNodeIcon(node.type), { size: 18 })}
-                                                        </div>
-                                                    )}
-                                                    <div className="flex-1 font-normal text-sm truncate text-slate-900" title={node.label}>{node.label}</div>
-                                                    {node.status === 'completed' && (
-                                                        <div className="flex-shrink-0 p-1 bg-[#256A65]/10 rounded-full">
-                                                            <Check size={14} className="text-[#256A65]" />
-                                                        </div>
-                                                    )}
-                                                    {node.status === 'error' && (
-                                                        <div className="flex-shrink-0 p-1 bg-red-100 rounded-full">
-                                                            <XCircle size={14} className="text-red-600" />
-                                                        </div>
-                                                    )}
-                                                    {node.status === 'running' && (
-                                                        <div className="flex-shrink-0 p-1 bg-yellow-100 rounded-full">
-                                                            <div className="w-3 h-3 border-2 border-yellow-600 border-t-transparent rounded-full animate-spin" />
-                                                        </div>
-                                                    )}
-                                                    {node.status === 'waiting' && (
-                                                        <div className="flex-shrink-0 p-1 bg-orange-100 rounded-full">
-                                                            <UserCheck size={14} className="text-orange-600 animate-pulse" />
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {node.executionResult && (
-                                                    <div className="mt-2 text-xs italic opacity-75">
-                                                        {node.executionResult}
-                                                    </div>
-                                                )}
-
-                                                {/* Human Approval Waiting UI */}
-                                                {node.type === 'humanApproval' && node.status === 'waiting' && (
-                                                    <div className="mt-3 space-y-2">
-                                                        <div className="text-xs text-orange-700 font-medium flex items-center gap-1">
-                                                            <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-                                                            Waiting for approval...
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleApproval(true);
-                                                                }}
-                                                                className="flex-1 px-3 py-1.5 bg-[#256A65] hover:bg-[#1e554f] text-white text-xs font-normal rounded-md transition-colors flex items-center justify-center gap-1"
-                                                            >
-                                                                <Check size={14} />
-                                                                Accept
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleApproval(false);
-                                                                }}
-                                                                className="flex-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-normal rounded-md transition-colors flex items-center justify-center gap-1"
-                                                            >
-                                                                <X size={14} />
-                                                                Reject
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </>
                                         )}
 
-                                        {node.type === 'fetchData' && node.config?.entityName && (
-                                            <div className="mt-2 text-xs font-medium text-[#256A65]">
-                                                Entity: {node.config.entityName}
-                                                {node.data && (
-                                                    <span className="ml-2 text-[#256A65]">({node.data.length} records)</span>
-                                                )}
+                                        {node.type === 'limsFetch' && node.config?.limsEndpoint && (
+                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
+                                                <p className="text-xs text-slate-600 break-words leading-relaxed">
+                                                    <span className="font-medium">Endpoint: {node.config.limsEndpoint}</span>
+                                                    {node.data && (
+                                                        <span className="ml-2 text-slate-500">• {Array.isArray(node.data) ? node.data.length : 1} records</span>
+                                                    )}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {node.type === 'statisticalAnalysis' && node.config?.statisticalMethod && (
+                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
+                                                <p className="text-xs text-slate-600 break-words leading-relaxed">
+                                                    <span className="font-medium">Method: {node.config.statisticalMethod}</span>
+                                                    {node.config.goldenBatchId && (
+                                                        <span className="ml-2 text-slate-500">• Golden Batch: {node.config.goldenBatchId}</span>
+                                                    )}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {node.type === 'alertAgent' && node.config?.alertSeverity && (
+                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
+                                                <p className="text-xs text-slate-600 break-words leading-relaxed">
+                                                    <span className="font-medium capitalize">Severity: {node.config.alertSeverity}</span>
+                                                    {node.config.alertActions && node.config.alertActions.length > 0 && (
+                                                        <span className="ml-2 text-slate-500">• Actions: {node.config.alertActions.join(', ')}</span>
+                                                    )}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {node.type === 'pdfReport' && node.config?.pdfTemplate && (
+                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
+                                                <p className="text-xs text-slate-600 break-words leading-relaxed">
+                                                    <span className="font-medium">Template: {node.config.pdfTemplate}</span>
+                                                    {node.data && node.data[0]?.pdfPath && (
+                                                        <span className="ml-2 text-slate-500">• Generated</span>
+                                                    )}
+                                                </p>
                                             </div>
                                         )}
 
                                         {node.type === 'join' && (
-                                            <div className="mt-2 text-xs font-medium text-cyan-700">
-                                                {node.config?.joinStrategy === 'mergeByKey'
-                                                    ? `${node.config?.joinType === 'outer' ? 'Outer' : 'Inner'} Join: ${node.config?.joinKey || 'key not set'}`
-                                                    : 'Strategy: Concatenate'}
-                                                {node.inputDataA && node.inputDataB && (
-                                                    <span className="ml-2 text-[#256A65]">✓ Ready</span>
-                                                )}
-                                                {(node.inputDataA || node.inputDataB) && !(node.inputDataA && node.inputDataB) && (
-                                                    <span className="ml-2 text-amber-600">⏳ {node.inputDataA ? 'B' : 'A'}</span>
-                                                )}
+                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
+                                                <div className="flex flex-col gap-2">
+                                                    <p className="text-xs text-slate-600 break-words leading-relaxed">
+                                                        <span className="font-medium">
+                                                            {node.config?.joinStrategy === 'mergeByKey'
+                                                                ? `${node.config?.joinType === 'outer' ? 'Outer' : 'Inner'} Join: ${node.config?.joinKey || 'key not set'}`
+                                                                : 'Strategy: Concatenate'}
+                                                        </span>
+                                                        {node.inputDataA && node.inputDataB && (
+                                                            <span className="ml-2 text-green-600 font-medium">• Ready</span>
+                                                        )}
+                                                        {(node.inputDataA || node.inputDataB) && !(node.inputDataA && node.inputDataB) && (
+                                                            <span className="ml-2 text-amber-500 font-medium">• Waiting {node.inputDataA ? 'B' : 'A'}</span>
+                                                        )}
+                                                    </p>
+                                                </div>
                                             </div>
                                         )}
 
                                         {node.type === 'excelInput' && (
-                                            <div className="mt-2 text-xs font-medium text-emerald-700">
+                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
                                                 {node.config?.fileName ? (
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <span className="truncate max-w-[160px]" title={node.config.fileName}>
-                                                            📄 {node.config.fileName}
-                                                        </span>
-                                                        <span className="text-slate-500">
+                                                    <div className="flex flex-col gap-1.5">
+                                                        <p className="text-xs text-slate-600 font-medium break-words" title={node.config.fileName}>
+                                                            {node.config.fileName}
+                                                        </p>
+                                                        <p className="text-xs text-slate-400">
                                                             {node.config.rowCount} rows • {node.config.headers?.length || 0} cols
-                                                        </span>
+                                                        </p>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-slate-400 italic">Click to upload file</span>
+                                                    <p className="text-xs text-slate-400 italic">Click to upload file</p>
                                                 )}
                                             </div>
                                         )}
 
                                         {node.type === 'condition' && (
-                                            <div className="mt-2 text-xs font-medium text-amber-700">
+                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
                                                 {node.config?.conditionField ? (
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <span>
-                                                            {node.config.conditionField} {node.config.conditionOperator} {node.config.conditionValue || ''}
-                                                        </span>
-                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${node.config.processingMode === 'perRow' ? 'bg-amber-200 text-amber-800' : 'bg-slate-200 text-slate-600'}`}>
-                                                            {node.config.processingMode === 'perRow' ? '⚡ Per Row (filter)' : '📦 Batch'}
+                                                    <div className="flex flex-col gap-2">
+                                                        <p className="text-xs text-slate-600 break-words leading-relaxed">
+                                                            <span className="font-medium">{node.config.conditionField}</span> {node.config.conditionOperator} <span className="font-medium">{node.config.conditionValue || ''}</span>
+                                                        </p>
+                                                        <span className={`text-[10px] px-2.5 py-1 rounded-full w-fit font-medium ${node.config.processingMode === 'perRow' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+                                                            {node.config.processingMode === 'perRow' ? 'Per Row' : 'Batch'}
                                                         </span>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-slate-400 italic">Not configured</span>
+                                                    <p className="text-xs text-slate-400 italic">Not configured</p>
                                                 )}
                                             </div>
                                         )}
 
                                         {node.type === 'splitColumns' && (
-                                            <div className="mt-2 text-xs font-medium text-sky-700">
+                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
                                                 {(node.config?.columnsOutputA?.length || 0) > 0 || (node.config?.columnsOutputB?.length || 0) > 0 ? (
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <div className="flex items-center gap-1">
-                                                            <span className="text-blue-600 font-normal">A:</span>
-                                                            <span>{node.config?.columnsOutputA?.length || 0} cols</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                            <span className="text-purple-600 font-normal">B:</span>
-                                                            <span>{node.config?.columnsOutputB?.length || 0} cols</span>
-                                                        </div>
+                                                    <div className="flex flex-col gap-1.5">
+                                                        <p className="text-xs text-slate-600 break-words">
+                                                            <span className="font-medium text-blue-600">A:</span> {node.config?.columnsOutputA?.length || 0} cols
+                                                        </p>
+                                                        <p className="text-xs text-slate-600 break-words">
+                                                            <span className="font-medium text-purple-600">B:</span> {node.config?.columnsOutputB?.length || 0} cols
+                                                        </p>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-slate-400 italic">Click to configure</span>
+                                                    <p className="text-xs text-slate-400 italic">Click to configure</p>
                                                 )}
                                             </div>
                                         )}
 
                                         {node.type === 'llm' && (
-                                            <div className="mt-2 text-xs font-medium text-violet-700">
+                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
                                                 {node.config?.llmPrompt ? (
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <span className="truncate max-w-[160px]" title={node.config.llmPrompt}>
-                                                            {node.config.llmPrompt.slice(0, 30)}{node.config.llmPrompt.length > 30 ? '...' : ''}
-                                                        </span>
-                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${node.config.processingMode === 'perRow' ? 'bg-violet-200 text-violet-800' : 'bg-slate-200 text-slate-600'}`}>
-                                                            {node.config.processingMode === 'perRow' ? '⚡ Per Row' : '📦 Batch'}
+                                                    <div className="flex flex-col gap-2">
+                                                        <p className="text-xs text-slate-600 break-words leading-relaxed" title={node.config.llmPrompt}>
+                                                            {node.config.llmPrompt}
+                                                        </p>
+                                                        <span className={`text-[10px] px-2.5 py-1 rounded-full w-fit font-medium ${node.config.processingMode === 'perRow' ? 'bg-violet-100 text-violet-700 border border-violet-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+                                                            {node.config.processingMode === 'perRow' ? 'Per Row' : 'Batch'}
                                                         </span>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-slate-400 italic">Not configured</span>
+                                                    <p className="text-xs text-slate-400 italic">Not configured</p>
                                                 )}
+                                            </div>
+                                        )}
+
+                                        {/* Sección 3: Errores y Estado - Al final del nodo */}
+                                        {(node.executionResult || (!isNodeConfigured(node) && node.type !== 'comment')) && (
+                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
+                                                {(() => {
+                                                    // Si hay executionResult, usarlo; si no, mostrar "Not Configured"
+                                                    const message = node.executionResult || 'Not Configured';
+                                                    
+                                                    // Determinar el color según el tipo de mensaje
+                                                    const isError = node.status === 'error' || message.toLowerCase().includes('error');
+                                                    const isNotConfigured = !node.executionResult || 
+                                                                          message.toLowerCase().includes('not configured') || 
+                                                                          message.toLowerCase().includes('not set') ||
+                                                                          message.toLowerCase().includes('click to');
+                                                    
+                                                    let textColor = 'text-slate-500';
+                                                    let bgColor = 'bg-slate-50';
+                                                    let borderColor = 'border-slate-200';
+                                                    
+                                                    if (isError) {
+                                                        textColor = 'text-red-700';
+                                                        bgColor = 'bg-red-50';
+                                                        borderColor = 'border-red-200';
+                                                    } else if (isNotConfigured) {
+                                                        textColor = 'text-amber-700';
+                                                        bgColor = 'bg-amber-50';
+                                                        borderColor = 'border-amber-200';
+                                                    }
+                                                    
+                                                    return (
+                                                        <div className={`px-3 py-2 rounded-lg border ${bgColor} ${borderColor} text-left w-full`}>
+                                                            <p className={`text-xs font-medium break-words leading-relaxed ${textColor} text-left`}>
+                                                                {message}
+                                                            </p>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
                                         )}
 
@@ -5205,7 +6026,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     // Condition nodes have TWO output connectors: TRUE and FALSE
                                                     <>
                                                         {/* TRUE output - top right (green) - fixed position */}
-                                                        <div className="absolute -right-2 group/connector z-30 pointer-events-auto" style={{ top: '28px', transform: 'translateY(-50%)' }}>
+                                                        <div className="absolute right-0 group/connector z-30 pointer-events-auto" style={{ top: '28px', transform: 'translate(50%, -50%)' }}>
                                                             {/* Larger hit area */}
                                                             <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
                                                                 onMouseDown={(e) => {
@@ -5218,12 +6039,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 }}
                                                             />
                                                             {/* Visible connector point */}
-                                                            <div className={`w-4 h-4 bg-green-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'true' ? 'border-green-500 scale-125 bg-green-100 shadow-md' : 'border-green-400 group-hover/connector:border-green-500 group-hover/connector:bg-green-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="TRUE path" />
+                                                            <div className={`w-5 h-5 bg-green-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'true' ? 'border-green-500 scale-125 bg-green-100 shadow-md' : 'border-green-400 group-hover/connector:border-green-500 group-hover/connector:bg-green-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} 
+                                                                title="TRUE path" />
                                                         </div>
                                                         <span className="absolute -right-6 text-[9px] font-normal text-[#256A65]" style={{ top: '28px', transform: 'translateY(-50%)' }}>✓</span>
 
                                                         {/* FALSE output - bottom right (red) - fixed position */}
-                                                        <div className="absolute -right-2 group/connector z-30 pointer-events-auto" style={{ bottom: '28px', transform: 'translateY(50%)' }}>
+                                                        <div className="absolute right-0 group/connector z-30 pointer-events-auto" style={{ bottom: '28px', transform: 'translate(50%, 50%)' }}>
                                                             {/* Larger hit area */}
                                                             <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
                                                                 onMouseDown={(e) => {
@@ -5236,7 +6058,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 }}
                                                             />
                                                             {/* Visible connector point */}
-                                                            <div className={`w-4 h-4 bg-red-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'false' ? 'border-red-500 scale-125 bg-red-100 shadow-md' : 'border-red-400 group-hover/connector:border-red-500 group-hover/connector:bg-red-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="FALSE path" />
+                                                            <div className={`w-5 h-5 bg-red-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'false' ? 'border-red-500 scale-125 bg-red-100 shadow-md' : 'border-red-400 group-hover/connector:border-red-500 group-hover/connector:bg-red-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} 
+                                                                title="FALSE path" />
                                                         </div>
                                                         <span className="absolute -right-6 text-[9px] font-normal text-red-600" style={{ bottom: '28px', transform: 'translateY(50%)' }}>✗</span>
                                                     </>
@@ -5244,7 +6067,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     // Split Columns nodes have TWO output connectors: A and B
                                                     <>
                                                         {/* Output A - top right (blue) - fixed position */}
-                                                        <div className="absolute -right-2 group/connector z-30 pointer-events-auto" style={{ top: '28px', transform: 'translateY(-50%)' }}>
+                                                        <div className="absolute right-0 group/connector z-30 pointer-events-auto" style={{ top: '28px', transform: 'translate(50%, -50%)' }}>
                                                             {/* Larger hit area */}
                                                             <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
                                                                 onMouseDown={(e) => {
@@ -5257,12 +6080,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 }}
                                                             />
                                                             {/* Visible connector point */}
-                                                            <div className={`w-4 h-4 bg-blue-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'A' ? 'border-blue-500 scale-125 bg-blue-100 shadow-md' : 'border-blue-400 group-hover/connector:border-blue-500 group-hover/connector:bg-blue-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="Output A" />
+                                                            <div className={`w-5 h-5 bg-blue-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'A' ? 'border-blue-500 scale-125 bg-blue-100 shadow-md' : 'border-blue-400 group-hover/connector:border-blue-500 group-hover/connector:bg-blue-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} 
+                                                                title="Output A" />
                                                         </div>
                                                         <span className="absolute -right-6 text-[9px] font-normal text-blue-600" style={{ top: '28px', transform: 'translateY(-50%)' }}>A</span>
 
                                                         {/* Output B - bottom right (purple) - fixed position */}
-                                                        <div className="absolute -right-2 group/connector z-30 pointer-events-auto" style={{ bottom: '28px', transform: 'translateY(50%)' }}>
+                                                        <div className="absolute right-0 group/connector z-30 pointer-events-auto" style={{ bottom: '28px', transform: 'translate(50%, 50%)' }}>
                                                             {/* Larger hit area */}
                                                             <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
                                                                 onMouseDown={(e) => {
@@ -5275,14 +6099,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 }}
                                                             />
                                                             {/* Visible connector point */}
-                                                            <div className={`w-4 h-4 bg-purple-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'B' ? 'border-purple-500 scale-125 bg-purple-100 shadow-md' : 'border-purple-400 group-hover/connector:border-purple-500 group-hover/connector:bg-purple-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} title="Output B" />
+                                                            <div className={`w-5 h-5 bg-purple-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'B' ? 'border-purple-500 scale-125 bg-purple-100 shadow-md' : 'border-purple-400 group-hover/connector:border-purple-500 group-hover/connector:bg-purple-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} 
+                                                                title="Output B" />
                                                         </div>
                                                         <span className="absolute -right-6 text-[9px] font-normal text-purple-600" style={{ bottom: '28px', transform: 'translateY(50%)' }}>B</span>
                                                     </>
                                                 ) : (
-                                                    // Regular nodes have ONE output connector
+                                                    // Regular nodes have ONE output connector - centered on right edge
                                                     <div 
-                                                        className="absolute -right-2 top-1/2 -translate-y-1/2 group/connector cursor-crosshair z-30 pointer-events-auto"
+                                                        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 group/connector cursor-crosshair z-30 pointer-events-auto"
                                                         onMouseDown={(e) => {
                                                             e.stopPropagation();
                                                             handleConnectorMouseDown(e, node.id);
@@ -5292,8 +6117,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             handleConnectorMouseUp(e, node.id);
                                                         }}
                                                     >
+                                                        {/* Larger hit area for easier clicking */}
+                                                        <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" />
                                                         {/* Visible connector point */}
-                                                        <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id ? 'border-[#256A65] scale-125 bg-[#256A65]/10 shadow-md' : 'border-slate-400 group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} />
+                                                        <div className={`w-5 h-5 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id ? 'border-[#256A65] scale-125 bg-[#256A65]/10 shadow-md' : 'border-slate-400 group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} />
                                                     </div>
                                                 )}
                                                 
@@ -5303,7 +6130,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         // Join nodes have TWO input connectors: A and B - fixed positions
                                                         <>
                                                             {/* Input A - top left */}
-                                                            <div className="absolute -left-2 group/connector z-30 pointer-events-auto" style={{ top: '28px', transform: 'translateY(-50%)' }}>
+                                                            <div className="absolute left-0 group/connector z-30 pointer-events-auto" style={{ top: '60px', transform: 'translate(-50%, -50%)' }}>
                                                                 {/* Larger hit area */}
                                                                 <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
                                                                     onMouseUp={(e) => {
@@ -5312,10 +6139,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     }}
                                                                 />
                                                                 {/* Visible connector point */}
-                                                                <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none border-slate-400 group-hover/connector:border-cyan-500 group-hover/connector:bg-cyan-50 group-hover/connector:scale-110 group-hover/connector:shadow-md`} title="Input A" />
+                                                                <div className={`w-5 h-5 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none border-slate-400 group-hover/connector:border-cyan-500 group-hover/connector:bg-cyan-50 group-hover/connector:scale-110 group-hover/connector:shadow-md`}
+                                                                    title="Input A" />
                                                             </div>
                                                             {/* Input B - bottom left */}
-                                                            <div className="absolute -left-2 group/connector z-30 pointer-events-auto" style={{ bottom: '28px', transform: 'translateY(50%)' }}>
+                                                            <div className="absolute left-0 group/connector z-30 pointer-events-auto" style={{ top: '90px', transform: 'translate(-50%, -50%)' }}>
                                                                 {/* Larger hit area */}
                                                                 <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
                                                                     onMouseUp={(e) => {
@@ -5324,13 +6152,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     }}
                                                                 />
                                                                 {/* Visible connector point */}
-                                                                <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none border-slate-400 group-hover/connector:border-cyan-500 group-hover/connector:bg-cyan-50 group-hover/connector:scale-110 group-hover/connector:shadow-md`} title="Input B" />
+                                                                <div className={`w-5 h-5 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none border-slate-400 group-hover/connector:border-cyan-500 group-hover/connector:bg-cyan-50 group-hover/connector:scale-110 group-hover/connector:shadow-md`}
+                                                                    title="Input B" />
                                                             </div>
                                                         </>
                                                     ) : (
-                                                        // Regular nodes have ONE input connector
-                                                        <div className="absolute -left-2 top-1/2 -translate-y-1/2 group/connector z-30 pointer-events-auto">
-                                                            {/* Larger hit area */}
+                                                        // Regular nodes have ONE input connector - centered on left edge
+                                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 group/connector z-30 pointer-events-auto">
+                                                            {/* Larger hit area for easier clicking */}
                                                             <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
                                                                 onMouseUp={(e) => {
                                                                     e.stopPropagation();
@@ -5338,7 +6167,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 }}
                                                             />
                                                             {/* Visible connector point */}
-                                                            <div className={`w-4 h-4 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none border-slate-400 group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md`} />
+                                                            <div className={`w-5 h-5 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none border-slate-400 group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md`} />
                                                         </div>
                                                     )
                                                 )}
@@ -5370,21 +6199,32 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 {/* Temporary Connection Line */}
                                 {dragConnectionStart && dragConnectionCurrent && (() => {
                                     const startNode = nodes.find(n => n.id === dragConnectionStart.nodeId)!;
-                                    const startX = startNode.x + 96;
+                                    const NODE_WIDTH = 320;
+                                    const NODE_HALF_WIDTH = NODE_WIDTH / 2; // 160px
+                                    const CONNECTOR_SIZE = 20; // w-5 h-5 = 20px
+                                    const CONNECTOR_RADIUS = CONNECTOR_SIZE / 2; // 10px
+                                    const ESTIMATED_NODE_HALF_HEIGHT = 65;
                                     
-                                    // Adjust Y position for condition and splitColumns node outputs
-                                    let startY = startNode.y;
-                                    if (startNode.type === 'condition') {
-                                        if (dragConnectionStart.outputType === 'true') {
-                                            startY = startNode.y - 20;
-                                        } else if (dragConnectionStart.outputType === 'false') {
-                                            startY = startNode.y + 20;
-                                        }
-                                    } else if (startNode.type === 'splitColumns') {
-                                        if (dragConnectionStart.outputType === 'A') {
-                                            startY = startNode.y - 20;
-                                        } else if (dragConnectionStart.outputType === 'B') {
-                                            startY = startNode.y + 20;
+                                    // Use the actual clicked position if available, otherwise calculate
+                                    // OUTPUT connector: right-0 + translate-x-1/2 = node.x + 160 + 10
+                                    const startX = dragConnectionStart.x || (startNode.x + NODE_HALF_WIDTH + CONNECTOR_RADIUS);
+                                    // top-1/2 -translate-y-1/2 = node.y - 10
+                                    let startY = dragConnectionStart.y || (startNode.y - CONNECTOR_RADIUS);
+                                    
+                                    // If we need to calculate Y position for special node types
+                                    if (!dragConnectionStart.y) {
+                                        if (startNode.type === 'condition') {
+                                            if (dragConnectionStart.outputType === 'true') {
+                                                startY = startNode.y - ESTIMATED_NODE_HALF_HEIGHT + 28 - CONNECTOR_RADIUS;
+                                            } else if (dragConnectionStart.outputType === 'false') {
+                                                startY = startNode.y + ESTIMATED_NODE_HALF_HEIGHT - 28 + CONNECTOR_RADIUS;
+                                            }
+                                        } else if (startNode.type === 'splitColumns') {
+                                            if (dragConnectionStart.outputType === 'A') {
+                                                startY = startNode.y - ESTIMATED_NODE_HALF_HEIGHT + 28 - CONNECTOR_RADIUS;
+                                            } else if (dragConnectionStart.outputType === 'B') {
+                                                startY = startNode.y + ESTIMATED_NODE_HALF_HEIGHT - 28 + CONNECTOR_RADIUS;
+                                            }
                                         }
                                     }
                                     
@@ -5442,31 +6282,65 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                 {nodes.length === 0 && (
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
-                                        <div className="text-center max-w-md px-6">
-                                            <div className="mb-6">
-                                                <Workflow size={64} className="mx-auto mb-4 text-slate-300" />
-                                                <h3 className="text-xl font-normal text-slate-700 mb-2">Start building your workflow</h3>
-                                                <p className="text-sm text-slate-500 mb-6">
-                                                    Drag components from the sidebar or create your workflow with AI
+                                        <div className="text-center max-w-lg px-6">
+                                            <div className="mb-8">
+                                                <div className="relative mb-6">
+                                                    <div className="absolute inset-0 bg-gradient-to-br from-[#256A65]/10 to-slate-100/50 rounded-full blur-3xl"></div>
+                                                    <Workflow size={80} className="mx-auto relative text-slate-300" />
+                                                </div>
+                                                <h3 className="text-2xl font-normal text-slate-900 mb-3">Start building your workflow</h3>
+                                                <p className="text-sm text-slate-600 mb-8 leading-relaxed">
+                                                    Create powerful automation workflows by dragging components from the sidebar or let AI help you build one
                                                 </p>
                                             </div>
-                                            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                                            <div className="flex flex-col gap-4">
                                                 <button
                                                     onClick={() => setShowAiAssistant(true)}
-                                                    className="flex items-center justify-center gap-2 px-6 py-3 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] transition-colors font-medium shadow-sm"
+                                                    className="flex items-center justify-center gap-2 px-6 py-3.5 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] transition-all font-medium shadow-md hover:shadow-lg transform hover:scale-[1.02]"
                                                 >
-                                                    <Sparkles size={18} />
-                                                    Create with AI
+                                                    <Sparkles size={20} />
+                                                    Create with AI Assistant
                                                 </button>
-                                                <div className="flex items-center gap-2 text-sm text-slate-400">
-                                                    <span className="h-px w-8 bg-slate-300"></span>
-                                                    <span>or</span>
-                                                    <span className="h-px w-8 bg-slate-300"></span>
+                                                <div className="flex items-center gap-3 my-2">
+                                                    <span className="h-px flex-1 bg-slate-200"></span>
+                                                    <span className="text-xs text-slate-400 font-medium">OR</span>
+                                                    <span className="h-px flex-1 bg-slate-200"></span>
                                                 </div>
-                                                <div className="text-xs text-slate-500 flex items-center justify-center gap-1">
-                                                    <span>Drag components</span>
-                                                    <ChevronRight size={14} className="text-slate-400" />
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <button
+                                                        onClick={() => {
+                                                            const triggerItem = DRAGGABLE_ITEMS.find(i => i.type === 'trigger' && i.label === 'Manual Trigger');
+                                                            if (triggerItem) {
+                                                                handleDragStart({ dataTransfer: { setData: () => {} } } as any, triggerItem);
+                                                                const centerX = canvasRef.current ? canvasRef.current.getBoundingClientRect().width / 2 : 400;
+                                                                const centerY = canvasRef.current ? canvasRef.current.getBoundingClientRect().height / 2 : 300;
+                                                                handleDrop({ clientX: centerX, clientY: centerY } as any);
+                                                            }
+                                                        }}
+                                                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all text-sm font-medium text-slate-700 shadow-sm hover:shadow-md"
+                                                    >
+                                                        <Play size={16} className="text-slate-600" />
+                                                        Add Trigger
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            const fetchItem = DRAGGABLE_ITEMS.find(i => i.type === 'fetchData');
+                                                            if (fetchItem) {
+                                                                handleDragStart({ dataTransfer: { setData: () => {} } } as any, fetchItem);
+                                                                const centerX = canvasRef.current ? canvasRef.current.getBoundingClientRect().width / 2 : 400;
+                                                                const centerY = canvasRef.current ? canvasRef.current.getBoundingClientRect().height / 2 : 300;
+                                                                handleDrop({ clientX: centerX, clientY: centerY } as any);
+                                                            }
+                                                        }}
+                                                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all text-sm font-medium text-slate-700 shadow-sm hover:shadow-md"
+                                                    >
+                                                        <Database size={16} className="text-slate-600" />
+                                                        Add Data Source
+                                                    </button>
                                                 </div>
+                                                <p className="text-xs text-slate-400 mt-4">
+                                                    💡 Tip: Drag components from the sidebar to get started
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
@@ -6073,6 +6947,328 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             What would you like this node to do?
                                         </button>
                                     </div>
+                            </NodeConfigSidePanel>
+                        )}
+
+                        {/* LIMS Connector Modal */}
+                        {configuringLIMSNodeId && (
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringLIMSNodeId}
+                                onClose={() => setConfiguringLIMSNodeId(null)}
+                                title="LIMS Connector"
+                                description="Fetch data from Laboratory Information Management System"
+                                icon={FlaskConical}
+                                width="w-[500px]"
+                                footer={
+                                    <>
+                                        <button
+                                            onClick={() => setConfiguringLIMSNodeId(null)}
+                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveLIMSConfig}
+                                            disabled={!limsServerUrl.trim() || !limsApiKey.trim()}
+                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save
+                                        </button>
+                                    </>
+                                }
+                            >
+                                <div className="space-y-5">
+                                    <div>
+                                        <h4 className="text-xs font-medium text-slate-700 mb-3">Connection Settings</h4>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                    LIMS Server URL
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={limsServerUrl}
+                                                    onChange={(e) => setLimsServerUrl(e.target.value)}
+                                                    placeholder="https://lims.company.com/api"
+                                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                    API Key
+                                                </label>
+                                                <input
+                                                    type="password"
+                                                    value={limsApiKey}
+                                                    onChange={(e) => setLimsApiKey(e.target.value)}
+                                                    placeholder="Enter API key"
+                                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                    Endpoint
+                                                </label>
+                                                <select
+                                                    value={limsEndpoint}
+                                                    onChange={(e) => setLimsEndpoint(e.target.value)}
+                                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                                >
+                                                    <option value="materials">Materials (Raw Materials)</option>
+                                                    <option value="batches">Batches</option>
+                                                    <option value="qc">Quality Control Results</option>
+                                                    <option value="analyses">Analyses</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                    Query (Optional)
+                                                </label>
+                                                <textarea
+                                                    value={limsQuery}
+                                                    onChange={(e) => setLimsQuery(e.target.value)}
+                                                    placeholder='{"batchId": "BATCH123", "status": "approved"}'
+                                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 font-mono"
+                                                    rows={3}
+                                                />
+                                                <p className="text-xs text-slate-500 mt-1">JSON query parameters</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </NodeConfigSidePanel>
+                        )}
+
+                        {/* Statistical Analysis Modal */}
+                        {configuringStatisticalNodeId && (
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringStatisticalNodeId}
+                                onClose={() => setConfiguringStatisticalNodeId(null)}
+                                title="Statistical Analysis"
+                                description="Perform PCA, SPC, or compare with golden batch"
+                                icon={TrendingUp}
+                                width="w-[500px]"
+                                footer={
+                                    <>
+                                        <button
+                                            onClick={() => setConfiguringStatisticalNodeId(null)}
+                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveStatisticalConfig}
+                                            disabled={!statisticalMethod}
+                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save
+                                        </button>
+                                    </>
+                                }
+                            >
+                                <div className="space-y-5">
+                                    <div>
+                                        <h4 className="text-xs font-medium text-slate-700 mb-3">Analysis Method</h4>
+                                        <select
+                                            value={statisticalMethod}
+                                            onChange={(e) => setStatisticalMethod(e.target.value as any)}
+                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                        >
+                                            <option value="goldenBatch">Compare with Golden Batch</option>
+                                            <option value="pca">Principal Component Analysis (PCA)</option>
+                                            <option value="spc">Statistical Process Control (SPC)</option>
+                                            <option value="regression">Regression Analysis</option>
+                                        </select>
+                                    </div>
+                                    {statisticalMethod === 'goldenBatch' && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                Golden Batch ID
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={goldenBatchId}
+                                                onChange={(e) => setGoldenBatchId(e.target.value)}
+                                                placeholder="BATCH_REF_001"
+                                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                            />
+                                        </div>
+                                    )}
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            Parameters (JSON)
+                                        </label>
+                                        <textarea
+                                            value={statisticalParams}
+                                            onChange={(e) => setStatisticalParams(e.target.value)}
+                                            placeholder='{"n_components": 3, "tolerance": 0.05}'
+                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 font-mono"
+                                            rows={4}
+                                        />
+                                        <p className="text-xs text-slate-500 mt-1">Analysis-specific parameters in JSON format</p>
+                                    </div>
+                                </div>
+                            </NodeConfigSidePanel>
+                        )}
+
+                        {/* Alert Agent Modal */}
+                        {configuringAlertAgentNodeId && (
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringAlertAgentNodeId}
+                                onClose={() => setConfiguringAlertAgentNodeId(null)}
+                                title="Alert Agent"
+                                description="Configure deterministic alerts with conditions and actions"
+                                icon={Bell}
+                                width="w-[500px]"
+                                footer={
+                                    <>
+                                        <button
+                                            onClick={() => setConfiguringAlertAgentNodeId(null)}
+                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveAlertAgentConfig}
+                                            disabled={!alertConditions.trim()}
+                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save
+                                        </button>
+                                    </>
+                                }
+                            >
+                                <div className="space-y-5">
+                                    <div>
+                                        <h4 className="text-xs font-medium text-slate-700 mb-3">Alert Severity</h4>
+                                        <select
+                                            value={alertSeverity}
+                                            onChange={(e) => setAlertSeverity(e.target.value as any)}
+                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                        >
+                                            <option value="info">Info</option>
+                                            <option value="warning">Warning</option>
+                                            <option value="critical">Critical</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xs font-medium text-slate-700 mb-3">Alert Conditions (JSON)</h4>
+                                        <textarea
+                                            value={alertConditions}
+                                            onChange={(e) => setAlertConditions(e.target.value)}
+                                            placeholder='[{"field": "temperature", "operator": ">", "value": 100, "message": "Temperature exceeded limit"}]'
+                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 font-mono"
+                                            rows={6}
+                                        />
+                                        <p className="text-xs text-slate-500 mt-1">Array of condition objects. Operators: &gt;, &lt;, &gt;=, &lt;=, ==, !=</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xs font-medium text-slate-700 mb-3">Actions</h4>
+                                        <div className="space-y-2">
+                                            {['email', 'sms', 'webhook', 'stop'].map(action => (
+                                                <label key={action} className="flex items-center gap-2 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={alertActions.includes(action)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setAlertActions([...alertActions, action]);
+                                                            } else {
+                                                                setAlertActions(alertActions.filter(a => a !== action));
+                                                            }
+                                                        }}
+                                                        className="w-4 h-4 text-slate-600 border-slate-300 rounded focus:ring-slate-300"
+                                                    />
+                                                    <span className="text-xs text-slate-700 capitalize">{action}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            Recipients (comma-separated)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={alertRecipients}
+                                            onChange={(e) => setAlertRecipients(e.target.value)}
+                                            placeholder="email@example.com, +1234567890"
+                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                        />
+                                        <p className="text-xs text-slate-500 mt-1">Emails or phone numbers</p>
+                                    </div>
+                                </div>
+                            </NodeConfigSidePanel>
+                        )}
+
+                        {/* PDF Report Generator Modal */}
+                        {configuringPdfReportNodeId && (
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringPdfReportNodeId}
+                                onClose={() => setConfiguringPdfReportNodeId(null)}
+                                title="PDF Report Generator"
+                                description="Generate structured PDF reports from data"
+                                icon={FileCheck}
+                                width="w-[500px]"
+                                footer={
+                                    <>
+                                        <button
+                                            onClick={() => setConfiguringPdfReportNodeId(null)}
+                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={savePdfReportConfig}
+                                            disabled={!pdfTemplate.trim()}
+                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save
+                                        </button>
+                                    </>
+                                }
+                            >
+                                <div className="space-y-5">
+                                    <div>
+                                        <h4 className="text-xs font-medium text-slate-700 mb-3">Report Template</h4>
+                                        <select
+                                            value={pdfTemplate}
+                                            onChange={(e) => setPdfTemplate(e.target.value)}
+                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                        >
+                                            <option value="standard">Standard Report</option>
+                                            <option value="goldenBatch">Golden Batch Analysis</option>
+                                            <option value="qc">Quality Control Report</option>
+                                            <option value="compliance">Compliance Report</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            Report Data Structure (JSON)
+                                        </label>
+                                        <textarea
+                                            value={pdfReportData}
+                                            onChange={(e) => setPdfReportData(e.target.value)}
+                                            placeholder='{"title": "Batch Analysis", "sections": [...]}'
+                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 font-mono"
+                                            rows={6}
+                                        />
+                                        <p className="text-xs text-slate-500 mt-1">Optional: Customize report structure. Leave empty to use input data.</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            Output Path (Optional)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={pdfOutputPath}
+                                            onChange={(e) => setPdfOutputPath(e.target.value)}
+                                            placeholder="/reports/batch_analysis.pdf"
+                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                        />
+                                        <p className="text-xs text-slate-500 mt-1">Leave empty for auto-generated path</p>
+                                    </div>
+                                </div>
                             </NodeConfigSidePanel>
                         )}
 
@@ -6859,153 +8055,324 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             const node = nodes.find(n => n.id === viewingDataNodeId);
                             if (!node) return null;
 
+                            // Helper function to normalize data to array format
+                            const normalizeToArray = (data: any): any[] => {
+                                if (!data) return [];
+                                if (Array.isArray(data)) {
+                                    // If array is empty or contains objects, return as is
+                                    return data;
+                                }
+                                if (typeof data === 'object') {
+                                    // Check if it's splitColumns format (has outputA or outputB)
+                                    if (data.outputA !== undefined || data.outputB !== undefined) {
+                                        // This is splitColumns format, return as is (not an array)
+                                        return data as any;
+                                    }
+                                    // Single object, wrap it in array
+                                    return [data];
+                                }
+                                // Primitive value, wrap it
+                                return [{ value: data }];
+                            };
+
                             // Special handling for splitColumns node
                             const isSplitColumnsNode = node.type === 'splitColumns';
-                            const hasInput = node.inputData && Array.isArray(node.inputData) && node.inputData.length > 0;
-                            const hasOutput = !isSplitColumnsNode && node.outputData && Array.isArray(node.outputData) && node.outputData.length > 0;
-                            const hasOutputA = isSplitColumnsNode && node.outputData?.outputA?.length > 0;
-                            const hasOutputB = isSplitColumnsNode && node.outputData?.outputB?.length > 0;
+                            
+                            // Get data from various possible locations
+                            // Input data should only come from explicit inputData (from previous nodes)
+                            // Output data can come from outputData or fallback to node.data
+                            let rawInputData = node.inputData; // Only use explicit inputData
+                            let rawOutputData = node.outputData || node.data; // Use outputData or fallback to node.data
+                            
+                            // Don't use node.data as fallback for input - input should come from previous nodes
+                            // If inputData doesn't exist, it means there's no input (e.g., trigger nodes)
+                            
+                            const nodeInputData = normalizeToArray(rawInputData);
+                            const nodeOutputData = normalizeToArray(rawOutputData);
+                            
+                            const hasInput = rawInputData !== undefined && rawInputData !== null && Array.isArray(nodeInputData) && nodeInputData.length > 0;
+                            const hasOutput = !isSplitColumnsNode && rawOutputData !== undefined && rawOutputData !== null && Array.isArray(nodeOutputData) && nodeOutputData.length > 0;
+                            const hasOutputA = isSplitColumnsNode && nodeOutputData?.outputA?.length > 0;
+                            const hasOutputB = isSplitColumnsNode && nodeOutputData?.outputB?.length > 0;
 
                             if (!hasInput && !hasOutput && !hasOutputA && !hasOutputB) return null;
+                            
+                            // Determine the correct active tab based on available data
+                            // Use output if available and selected, otherwise use input if available
+                            // If current tab is invalid, use the available one
+                            const effectiveTab = !isSplitColumnsNode 
+                                ? ((dataViewTab === 'input' && hasInput) || (dataViewTab === 'output' && hasOutput) 
+                                    ? dataViewTab 
+                                    : (hasOutput ? 'output' : (hasInput ? 'input' : 'output')))
+                                : dataViewTab;
 
                             return (
-                                <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none" onClick={() => setViewingDataNodeId(null)}>
-                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md max-w-4xl max-h-[80vh] overflow-hidden flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
-                                        <div className="flex items-center justify-between mb-4">
-                                            <h3 className="text-lg font-normal text-slate-800">
-                                                {node.label} - Data Preview
-                                            </h3>
+                                <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-black/40 backdrop-blur-sm pointer-events-none" onClick={() => setViewingDataNodeId(null)}>
+                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-[95vw] h-[90vh] overflow-hidden flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                                        {/* Header */}
+                                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white shrink-0">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                                                    <Database className="text-slate-600" size={18} />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                        {node.label} - Data Preview
+                                                    </h3>
+                                                    <p className="text-xs text-slate-500 mt-0.5">View node data</p>
+                                                </div>
+                                            </div>
                                             <button
                                                 onClick={() => setViewingDataNodeId(null)}
-                                                className="p-1 hover:bg-slate-100 rounded"
+                                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                                aria-label="Close"
                                             >
-                                                <X size={20} />
+                                                <X size={18} />
                                             </button>
                                         </div>
 
-                                        {/* Tabs - different for splitColumns */}
-                                        {isSplitColumnsNode ? (
-                                            <div className="flex gap-2 mb-4 border-b">
-                                                {hasInput && (
-                                                    <button
-                                                        onClick={() => setSplitViewTab('input')}
-                                                        className={`px-4 py-2 font-medium transition-all ${splitViewTab === 'input'
-                                                            ? 'text-emerald-600 border-b-2 border-emerald-600'
-                                                            : 'text-slate-600 hover:text-slate-800'
-                                                            }`}
-                                                    >
-                                                        Input ({node.inputData.length})
-                                                    </button>
-                                                )}
-                                                {hasOutputA && (
-                                                    <button
-                                                        onClick={() => setSplitViewTab('outputA')}
-                                                        className={`px-4 py-2 font-medium transition-all ${splitViewTab === 'outputA'
-                                                            ? 'text-blue-600 border-b-2 border-blue-600'
-                                                            : 'text-slate-600 hover:text-slate-800'
-                                                            }`}
-                                                    >
-                                                        <span className="flex items-center gap-1">
-                                                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                                            Output A ({node.outputData.outputA.length})
-                                                        </span>
-                                                    </button>
-                                                )}
-                                                {hasOutputB && (
-                                                    <button
-                                                        onClick={() => setSplitViewTab('outputB')}
-                                                        className={`px-4 py-2 font-medium transition-all ${splitViewTab === 'outputB'
-                                                            ? 'text-purple-600 border-b-2 border-purple-600'
-                                                            : 'text-slate-600 hover:text-slate-800'
-                                                            }`}
-                                                    >
-                                                        <span className="flex items-center gap-1">
-                                                            <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                                                            Output B ({node.outputData.outputB.length})
-                                                        </span>
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <div className="flex gap-2 mb-4 border-b">
-                                                {hasInput && (
-                                                    <button
-                                                        onClick={() => setDataViewTab('input')}
-                                                        className={`px-4 py-2 font-medium transition-all ${dataViewTab === 'input'
-                                                            ? 'text-emerald-600 border-b-2 border-emerald-600'
-                                                            : 'text-slate-600 hover:text-slate-800'
-                                                            }`}
-                                                    >
-                                                        Input ({node.inputData.length})
-                                                    </button>
-                                                )}
-                                                {hasOutput && (
-                                                    <button
-                                                        onClick={() => setDataViewTab('output')}
-                                                        className={`px-4 py-2 font-medium transition-all ${dataViewTab === 'output'
-                                                            ? 'text-emerald-600 border-b-2 border-emerald-600'
-                                                            : 'text-slate-600 hover:text-slate-800'
-                                                            }`}
-                                                    >
-                                                        Output ({node.outputData.length})
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        <div className="overflow-auto flex-1">
-                                            {(() => {
-                                                let displayData: any[];
-                                                if (isSplitColumnsNode) {
-                                                    displayData = splitViewTab === 'input' 
-                                                        ? node.inputData 
-                                                        : splitViewTab === 'outputA' 
-                                                            ? node.outputData?.outputA 
-                                                            : node.outputData?.outputB;
-                                                } else {
-                                                    displayData = dataViewTab === 'input' ? node.inputData : node.outputData;
-                                                }
-                                                
-                                                const MAX_PREVIEW_ROWS = 500;
-                                                const totalRows = displayData?.length || 0;
-                                                const limitedData = displayData?.slice(0, MAX_PREVIEW_ROWS) || [];
-                                                const isLimited = totalRows > MAX_PREVIEW_ROWS;
-                                                
-                                                return displayData && displayData.length > 0 ? (
-                                                    <>
-                                                        {isLimited && (
-                                                            <div className="bg-slate-50 border border-slate-200 text-slate-800 px-4 py-2 rounded-lg mb-3 text-xs flex items-center gap-2">
-                                                                <span>⚠️</span>
-                                                                <span>Showing first {MAX_PREVIEW_ROWS} of {totalRows.toLocaleString()} rows for performance</span>
-                                                            </div>
-                                                        )}
-                                                        <table className="w-full text-sm">
-                                                            <thead className="bg-slate-100 sticky top-0">
-                                                                <tr>
-                                                                    {Object.keys(displayData[0]).map(key => (
-                                                                        <th key={key} className="px-4 py-2 text-left font-normal text-slate-700 border-b">
-                                                                            {key}
-                                                                        </th>
-                                                                    ))}
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {limitedData.map((record: any, idx: number) => (
-                                                                    <tr key={idx} className="border-b hover:bg-slate-50">
-                                                                        {Object.values(record).map((value: any, vidx: number) => (
-                                                                            <td key={vidx} className="px-4 py-2">
-                                                                                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                                                                            </td>
-                                                                        ))}
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    </>
+                                        {/* Content with tabs */}
+                                        <div className="flex-1 overflow-hidden flex flex-col px-6 py-4">
+                                            {/* Tabs - different for splitColumns */}
+                                            {isSplitColumnsNode ? (
+                                                <div className="flex gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200 mb-4 shrink-0">
+                                                    {hasInput && (
+                                                        <button
+                                                            onClick={() => setSplitViewTab('input')}
+                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${splitViewTab === 'input'
+                                                                ? 'bg-white text-slate-900 shadow-sm'
+                                                                : 'text-slate-600 hover:text-slate-800'
+                                                                }`}
+                                                        >
+                                                            Input ({Array.isArray(nodeInputData) ? nodeInputData.length : 0})
+                                                        </button>
+                                                    )}
+                                                    {hasOutputA && (
+                                                        <button
+                                                            onClick={() => setSplitViewTab('outputA')}
+                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${splitViewTab === 'outputA'
+                                                                ? 'bg-white text-slate-900 shadow-sm'
+                                                                : 'text-slate-600 hover:text-slate-800'
+                                                                }`}
+                                                        >
+                                                            <span className="flex items-center justify-center gap-1.5">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                                                Output A ({nodeOutputData?.outputA?.length || 0})
+                                                            </span>
+                                                        </button>
+                                                    )}
+                                                    {hasOutputB && (
+                                                        <button
+                                                            onClick={() => setSplitViewTab('outputB')}
+                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${splitViewTab === 'outputB'
+                                                                ? 'bg-white text-slate-900 shadow-sm'
+                                                                : 'text-slate-600 hover:text-slate-800'
+                                                                }`}
+                                                        >
+                                                            <span className="flex items-center justify-center gap-1.5">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                                                                Output B ({nodeOutputData?.outputB?.length || 0})
+                                                            </span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                // Only show tabs if both exist, or show single tab without tab styling
+                                                (hasInput && hasOutput) ? (
+                                                    <div className="flex gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200 mb-4 shrink-0">
+                                                        <button
+                                                            onClick={() => setDataViewTab('input')}
+                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${effectiveTab === 'input'
+                                                                ? 'bg-white text-slate-900 shadow-sm'
+                                                                : 'text-slate-600 hover:text-slate-800'
+                                                                }`}
+                                                        >
+                                                            Input ({Array.isArray(nodeInputData) ? nodeInputData.length : 0})
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setDataViewTab('output')}
+                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${effectiveTab === 'output'
+                                                                ? 'bg-white text-slate-900 shadow-sm'
+                                                                : 'text-slate-600 hover:text-slate-800'
+                                                                }`}
+                                                        >
+                                                            Output ({Array.isArray(nodeOutputData) ? nodeOutputData.length : 0})
+                                                        </button>
+                                                    </div>
                                                 ) : (
-                                                    <p className="text-slate-500 text-center py-8">No data available</p>
-                                                );
-                                            })()}
+                                                    // Single tab - show label without tab styling
+                                                    <div className="mb-4 shrink-0">
+                                                        <div className="text-sm font-medium text-slate-700">
+                                                            {hasInput ? `Input (${Array.isArray(nodeInputData) ? nodeInputData.length : 0})` : `Output (${Array.isArray(nodeOutputData) ? nodeOutputData.length : 0})`}
+                                                        </div>
+                                                    </div>
+                                                )
+                                            )}
+
+                                            {/* Table Container */}
+                                            <div className="flex-1 overflow-auto -mx-6 px-6">
+                                                {(() => {
+                                                    let displayData: any[];
+                                                    if (isSplitColumnsNode) {
+                                                        displayData = splitViewTab === 'input' 
+                                                            ? nodeInputData 
+                                                            : splitViewTab === 'outputA' 
+                                                                ? nodeOutputData?.outputA 
+                                                                : nodeOutputData?.outputB;
+                                                    } else {
+                                                        // Use effectiveTab to determine which data to display
+                                                        displayData = effectiveTab === 'input' ? nodeInputData : nodeOutputData;
+                                                    }
+                                                    
+                                                    // Ensure displayData is an array
+                                                    if (!Array.isArray(displayData)) {
+                                                        if (displayData && typeof displayData === 'object') {
+                                                            displayData = [displayData];
+                                                        } else {
+                                                            displayData = [];
+                                                        }
+                                                    }
+                                                    
+                                                    const MAX_PREVIEW_ROWS = 500;
+                                                    const totalRows = displayData?.length || 0;
+                                                    const limitedData = displayData?.slice(0, MAX_PREVIEW_ROWS) || [];
+                                                    const isLimited = totalRows > MAX_PREVIEW_ROWS;
+                                                    
+                                                    // Flatten nested objects into flat key-value pairs
+                                                    const flattenObject = (obj: any, prefix: string = ''): Record<string, any> => {
+                                                        const flattened: Record<string, any> = {};
+                                                        
+                                                        if (obj === null || obj === undefined) {
+                                                            return { [prefix || 'value']: null };
+                                                        }
+                                                        
+                                                        if (Array.isArray(obj)) {
+                                                            // For arrays, show as JSON string or count
+                                                            flattened[prefix || 'value'] = `[${obj.length} items]`;
+                                                            // Optionally, expand first few items
+                                                            if (obj.length > 0 && obj.length <= 5) {
+                                                                obj.forEach((item, idx) => {
+                                                                    if (typeof item === 'object' && item !== null) {
+                                                                        Object.assign(flattened, flattenObject(item, `${prefix || 'item'}[${idx}].`));
+                                                                    } else {
+                                                                        flattened[`${prefix || 'item'}[${idx}]`] = item;
+                                                                    }
+                                                                });
+                                                            }
+                                                            return flattened;
+                                                        }
+                                                        
+                                                        if (typeof obj !== 'object') {
+                                                            return { [prefix || 'value']: obj };
+                                                        }
+                                                        
+                                                        // Recursively flatten object
+                                                        for (const key in obj) {
+                                                            if (obj.hasOwnProperty(key)) {
+                                                                const newKey = prefix ? `${prefix}${key}` : key;
+                                                                const value = obj[key];
+                                                                
+                                                                if (value === null || value === undefined) {
+                                                                    flattened[newKey] = null;
+                                                                } else if (Array.isArray(value)) {
+                                                                    // Arrays: show count and optionally expand
+                                                                    if (value.length === 0) {
+                                                                        flattened[newKey] = '[]';
+                                                                    } else if (value.length <= 3 && value.every(v => typeof v !== 'object' || v === null)) {
+                                                                        // Small array of primitives: show values
+                                                                        flattened[newKey] = `[${value.join(', ')}]`;
+                                                                    } else {
+                                                                        flattened[newKey] = `[${value.length} items]`;
+                                                                    }
+                                                                } else if (typeof value === 'object') {
+                                                                    // Nested object: flatten recursively
+                                                                    Object.assign(flattened, flattenObject(value, `${newKey}.`));
+                                                                } else {
+                                                                    flattened[newKey] = value;
+                                                                }
+                                                            }
+                                                        }
+                                                        
+                                                        return flattened;
+                                                    };
+                                                    
+                                                    // Flatten all records
+                                                    const flattenedData = limitedData.map(record => flattenObject(record));
+                                                    
+                                                    // Get all unique keys from flattened records
+                                                    const getAllKeys = (data: any[]): string[] => {
+                                                        const keysSet = new Set<string>();
+                                                        data.forEach(record => {
+                                                            if (record && typeof record === 'object') {
+                                                                Object.keys(record).forEach(key => keysSet.add(key));
+                                                            }
+                                                        });
+                                                        return Array.from(keysSet).sort();
+                                                    };
+                                                    
+                                                    const allKeys = getAllKeys(flattenedData);
+                                                    
+                                                    return displayData && displayData.length > 0 && allKeys.length > 0 ? (
+                                                        <>
+                                                            {isLimited && (
+                                                                <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2.5 rounded-lg mb-4 text-sm flex items-center gap-2 shrink-0">
+                                                                    <AlertCircle size={16} />
+                                                                    <span>Showing first {MAX_PREVIEW_ROWS.toLocaleString()} of {totalRows.toLocaleString()} rows</span>
+                                                                </div>
+                                                            )}
+                                                            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                                                                <div className="overflow-auto max-h-full">
+                                                                    <table className="w-full text-sm">
+                                                                        <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+                                                                            <tr>
+                                                                                {allKeys.map(key => (
+                                                                                    <th key={key} className="px-4 py-3 text-left font-medium text-slate-700 whitespace-nowrap">
+                                                                                        {key}
+                                                                                    </th>
+                                                                                ))}
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-slate-100">
+                                                                            {flattenedData.map((record: any, idx: number) => (
+                                                                                <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                                                                    {allKeys.map((key, vidx) => {
+                                                                                        const value = record?.[key];
+                                                                                        const displayValue = value === null || value === undefined 
+                                                                                            ? '—' 
+                                                                                            : typeof value === 'object' 
+                                                                                                ? JSON.stringify(value) 
+                                                                                                : String(value);
+                                                                                        
+                                                                                        return (
+                                                                                            <td key={`${idx}-${vidx}`} className="px-4 py-3 text-slate-600">
+                                                                                                <div className="max-w-[400px] break-words" title={displayValue}>
+                                                                                                    <span className={value === null || value === undefined ? 'text-slate-300' : 'text-slate-700'}>
+                                                                                                        {displayValue}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                            </td>
+                                                                                        );
+                                                                                    })}
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </div>
+                                                            {totalRows > 0 && (
+                                                                <div className="mt-4 text-sm text-slate-500 text-center shrink-0">
+                                                                    <span className="font-medium">{totalRows.toLocaleString()}</span> {totalRows === 1 ? 'row' : 'rows'} total
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        <div className="text-center py-12">
+                                                            <Database size={32} className="mx-auto text-slate-300 mb-2" />
+                                                            <p className="text-sm text-slate-500">No data available</p>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -8390,32 +9757,40 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 </div>
             )}
 
-            {/* Toast Notification */}
+            {/* Toast Notification - Improved Design */}
             {toast && (
-                <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-lg border animate-in slide-in-from-bottom-4 fade-in duration-300 ${
-                    toast.type === 'success' 
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-                        : 'bg-red-50 border-red-200 text-red-800'
-                }`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                <div 
+                    className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-xl shadow-xl border backdrop-blur-sm animate-in slide-in-from-bottom-4 fade-in duration-300 ${
+                        toast.type === 'success' 
+                            ? 'bg-emerald-50/95 border-emerald-200/50 text-emerald-900' 
+                            : 'bg-red-50/95 border-red-200/50 text-red-900'
+                    }`}
+                    style={{
+                        animation: 'slideInUp 0.3s ease-out',
+                    }}
+                >
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                         toast.type === 'success' ? 'bg-emerald-100' : 'bg-red-100'
                     }`}>
                         {toast.type === 'success' ? (
-                            <Check size={18} className="text-emerald-600" />
+                            <CheckCircle size={20} className="text-emerald-600" />
                         ) : (
-                            <X size={18} className="text-red-600" />
+                            <XCircle size={20} className="text-red-600" />
                         )}
                     </div>
-                    <span className="font-medium text-sm">{toast.message}</span>
+                    <div className="flex-1 min-w-0">
+                        <span className="font-medium text-sm block">{toast.message}</span>
+                    </div>
                     <button 
                         onClick={() => setToast(null)}
-                        className={`ml-2 p-1 rounded-full transition-colors ${
+                        className={`ml-2 p-1.5 rounded-lg transition-colors flex-shrink-0 ${
                             toast.type === 'success' 
-                                ? 'hover:bg-emerald-100 text-emerald-500' 
-                                : 'hover:bg-red-100 text-red-500'
+                                ? 'hover:bg-emerald-100/50 text-emerald-600' 
+                                : 'hover:bg-red-100/50 text-red-600'
                         }`}
+                        title="Close"
                     >
-                        <X size={14} />
+                        <X size={16} />
                     </button>
                 </div>
             )}
@@ -8656,50 +10031,59 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             {/* Node Feedback Popup */}
             {feedbackPopupNodeId && (
-                <div className="fixed inset-0 flex items-center justify-center z-[60] pointer-events-none" onClick={closeFeedbackPopup}>
-                    <div className="bg-white rounded-xl shadow-2xl p-6 w-[450px] max-w-[90vw] pointer-events-auto" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
-                                <MessageSquare size={20} className="text-[#256A65]" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-normal text-slate-800">Share Your Feedback</h3>
-                                <p className="text-sm text-slate-500">Node: {feedbackPopupNodeLabel}</p>
+                <div className="fixed inset-0 flex items-center justify-center z-[60] p-4 bg-black/40 backdrop-blur-sm pointer-events-none" onClick={closeFeedbackPopup}>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-slate-200">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                    <MessageSquare size={18} className="text-slate-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                        Share Your Feedback
+                                    </h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">Node: {feedbackPopupNodeLabel}</p>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                What would you like this node to do?
-                            </label>
-                            <textarea
-                                value={feedbackText}
-                                onChange={(e) => setFeedbackText(e.target.value)}
-                                placeholder="Describe the functionality you'd like to see, any improvements, or share your ideas..."
-                                rows={4}
-                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 resize-none placeholder:text-slate-400"
-                                autoFocus
-                            />
-                            <p className="text-xs text-slate-500 mt-1">
-                                Your feedback helps us improve the platform. Thank you!
-                            </p>
+                        {/* Content */}
+                        <div className="px-6 py-4">
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    What would you like this node to do?
+                                </label>
+                                <textarea
+                                    value={feedbackText}
+                                    onChange={(e) => setFeedbackText(e.target.value)}
+                                    placeholder="Describe the functionality you'd like to see, any improvements, or share your ideas..."
+                                    rows={4}
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 resize-none placeholder:text-slate-400 hover:border-slate-300 transition-colors"
+                                    autoFocus
+                                />
+                                <p className="text-xs text-slate-500 mt-2">
+                                    Your feedback helps us improve the platform. Thank you!
+                                </p>
+                            </div>
                         </div>
 
-                        <div className="flex gap-2 justify-end">
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-slate-200 flex gap-2 justify-end">
                             <button
                                 onClick={closeFeedbackPopup}
-                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={submitFeedback}
                                 disabled={!feedbackText.trim() || isSubmittingFeedback}
-                                className="px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] disabled:opacity-50 text-sm font-medium flex items-center gap-2"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isSubmittingFeedback ? (
                                     <>
-                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                         Sending...
                                     </>
                                 ) : (
@@ -9026,8 +10410,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 style={{ left: node.x, top: node.y }}
                                             >
                                                 <div className="flex items-center gap-2">
-                                                    <div className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 ${iconBg}`}>
-                                                        <IconComponent size={14} />
+                                                    <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0">
+                                                        <IconComponent size={14} className={iconBg} />
                                                     </div>
                                                     <span className="text-xs font-normal text-slate-900 truncate flex-1" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                                                         {node.label}
@@ -9158,8 +10542,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             onClick={() => handleQuickConnect(item.type)}
                                             className="w-full flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:border-[#256A65] hover:bg-[#256A65]/5 transition-all text-left mb-2 group"
                                         >
-                                            <div className={`p-2 rounded-lg flex-shrink-0 ${getNodeIconBg(item.type)}`}>
-                                                <Icon size={18} />
+                                            <div className="p-1.5 rounded-lg flex-shrink-0">
+                                                <Icon size={14} className={getNodeIconBg(item.type)} />
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="font-normal text-sm text-slate-900 group-hover:text-[#256A65] transition-colors">

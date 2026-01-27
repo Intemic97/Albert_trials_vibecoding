@@ -3,6 +3,22 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Loader2, CheckCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { API_BASE } from '../config';
+import { logger } from '../utils/logger';
+import { handleError, ApiError } from '../utils/errorHandler';
+
+interface FormData {
+    email: string;
+    password: string;
+    name: string;
+    orgName: string;
+}
+
+interface ApiResponse {
+    error?: string;
+    requiresVerification?: boolean;
+    email?: string;
+    user?: unknown;
+}
 
 export function LoginPage() {
     const { login } = useAuth();
@@ -15,19 +31,20 @@ export function LoginPage() {
     const [resendSuccess, setResendSuccess] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<FormData>({
         email: '',
         password: '',
         name: '',
         orgName: ''
     });
 
-    const parseResponse = async (res: Response) => {
+    const parseResponse = async (res: Response): Promise<ApiResponse> => {
         const contentType = res.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
             try {
                 return await res.json();
             } catch (error) {
+                logger.error('Failed to parse JSON response', error);
                 return { error: 'Respuesta JSON invalida del servidor.' };
             }
         }
@@ -45,6 +62,8 @@ export function LoginPage() {
         const endpoint = isLogin ? '/auth/login' : '/auth/register';
 
         try {
+            logger.debug('Submitting authentication form', { endpoint, email: formData.email });
+            
             const res = await fetch(`${API_BASE}${endpoint}`, {
                 method: 'POST',
                 headers: {
@@ -61,21 +80,32 @@ export function LoginPage() {
                 if (data.requiresVerification) {
                     setShowVerificationMessage(true);
                     setVerificationEmail(data.email || formData.email);
+                    logger.info('Verification required', { email: data.email || formData.email });
                     return;
                 }
-                throw new Error(data.error || 'Authentication failed');
+                throw new ApiError(
+                    data.error || 'Authentication failed',
+                    res.status,
+                    endpoint
+                );
             }
 
             // Check if registration requires verification
             if (data.requiresVerification) {
                 setShowVerificationMessage(true);
                 setVerificationEmail(formData.email);
+                logger.info('Registration requires verification', { email: formData.email });
                 return;
             }
 
-            login(data.user);
-        } catch (err: any) {
-            setError(err.message);
+            if (data.user) {
+                login(data.user);
+                logger.info('Authentication successful', { email: formData.email });
+            }
+        } catch (err) {
+            const appError = handleError(err);
+            setError(appError.userMessage || appError.message);
+            logger.error('Authentication failed', appError, { endpoint, email: formData.email });
         } finally {
             setIsLoading(false);
         }
@@ -87,6 +117,8 @@ export function LoginPage() {
         setResendSuccess(false);
 
         try {
+            logger.debug('Resending verification email', { email: verificationEmail });
+            
             const res = await fetch(`${API_BASE}/auth/resend-verification`, {
                 method: 'POST',
                 headers: {
@@ -99,12 +131,19 @@ export function LoginPage() {
             const data = await parseResponse(res);
 
             if (!res.ok) {
-                throw new Error(data.error || 'Failed to resend verification email');
+                throw new ApiError(
+                    data.error || 'Failed to resend verification email',
+                    res.status,
+                    '/auth/resend-verification'
+                );
             }
 
             setResendSuccess(true);
-        } catch (err: any) {
-            setError(err.message);
+            logger.info('Verification email resent successfully', { email: verificationEmail });
+        } catch (err) {
+            const appError = handleError(err);
+            setError(appError.userMessage || appError.message);
+            logger.error('Failed to resend verification email', appError, { email: verificationEmail });
         } finally {
             setIsResending(false);
         }
@@ -113,34 +152,36 @@ export function LoginPage() {
     // Show verification message screen
     if (showVerificationMessage) {
         return (
-            <div className="min-h-screen bg-[#dde1e7] flex items-center justify-center p-4">
+            <div className="min-h-screen bg-gradient-to-br from-[#dde1e7] via-[#e8ecf1] to-[#dde1e7] flex items-center justify-center p-4">
                 <div className="w-full max-w-md">
-                    <div className="bg-white rounded-xl p-8 shadow-sm">
+                    <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
                         <div className="flex items-center justify-center mx-auto mb-6">
-                            <div className="w-16 h-16 bg-[#1e3a5f]/10 rounded-full flex items-center justify-center">
-                                <Mail className="w-8 h-8 text-[#1e3a5f]" />
+                            <div className="w-20 h-20 bg-gradient-to-br from-[#1e3a5f] to-[#2d4a6f] rounded-full flex items-center justify-center shadow-md">
+                                <Mail className="w-10 h-10 text-white" />
                             </div>
                         </div>
                         
-                        <h1 className="text-2xl font-normal text-gray-900 text-center mb-2">Check your email</h1>
-                        <p className="text-gray-500 text-center mb-6">
-                            We've sent a verification link to<br />
-                            <span className="text-gray-900 font-medium">{verificationEmail}</span>
+                        <h1 className="text-2xl font-semibold text-gray-900 text-center mb-3">Check your email</h1>
+                        <p className="text-gray-600 text-center mb-2 text-sm">
+                            We've sent a verification link to
+                        </p>
+                        <p className="text-gray-900 font-semibold text-center mb-6 break-all">
+                            {verificationEmail}
                         </p>
                         
-                        <p className="text-sm text-gray-400 text-center mb-6">
+                        <p className="text-sm text-gray-500 text-center mb-8 leading-relaxed">
                             Click the link in the email to verify your account and start using Intemic.
                         </p>
 
                         {resendSuccess && (
-                            <div className="p-3 bg-[#1e3a5f]/10 border border-[#1e3a5f]/20 rounded-lg text-sm text-[#1e3a5f] mb-4 flex items-center gap-2 justify-center">
-                                <CheckCircle className="w-4 h-4" />
-                                Verification email sent!
+                            <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 mb-4 flex items-center gap-2 justify-center">
+                                <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                                <span>Verification email sent!</span>
                             </div>
                         )}
 
                         {error && (
-                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 mb-4">
+                            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 mb-4">
                                 {error}
                             </div>
                         )}
@@ -148,14 +189,17 @@ export function LoginPage() {
                         <button
                             onClick={handleResendVerification}
                             disabled={isResending}
-                            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+                            className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium py-3 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mb-4 border border-gray-200 hover:border-gray-300"
                         >
                             {isResending ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <>
+                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                    <span>Sending...</span>
+                                </>
                             ) : (
                                 <>
                                     <RefreshCw className="w-4 h-4" />
-                                    Resend verification email
+                                    <span>Resend verification email</span>
                                 </>
                             )}
                         </button>
@@ -167,9 +211,9 @@ export function LoginPage() {
                                 setError('');
                                 setResendSuccess(false);
                             }}
-                            className="w-full text-sm text-[#1e3a5f] hover:text-[#2d4a6f] transition-colors"
+                            className="w-full text-sm text-[#1e3a5f] hover:text-[#2d4a6f] transition-colors font-medium py-2"
                         >
-                            Back to login
+                            ← Back to login
                         </button>
                     </div>
                 </div>
@@ -178,28 +222,42 @@ export function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#dde1e7] flex items-center justify-center p-4">
+        <div className="min-h-screen bg-gradient-to-br from-[#dde1e7] via-[#e8ecf1] to-[#dde1e7] flex items-center justify-center p-4">
             <div className="w-full max-w-md">
-                <div className="bg-white rounded-xl p-8 shadow-sm">
+                <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
                     {/* Logo */}
-                    <div className="mb-8">
+                    <div className="mb-8 flex justify-center">
                         <img
                             src="/logo.svg"
                             alt="Intemic"
-                            className="h-8 w-auto object-contain"
+                            className="h-10 w-auto object-contain"
                         />
                     </div>
 
                     {/* Title */}
-                    <div className="mb-6">
-                        <h1 className="text-xl font-normal text-gray-900 mb-1">
+                    <div className="mb-8 text-center">
+                        <h1 className="text-2xl font-semibold text-gray-900 mb-2">
                             {isLogin ? 'Sign in to your account' : 'Create your account'}
                         </h1>
-                        <p className="text-sm text-[#1e3a5f]">
+                        <p className="text-sm text-gray-600">
                             {isLogin ? (
-                                <>Don't have an account? <button onClick={() => setIsLogin(false)} className="font-medium hover:underline">Sign up</button></>
+                                <>Don't have an account?{' '}
+                                    <button 
+                                        onClick={() => setIsLogin(false)} 
+                                        className="font-semibold text-[#1e3a5f] hover:text-[#2d4a6f] transition-colors underline underline-offset-2"
+                                    >
+                                        Sign up
+                                    </button>
+                                </>
                             ) : (
-                                <>Already have an account? <button onClick={() => setIsLogin(true)} className="font-medium hover:underline">Sign in</button></>
+                                <>Already have an account?{' '}
+                                    <button 
+                                        onClick={() => setIsLogin(true)} 
+                                        className="font-semibold text-[#1e3a5f] hover:text-[#2d4a6f] transition-colors underline underline-offset-2"
+                                    >
+                                        Sign in
+                                    </button>
+                                </>
                             )}
                         </p>
                     </div>
@@ -208,22 +266,26 @@ export function LoginPage() {
                         {!isLogin && (
                             <>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                        Full Name
+                                    </label>
                                     <input
                                         type="text"
                                         required
-                                        className="w-full bg-white border border-gray-200 rounded-lg py-2.5 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
+                                        className="w-full bg-white border border-gray-200 rounded-xl py-3 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
                                         placeholder="John Doe"
                                         value={formData.name}
                                         onChange={e => setFormData({ ...formData, name: e.target.value })}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Organization Name</label>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                        Organization Name
+                                    </label>
                                     <input
                                         type="text"
                                         required
-                                        className="w-full bg-white border border-gray-200 rounded-lg py-2.5 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
+                                        className="w-full bg-white border border-gray-200 rounded-xl py-3 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
                                         placeholder="Acme Inc."
                                         value={formData.orgName}
                                         onChange={e => setFormData({ ...formData, orgName: e.target.value })}
@@ -233,11 +295,13 @@ export function LoginPage() {
                         )}
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Email
+                            </label>
                             <input
                                 type="email"
                                 required
-                                className="w-full bg-white border border-gray-200 rounded-lg py-2.5 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
+                                className="w-full bg-white border border-gray-200 rounded-xl py-3 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
                                 placeholder="name@company.com"
                                 value={formData.email}
                                 onChange={e => setFormData({ ...formData, email: e.target.value })}
@@ -245,12 +309,14 @@ export function LoginPage() {
                         </div>
 
                         <div>
-                            <div className="flex items-center justify-between mb-1.5">
-                                <label className="block text-sm font-medium text-gray-700">Password</label>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-sm font-semibold text-gray-700">
+                                    Password
+                                </label>
                                 {isLogin && (
                                     <Link 
                                         to="/forgot-password" 
-                                        className="text-xs text-[#1e3a5f] hover:text-[#2d4a6f] transition-colors"
+                                        className="text-xs font-medium text-[#1e3a5f] hover:text-[#2d4a6f] transition-colors"
                                     >
                                         Forgot password?
                                     </Link>
@@ -260,7 +326,7 @@ export function LoginPage() {
                                 <input
                                     type={showPassword ? 'text' : 'password'}
                                     required
-                                    className="w-full bg-white border border-gray-200 rounded-lg py-2.5 px-4 pr-10 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
+                                    className="w-full bg-white border border-gray-200 rounded-xl py-3 px-4 pr-12 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
                                     placeholder="••••••••"
                                     value={formData.password}
                                     onChange={e => setFormData({ ...formData, password: e.target.value })}
@@ -268,7 +334,8 @@ export function LoginPage() {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
+                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                                 >
                                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                                 </button>
@@ -276,7 +343,7 @@ export function LoginPage() {
                         </div>
 
                         {error && (
-                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
                                 {error}
                             </div>
                         )}
@@ -284,12 +351,15 @@ export function LoginPage() {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full bg-gradient-to-r from-[#1e3a5f] to-[#2d4a6f] hover:from-[#2d4a6f] hover:to-[#3d5a7f] text-white font-semibold py-3.5 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
                         >
                             {isLoading ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <>
+                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                    <span>Please wait...</span>
+                                </>
                             ) : (
-                                isLogin ? 'Sign in' : 'Create account'
+                                <span>{isLogin ? 'Sign in' : 'Create account'}</span>
                             )}
                         </button>
                     </form>

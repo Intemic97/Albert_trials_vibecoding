@@ -1,8 +1,6 @@
-<<<<<<< Updated upstream
-=======
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Database, Plus, Search, Filter, X, FileText, Shield, Upload, FileSpreadsheet, Loader2, File, Download, Trash2, Eye, Link as LinkIcon, Copy, Check } from 'lucide-react';
+import { Database, Plus, Search, Filter, X, FileText, Folder, FolderPlus, Upload, FileSpreadsheet, Loader2, File, Download, Trash2, Eye, Link as LinkIcon, Copy, Check, Edit3 } from 'lucide-react';
 import { Entity } from '../types';
 import { EntityCard } from './EntityCard';
 import { Tabs } from './Tabs';
@@ -14,32 +12,39 @@ interface KnowledgeBaseProps {
     onNavigate: (entityId: string) => void;
 }
 
-interface Standard {
+interface Folder {
     id: string;
     name: string;
-    code?: string;
-    category?: string;
     description?: string;
-    version?: string;
-    status?: string;
-    effectiveDate?: string;
-    expiryDate?: string;
-    tags?: string[];
-    relatedEntityIds?: string[];
+    color?: string;
+    parentId?: string;
+    documentIds: string[];
+    entityIds: string[];
+    createdAt: string;
+    updatedAt: string;
+    createdBy: string;
 }
 
 export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNavigate }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'entities' | 'standards' | 'documents'>('entities');
+    const [activeTab, setActiveTab] = useState<'entities' | 'folders' | 'documents'>('entities');
     const [searchQuery, setSearchQuery] = useState('');
     const [isCreatingEntity, setIsCreatingEntity] = useState(false);
     const [newEntityName, setNewEntityName] = useState('');
     const [newEntityDescription, setNewEntityDescription] = useState('');
-    const [standards, setStandards] = useState<Standard[]>([]);
-    const [isLoadingStandards, setIsLoadingStandards] = useState(false);
-    const [isCreatingStandard, setIsCreatingStandard] = useState(false);
+    
+    // Folders state
+    const [folders, setFolders] = useState<Folder[]>([]);
+    const [isLoadingFolders, setIsLoadingFolders] = useState(false);
+    const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+    const [newFolderName, setNewFolderName] = useState('');
+    const [newFolderDescription, setNewFolderDescription] = useState('');
+    const [newFolderColor, setNewFolderColor] = useState('#3b82f6');
+    const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
+    const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
+    const [showFolderSelector, setShowFolderSelector] = useState<{ type: 'document' | 'entity', itemId: string } | null>(null);
     
     // Documents state
     const [documents, setDocuments] = useState<any[]>([]);
@@ -47,10 +52,6 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     const [isUploadingDocument, setIsUploadingDocument] = useState(false);
     const documentFileInputRef = useRef<HTMLInputElement>(null);
     const [copiedDocId, setCopiedDocId] = useState<string | null>(null);
-    const [newStandardName, setNewStandardName] = useState('');
-    const [newStandardCode, setNewStandardCode] = useState('');
-    const [newStandardCategory, setNewStandardCategory] = useState('');
-    const [newStandardDescription, setNewStandardDescription] = useState('');
     
     // File upload states
     const [isUploadingFile, setIsUploadingFile] = useState(false);
@@ -68,28 +69,35 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         }
     }, [location.pathname, location.search]);
 
-    // Load standards when tab is active
+    // Load folders and documents when tab is active
     useEffect(() => {
-        if (activeTab === 'standards') {
-            fetchStandards();
+        if (activeTab === 'folders') {
+            fetchFolders();
         } else if (activeTab === 'documents') {
             fetchDocuments();
         }
     }, [activeTab]);
 
-    const fetchStandards = async () => {
-        setIsLoadingStandards(true);
+    // Load folders when needed for entity/document assignment
+    useEffect(() => {
+        if (showFolderSelector && folders.length === 0) {
+            fetchFolders();
+        }
+    }, [showFolderSelector]);
+
+    const fetchFolders = async () => {
+        setIsLoadingFolders(true);
         try {
-            const res = await fetch(`${API_BASE}/standards`, { credentials: 'include' });
+            const res = await fetch(`${API_BASE}/knowledge/folders`, { credentials: 'include' });
             if (res.ok) {
                 const data = await res.json();
-                setStandards(Array.isArray(data) ? data : []);
+                setFolders(Array.isArray(data) ? data : []);
             }
         } catch (error) {
-            console.error('Error fetching standards:', error);
-            setStandards([]);
+            console.error('Error fetching folders:', error);
+            setFolders([]);
         } finally {
-            setIsLoadingStandards(false);
+            setIsLoadingFolders(false);
         }
     };
 
@@ -196,61 +204,137 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         }
     };
 
-    const handleCreateStandard = async () => {
-        if (!newStandardName.trim()) return;
+    const handleCreateFolder = async () => {
+        if (!newFolderName.trim()) return;
 
-        const newStandard = {
-            id: Math.random().toString(36).substr(2, 9),
-            name: newStandardName,
-            code: newStandardCode || undefined,
-            category: newStandardCategory || undefined,
-            description: newStandardDescription || undefined,
-            status: 'active',
-            tags: [],
-            relatedEntityIds: []
+        const newFolder: Omit<Folder, 'id' | 'createdAt' | 'updatedAt'> = {
+            name: newFolderName.trim(),
+            description: newFolderDescription.trim() || undefined,
+            color: newFolderColor,
+            documentIds: [],
+            entityIds: [],
+            createdBy: user?.id || user?.email || 'unknown'
         };
 
         try {
-            await fetch(`${API_BASE}/standards`, {
+            const res = await fetch(`${API_BASE}/knowledge/folders`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newStandard),
+                body: JSON.stringify(newFolder),
                 credentials: 'include'
             });
-            
-            setNewStandardName('');
-            setNewStandardCode('');
-            setNewStandardCategory('');
-            setNewStandardDescription('');
-            setIsCreatingStandard(false);
-            await fetchStandards();
+
+            if (res.ok) {
+                setNewFolderName('');
+                setNewFolderDescription('');
+                setNewFolderColor('#3b82f6');
+                setIsCreatingFolder(false);
+                await fetchFolders();
+            } else {
+                alert('Failed to create folder');
+            }
         } catch (error) {
-            console.error('Error creating standard:', error);
-            alert('Failed to create standard');
+            console.error('Error creating folder:', error);
+            alert('Failed to create folder');
         }
     };
 
-    const handleDeleteStandard = async (standard: Standard) => {
-        if (!confirm(`Are you sure you want to delete "${standard.name}"?`)) {
+    const handleUpdateFolder = async (folder: Folder) => {
+        try {
+            const res = await fetch(`${API_BASE}/knowledge/folders/${folder.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: folder.name,
+                    description: folder.description,
+                    color: folder.color
+                }),
+                credentials: 'include'
+            });
+
+            if (res.ok) {
+                setEditingFolder(null);
+                await fetchFolders();
+            } else {
+                alert('Failed to update folder');
+            }
+        } catch (error) {
+            console.error('Error updating folder:', error);
+            alert('Failed to update folder');
+        }
+    };
+
+    const handleDeleteFolder = async (folder: Folder) => {
+        if (!confirm(`Are you sure you want to delete "${folder.name}"? This will not delete the documents or entities inside.`)) {
             return;
         }
 
         try {
-            await fetch(`${API_BASE}/standards/${standard.id}`, {
+            const res = await fetch(`${API_BASE}/knowledge/folders/${folder.id}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
-            await fetchStandards();
+
+            if (res.ok) {
+                await fetchFolders();
+            } else {
+                alert('Failed to delete folder');
+            }
         } catch (error) {
-            console.error('Error deleting standard:', error);
-            alert('Failed to delete standard');
+            console.error('Error deleting folder:', error);
+            alert('Failed to delete folder');
         }
     };
 
-    const filteredStandards = standards.filter(standard =>
-        standard.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        standard.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        standard.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    const handleAddToFolder = async (folderId: string, type: 'document' | 'entity', itemId: string) => {
+        try {
+            const res = await fetch(`${API_BASE}/knowledge/folders/${folderId}/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type, itemId }),
+                credentials: 'include'
+            });
+
+            if (res.ok) {
+                await fetchFolders();
+                if (type === 'document') {
+                    await fetchDocuments();
+                }
+            } else {
+                alert('Failed to add item to folder');
+            }
+        } catch (error) {
+            console.error('Error adding to folder:', error);
+            alert('Failed to add item to folder');
+        }
+    };
+
+    const handleRemoveFromFolder = async (folderId: string, type: 'document' | 'entity', itemId: string) => {
+        try {
+            const res = await fetch(`${API_BASE}/knowledge/folders/${folderId}/remove`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type, itemId }),
+                credentials: 'include'
+            });
+
+            if (res.ok) {
+                await fetchFolders();
+                if (type === 'document') {
+                    await fetchDocuments();
+                }
+            } else {
+                alert('Failed to remove item from folder');
+            }
+        } catch (error) {
+            console.error('Error removing from folder:', error);
+            alert('Failed to remove item from folder');
+        }
+    };
+
+    const filteredFolders = folders.filter(folder =>
+        folder.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        folder.description?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     const fetchDocuments = async () => {
@@ -327,36 +411,17 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         setTimeout(() => setCopiedDocId(null), 2000);
     };
 
-    const handleCopyStandardCitation = async (standard: Standard) => {
-        const citation = `@${standard.name}`;
+    const handleCopyFolderCitation = async (folder: Folder) => {
+        const citation = `@${folder.name}`;
         await navigator.clipboard.writeText(citation);
-        setCopiedDocId(standard.id);
+        setCopiedDocId(folder.id);
         setTimeout(() => setCopiedDocId(null), 2000);
     };
 
-    // Combine documents and standards for the documents view
-    const allDocuments = [
-        ...documents.map(doc => ({ ...doc, type: 'document' })),
-        ...standards.map(standard => ({
-            id: standard.id,
-            name: standard.name,
-            summary: standard.description,
-            tags: [],
-            fileSize: null,
-            createdAt: standard.effectiveDate || new Date().toISOString(),
-            type: 'standard',
-            code: standard.code,
-            category: standard.category,
-            version: standard.version,
-            status: standard.status
-        }))
-    ];
-
-    const filteredDocuments = allDocuments.filter(doc =>
+    const filteredDocuments = documents.filter(doc =>
         doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         doc.summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (Array.isArray(doc.tags) && doc.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()))) ||
-        (doc.type === 'standard' && doc.code?.toLowerCase().includes(searchQuery.toLowerCase()))
+        (Array.isArray(doc.tags) && doc.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase())))
     );
 
     return (
@@ -377,11 +442,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                 <Tabs
                     items={[
                         { id: 'entities', label: 'Entities', icon: Database, badge: entities.length },
-                        { id: 'standards', label: 'Standards', icon: Shield, badge: standards.length },
-                        { id: 'documents', label: 'Documents', icon: FileText, badge: documents.length }
+                        { id: 'documents', label: 'Documents', icon: FileText, badge: documents.length },
+                        { id: 'folders', label: 'Folders', icon: Folder, badge: folders.length }
                     ]}
                     activeTab={activeTab}
-                    onChange={(tabId) => setActiveTab(tabId as 'entities' | 'standards' | 'documents')}
+                    onChange={(tabId) => setActiveTab(tabId as 'entities' | 'folders' | 'documents')}
                 />
             </div>
 
@@ -424,14 +489,36 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
 
                         {/* Entities Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
-                            {filteredEntities.map((entity) => (
-                                <EntityCard
-                                    key={entity.id}
-                                    entity={entity}
-                                    onClick={(e) => onNavigate(e.id)}
-                                    onDelete={handleDeleteEntity}
-                                />
-                            ))}
+                            {filteredEntities.map((entity) => {
+                                const entityFolder = folders.find(f => f.entityIds.includes(entity.id));
+                                return (
+                                    <div key={entity.id} className="group relative">
+                                        <EntityCard
+                                            entity={entity}
+                                            onClick={(e) => onNavigate(e.id)}
+                                            onDelete={handleDeleteEntity}
+                                        />
+                                        {/* Folder assignment button */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowFolderSelector({ type: 'entity', itemId: entity.id });
+                                            }}
+                                            className="absolute top-3 right-3 p-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-md text-slate-600 transition-colors shadow-sm opacity-0 group-hover:opacity-100 z-10"
+                                            title="Add to folder"
+                                        >
+                                            <Folder size={14} />
+                                        </button>
+                                        {/* Folder badge */}
+                                        {entityFolder && (
+                                            <div className="absolute top-3 left-3 flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs text-slate-600 shadow-sm">
+                                                <Folder size={12} style={{ color: entityFolder.color || '#3b82f6' }} />
+                                                <span className="truncate max-w-[100px]">{entityFolder.name}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
 
                             {/* Empty State / Add New Placeholder */}
                             <div
@@ -445,14 +532,14 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                             </div>
                         </div>
                     </>
-                ) : activeTab === 'standards' ? (
+                ) : activeTab === 'folders' ? (
                     <>
-                        {/* Standards Toolbar */}
+                        {/* Folders Toolbar */}
                         <div className="flex justify-between items-center mb-6">
                             <div className="text-sm text-slate-500">
                                 {searchQuery
-                                    ? `Showing ${filteredStandards.length} of ${standards.length} standards`
-                                    : `Total: ${standards.length} standards`
+                                    ? `Showing ${filteredFolders.length} of ${folders.length} folders`
+                                    : `Total: ${folders.length} folders`
                                 }
                             </div>
                             <div className="flex items-center gap-3">
@@ -460,105 +547,124 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                                     <input
                                         type="text"
-                                        placeholder="Search standards..."
+                                        placeholder="Search folders..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 w-60 placeholder:text-slate-400"
                                     />
                                 </div>
-                                <button className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-                                    <Filter size={14} className="mr-2" />
-                                    Filter
-                                </button>
                                 <button
-                                    onClick={() => setIsCreatingStandard(true)}
+                                    onClick={() => setIsCreatingFolder(true)}
                                     className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                 >
-                                    <Plus size={14} className="mr-2" />
-                                    Create Standard
+                                    <FolderPlus size={14} className="mr-2" />
+                                    Create Folder
                                 </button>
                             </div>
                         </div>
 
-                        {/* Standards Grid */}
-                        {isLoadingStandards ? (
+                        {/* Folders Grid */}
+                        {isLoadingFolders ? (
                             <div className="flex items-center justify-center py-12">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+                                <Loader2 className="animate-spin text-slate-400" size={24} />
                             </div>
-                        ) : filteredStandards.length > 0 ? (
+                        ) : filteredFolders.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
-                                {filteredStandards.map((standard) => (
+                                {filteredFolders.map((folder) => (
                                     <div
-                                        key={standard.id}
-                                        className="bg-white border border-slate-200 rounded-lg p-5 cursor-pointer group hover:shadow-md transition-all"
+                                        key={folder.id}
+                                        className="group relative bg-white border border-slate-200 rounded-lg p-5 hover:border-slate-300 hover:shadow-md transition-all cursor-pointer flex flex-col"
+                                        onClick={() => setSelectedFolder(folder)}
                                     >
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
-                                                    <Shield size={18} className="text-blue-600" />
-                                                </div>
-                                                <div>
-                                                    <h3 className="text-base font-normal text-slate-900 group-hover:text-slate-700 transition-colors">
-                                                        {standard.name}
-                                                    </h3>
-                                                    {standard.code && (
-                                                        <p className="text-xs text-slate-500 mt-1">
-                                                            Code: {standard.code}
-                                                        </p>
-                                                    )}
-                                                    {standard.category && (
-                                                        <p className="text-xs text-slate-500">
-                                                            Category: {standard.category}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
+                                        {/* Action buttons */}
+                                        <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    handleDeleteStandard(standard);
+                                                    setEditingFolder(folder);
                                                 }}
-                                                className="text-slate-300 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                                                className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-md text-slate-600 transition-colors shadow-sm"
+                                                title="Edit folder"
                                             >
-                                                <X size={16} />
+                                                <Edit3 size={14} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteFolder(folder);
+                                                }}
+                                                className="p-1.5 bg-white border border-red-200 hover:bg-red-50 rounded-md text-red-600 transition-colors shadow-sm"
+                                                title="Delete folder"
+                                            >
+                                                <Trash2 size={14} />
                                             </button>
                                         </div>
-                                        {standard.description && (
-                                            <p className="text-xs text-slate-600 mb-4 line-clamp-2">
-                                                {standard.description}
+
+                                        {/* Header with icon and title */}
+                                        <div className="flex items-start gap-3 pr-12 mb-3">
+                                            <div 
+                                                className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-all"
+                                                style={{ backgroundColor: folder.color || '#3b82f6', opacity: 0.1 }}
+                                            >
+                                                <Folder 
+                                                    size={20} 
+                                                    style={{ color: folder.color || '#3b82f6' }}
+                                                />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-normal text-sm text-slate-900 group-hover:text-slate-700 transition-colors leading-tight" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                    {folder.name}
+                                                </h3>
+                                            </div>
+                                        </div>
+
+                                        {/* Description */}
+                                        {folder.description && (
+                                            <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">
+                                                {folder.description}
                                             </p>
                                         )}
-                                        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                                            <div className="text-xs text-slate-500">
-                                                {standard.status || 'active'}
+                                        
+                                        {/* Footer stats */}
+                                        <div className="mt-auto pt-3 border-t border-slate-100 flex items-center gap-3 text-xs text-slate-500">
+                                            <div className="flex items-center gap-1.5">
+                                                <FileText size={12} className="text-slate-400" />
+                                                <span className="font-medium text-slate-600">{folder.documentIds.length}</span>
+                                                <span>document{folder.documentIds.length !== 1 ? 's' : ''}</span>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                {standard.version && (
-                                                    <div className="text-xs text-slate-500">
-                                                        v{standard.version}
+                                            {folder.entityIds.length > 0 && (
+                                                <>
+                                                    <span className="text-slate-300">•</span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Database size={12} className="text-slate-400" />
+                                                        <span className="font-medium text-slate-600">{folder.entityIds.length}</span>
+                                                        <span>entit{folder.entityIds.length !== 1 ? 'ies' : 'y'}</span>
                                                     </div>
-                                                )}
-                                                {copiedDocId === standard.id && (
-                                                    <div className="text-xs text-green-600 flex items-center gap-1">
-                                                        <Check size={10} />
-                                                        Cited
-                                                    </div>
-                                                )}
-                                            </div>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         ) : (
                             <div className="bg-white rounded-lg border-2 border-dashed border-slate-300 p-12 text-center">
-                                <Shield className="mx-auto text-slate-300 mb-4" size={48} />
-                                <h3 className="text-base font-normal text-slate-700 mb-2">No standards found</h3>
-                                <p className="text-sm text-slate-500">
+                                <Folder className="mx-auto text-slate-300 mb-4" size={48} />
+                                <h3 className="text-base font-normal text-slate-700 mb-2">No folders found</h3>
+                                <p className="text-sm text-slate-500 mb-4">
                                     {searchQuery
                                         ? 'Try adjusting your search query'
-                                        : 'Create your first standard to get started'
+                                        : 'Create folders to organize your documents and entities'
                                     }
                                 </p>
+                                {!searchQuery && (
+                                    <button
+                                        onClick={() => setIsCreatingFolder(true)}
+                                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
+                                    >
+                                        <FolderPlus size={16} />
+                                        Create Folder
+                                    </button>
+                                )}
                             </div>
                         )}
                     </>
@@ -568,8 +674,8 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                         <div className="flex justify-between items-center mb-6">
                             <div className="text-sm text-slate-500">
                                 {searchQuery
-                                    ? `Showing ${filteredDocuments.length} of ${allDocuments.length} documents`
-                                    : `Total: ${allDocuments.length} documents (${documents.length} files, ${standards.length} standards)`
+                                    ? `Showing ${filteredDocuments.length} of ${documents.length} documents`
+                                    : `Total: ${documents.length} documents`
                                 }
                             </div>
                             <div className="flex items-center gap-3">
@@ -616,49 +722,51 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                             </div>
                         ) : filteredDocuments.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
-                                {filteredDocuments.map((doc) => (
-                                    <div
-                                        key={doc.id}
-                                        className="bg-white border border-slate-200 rounded-lg p-5 hover:shadow-md transition-all group"
-                                    >
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                                                    doc.type === 'standard' 
-                                                        ? 'bg-gradient-to-br from-blue-50 to-blue-100' 
-                                                        : 'bg-gradient-to-br from-purple-50 to-purple-100'
-                                                }`}>
-                                                    {doc.type === 'standard' ? (
-                                                        <Shield size={18} className="text-blue-600" />
-                                                    ) : (
+                                {filteredDocuments.map((doc) => {
+                                    const folder = folders.find(f => f.documentIds.includes(doc.id));
+                                    return (
+                                        <div
+                                            key={doc.id}
+                                            className="bg-white border border-slate-200 rounded-lg p-5 hover:shadow-md transition-all group"
+                                        >
+                                            <div className="flex items-start justify-between mb-3">
+                                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-50 to-purple-100 flex items-center justify-center flex-shrink-0">
                                                         <FileText size={18} className="text-purple-600" />
-                                                    )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="text-base font-normal text-slate-900 truncate" title={doc.name}>
+                                                            {doc.name}
+                                                        </h3>
+                                                        {doc.summary && (
+                                                            <p className="text-xs text-slate-500 mt-1 line-clamp-2">{doc.summary}</p>
+                                                        )}
+                                                        {folder && (
+                                                            <div className="flex items-center gap-1 mt-1">
+                                                                <Folder size={12} className="text-slate-400" />
+                                                                <span className="text-xs text-slate-500">{folder.name}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h3 className="text-base font-normal text-slate-900 truncate" title={doc.name}>
-                                                        {doc.name}
-                                                    </h3>
-                                                    {doc.summary && (
-                                                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{doc.summary}</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={() => {
-                                                        if (doc.type === 'standard') {
-                                                            const standard = standards.find(s => s.id === doc.id);
-                                                            if (standard) handleCopyStandardCitation(standard);
-                                                        } else {
-                                                            handleCopyCitation(doc);
-                                                        }
-                                                    }}
-                                                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors"
-                                                    title="Copy citation"
-                                                >
-                                                    {copiedDocId === doc.id ? <Check size={14} /> : <LinkIcon size={14} />}
-                                                </button>
-                                                {doc.type !== 'standard' && (
+                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setShowFolderSelector({ type: 'document', itemId: doc.id });
+                                                        }}
+                                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors"
+                                                        title="Add to folder"
+                                                    >
+                                                        <Folder size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleCopyCitation(doc)}
+                                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors"
+                                                        title="Copy citation"
+                                                    >
+                                                        {copiedDocId === doc.id ? <Check size={14} /> : <LinkIcon size={14} />}
+                                                    </button>
                                                     <button
                                                         onClick={() => handleDeleteDocument(doc.id)}
                                                         className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
@@ -666,59 +774,39 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                     >
                                                         <Trash2 size={14} />
                                                     </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="flex items-center gap-4 text-xs text-slate-500 mt-4 pt-4 border-t border-slate-100">
+                                                {doc.fileSize && (
+                                                    <span>{(doc.fileSize / 1024).toFixed(1)} KB</span>
+                                                )}
+                                                {doc.tags && doc.tags.length > 0 && (
+                                                    <span className="flex items-center gap-1">
+                                                        {doc.tags.slice(0, 2).map((tag: string, idx: number) => (
+                                                            <span key={idx} className="px-2 py-0.5 bg-slate-100 rounded text-slate-600">
+                                                                {tag}
+                                                            </span>
+                                                        ))}
+                                                        {doc.tags.length > 2 && <span>+{doc.tags.length - 2}</span>}
+                                                    </span>
+                                                )}
+                                                {doc.createdAt && (
+                                                    <span className="ml-auto">
+                                                        {new Date(doc.createdAt).toLocaleDateString()}
+                                                    </span>
                                                 )}
                                             </div>
-                                        </div>
-                                        
-                                        <div className="flex items-center gap-4 text-xs text-slate-500 mt-4 pt-4 border-t border-slate-100">
-                                            {doc.type === 'standard' ? (
-                                                <>
-                                                    {doc.code && (
-                                                        <span className="px-2 py-0.5 bg-purple-100 rounded text-purple-700 font-medium">
-                                                            {doc.code}
-                                                        </span>
-                                                    )}
-                                                    {doc.category && (
-                                                        <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-600">
-                                                            {doc.category}
-                                                        </span>
-                                                    )}
-                                                    {doc.version && (
-                                                        <span className="text-slate-500">v{doc.version}</span>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                <>
-                                                    {doc.fileSize && (
-                                                        <span>{(doc.fileSize / 1024).toFixed(1)} KB</span>
-                                                    )}
-                                                    {doc.tags && doc.tags.length > 0 && (
-                                                        <span className="flex items-center gap-1">
-                                                            {doc.tags.slice(0, 2).map((tag: string, idx: number) => (
-                                                                <span key={idx} className="px-2 py-0.5 bg-slate-100 rounded text-slate-600">
-                                                                    {tag}
-                                                                </span>
-                                                            ))}
-                                                            {doc.tags.length > 2 && <span>+{doc.tags.length - 2}</span>}
-                                                        </span>
-                                                    )}
-                                                </>
-                                            )}
-                                            {doc.createdAt && (
-                                                <span className="ml-auto">
-                                                    {new Date(doc.createdAt).toLocaleDateString()}
-                                                </span>
+                                            
+                                            {copiedDocId === doc.id && (
+                                                <div className="mt-2 text-xs text-green-600 flex items-center gap-1">
+                                                    <Check size={12} />
+                                                    Citation copied! Use @{doc.name} to reference this document
+                                                </div>
                                             )}
                                         </div>
-                                        
-                                        {copiedDocId === doc.id && (
-                                            <div className="mt-2 text-xs text-green-600 flex items-center gap-1">
-                                                <Check size={12} />
-                                                Citation copied! Use @{doc.name} to reference this {doc.type === 'standard' ? 'standard' : 'document'}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -753,87 +841,221 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                 ) : null}
             </div>
 
-            {/* Create Standard Modal */}
-            {isCreatingStandard && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsCreatingStandard(false)}>
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col" onClick={(e) => e.stopPropagation()}>
-                        <div className="bg-white border-b border-slate-200 px-6 py-5 shrink-0 flex items-center justify-between">
-                            <div>
-                                <h2 className="text-lg font-normal text-slate-900">Create Standard</h2>
-                                <p className="text-xs text-slate-500 mt-1">Define a new standard for compliance</p>
+            {/* Create/Edit Folder Modal */}
+            {(isCreatingFolder || editingFolder) && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 pointer-events-none" onClick={() => { setIsCreatingFolder(false); setEditingFolder(null); }}>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-slate-200">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                    <FolderPlus size={18} className="text-slate-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                        {editingFolder ? 'Edit Folder' : 'Create Folder'}
+                                    </h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">Organize your documents and entities</p>
+                                </div>
+                                <button
+                                    onClick={() => { setIsCreatingFolder(false); setEditingFolder(null); setNewFolderName(''); setNewFolderDescription(''); setNewFolderColor('#3b82f6'); }}
+                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                >
+                                    <X size={18} />
+                                </button>
                             </div>
-                            <button
-                                onClick={() => setIsCreatingStandard(false)}
-                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                            >
-                                <X size={18} />
-                            </button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+
+                        {/* Content */}
+                        <div className="px-6 py-4 space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Standard Name <span className="text-red-500">*</span>
+                                    Folder Name <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
-                                    value={newStandardName}
-                                    onChange={(e) => setNewStandardName(e.target.value)}
-                                    placeholder="e.g., ISO 9001, GDPR Compliance"
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                    value={editingFolder ? editingFolder.name : newFolderName}
+                                    onChange={(e) => editingFolder ? setEditingFolder({...editingFolder, name: e.target.value}) : setNewFolderName(e.target.value)}
+                                    placeholder="e.g., Quality Standards, Project Documents"
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
                                     autoFocus
                                 />
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Code
-                                </label>
-                                <input
-                                    type="text"
-                                    value={newStandardCode}
-                                    onChange={(e) => setNewStandardCode(e.target.value)}
-                                    placeholder="e.g., ISO-9001"
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Category
-                                </label>
-                                <input
-                                    type="text"
-                                    value={newStandardCategory}
-                                    onChange={(e) => setNewStandardCategory(e.target.value)}
-                                    placeholder="e.g., Quality, Security, Compliance"
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                                />
-                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-2">
                                     Description
                                 </label>
                                 <textarea
-                                    value={newStandardDescription}
-                                    onChange={(e) => setNewStandardDescription(e.target.value)}
-                                    placeholder="Optional description of the standard"
+                                    value={editingFolder ? editingFolder.description || '' : newFolderDescription}
+                                    onChange={(e) => editingFolder ? setEditingFolder({...editingFolder, description: e.target.value}) : setNewFolderDescription(e.target.value)}
+                                    placeholder="Optional description of what this folder contains"
                                     rows={3}
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-300 resize-none"
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 resize-none placeholder:text-slate-400"
                                 />
                             </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Color
+                                </label>
+                                <div className="flex gap-2">
+                                    {['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'].map((color) => (
+                                        <button
+                                            key={color}
+                                            onClick={() => editingFolder ? setEditingFolder({...editingFolder, color}) : setNewFolderColor(color)}
+                                            className={`w-10 h-10 rounded-lg border-2 transition-all ${
+                                                (editingFolder ? editingFolder.color : newFolderColor) === color
+                                                    ? 'border-slate-900 scale-110'
+                                                    : 'border-slate-200 hover:border-slate-300'
+                                            }`}
+                                            style={{ backgroundColor: color }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
                         </div>
-                        <div className="border-t border-slate-200 px-6 py-4 shrink-0 flex items-center justify-end gap-3">
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-slate-200 flex gap-2 justify-end">
                             <button
-                                onClick={() => setIsCreatingStandard(false)}
-                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors"
+                                onClick={() => { setIsCreatingFolder(false); setEditingFolder(null); setNewFolderName(''); setNewFolderDescription(''); setNewFolderColor('#3b82f6'); }}
+                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
-                                onClick={handleCreateStandard}
-                                disabled={!newStandardName.trim()}
-                                className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                onClick={() => editingFolder ? handleUpdateFolder(editingFolder) : handleCreateFolder()}
+                                disabled={!((editingFolder ? editingFolder.name : newFolderName).trim())}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Create Standard
+                                {editingFolder ? 'Save Changes' : 'Create Folder'}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Folder Detail Modal */}
+            {selectedFolder && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 pointer-events-none" onClick={() => setSelectedFolder(null)}>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[80vh] pointer-events-auto flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-slate-200 shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div 
+                                    className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                                    style={{ backgroundColor: selectedFolder.color || '#3b82f6', opacity: 0.1 }}
+                                >
+                                    <Folder size={20} style={{ color: selectedFolder.color || '#3b82f6' }} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="text-lg font-normal text-slate-900 truncate" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                        {selectedFolder.name}
+                                    </h3>
+                                    {selectedFolder.description && (
+                                        <p className="text-xs text-slate-500 mt-0.5">{selectedFolder.description}</p>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => handleCopyFolderCitation(selectedFolder)}
+                                        className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                        title="Copy citation"
+                                    >
+                                        {copiedDocId === selectedFolder.id ? <Check size={18} /> : <LinkIcon size={18} />}
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedFolder(null)}
+                                        className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                            </div>
+                            {copiedDocId === selectedFolder.id && (
+                                <div className="mt-2 text-xs text-green-600 flex items-center gap-1">
+                                    <Check size={12} />
+                                    Citation copied! Use @{selectedFolder.name} to reference this folder
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+                            {/* Documents Section */}
+                            <div>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h4 className="text-sm font-medium text-slate-900">Documents ({selectedFolder.documentIds.length})</h4>
+                                    <button
+                                        onClick={() => {
+                                            setShowFolderSelector({ type: 'document', itemId: '' });
+                                            setSelectedFolder(null);
+                                        }}
+                                        className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1"
+                                    >
+                                        <Plus size={12} />
+                                        Add Document
+                                    </button>
+                                </div>
+                                {selectedFolder.documentIds.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {documents.filter(doc => selectedFolder.documentIds.includes(doc.id)).map((doc) => (
+                                            <div key={doc.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+                                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                    <FileText size={14} className="text-slate-400 flex-shrink-0" />
+                                                    <span className="text-sm text-slate-700 truncate">{doc.name}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleRemoveFromFolder(selectedFolder.id, 'document', doc.id)}
+                                                    className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-slate-500 text-center py-4">No documents in this folder</p>
+                                )}
+                            </div>
+
+                            {/* Entities Section */}
+                            <div>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h4 className="text-sm font-medium text-slate-900">Entities ({selectedFolder.entityIds.length})</h4>
+                                    <button
+                                        onClick={() => {
+                                            setShowFolderSelector({ type: 'entity', itemId: '' });
+                                            setSelectedFolder(null);
+                                        }}
+                                        className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1"
+                                    >
+                                        <Plus size={12} />
+                                        Add Entity
+                                    </button>
+                                </div>
+                                {selectedFolder.entityIds.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {entities.filter(entity => selectedFolder.entityIds.includes(entity.id)).map((entity) => (
+                                            <div key={entity.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+                                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                    <Database size={14} className="text-slate-400 flex-shrink-0" />
+                                                    <span className="text-sm text-slate-700 truncate">{entity.name}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleRemoveFromFolder(selectedFolder.id, 'entity', entity.id)}
+                                                    className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-slate-500 text-center py-4">No entities in this folder</p>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1003,7 +1225,208 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                     </div>
                 </div>
             )}
+
+            {/* Folder Selector Modal */}
+            {showFolderSelector && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 pointer-events-none" onClick={() => setShowFolderSelector(null)}>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-slate-200">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                    <Folder size={18} className="text-slate-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                        {showFolderSelector.itemId ? 'Select Folder' : 'Add to Folder'}
+                                    </h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        {showFolderSelector.itemId 
+                                            ? `Choose a folder to add this ${showFolderSelector.type === 'document' ? 'document' : 'entity'} to`
+                                            : `Select a ${showFolderSelector.type === 'document' ? 'document' : 'entity'} to add to a folder`
+                                        }
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setShowFolderSelector(null)}
+                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="px-6 py-4 max-h-[400px] overflow-y-auto">
+                            {showFolderSelector.itemId ? (
+                                // Show folders to select
+                                folders.length === 0 ? (
+                                    <div className="text-center py-8">
+                                        <Folder className="mx-auto text-slate-300 mb-3" size={32} />
+                                        <p className="text-sm text-slate-600 mb-2">No folders yet</p>
+                                        <p className="text-xs text-slate-500 mb-4">Create a folder first to organize your items</p>
+                                        <button
+                                            onClick={() => {
+                                                setShowFolderSelector(null);
+                                                setIsCreatingFolder(true);
+                                            }}
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md mx-auto"
+                                        >
+                                            <FolderPlus size={14} />
+                                            Create Folder
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {folders.map((folder) => {
+                                            const isInFolder = showFolderSelector.type === 'document'
+                                                ? folder.documentIds.includes(showFolderSelector.itemId)
+                                                : folder.entityIds.includes(showFolderSelector.itemId);
+                                            
+                                            return (
+                                                <button
+                                                    key={folder.id}
+                                                    onClick={() => {
+                                                        if (isInFolder) {
+                                                            handleRemoveFromFolder(folder.id, showFolderSelector.type, showFolderSelector.itemId);
+                                                        } else {
+                                                            handleAddToFolder(folder.id, showFolderSelector.type, showFolderSelector.itemId);
+                                                        }
+                                                        setShowFolderSelector(null);
+                                                    }}
+                                                    className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${
+                                                        isInFolder
+                                                            ? 'bg-slate-50 border-slate-300'
+                                                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    <div 
+                                                        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                                                        style={{ backgroundColor: folder.color || '#3b82f6', opacity: 0.1 }}
+                                                    >
+                                                        <Folder 
+                                                            size={16} 
+                                                            style={{ color: folder.color || '#3b82f6' }}
+                                                        />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-medium text-slate-900 truncate">
+                                                                {folder.name}
+                                                            </span>
+                                                            {isInFolder && (
+                                                                <Check size={14} className="text-green-600 flex-shrink-0" />
+                                                            )}
+                                                        </div>
+                                                        {folder.description && (
+                                                            <p className="text-xs text-slate-500 truncate mt-0.5">
+                                                                {folder.description}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 flex-shrink-0">
+                                                        {showFolderSelector.type === 'document' 
+                                                            ? `${folder.documentIds.length} docs`
+                                                            : `${folder.entityIds.length} entities`
+                                                        }
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )
+                            ) : (
+                                // Show items to select (when adding to folder from folder detail)
+                                <div className="space-y-2">
+                                    {showFolderSelector.type === 'document' ? (
+                                        documents.map((doc) => {
+                                            const isInFolder = selectedFolder?.documentIds.includes(doc.id) || false;
+                                            return (
+                                                <button
+                                                    key={doc.id}
+                                                    onClick={() => {
+                                                        if (selectedFolder) {
+                                                            if (isInFolder) {
+                                                                handleRemoveFromFolder(selectedFolder.id, 'document', doc.id);
+                                                            } else {
+                                                                handleAddToFolder(selectedFolder.id, 'document', doc.id);
+                                                            }
+                                                        }
+                                                        setShowFolderSelector(null);
+                                                    }}
+                                                    className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${
+                                                        isInFolder
+                                                            ? 'bg-slate-50 border-slate-300'
+                                                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    <FileText size={16} className="text-slate-400 flex-shrink-0" />
+                                                    <span className="text-sm font-medium text-slate-900 truncate flex-1">
+                                                        {doc.name}
+                                                    </span>
+                                                    {isInFolder && <Check size={14} className="text-green-600 flex-shrink-0" />}
+                                                </button>
+                                            );
+                                        })
+                                    ) : (
+                                        entities.map((entity) => {
+                                            const isInFolder = selectedFolder?.entityIds.includes(entity.id) || false;
+                                            return (
+                                                <button
+                                                    key={entity.id}
+                                                    onClick={() => {
+                                                        if (selectedFolder) {
+                                                            if (isInFolder) {
+                                                                handleRemoveFromFolder(selectedFolder.id, 'entity', entity.id);
+                                                            } else {
+                                                                handleAddToFolder(selectedFolder.id, 'entity', entity.id);
+                                                            }
+                                                        }
+                                                        setShowFolderSelector(null);
+                                                    }}
+                                                    className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${
+                                                        isInFolder
+                                                            ? 'bg-slate-50 border-slate-300'
+                                                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    <Database size={16} className="text-slate-400 flex-shrink-0" />
+                                                    <span className="text-sm font-medium text-slate-900 truncate flex-1">
+                                                        {entity.name}
+                                                    </span>
+                                                    {isInFolder && <Check size={14} className="text-green-600 flex-shrink-0" />}
+                                                </button>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-slate-200 flex gap-2 justify-end">
+                            <button
+                                onClick={() => setShowFolderSelector(null)}
+                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            {!showFolderSelector.itemId && folders.length === 0 && (
+                                <button
+                                    onClick={() => {
+                                        setShowFolderSelector(null);
+                                        setIsCreatingFolder(true);
+                                    }}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                >
+                                    <FolderPlus size={14} />
+                                    Create Folder
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
->>>>>>> Stashed changes

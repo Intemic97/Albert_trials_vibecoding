@@ -224,7 +224,7 @@ export const Copilots: React.FC = () => {
                     };
                     
                     // Try PUT first, if it fails (404), try POST
-                    fetch(`${API_BASE}/api/copilot/chats/${chat.id}`, {
+                    fetch(`${API_BASE}/copilot/chats/${chat.id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
@@ -233,7 +233,7 @@ export const Copilots: React.FC = () => {
                     }).catch(() => {
                         // If PUT fails, try POST (chat might not exist)
                         console.log('[Copilots] PUT failed on unmount, trying POST for chat:', chat.id);
-                        fetch(`${API_BASE}/api/copilot/chats`, {
+                        fetch(`${API_BASE}/copilot/chats`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             credentials: 'include',
@@ -255,7 +255,7 @@ export const Copilots: React.FC = () => {
     const loadChats = async () => {
         try {
             console.log('[Copilots] Loading chats from server...');
-            const response = await fetch(`${API_BASE}/api/copilot/chats`, {
+            const response = await fetch(`${API_BASE}/copilot/chats`, {
                 credentials: 'include'
             });
             console.log('[Copilots] Response status:', response.status, response.statusText);
@@ -358,7 +358,7 @@ export const Copilots: React.FC = () => {
                 allowedEntitiesCount: payload.allowedEntities ? payload.allowedEntities.length : 0
             });
             
-            const response = await fetch(`${API_BASE}/api/copilot/chats/${chat.id}`, {
+            const response = await fetch(`${API_BASE}/copilot/chats/${chat.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -440,7 +440,7 @@ export const Copilots: React.FC = () => {
                 allowedEntities: newChat.allowedEntities && newChat.allowedEntities.length > 0 ? newChat.allowedEntities : null
             };
             console.log('[Copilots] Saving new chat to backend:', newChat.id, payload);
-            const response = await fetch(`${API_BASE}/api/copilot/chats`, {
+            const response = await fetch(`${API_BASE}/copilot/chats`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -504,7 +504,7 @@ export const Copilots: React.FC = () => {
                         instructions: newChat.instructions || null,
                         allowedEntities: newChat.allowedEntities && newChat.allowedEntities.length > 0 ? newChat.allowedEntities : null
                     };
-                    await fetch(`${API_BASE}/api/copilot/chats`, {
+                    await fetch(`${API_BASE}/copilot/chats`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
@@ -540,7 +540,7 @@ export const Copilots: React.FC = () => {
 
     const deleteChat = async (chatId: string) => {
         try {
-            const response = await fetch(`${API_BASE}/api/copilot/chats/${chatId}`, {
+            const response = await fetch(`${API_BASE}/copilot/chats/${chatId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });

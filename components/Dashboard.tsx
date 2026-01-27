@@ -4,7 +4,6 @@ import { Entity } from '../types';
 import { Database, Sparkles, X, Info, Plus, Share2, ChevronDown, Copy, Check, Trash2, Link, ExternalLink, LayoutDashboard, Search, ArrowLeft, Calendar, Clock, ChevronRight, Sliders, GripVertical, Maximize2, BarChart3, LineChart, PieChart, AreaChart, TrendingUp, Table2 } from 'lucide-react';
 import { PromptInput } from './PromptInput';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
-import { Tabs } from './Tabs';
 import { Pagination } from './Pagination';
 import { API_BASE } from '../config';
 import GridLayout, { Layout } from 'react-grid-layout';
@@ -63,9 +62,9 @@ const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = 
     const [showExplanation, setShowExplanation] = useState(false);
     
     return (
-        <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-full flex flex-col overflow-hidden relative">
+        <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-full flex flex-col relative overflow-hidden">
             {/* Drag Handle - Entire header is draggable */}
-            <div className="drag-handle cursor-move p-2 border-b border-slate-100 flex items-center justify-between group hover:bg-slate-50 transition-colors select-none">
+            <div className="drag-handle cursor-move p-2 border-b border-slate-100 flex items-center justify-between group hover:bg-slate-50 transition-colors select-none flex-shrink-0" style={{ pointerEvents: 'auto', touchAction: 'none' }}>
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                     <GripVertical size={14} className="text-slate-400 group-hover:text-slate-600 transition-colors flex-shrink-0" />
                     <h3 className="text-sm font-medium text-slate-900 truncate">{widget.title}</h3>
@@ -83,11 +82,17 @@ const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = 
                     <X size={14} />
                 </button>
             </div>
-            <div className="p-4 flex-1 overflow-auto min-h-0">
-                <p className="text-xs text-slate-500 mb-3">{widget.description}</p>
-                <DynamicChart config={widget} />
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                {widget.description && (
+                    <div className="px-4 pt-3 pb-2 flex-shrink-0">
+                        <p className="text-xs text-slate-500">{widget.description}</p>
+                    </div>
+                )}
+                <div className="flex-1 min-h-0 px-4 pb-4 overflow-hidden">
+                    <DynamicChart config={widget} />
+                </div>
                 {widget.explanation && (
-                    <div className="mt-3 pt-3 border-t border-slate-100">
+                    <div className="px-4 pb-3 pt-2 border-t border-slate-100 flex-shrink-0">
                         <button
                             onClick={() => setShowExplanation(!showExplanation)}
                             className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-800 font-medium"
@@ -103,7 +108,6 @@ const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = 
                     </div>
                 )}
             </div>
-            {/* Resize handle indicator - CSS from react-resizable will handle this */}
         </div>
     );
 };
@@ -188,9 +192,6 @@ const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSav
 export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onViewChange }) => {
     const { dashboardId: urlDashboardId } = useParams();
     const navigate = useNavigate();
-    
-    // Tab state
-    const [activeTab, setActiveTab] = useState<'dashboards' | 'simulations'>('dashboards');
     
     // Dashboard state
     const [dashboards, setDashboards] = useState<DashboardData[]>([]);
@@ -350,9 +351,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     minW: 2,
                     minH: 2,
                     maxW: 12,
-                    maxH: 10,
+                    maxH: 20,
                     isResizable: true,
-                    isDraggable: true
+                    isDraggable: true,
+                    resizeHandles: ['se', 's', 'e', 'sw', 'nw', 'ne', 'n', 'w']
                 }));
                 setLayout(newLayout);
             } else {
@@ -735,10 +737,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         setCurrentDashboardPage(1);
     }, [dashboardSearchQuery]);
 
-    // Interactive Dashboard state
-    const [interactiveDashboards, setInteractiveDashboards] = useState<any[]>([]);
-    const [selectedInteractiveDashboardId, setSelectedInteractiveDashboardId] = useState<string | null>(null);
-    const [scenarioVariables, setScenarioVariables] = useState<Record<string, any>>({});
 
     return (
         <div className="flex flex-col h-full bg-slate-50" data-tutorial="dashboard-content">
@@ -753,46 +751,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 </header>
             )}
 
-            {/* Content with Tabs */}
+            {/* Content */}
             <div className="flex-1 flex flex-col overflow-hidden bg-white">
-                {/* Tabs - Only show when no dashboard is selected */}
-                {!selectedDashboardId && (
-                    <div className="px-8 pt-6">
-                        <Tabs
-                            items={[
-                                { 
-                                    id: 'dashboards', 
-                                    label: 'Dashboards', 
-                                    icon: LayoutDashboard,
-                                    badge: dashboards.length
-                                },
-                                { 
-                                    id: 'simulations', 
-                                    label: 'Simulations', 
-                                    icon: Sliders,
-                                    badge: interactiveDashboards.length
-                                }
-                            ]}
-                            activeTab={activeTab}
-                            onChange={(tabId) => {
-                                if (tabId === 'dashboards') {
-                                    setActiveTab('dashboards');
-                                    setSelectedDashboardId(null);
-                                    setSelectedInteractiveDashboardId(null);
-                                    navigate('/dashboard', { replace: true });
-                                } else {
-                                    setActiveTab('simulations');
-                                    setSelectedDashboardId(null);
-                                    setSelectedInteractiveDashboardId(null);
-                                }
-                            }}
-                        />
-                    </div>
-                )}
-
-                {/* Tab Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
-            {activeTab === 'dashboards' && !selectedDashboardId ? (
+            {!selectedDashboardId ? (
                 /* Dashboards List View */
                 <>
                     {/* Content Area */}
@@ -918,7 +880,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                         )}
                     </div>
                 </>
-            ) : activeTab === 'dashboards' && selectedDashboardId ? (
+            ) : selectedDashboardId ? (
                 <>
                     {/* Header */}
                     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-20 shrink-0">
@@ -1041,6 +1003,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                         onResizeStop={(layout) => {
                                             setIsDragging(false);
                                             handleLayoutChange(layout);
+                                            // Save immediately after resize stops
+                                            if (selectedDashboardId) {
+                                                setTimeout(async () => {
+                                                    for (const item of layout) {
+                                                        try {
+                                                            await fetch(`${API_BASE}/widgets/${item.i}/grid`, {
+                                                                method: 'PUT',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                credentials: 'include',
+                                                                body: JSON.stringify({
+                                                                    gridX: item.x,
+                                                                    gridY: item.y,
+                                                                    gridWidth: item.w,
+                                                                    gridHeight: item.h
+                                                                })
+                                                            });
+                                                        } catch (error) {
+                                                            console.error('Error updating widget size:', error);
+                                                        }
+                                                    }
+                                                }, 100);
+                                            }
                                         }}
                                         isDraggable={true}
                                         isResizable={true}
@@ -1050,6 +1034,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                         compactType={null}
                                         preventCollision={false}
                                         useCSSTransforms={true}
+                                        resizeHandles={['se', 's', 'e', 'sw', 'nw', 'ne', 'n', 'w']}
+                                        allowOverlap={false}
                                     >
                                         {savedWidgets.map((widget) => (
                                             <GridWidgetCard
@@ -1196,17 +1182,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                         </div>
                     </div>
                 </>
-            ) : activeTab === 'simulations' ? (
-                <InteractiveDashboardsView
-                    entities={entities}
-                    interactiveDashboards={interactiveDashboards}
-                    setInteractiveDashboards={setInteractiveDashboards}
-                    selectedInteractiveDashboardId={selectedInteractiveDashboardId}
-                    setSelectedInteractiveDashboardId={setSelectedInteractiveDashboardId}
-                    scenarioVariables={scenarioVariables}
-                    setScenarioVariables={setScenarioVariables}
-                    onNavigate={onNavigate}
-                />
             ) : null}
                 </div>
             </div>
@@ -1293,327 +1268,3 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     );
 };
 
-// Simulations Component
-interface InteractiveDashboardsViewProps {
-    entities: Entity[];
-    interactiveDashboards: any[];
-    setInteractiveDashboards: (dashboards: any[]) => void;
-    selectedInteractiveDashboardId: string | null;
-    setSelectedInteractiveDashboardId: (id: string | null) => void;
-    scenarioVariables: Record<string, any>;
-    setScenarioVariables: (vars: Record<string, any>) => void;
-    onNavigate?: (entityId: string) => void;
-}
-
-const InteractiveDashboardsView: React.FC<InteractiveDashboardsViewProps> = ({
-    entities,
-    interactiveDashboards,
-    setInteractiveDashboards,
-    selectedInteractiveDashboardId,
-    setSelectedInteractiveDashboardId,
-    scenarioVariables,
-    setScenarioVariables,
-    onNavigate
-}) => {
-    const [isCreating, setIsCreating] = useState(false);
-    const [newDashboardName, setNewDashboardName] = useState('');
-    const [selectedVariables, setSelectedVariables] = useState<string[]>([]);
-    const [variableValues, setVariableValues] = useState<Record<string, number>>({});
-
-    const selectedDashboard = interactiveDashboards.find(d => d.id === selectedInteractiveDashboardId);
-
-    const handleCreateInteractiveDashboard = async () => {
-        if (!newDashboardName.trim()) {
-            alert('Please enter a dashboard name');
-            return;
-        }
-
-        const id = generateUUID();
-        const newDashboard = {
-            id,
-            name: newDashboardName.trim(),
-            variables: selectedVariables,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
-
-        setInteractiveDashboards([...interactiveDashboards, newDashboard]);
-        setSelectedInteractiveDashboardId(id);
-        setNewDashboardName('');
-        setIsCreating(false);
-        setSelectedVariables([]);
-    };
-
-    const handleAddVariable = (entityId: string, propertyId: string) => {
-        const key = `${entityId}_${propertyId}`;
-        if (!selectedVariables.includes(key)) {
-            setSelectedVariables([...selectedVariables, key]);
-            setVariableValues({ ...variableValues, [key]: 0 });
-        }
-    };
-
-    const handleUpdateVariable = (key: string, value: number) => {
-        setVariableValues({ ...variableValues, [key]: value });
-        setScenarioVariables({ ...scenarioVariables, [key]: value });
-    };
-
-    const getEntityPropertyName = (key: string) => {
-        const [entityId, propertyId] = key.split('_');
-        const entity = entities.find(e => e.id === entityId);
-        const property = entity?.properties?.find(p => p.id === propertyId);
-        return `${entity?.name || 'Unknown'}.${property?.name || 'Unknown'}`;
-    };
-
-    if (selectedInteractiveDashboardId && selectedDashboard) {
-        return (
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                <div className="max-w-7xl mx-auto space-y-6">
-                    {/* Header */}
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h2 className="text-xl font-normal text-slate-900 mb-1">{selectedDashboard.name}</h2>
-                            <p className="text-sm text-slate-500">Simulation for what-if scenarios</p>
-                        </div>
-                        <button
-                            onClick={() => setSelectedInteractiveDashboardId(null)}
-                            className="flex items-center gap-2 px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-md transition-colors text-sm"
-                        >
-                            <ArrowLeft size={14} />
-                            <span className="font-medium">Back</span>
-                        </button>
-                    </div>
-
-                    {/* Scenario Variables Panel */}
-                    <div className="bg-white rounded-lg border border-slate-200 p-6">
-                        <h3 className="text-base font-normal text-slate-900 mb-4 flex items-center gap-2">
-                            <Sliders size={16} className="text-slate-600" />
-                            Scenario Variables
-                        </h3>
-                        <div className="space-y-4">
-                            {selectedDashboard.variables && selectedDashboard.variables.length > 0 ? (
-                                selectedDashboard.variables.map((key: string) => (
-                                    <div key={key} className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg">
-                                        <div className="flex-1">
-                                            <label className="text-sm font-medium text-slate-700 mb-1 block">
-                                                {getEntityPropertyName(key)}
-                                            </label>
-                                            <input
-                                                type="number"
-                                                value={variableValues[key] || 0}
-                                                onChange={(e) => handleUpdateVariable(key, parseFloat(e.target.value) || 0)}
-                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-300"
-                                                placeholder="Enter value"
-                                            />
-                                        </div>
-                                        <button
-                                            onClick={() => {
-                                                const updatedVars = selectedDashboard.variables.filter((v: string) => v !== key);
-                                                setInteractiveDashboards(interactiveDashboards.map(d => 
-                                                    d.id === selectedDashboard.id 
-                                                        ? { ...d, variables: updatedVars }
-                                                        : d
-                                                ));
-                                                const newValues = { ...variableValues };
-                                                delete newValues[key];
-                                                setVariableValues(newValues);
-                                            }}
-                                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                        >
-                                            <X size={16} />
-                                        </button>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-sm text-slate-500 text-center py-4">
-                                    No variables added yet. Add variables from entities below.
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Add Variable Section */}
-                        <div className="mt-6 pt-6 border-t border-slate-200">
-                            <h4 className="text-sm font-medium text-slate-700 mb-3">Add Variable</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {entities.map(entity => (
-                                    <div key={entity.id} className="border border-slate-200 rounded-lg p-4">
-                                        <h5 className="text-sm font-medium text-slate-900 mb-2">{entity.name}</h5>
-                                        <div className="space-y-2">
-                                            {entity.properties?.filter(p => p.type === 'number' || p.type === 'integer').map(property => {
-                                                const key = `${entity.id}_${property.id}`;
-                                                const isSelected = selectedDashboard.variables?.includes(key);
-                                                return (
-                                                    <button
-                                                        key={property.id}
-                                                        onClick={() => {
-                                                            if (!isSelected) {
-                                                                handleAddVariable(entity.id, property.id);
-                                                                const updatedVars = [...(selectedDashboard.variables || []), key];
-                                                                setInteractiveDashboards(interactiveDashboards.map(d => 
-                                                                    d.id === selectedDashboard.id 
-                                                                        ? { ...d, variables: updatedVars }
-                                                                        : d
-                                                                ));
-                                                            }
-                                                        }}
-                                                        disabled={isSelected}
-                                                        className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${
-                                                            isSelected
-                                                                ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
-                                                                : 'bg-slate-50 hover:bg-slate-100 text-slate-700'
-                                                        }`}
-                                                    >
-                                                        {property.name} ({property.type})
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* What-If Scenarios */}
-                    <div className="bg-white rounded-lg border border-slate-200 p-6">
-                        <h3 className="text-base font-normal text-slate-900 mb-4">What-If Scenarios</h3>
-                        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                            <p className="text-sm text-slate-600 mb-4">
-                                Adjust the variables above to see how changes affect your data visualizations.
-                            </p>
-                            <div className="space-y-2">
-                                {Object.keys(scenarioVariables).length > 0 ? (
-                                    Object.entries(scenarioVariables).map(([key, value]) => (
-                                        <div key={key} className="flex items-center justify-between p-2 bg-white rounded">
-                                            <span className="text-sm text-slate-700">{getEntityPropertyName(key)}</span>
-                                            <span className="text-sm font-medium text-slate-900">{value}</span>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p className="text-sm text-slate-500 text-center py-4">
-                                        Add variables and adjust their values to create scenarios
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Placeholder for widgets/charts */}
-                    <div className="bg-white rounded-lg border border-slate-200 p-6">
-                        <h3 className="text-base font-normal text-slate-900 mb-4">Visualizations</h3>
-                        <div className="bg-slate-50 rounded-lg p-8 text-center border-2 border-dashed border-slate-300">
-                            <Database className="mx-auto text-slate-300 mb-3" size={40} />
-                            <p className="text-sm text-slate-500">
-                                Charts and visualizations will appear here based on your scenario variables
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-            <div className="max-w-7xl mx-auto">
-                {/* Toolbar */}
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h2 className="text-lg font-normal text-slate-900 mb-1">Simulations</h2>
-                        <p className="text-sm text-slate-500">Create simulations for what-if scenario analysis</p>
-                    </div>
-                    <button
-                        onClick={() => setIsCreating(true)}
-                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
-                    >
-                        <Plus size={14} className="mr-2" />
-                        Create Simulation
-                    </button>
-                </div>
-
-                {/* Create Modal */}
-                {isCreating && (
-                    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setIsCreating(false)}>
-                        <div className="bg-white rounded-lg border border-slate-200 shadow-xl p-6 w-[500px]" onClick={e => e.stopPropagation()}>
-                            <h3 className="text-lg font-normal text-slate-800 mb-4">Create Simulation</h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">Dashboard Name</label>
-                                    <input
-                                        type="text"
-                                        value={newDashboardName}
-                                        onChange={(e) => setNewDashboardName(e.target.value)}
-                                        placeholder="e.g., Sales Forecast Scenarios"
-                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-300"
-                                        autoFocus
-                                    />
-                                </div>
-                                <div className="flex gap-2 justify-end pt-4 border-t border-slate-200">
-                                    <button
-                                        onClick={() => {
-                                            setIsCreating(false);
-                                            setNewDashboardName('');
-                                        }}
-                                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={handleCreateInteractiveDashboard}
-                                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium"
-                                    >
-                                        Create
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Dashboards Grid */}
-                {interactiveDashboards.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {interactiveDashboards.map((dashboard) => (
-                            <div
-                                key={dashboard.id}
-                                onClick={() => setSelectedInteractiveDashboardId(dashboard.id)}
-                                className="bg-white border border-slate-200 rounded-lg p-5 cursor-pointer group hover:shadow-md transition-shadow"
-                            >
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-50 to-teal-100 flex items-center justify-center">
-                                            <Sliders size={18} className="text-teal-600" />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-base font-normal text-slate-900">{dashboard.name}</h3>
-                                            <p className="text-xs text-slate-500 mt-1">
-                                                {dashboard.variables?.length || 0} variables
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-4 pt-4 border-t border-slate-100">
-                                    <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    <span className="opacity-0 group-hover:opacity-100 transition-opacity font-medium text-slate-900">Open dashboard</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="bg-white rounded-lg border border-slate-200 p-12 text-center">
-                        <Sliders className="mx-auto text-slate-300 mb-4" size={48} />
-                        <h3 className="text-base font-normal text-slate-700 mb-2">No Simulations</h3>
-                        <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
-                            Create a simulation to explore what-if scenarios by adjusting variables and seeing how they affect your data.
-                        </p>
-                        <button
-                            onClick={() => setIsCreating(true)}
-                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium"
-                        >
-                            Create Your First Simulation
-                        </button>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};

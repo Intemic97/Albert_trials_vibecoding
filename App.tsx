@@ -27,6 +27,8 @@ import { Copilots } from './components/Copilots';
 import { LogsAndAlerts } from './components/LogsAndAlerts';
 import { Connections } from './components/Connections';
 import { Documentation } from './components/Documentation';
+import { KnowledgeBase } from './components/KnowledgeBase';
+import { Simulations } from './components/Simulations';
 import { Tabs } from './components/Tabs';
 import { API_BASE } from './config';
 
@@ -79,6 +81,7 @@ function AuthenticatedApp() {
     const getCurrentView = () => {
         const path = location.pathname;
         if (path.startsWith('/dashboard')) return 'dashboard';
+        if (path.startsWith('/simulations')) return 'simulations';
         if (path.startsWith('/workflow')) return 'workflows';
         if (path.startsWith('/database')) return 'database';
         if (path.startsWith('/templates')) return 'templates';
@@ -104,6 +107,7 @@ function AuthenticatedApp() {
         const routes: Record<string, string> = {
             'overview': '/overview',
             'dashboard': '/dashboard',
+            'simulations': '/simulations',
             'workflows': '/workflows',
             'database': '/database',
             'reports': '/reports',
@@ -935,6 +939,15 @@ function AuthenticatedApp() {
                     } />
                     <Route path="/admin" element={
                         <AdminPanel onNavigate={handleNavigate} />
+                    } />
+                    <Route path="/simulations/:simulationId?/scenarios/:scenarioId?" element={
+                        <Simulations 
+                            entities={entities} 
+                            onNavigate={(entityId) => {
+                                setActiveEntityId(entityId);
+                                navigate(`/database/${entityId}`);
+                            }}
+                        />
                     } />
                     <Route path="/database" element={
                         <KnowledgeBase 
