@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Database, Info } from 'lucide-react';
+import { Layout, Database, Info } from '@phosphor-icons/react';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { API_BASE } from '../config';
 
@@ -27,24 +27,24 @@ const WidgetCard: React.FC<{ widget: WidgetConfig }> = ({ widget }) => {
     const [showExplanation, setShowExplanation] = useState(false);
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-light)] p-6">
             <h3 className="text-lg font-normal text-slate-800 mb-1">{widget.title}</h3>
-            <p className="text-xs text-slate-500 mb-4">{widget.description}</p>
+            <p className="text-xs text-[var(--text-secondary)] mb-4">{widget.description}</p>
 
             <DynamicChart config={widget} />
 
             {widget.explanation && (
-                <div className="mt-4 pt-4 border-t border-slate-100">
+                <div className="mt-4 pt-4 border-t border-[var(--border-light)]">
                     <button
                         onClick={() => setShowExplanation(!showExplanation)}
                         className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium"
                     >
-                        <Info size={12} />
+                        <Info size={12} weight="light" />
                         How was this prepared?
                     </button>
 
                     {showExplanation && (
-                        <div className="mt-2 p-3 bg-teal-50 rounded-lg text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
+                        <div className="mt-2 p-3 bg-teal-50 rounded-lg text-xs text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap">
                             {widget.explanation}
                         </div>
                     )}
@@ -86,10 +86,10 @@ export const SharedDashboard: React.FC<SharedDashboardProps> = ({ shareToken }) 
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+            <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
-                    <p className="text-slate-600">Loading dashboard...</p>
+                    <p className="text-[var(--text-secondary)]">Loading dashboard...</p>
                 </div>
             </div>
         );
@@ -97,11 +97,11 @@ export const SharedDashboard: React.FC<SharedDashboardProps> = ({ shareToken }) 
 
     if (error) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+            <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
                 <div className="text-center max-w-md">
-                    <LayoutDashboard className="mx-auto text-slate-300 mb-4" size={48} />
+                    <Layout className="mx-auto text-slate-300 mb-4" size={48} weight="light" />
                     <h1 className="text-xl font-normal text-slate-800 mb-2">Dashboard Unavailable</h1>
-                    <p className="text-slate-600">{error}</p>
+                    <p className="text-[var(--text-secondary)]">{error}</p>
                 </div>
             </div>
         );
@@ -110,15 +110,15 @@ export const SharedDashboard: React.FC<SharedDashboardProps> = ({ shareToken }) 
     if (!data) return null;
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-[var(--bg-primary)]">
             {/* Header */}
-            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm">
+            <header className="h-16 bg-[var(--bg-card)] border-b border-[var(--border-light)] flex items-center justify-between px-8 shadow-sm">
                 <div className="flex items-center gap-3">
-                    <LayoutDashboard className="text-teal-600" size={24} />
+                    <Layout className="text-teal-600" size={24} weight="light" />
                     <div>
                         <h1 className="text-xl font-normal text-slate-800">{data.dashboard.name}</h1>
                         {data.dashboard.description && (
-                            <p className="text-xs text-slate-500">{data.dashboard.description}</p>
+                            <p className="text-xs text-[var(--text-secondary)]">{data.dashboard.description}</p>
                         )}
                     </div>
                 </div>
@@ -137,10 +137,10 @@ export const SharedDashboard: React.FC<SharedDashboardProps> = ({ shareToken }) 
                             ))}
                         </div>
                     ) : (
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
-                            <Database className="mx-auto text-slate-300 mb-4" size={48} />
-                            <h3 className="text-lg font-normal text-slate-600 mb-2">No widgets</h3>
-                            <p className="text-sm text-slate-500">
+                        <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-light)] p-12 text-center">
+                            <Database className="mx-auto text-slate-300 mb-4" size={48} weight="light" />
+                            <h3 className="text-lg font-normal text-[var(--text-secondary)] mb-2">No widgets</h3>
+                            <p className="text-sm text-[var(--text-secondary)]">
                                 This dashboard doesn't have any widgets yet.
                             </p>
                         </div>

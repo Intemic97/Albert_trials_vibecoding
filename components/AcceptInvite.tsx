@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Mail, Lock, User, ArrowRight, Loader2, Users, CheckCircle, XCircle } from 'lucide-react';
+import { Envelope, Lock, User, ArrowRight, SpinnerGap, Users, CheckCircle, XCircle } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 
 interface InvitationInfo {
@@ -109,9 +109,9 @@ export function AcceptInvite() {
     // Loading state
     if (status === 'loading') {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+            <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
                 <div className="w-full max-w-md text-center">
-                    <Loader2 className="w-12 h-12 text-blue-400 animate-spin mx-auto mb-4" />
+                    <SpinnerGap weight="light" className="w-12 h-12 text-blue-400 animate-spin mx-auto mb-4" />
                     <p className="text-slate-400">Validating invitation...</p>
                 </div>
             </div>
@@ -121,11 +121,11 @@ export function AcceptInvite() {
     // Invalid invitation
     if (status === 'invalid') {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+            <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
                 <div className="w-full max-w-md">
-                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
+                    <div className="bg-[var(--bg-selected)]/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
                         <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <XCircle className="w-8 h-8 text-red-400" />
+                            <XCircle weight="light" className="w-8 h-8 text-red-400" />
                         </div>
                         <h1 className="text-2xl font-normal text-white mb-2">Invalid Invitation</h1>
                         <p className="text-slate-400 mb-6">{error}</p>
@@ -144,17 +144,17 @@ export function AcceptInvite() {
     // Success state
     if (status === 'success') {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+            <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
                 <div className="w-full max-w-md">
-                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
+                    <div className="bg-[var(--bg-selected)]/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
                         <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <CheckCircle className="w-8 h-8 text-emerald-400" />
+                            <CheckCircle weight="light" className="w-8 h-8 text-emerald-400" />
                         </div>
                         <h1 className="text-2xl font-normal text-white mb-2">Welcome to the team!</h1>
                         <p className="text-slate-400 mb-2">
                             You've successfully joined <span className="text-white font-medium">{invitation?.organizationName}</span>
                         </p>
-                        <p className="text-slate-500 text-sm">Redirecting you to the dashboard...</p>
+                        <p className="text-[var(--text-secondary)] text-sm">Redirecting you to the dashboard...</p>
                     </div>
                 </div>
             </div>
@@ -163,13 +163,13 @@ export function AcceptInvite() {
 
     // Registration form
     return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
             <div className="w-full max-w-md">
-                <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl">
+                <div className="bg-[var(--bg-selected)]/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl">
                     {/* Header */}
                     <div className="text-center mb-8">
                         <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Users className="w-8 h-8 text-blue-400" />
+                            <Users weight="light" className="w-8 h-8 text-blue-400" />
                         </div>
                         <h1 className="text-2xl font-normal text-white mb-2">Join {invitation?.organizationName}</h1>
                         <p className="text-slate-400">
@@ -179,9 +179,9 @@ export function AcceptInvite() {
 
                     {/* Email display */}
                     <div className="mb-6 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-                        <p className="text-xs text-slate-500 mb-1">You're signing up as</p>
+                        <p className="text-xs text-[var(--text-secondary)] mb-1">You're signing up as</p>
                         <p className="text-white font-medium flex items-center gap-2">
-                            <Mail className="w-4 h-4 text-slate-400" />
+                            <Envelope weight="light" className="w-4 h-4 text-slate-400" />
                             {invitation?.email}
                         </p>
                     </div>
@@ -191,11 +191,11 @@ export function AcceptInvite() {
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-slate-300">Your Name</label>
                             <div className="relative">
-                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                                <User weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-secondary)]" />
                                 <input
                                     type="text"
                                     required
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                                     placeholder="John Doe"
                                     value={formData.name}
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
@@ -206,11 +206,11 @@ export function AcceptInvite() {
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-slate-300">Password</label>
                             <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                                <Lock weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-secondary)]" />
                                 <input
                                     type="password"
                                     required
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                                     placeholder="••••••••"
                                     value={formData.password}
                                     onChange={e => setFormData({ ...formData, password: e.target.value })}
@@ -221,11 +221,11 @@ export function AcceptInvite() {
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-slate-300">Confirm Password</label>
                             <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                                <Lock weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-secondary)]" />
                                 <input
                                     type="password"
                                     required
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                                     placeholder="••••••••"
                                     value={formData.confirmPassword}
                                     onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
@@ -245,11 +245,11 @@ export function AcceptInvite() {
                             className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {status === 'registering' ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <SpinnerGap weight="light" className="w-5 h-5 animate-spin" />
                             ) : (
                                 <>
                                     Join Team
-                                    <ArrowRight className="w-5 h-5" />
+                                    <ArrowRight weight="light" className="w-5 h-5" />
                                 </>
                             )}
                         </button>

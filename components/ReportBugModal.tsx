@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Bug, Send, Loader2 } from 'lucide-react';
+import { X, Bug, PaperPlaneTilt, SpinnerGap } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 
 interface ReportBugModalProps {
@@ -55,7 +55,7 @@ export const ReportBugModal: React.FC<ReportBugModalProps> = ({ isOpen, onClose 
     return (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100] animate-in fade-in duration-200">
             <div 
-                className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200"
+                className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
@@ -64,20 +64,20 @@ export const ReportBugModal: React.FC<ReportBugModalProps> = ({ isOpen, onClose 
                         <div className="p-2 bg-red-50 rounded-lg">
                             <Bug size={18} className="text-red-600" />
                         </div>
-                        <h2 className="text-base font-normal text-slate-900">Report a Bug</h2>
+                        <h2 className="text-base font-normal text-[var(--text-primary)]">Report a Bug</h2>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="p-1.5 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
                     >
-                        <X size={18} className="text-slate-400" />
+                        <X size={18} className="text-slate-400" weight="light" />
                     </button>
                 </div>
 
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
                             What went wrong? <span className="text-red-500">*</span>
                         </label>
                         <textarea
@@ -85,13 +85,13 @@ export const ReportBugModal: React.FC<ReportBugModalProps> = ({ isOpen, onClose 
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="Describe the bug you encountered..."
                             rows={4}
-                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 resize-none"
+                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-slate-400 resize-none"
                             required
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
                             Steps to reproduce (optional)
                         </label>
                         <textarea
@@ -99,7 +99,7 @@ export const ReportBugModal: React.FC<ReportBugModalProps> = ({ isOpen, onClose 
                             onChange={(e) => setSteps(e.target.value)}
                             placeholder="1. Go to...&#10;2. Click on...&#10;3. See error..."
                             rows={3}
-                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 resize-none"
+                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-slate-400 resize-none"
                         />
                     </div>
 
@@ -118,7 +118,7 @@ export const ReportBugModal: React.FC<ReportBugModalProps> = ({ isOpen, onClose 
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-3 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700 transition-colors"
+                            className="px-3 py-2 border border-[var(--border-light)] rounded-lg hover:bg-slate-50 text-sm font-medium text-[var(--text-primary)] transition-colors"
                         >
                             Cancel
                         </button>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, XCircle, Loader2, ArrowRight } from 'lucide-react';
+import { CheckCircle, XCircle, SpinnerGap, ArrowRight } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 
 export function VerifyEmail() {
@@ -51,14 +51,14 @@ export function VerifyEmail() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
             <div className="w-full max-w-md">
-                <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
+                <div className="bg-[var(--bg-selected)]/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
                     {status === 'loading' && (
                         <>
                             <div className="flex items-center justify-center mx-auto mb-6">
                                 <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center">
-                                    <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+                                    <SpinnerGap weight="light" className="w-8 h-8 text-blue-400 animate-spin" />
                                 </div>
                             </div>
                             <h1 className="text-2xl font-normal text-white mb-2">Verifying your email...</h1>
@@ -70,7 +70,7 @@ export function VerifyEmail() {
                         <>
                             <div className="flex items-center justify-center mx-auto mb-6">
                                 <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center">
-                                    <CheckCircle className="w-8 h-8 text-emerald-400" />
+                                    <CheckCircle weight="light" className="w-8 h-8 text-emerald-400" />
                                 </div>
                             </div>
                             <h1 className="text-2xl font-normal text-white mb-2">Email Verified!</h1>
@@ -88,7 +88,7 @@ export function VerifyEmail() {
                                 className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
                             >
                                 Continue to Login
-                                <ArrowRight className="w-5 h-5" />
+                                <ArrowRight weight="light" className="w-5 h-5" />
                             </button>
                         </>
                     )}
@@ -97,7 +97,7 @@ export function VerifyEmail() {
                         <>
                             <div className="flex items-center justify-center mx-auto mb-6">
                                 <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
-                                    <XCircle className="w-8 h-8 text-red-400" />
+                                    <XCircle weight="light" className="w-8 h-8 text-red-400" />
                                 </div>
                             </div>
                             <h1 className="text-2xl font-normal text-white mb-2">Verification Failed</h1>
@@ -107,7 +107,7 @@ export function VerifyEmail() {
                                 className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
                             >
                                 Back to Login
-                                <ArrowRight className="w-5 h-5" />
+                                <ArrowRight weight="light" className="w-5 h-5" />
                             </button>
                         </>
                     )}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Play, Loader2, CheckCircle, AlertCircle, FileText, Send, ArrowRight } from 'lucide-react';
+import { Play, SpinnerGap, CheckCircle, WarningCircle, FileText, PaperPlaneTilt, ArrowRight } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 
 interface WorkflowInput {
@@ -116,8 +116,8 @@ export const PublicWorkflowForm: React.FC = () => {
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-teal-50 flex items-center justify-center">
                 <div className="text-center">
-                    <Loader2 className="w-12 h-12 text-teal-500 animate-spin mx-auto mb-4" />
-                    <p className="text-slate-600">Loading workflow...</p>
+                    <SpinnerGap className="w-12 h-12 text-teal-500 animate-spin mx-auto mb-4" weight="light" />
+                    <p className="text-[var(--text-secondary)]">Loading workflow...</p>
                 </div>
             </div>
         );
@@ -128,10 +128,10 @@ export const PublicWorkflowForm: React.FC = () => {
             <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-red-50 flex items-center justify-center p-4">
                 <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center border border-red-100">
                     <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <AlertCircle className="w-8 h-8 text-red-500" />
+                        <WarningCircle className="w-8 h-8 text-red-500" weight="light" />
                     </div>
                     <h1 className="text-2xl font-normal text-slate-800 mb-2">Oops!</h1>
-                    <p className="text-slate-600">{error}</p>
+                    <p className="text-[var(--text-secondary)]">{error}</p>
                 </div>
             </div>
         );
@@ -144,7 +144,7 @@ export const PublicWorkflowForm: React.FC = () => {
                 <div className="max-w-3xl mx-auto px-4 py-6">
                     <div className="flex items-center gap-3">
                         <div className="p-2.5 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-xl text-white">
-                            <FileText className="w-6 h-6" />
+                            <FileText className="w-6 h-6" weight="light" />
                         </div>
                         <div>
                             <h1 className="text-2xl font-normal text-slate-800">{workflow?.name || 'Workflow'}</h1>
@@ -163,7 +163,7 @@ export const PublicWorkflowForm: React.FC = () => {
                     <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
                         <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
                             <h2 className="font-normal text-slate-700 flex items-center gap-2">
-                                <Send size={18} className="text-teal-600" />
+                                <PaperPlaneTilt size={18} weight="light" className="text-teal-600" />
                                 Inputs
                             </h2>
                         </div>
@@ -200,12 +200,12 @@ export const PublicWorkflowForm: React.FC = () => {
                     >
                         {isSubmitting ? (
                             <>
-                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <SpinnerGap className="w-5 h-5 animate-spin" weight="light" />
                                 Running workflow...
                             </>
                         ) : (
                             <>
-                                <Play className="w-5 h-5" />
+                                <Play className="w-5 h-5" weight="light" />
                                 Run Workflow
                             </>
                         )}
@@ -214,7 +214,7 @@ export const PublicWorkflowForm: React.FC = () => {
                     {/* Error Message */}
                     {submitError && (
                         <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-                            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                            <WarningCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" weight="light" />
                             <div>
                                 <p className="font-medium text-red-800">Error</p>
                                 <p className="text-sm text-red-600">{submitError}</p>
@@ -227,7 +227,7 @@ export const PublicWorkflowForm: React.FC = () => {
                         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
                             <div className="bg-gradient-to-r from-emerald-50 to-teal-50 px-6 py-4 border-b border-emerald-200">
                                 <h2 className="font-normal text-emerald-800 flex items-center gap-2">
-                                    <CheckCircle size={18} className="text-emerald-600" />
+                                    <CheckCircle size={18} weight="light" className="text-emerald-600" />
                                     Workflow Executed Successfully
                                 </h2>
                                 <p className="text-sm text-emerald-600 mt-1">

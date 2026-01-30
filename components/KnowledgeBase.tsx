@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Database, Plus, Search, Filter, X, FileText, Folder, FolderPlus, Upload, FileSpreadsheet, Loader2, File, Download, Trash2, Eye, Link as LinkIcon, Copy, Check, Edit3 } from 'lucide-react';
+import { Database, Plus, MagnifyingGlass, Funnel, X, FileText, Folder, FolderPlus, UploadSimple, Table, SpinnerGap, File, DownloadSimple, Trash, Eye, Link as LinkIcon, Copy, Check, PencilSimple, Calendar, Tag, CaretRight } from '@phosphor-icons/react';
 import { Entity } from '../types';
 import { EntityCard } from './EntityCard';
 import { Tabs } from './Tabs';
+import { PageHeader } from './PageHeader';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../hooks/useNotifications';
+import { ToastContainer } from './ui/Toast';
 
 interface KnowledgeBaseProps {
     entities: Entity[];
@@ -27,6 +30,7 @@ interface Folder {
 
 export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNavigate }) => {
     const navigate = useNavigate();
+    const { notifications, removeNotification, success, error: showError, warning } = useNotifications(3000);
     const location = useLocation();
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'entities' | 'folders' | 'documents'>('entities');
@@ -135,7 +139,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             window.location.reload();
         } catch (error) {
             console.error('Error creating entity:', error);
-            alert('Failed to create entity');
+            showError('Failed to create entity');
         }
     };
 
@@ -146,7 +150,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
         
         if (!allowedExtensions.includes(fileExtension)) {
-            alert('Please upload a CSV or Excel file (.csv, .xlsx, .xls)');
+            warning('Invalid file type', 'Please upload a CSV or Excel file (.csv, .xlsx, .xls)');
             return;
         }
 
@@ -176,12 +180,12 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                 // Reload entities
                 window.location.reload();
             } else {
-                const error = await res.json();
-                alert(error.error || 'Failed to create entity from file');
+                const errorData = await res.json();
+                showError('Failed to create entity', errorData.error || 'Please try again');
             }
         } catch (error) {
             console.error('Error uploading file:', error);
-            alert('Failed to upload file');
+            showError('Failed to upload file');
         } finally {
             setIsUploadingFile(false);
         }
@@ -200,7 +204,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             window.location.reload();
         } catch (error) {
             console.error('Error deleting entity:', error);
-            alert('Failed to delete entity');
+            showError('Failed to delete entity');
         }
     };
 
@@ -231,11 +235,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                 setIsCreatingFolder(false);
                 await fetchFolders();
             } else {
-                alert('Failed to create folder');
+                showError('Failed to create folder');
             }
         } catch (error) {
             console.error('Error creating folder:', error);
-            alert('Failed to create folder');
+            showError('Failed to create folder');
         }
     };
 
@@ -256,11 +260,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                 setEditingFolder(null);
                 await fetchFolders();
             } else {
-                alert('Failed to update folder');
+                showError('Failed to update folder');
             }
         } catch (error) {
             console.error('Error updating folder:', error);
-            alert('Failed to update folder');
+            showError('Failed to update folder');
         }
     };
 
@@ -278,11 +282,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             if (res.ok) {
                 await fetchFolders();
             } else {
-                alert('Failed to delete folder');
+                showError('Failed to delete folder');
             }
         } catch (error) {
             console.error('Error deleting folder:', error);
-            alert('Failed to delete folder');
+            showError('Failed to delete folder');
         }
     };
 
@@ -301,11 +305,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                     await fetchDocuments();
                 }
             } else {
-                alert('Failed to add item to folder');
+                showError('Failed to add item to folder');
             }
         } catch (error) {
             console.error('Error adding to folder:', error);
-            alert('Failed to add item to folder');
+            showError('Failed to add item to folder');
         }
     };
 
@@ -324,11 +328,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                     await fetchDocuments();
                 }
             } else {
-                alert('Failed to remove item from folder');
+                showError('Failed to remove item from folder');
             }
         } catch (error) {
             console.error('Error removing from folder:', error);
-            alert('Failed to remove item from folder');
+            showError('Failed to remove item from folder');
         }
     };
 
@@ -373,12 +377,12 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                     documentFileInputRef.current.value = '';
                 }
             } else {
-                const error = await res.json();
-                alert(error.error || 'Failed to upload document');
+                const errorData = await res.json();
+                showError('Failed to upload document', errorData.error);
             }
         } catch (error) {
             console.error('Error uploading document:', error);
-            alert('Failed to upload document');
+            showError('Failed to upload document');
         } finally {
             setIsUploadingDocument(false);
         }
@@ -396,11 +400,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             if (res.ok) {
                 await fetchDocuments();
             } else {
-                alert('Failed to delete document');
+                showError('Failed to delete document');
             }
         } catch (error) {
             console.error('Error deleting document:', error);
-            alert('Failed to delete document');
+            showError('Failed to delete document');
         }
     };
 
@@ -425,20 +429,12 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     );
 
     return (
-        <div className="flex flex-col h-full bg-slate-50" data-tutorial="database-content">
+        <div className="flex flex-col h-full bg-[var(--bg-primary)]" data-tutorial="database-content">
             {/* Header */}
-            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
-                <div>
-                    <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
-                        Your database
-                    </h1>
-                    <p className="text-[11px] text-slate-500">View and manage your different entities</p>
-                </div>
-                <div />
-            </header>
+            <PageHeader title="Your database" subtitle="View and manage your different entities" />
 
             {/* Tabs */}
-            <div className="px-8 pt-6 bg-white border-b border-slate-200">
+            <div className="px-8 pt-6 bg-[var(--bg-primary)] border-b border-[var(--border-light)]">
                 <Tabs
                     items={[
                         { id: 'entities', label: 'Entities', icon: Database, badge: entities.length },
@@ -456,7 +452,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                     <>
                         {/* Toolbar */}
                         <div className="flex justify-between items-center mb-6">
-                            <div className="text-sm text-slate-500">
+                            <div className="text-sm text-[var(--text-secondary)]">
                                 {searchQuery
                                     ? `Showing ${filteredEntities.length} of ${entities.length} entities`
                                     : `Total: ${entities.length} entities`
@@ -464,24 +460,24 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                             </div>
                             <div className="flex items-center gap-3">
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                    <MagnifyingGlass weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={14} />
                                     <input
                                         type="text"
                                         placeholder="Search entities..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 w-60 placeholder:text-slate-400"
+                                        className="pl-8 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] w-60 placeholder:text-[var(--text-tertiary)]"
                                     />
                                 </div>
-                                <button className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-                                    <Filter size={14} className="mr-2" />
+                                <button className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors">
+                                    <Funnel weight="light" size={14} className="mr-2" />
                                     Filter
                                 </button>
                                 <button
                                     onClick={() => setIsCreatingEntity(true)}
-                                    className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                    className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                                 >
-                                    <Plus size={14} className="mr-2" />
+                                    <Plus weight="light" size={14} className="mr-2" />
                                     Create Entity
                                 </button>
                             </div>
@@ -504,15 +500,15 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                 e.stopPropagation();
                                                 setShowFolderSelector({ type: 'entity', itemId: entity.id });
                                             }}
-                                            className="absolute top-3 right-3 p-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-md text-slate-600 transition-colors shadow-sm opacity-0 group-hover:opacity-100 z-10"
+                                            className="absolute top-3 right-3 p-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-tertiary)] rounded-md text-[var(--text-secondary)] transition-colors shadow-sm opacity-0 group-hover:opacity-100 z-10"
                                             title="Add to folder"
                                         >
-                                            <Folder size={14} />
+                                            <Folder weight="light" size={14} />
                                         </button>
                                         {/* Folder badge */}
                                         {entityFolder && (
-                                            <div className="absolute top-3 left-3 flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs text-slate-600 shadow-sm">
-                                                <Folder size={12} style={{ color: entityFolder.color || '#3b82f6' }} />
+                                            <div className="absolute top-3 left-3 flex items-center gap-1 px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md text-xs text-[var(--text-secondary)] shadow-sm">
+                                                <Folder weight="light" size={12} style={{ color: entityFolder.color || '#3b82f6' }} />
                                                 <span className="truncate max-w-[100px]">{entityFolder.name}</span>
                                             </div>
                                         )}
@@ -523,10 +519,10 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                             {/* Empty State / Add New Placeholder */}
                             <div
                                 onClick={() => setIsCreatingEntity(true)}
-                                className="border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center min-h-[200px] text-slate-400 hover:border-teal-500 hover:text-teal-600 hover:bg-teal-50 transition-all cursor-pointer group"
+                                className="border-2 border-dashed border-[var(--border-medium)] rounded-xl flex flex-col items-center justify-center min-h-[200px] text-[var(--text-tertiary)] hover:border-teal-500 hover:text-teal-600 hover:bg-teal-50 transition-all cursor-pointer group"
                             >
-                                <div className="p-4 bg-slate-100 rounded-full mb-3 group-hover:bg-white">
-                                    <Plus size={24} />
+                                <div className="p-4 bg-[var(--bg-tertiary)] rounded-full mb-3 group-hover:bg-[var(--bg-card)]">
+                                    <Plus weight="light" size={24} />
                                 </div>
                                 <span className="font-medium">Create new entity</span>
                             </div>
@@ -536,7 +532,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                     <>
                         {/* Folders Toolbar */}
                         <div className="flex justify-between items-center mb-6">
-                            <div className="text-sm text-slate-500">
+                            <div className="text-sm text-[var(--text-secondary)]">
                                 {searchQuery
                                     ? `Showing ${filteredFolders.length} of ${folders.length} folders`
                                     : `Total: ${folders.length} folders`
@@ -544,20 +540,20 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                             </div>
                             <div className="flex items-center gap-3">
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                    <MagnifyingGlass weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={14} />
                                     <input
                                         type="text"
                                         placeholder="Search folders..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 w-60 placeholder:text-slate-400"
+                                        className="pl-8 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] w-60 placeholder:text-[var(--text-tertiary)]"
                                     />
                                 </div>
                                 <button
                                     onClick={() => setIsCreatingFolder(true)}
-                                    className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                    className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                                 >
-                                    <FolderPlus size={14} className="mr-2" />
+                                    <FolderPlus weight="light" size={14} className="mr-2" />
                                     Create Folder
                                 </button>
                             </div>
@@ -566,14 +562,14 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                         {/* Folders Grid */}
                         {isLoadingFolders ? (
                             <div className="flex items-center justify-center py-12">
-                                <Loader2 className="animate-spin text-slate-400" size={24} />
+                                <SpinnerGap weight="light" className="animate-spin text-[var(--text-tertiary)]" size={24} />
                             </div>
                         ) : filteredFolders.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
                                 {filteredFolders.map((folder) => (
                                     <div
                                         key={folder.id}
-                                        className="group relative bg-white border border-slate-200 rounded-lg p-5 hover:border-slate-300 hover:shadow-md transition-all cursor-pointer flex flex-col"
+                                        className="group relative bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 hover:border-[var(--border-medium)] hover:shadow-md transition-all cursor-pointer flex flex-col"
                                         onClick={() => setSelectedFolder(folder)}
                                     >
                                         {/* Action buttons */}
@@ -583,20 +579,20 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                     e.stopPropagation();
                                                     setEditingFolder(folder);
                                                 }}
-                                                className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-md text-slate-600 transition-colors shadow-sm"
+                                                className="p-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-tertiary)] rounded-md text-[var(--text-secondary)] transition-colors shadow-sm"
                                                 title="Edit folder"
                                             >
-                                                <Edit3 size={14} />
+                                                <PencilSimple weight="light" size={14} />
                                             </button>
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleDeleteFolder(folder);
                                                 }}
-                                                className="p-1.5 bg-white border border-red-200 hover:bg-red-50 rounded-md text-red-600 transition-colors shadow-sm"
+                                                className="p-1.5 bg-[var(--bg-card)] border border-red-200 hover:bg-red-50 rounded-md text-red-600 transition-colors shadow-sm"
                                                 title="Delete folder"
                                             >
-                                                <Trash2 size={14} />
+                                                <Trash weight="light" size={14} />
                                             </button>
                                         </div>
 
@@ -607,12 +603,13 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                 style={{ backgroundColor: folder.color || '#3b82f6', opacity: 0.1 }}
                                             >
                                                 <Folder 
+                                                    weight="light"
                                                     size={20} 
                                                     style={{ color: folder.color || '#3b82f6' }}
                                                 />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <h3 className="font-normal text-sm text-slate-900 group-hover:text-slate-700 transition-colors leading-tight" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                <h3 className="font-normal text-sm text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors leading-tight" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                                     {folder.name}
                                                 </h3>
                                             </div>
@@ -620,24 +617,24 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
 
                                         {/* Description */}
                                         {folder.description && (
-                                            <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">
+                                            <p className="text-xs text-[var(--text-secondary)] line-clamp-2 mb-4 leading-relaxed">
                                                 {folder.description}
                                             </p>
                                         )}
                                         
                                         {/* Footer stats */}
-                                        <div className="mt-auto pt-3 border-t border-slate-100 flex items-center gap-3 text-xs text-slate-500">
+                                        <div className="mt-auto pt-3 border-t border-[var(--border-light)] flex items-center gap-3 text-xs text-[var(--text-secondary)]">
                                             <div className="flex items-center gap-1.5">
-                                                <FileText size={12} className="text-slate-400" />
-                                                <span className="font-medium text-slate-600">{folder.documentIds.length}</span>
+                                                <FileText weight="light" size={12} className="text-[var(--text-tertiary)]" />
+                                                <span className="font-medium text-[var(--text-secondary)]">{folder.documentIds.length}</span>
                                                 <span>document{folder.documentIds.length !== 1 ? 's' : ''}</span>
                                             </div>
                                             {folder.entityIds.length > 0 && (
                                                 <>
                                                     <span className="text-slate-300">•</span>
                                                     <div className="flex items-center gap-1.5">
-                                                        <Database size={12} className="text-slate-400" />
-                                                        <span className="font-medium text-slate-600">{folder.entityIds.length}</span>
+                                                        <Database weight="light" size={12} className="text-[var(--text-tertiary)]" />
+                                                        <span className="font-medium text-[var(--text-secondary)]">{folder.entityIds.length}</span>
                                                         <span>entit{folder.entityIds.length !== 1 ? 'ies' : 'y'}</span>
                                                     </div>
                                                 </>
@@ -647,10 +644,10 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                 ))}
                             </div>
                         ) : (
-                            <div className="bg-white rounded-lg border-2 border-dashed border-slate-300 p-12 text-center">
-                                <Folder className="mx-auto text-slate-300 mb-4" size={48} />
-                                <h3 className="text-base font-normal text-slate-700 mb-2">No folders found</h3>
-                                <p className="text-sm text-slate-500 mb-4">
+                            <div className="bg-[var(--bg-card)] rounded-lg border-2 border-dashed border-[var(--border-medium)] p-12 text-center">
+                                <Folder weight="light" className="mx-auto text-slate-300 mb-4" size={48} />
+                                <h3 className="text-base font-normal text-[var(--text-primary)] mb-2">No folders found</h3>
+                                <p className="text-sm text-[var(--text-secondary)] mb-4">
                                     {searchQuery
                                         ? 'Try adjusting your search query'
                                         : 'Create folders to organize your documents and entities'
@@ -659,9 +656,9 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                 {!searchQuery && (
                                     <button
                                         onClick={() => setIsCreatingFolder(true)}
-                                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
+                                        className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
                                     >
-                                        <FolderPlus size={16} />
+                                        <FolderPlus weight="light" size={16} />
                                         Create Folder
                                     </button>
                                 )}
@@ -672,7 +669,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                     <>
                         {/* Documents Toolbar */}
                         <div className="flex justify-between items-center mb-6">
-                            <div className="text-sm text-slate-500">
+                            <div className="text-sm text-[var(--text-secondary)]">
                                 {searchQuery
                                     ? `Showing ${filteredDocuments.length} of ${documents.length} documents`
                                     : `Total: ${documents.length} documents`
@@ -680,24 +677,24 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                             </div>
                             <div className="flex items-center gap-3">
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                    <MagnifyingGlass weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={14} />
                                     <input
                                         type="text"
                                         placeholder="Search documents..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 w-60 placeholder:text-slate-400"
+                                        className="pl-8 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] w-60 placeholder:text-[var(--text-tertiary)]"
                                     />
                                 </div>
-                                <button className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-                                    <Filter size={14} className="mr-2" />
+                                <button className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors">
+                                    <Funnel weight="light" size={14} className="mr-2" />
                                     Filter
                                 </button>
                                 <button
                                     onClick={() => documentFileInputRef.current?.click()}
-                                    className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                    className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                                 >
-                                    <Upload size={14} className="mr-2" />
+                                    <UploadSimple weight="light" size={14} className="mr-2" />
                                     Upload Document
                                 </button>
                                 <input
@@ -727,97 +724,122 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                     return (
                                         <div
                                             key={doc.id}
-                                            className="bg-white border border-slate-200 rounded-lg p-5 hover:shadow-md transition-all group"
+                                            className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 cursor-pointer group relative flex flex-col justify-between min-h-[200px] overflow-hidden transition-all duration-300 ease-out hover:shadow-md hover:border-[var(--border-medium)] hover:scale-[1.01] active:scale-[0.99]"
                                         >
-                                            <div className="flex items-start justify-between mb-3">
-                                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-50 to-purple-100 flex items-center justify-center flex-shrink-0">
-                                                        <FileText size={18} className="text-purple-600" />
+                                            <div className="flex-1">
+                                                {/* Header */}
+                                                <div className="flex items-start justify-between mb-4">
+                                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                        <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--bg-hover)] transition-all duration-300">
+                                                            <FileText weight="light" size={18} className="text-[var(--text-secondary)]" />
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <h3 className="text-base font-normal text-[var(--text-primary)] transition-colors truncate" style={{ fontFamily: "'Berkeley Mono', monospace" }} title={doc.name}>
+                                                                {doc.name}
+                                                            </h3>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <h3 className="text-base font-normal text-slate-900 truncate" title={doc.name}>
-                                                            {doc.name}
-                                                        </h3>
-                                                        {doc.summary && (
-                                                            <p className="text-xs text-slate-500 mt-1 line-clamp-2">{doc.summary}</p>
-                                                        )}
-                                                        {folder && (
-                                                            <div className="flex items-center gap-1 mt-1">
-                                                                <Folder size={12} className="text-slate-400" />
-                                                                <span className="text-xs text-slate-500">{folder.name}</span>
+                                                    {/* Action buttons */}
+                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setShowFolderSelector({ type: 'document', itemId: doc.id });
+                                                            }}
+                                                            className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+                                                            title="Add to folder"
+                                                        >
+                                                            <Folder weight="light" size={14} />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleCopyCitation(doc);
+                                                            }}
+                                                            className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+                                                            title="Copy citation"
+                                                        >
+                                                            {copiedDocId === doc.id ? <Check weight="light" size={14} className="text-green-500" /> : <LinkIcon weight="light" size={14} />}
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDeleteDocument(doc.id);
+                                                            }}
+                                                            className="p-1.5 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200 active:scale-90"
+                                                            title="Delete document"
+                                                        >
+                                                            <Trash weight="light" size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Description */}
+                                                {doc.summary && (
+                                                    <p className="text-sm text-[var(--text-secondary)] mb-4 line-clamp-2 leading-relaxed">
+                                                        {doc.summary}
+                                                    </p>
+                                                )}
+
+                                                {/* Metadata */}
+                                                <div className="space-y-2 mt-5">
+                                                    {folder && (
+                                                        <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                            <Folder weight="light" size={12} className="text-[var(--text-tertiary)]" />
+                                                            <span>{folder.name}</span>
+                                                        </div>
+                                                    )}
+                                                    {doc.fileSize && (
+                                                        <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                            <FileText weight="light" size={12} className="text-[var(--text-tertiary)]" />
+                                                            <span>{(doc.fileSize / 1024).toFixed(1)} KB</span>
+                                                        </div>
+                                                    )}
+                                                    {doc.createdAt && (
+                                                        <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                            <Calendar weight="light" size={12} className="text-[var(--text-tertiary)]" />
+                                                            <span>{new Date(doc.createdAt).toLocaleDateString()}</span>
+                                                        </div>
+                                                    )}
+                                                    {doc.tags && doc.tags.length > 0 && (
+                                                        <div className="flex items-center gap-2 text-xs">
+                                                            <Tag weight="light" size={12} className="text-[var(--text-tertiary)]" />
+                                                            <div className="flex items-center gap-1">
+                                                                {doc.tags.slice(0, 2).map((tag: string, idx: number) => (
+                                                                    <span key={idx} className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] rounded text-[var(--text-secondary)]">
+                                                                        {tag}
+                                                                    </span>
+                                                                ))}
+                                                                {doc.tags.length > 2 && <span className="text-[var(--text-tertiary)]">+{doc.tags.length - 2}</span>}
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setShowFolderSelector({ type: 'document', itemId: doc.id });
-                                                        }}
-                                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors"
-                                                        title="Add to folder"
-                                                    >
-                                                        <Folder size={14} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleCopyCitation(doc)}
-                                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors"
-                                                        title="Copy citation"
-                                                    >
-                                                        {copiedDocId === doc.id ? <Check size={14} /> : <LinkIcon size={14} />}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteDocument(doc.id)}
-                                                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                                                        title="Delete document"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
-                                            
-                                            <div className="flex items-center gap-4 text-xs text-slate-500 mt-4 pt-4 border-t border-slate-100">
-                                                {doc.fileSize && (
-                                                    <span>{(doc.fileSize / 1024).toFixed(1)} KB</span>
-                                                )}
-                                                {doc.tags && doc.tags.length > 0 && (
-                                                    <span className="flex items-center gap-1">
-                                                        {doc.tags.slice(0, 2).map((tag: string, idx: number) => (
-                                                            <span key={idx} className="px-2 py-0.5 bg-slate-100 rounded text-slate-600">
-                                                                {tag}
-                                                            </span>
-                                                        ))}
-                                                        {doc.tags.length > 2 && <span>+{doc.tags.length - 2}</span>}
+
+                                            {/* Footer with hover action */}
+                                            <div className="flex items-center justify-between mt-5">
+                                                <div className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary)]">
+                                                    <CaretRight weight="light" size={14} className="opacity-0 group-hover:opacity-100 transition-all duration-200 transform group-hover:translate-x-0.5" />
+                                                    <span className="opacity-0 group-hover:opacity-100 transition-all duration-200 font-medium text-[var(--text-primary)]">
+                                                        {copiedDocId === doc.id ? 'Citation copied!' : 'View document'}
                                                     </span>
-                                                )}
-                                                {doc.createdAt && (
-                                                    <span className="ml-auto">
-                                                        {new Date(doc.createdAt).toLocaleDateString()}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            
-                                            {copiedDocId === doc.id && (
-                                                <div className="mt-2 text-xs text-green-600 flex items-center gap-1">
-                                                    <Check size={12} />
-                                                    Citation copied! Use @{doc.name} to reference this document
                                                 </div>
-                                            )}
+                                            </div>
                                         </div>
                                     );
                                 })}
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <FileText size={48} className="text-slate-300 mb-4" />
-                                <h3 className="text-lg font-normal text-slate-900 mb-2">No documents yet</h3>
-                                <p className="text-sm text-slate-500 mb-6">Upload your first document to start building your knowledge base</p>
+                                <FileText weight="light" size={48} className="text-slate-300 mb-4" />
+                                <h3 className="text-lg font-normal text-[var(--text-primary)] mb-2">No documents yet</h3>
+                                <p className="text-sm text-[var(--text-secondary)] mb-6">Upload your first document to start building your knowledge base</p>
                                 <button
                                     onClick={() => documentFileInputRef.current?.click()}
-                                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                                    className="px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                                 >
-                                    <Upload size={16} />
+                                    <UploadSimple weight="light" size={16} />
                                     Upload Document
                                 </button>
                             </div>
@@ -826,12 +848,12 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                         {/* Upload Progress */}
                         {isUploadingDocument && (
                             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                                <div className="bg-white rounded-xl border border-slate-200 shadow-2xl p-6 max-w-md">
+                                <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl p-6 max-w-md">
                                     <div className="flex items-center gap-3 mb-4">
-                                        <Loader2 size={24} className="text-slate-600 animate-spin" />
+                                        <SpinnerGap weight="light" size={24} className="text-[var(--text-secondary)] animate-spin" />
                                         <div>
-                                            <h3 className="text-base font-medium text-slate-900">Uploading document</h3>
-                                            <p className="text-sm text-slate-500">Processing and extracting content...</p>
+                                            <h3 className="text-base font-medium text-[var(--text-primary)]">Uploading document</h3>
+                                            <p className="text-sm text-[var(--text-secondary)]">Processing and extracting content...</p>
                                         </div>
                                     </div>
                                 </div>
@@ -844,24 +866,24 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             {/* Create/Edit Folder Modal */}
             {(isCreatingFolder || editingFolder) && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 pointer-events-none" onClick={() => { setIsCreatingFolder(false); setEditingFolder(null); }}>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="px-6 py-4 border-b border-slate-200">
+                        <div className="px-6 py-4 border-b border-[var(--border-light)]">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                    <FolderPlus size={18} className="text-slate-600" />
+                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0">
+                                    <FolderPlus weight="light" size={18} className="text-[var(--text-secondary)]" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                    <h3 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                         {editingFolder ? 'Edit Folder' : 'Create Folder'}
                                     </h3>
-                                    <p className="text-xs text-slate-500 mt-0.5">Organize your documents and entities</p>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Organize your documents and entities</p>
                                 </div>
                                 <button
                                     onClick={() => { setIsCreatingFolder(false); setEditingFolder(null); setNewFolderName(''); setNewFolderDescription(''); setNewFolderColor('#3b82f6'); }}
-                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                    className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                                 >
-                                    <X size={18} />
+                                    <X weight="light" size={18} />
                                 </button>
                             </div>
                         </div>
@@ -869,7 +891,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                         {/* Content */}
                         <div className="px-6 py-4 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                     Folder Name <span className="text-red-500">*</span>
                                 </label>
                                 <input
@@ -877,13 +899,13 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                     value={editingFolder ? editingFolder.name : newFolderName}
                                     onChange={(e) => editingFolder ? setEditingFolder({...editingFolder, name: e.target.value}) : setNewFolderName(e.target.value)}
                                     placeholder="e.g., Quality Standards, Project Documents"
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                    className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                     autoFocus
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                     Description
                                 </label>
                                 <textarea
@@ -891,12 +913,12 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                     onChange={(e) => editingFolder ? setEditingFolder({...editingFolder, description: e.target.value}) : setNewFolderDescription(e.target.value)}
                                     placeholder="Optional description of what this folder contains"
                                     rows={3}
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 resize-none placeholder:text-slate-400"
+                                    className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] resize-none placeholder:text-[var(--text-tertiary)]"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                     Color
                                 </label>
                                 <div className="flex gap-2">
@@ -907,7 +929,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                             className={`w-10 h-10 rounded-lg border-2 transition-all ${
                                                 (editingFolder ? editingFolder.color : newFolderColor) === color
                                                     ? 'border-slate-900 scale-110'
-                                                    : 'border-slate-200 hover:border-slate-300'
+                                                    : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'
                                             }`}
                                             style={{ backgroundColor: color }}
                                         />
@@ -917,17 +939,17 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-slate-200 flex gap-2 justify-end">
+                        <div className="px-6 py-4 border-t border-[var(--border-light)] flex gap-2 justify-end">
                             <button
                                 onClick={() => { setIsCreatingFolder(false); setEditingFolder(null); setNewFolderName(''); setNewFolderDescription(''); setNewFolderColor('#3b82f6'); }}
-                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={() => editingFolder ? handleUpdateFolder(editingFolder) : handleCreateFolder()}
                                 disabled={!((editingFolder ? editingFolder.name : newFolderName).trim())}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {editingFolder ? 'Save Changes' : 'Create Folder'}
                             </button>
@@ -939,43 +961,43 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             {/* Folder Detail Modal */}
             {selectedFolder && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 pointer-events-none" onClick={() => setSelectedFolder(null)}>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[80vh] pointer-events-auto flex flex-col" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-2xl max-h-[80vh] pointer-events-auto flex flex-col" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="px-6 py-4 border-b border-slate-200 shrink-0">
+                        <div className="px-6 py-4 border-b border-[var(--border-light)] shrink-0">
                             <div className="flex items-center gap-3">
                                 <div 
                                     className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
                                     style={{ backgroundColor: selectedFolder.color || '#3b82f6', opacity: 0.1 }}
                                 >
-                                    <Folder size={20} style={{ color: selectedFolder.color || '#3b82f6' }} />
+                                    <Folder weight="light" size={20} style={{ color: selectedFolder.color || '#3b82f6' }} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="text-lg font-normal text-slate-900 truncate" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                    <h3 className="text-lg font-normal text-[var(--text-primary)] truncate" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                         {selectedFolder.name}
                                     </h3>
                                     {selectedFolder.description && (
-                                        <p className="text-xs text-slate-500 mt-0.5">{selectedFolder.description}</p>
+                                        <p className="text-xs text-[var(--text-secondary)] mt-0.5">{selectedFolder.description}</p>
                                     )}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={() => handleCopyFolderCitation(selectedFolder)}
-                                        className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                        className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                                         title="Copy citation"
                                     >
-                                        {copiedDocId === selectedFolder.id ? <Check size={18} /> : <LinkIcon size={18} />}
+                                        {copiedDocId === selectedFolder.id ? <Check weight="light" size={18} /> : <LinkIcon weight="light" size={18} />}
                                     </button>
                                     <button
                                         onClick={() => setSelectedFolder(null)}
-                                        className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                        className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                                     >
-                                        <X size={18} />
+                                        <X weight="light" size={18} />
                                     </button>
                                 </div>
                             </div>
                             {copiedDocId === selectedFolder.id && (
                                 <div className="mt-2 text-xs text-green-600 flex items-center gap-1">
-                                    <Check size={12} />
+                                    <Check weight="light" size={12} />
                                     Citation copied! Use @{selectedFolder.name} to reference this folder
                                 </div>
                             )}
@@ -986,74 +1008,74 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                             {/* Documents Section */}
                             <div>
                                 <div className="flex items-center justify-between mb-3">
-                                    <h4 className="text-sm font-medium text-slate-900">Documents ({selectedFolder.documentIds.length})</h4>
+                                    <h4 className="text-sm font-medium text-[var(--text-primary)]">Documents ({selectedFolder.documentIds.length})</h4>
                                     <button
                                         onClick={() => {
                                             setShowFolderSelector({ type: 'document', itemId: '' });
                                             setSelectedFolder(null);
                                         }}
-                                        className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1"
+                                        className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1"
                                     >
-                                        <Plus size={12} />
+                                        <Plus weight="light" size={12} />
                                         Add Document
                                     </button>
                                 </div>
                                 {selectedFolder.documentIds.length > 0 ? (
                                     <div className="space-y-2">
                                         {documents.filter(doc => selectedFolder.documentIds.includes(doc.id)).map((doc) => (
-                                            <div key={doc.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+                                            <div key={doc.id} className="flex items-center justify-between p-2 bg-[var(--bg-tertiary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors">
                                                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                    <FileText size={14} className="text-slate-400 flex-shrink-0" />
-                                                    <span className="text-sm text-slate-700 truncate">{doc.name}</span>
+                                                    <FileText weight="light" size={14} className="text-[var(--text-tertiary)] flex-shrink-0" />
+                                                    <span className="text-sm text-[var(--text-primary)] truncate">{doc.name}</span>
                                                 </div>
                                                 <button
                                                     onClick={() => handleRemoveFromFolder(selectedFolder.id, 'document', doc.id)}
-                                                    className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                                    className="p-1 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                                                 >
-                                                    <X size={14} />
+                                                    <X weight="light" size={14} />
                                                 </button>
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-xs text-slate-500 text-center py-4">No documents in this folder</p>
+                                    <p className="text-xs text-[var(--text-secondary)] text-center py-4">No documents in this folder</p>
                                 )}
                             </div>
 
                             {/* Entities Section */}
                             <div>
                                 <div className="flex items-center justify-between mb-3">
-                                    <h4 className="text-sm font-medium text-slate-900">Entities ({selectedFolder.entityIds.length})</h4>
+                                    <h4 className="text-sm font-medium text-[var(--text-primary)]">Entities ({selectedFolder.entityIds.length})</h4>
                                     <button
                                         onClick={() => {
                                             setShowFolderSelector({ type: 'entity', itemId: '' });
                                             setSelectedFolder(null);
                                         }}
-                                        className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1"
+                                        className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1"
                                     >
-                                        <Plus size={12} />
+                                        <Plus weight="light" size={12} />
                                         Add Entity
                                     </button>
                                 </div>
                                 {selectedFolder.entityIds.length > 0 ? (
                                     <div className="space-y-2">
                                         {entities.filter(entity => selectedFolder.entityIds.includes(entity.id)).map((entity) => (
-                                            <div key={entity.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+                                            <div key={entity.id} className="flex items-center justify-between p-2 bg-[var(--bg-tertiary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors">
                                                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                    <Database size={14} className="text-slate-400 flex-shrink-0" />
-                                                    <span className="text-sm text-slate-700 truncate">{entity.name}</span>
+                                                    <Database weight="light" size={14} className="text-[var(--text-tertiary)] flex-shrink-0" />
+                                                    <span className="text-sm text-[var(--text-primary)] truncate">{entity.name}</span>
                                                 </div>
                                                 <button
                                                     onClick={() => handleRemoveFromFolder(selectedFolder.id, 'entity', entity.id)}
-                                                    className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                                    className="p-1 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                                                 >
-                                                    <X size={14} />
+                                                    <X weight="light" size={14} />
                                                 </button>
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-xs text-slate-500 text-center py-4">No entities in this folder</p>
+                                    <p className="text-xs text-[var(--text-secondary)] text-center py-4">No entities in this folder</p>
                                 )}
                             </div>
                         </div>
@@ -1064,28 +1086,28 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             {/* Create Entity Modal */}
             {isCreatingEntity && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsCreatingEntity(false)}>
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col" onClick={(e) => e.stopPropagation()}>
-                        <div className="bg-white border-b border-slate-200 px-6 py-5 shrink-0 flex items-center justify-between">
+                    <div className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-md flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        <div className="bg-[var(--bg-card)] border-b border-[var(--border-light)] px-6 py-5 shrink-0 flex items-center justify-between">
                             <div>
-                                <h2 className="text-lg font-normal text-slate-900">Create Entity</h2>
-                                <p className="text-xs text-slate-500 mt-1">Define a new entity for your database</p>
+                                <h2 className="text-lg font-normal text-[var(--text-primary)]">Create Entity</h2>
+                                <p className="text-xs text-[var(--text-secondary)] mt-1">Define a new entity for your database</p>
                             </div>
                             <button
                                 onClick={() => setIsCreatingEntity(false)}
-                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
                             >
-                                <X size={18} />
+                                <X weight="light" size={18} />
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 space-y-4">
                             {/* Mode Toggle */}
-                            <div className="flex gap-2 p-1 bg-slate-50 rounded-lg border border-slate-200">
+                            <div className="flex gap-2 p-1 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
                                 <button
                                     onClick={() => setUploadMode('manual')}
                                     className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-colors ${
                                         uploadMode === 'manual'
-                                            ? 'bg-white text-slate-900 shadow-sm'
-                                            : 'text-slate-600 hover:text-slate-800'
+                                            ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                                            : 'text-[var(--text-secondary)] hover:text-slate-800'
                                     }`}
                                 >
                                     Manual
@@ -1094,12 +1116,12 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                     onClick={() => setUploadMode('file')}
                                     className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-colors ${
                                         uploadMode === 'file'
-                                            ? 'bg-white text-slate-900 shadow-sm'
-                                            : 'text-slate-600 hover:text-slate-800'
+                                            ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                                            : 'text-[var(--text-secondary)] hover:text-slate-800'
                                     }`}
                                 >
                                     <span className="flex items-center justify-center gap-2">
-                                        <Upload size={14} />
+                                        <UploadSimple weight="light" size={14} />
                                         Upload File
                                     </span>
                                 </button>
@@ -1108,7 +1130,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                             {uploadMode === 'manual' ? (
                                 <>
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                             Entity Name <span className="text-red-500">*</span>
                                         </label>
                                         <input
@@ -1116,12 +1138,12 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                             value={newEntityName}
                                             onChange={(e) => setNewEntityName(e.target.value)}
                                             placeholder="e.g., Customers, Products, Orders"
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)]"
                                             autoFocus
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                             Description
                                         </label>
                                         <textarea
@@ -1129,14 +1151,14 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                             onChange={(e) => setNewEntityDescription(e.target.value)}
                                             placeholder="Optional description of what this entity represents"
                                             rows={3}
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-300 resize-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] resize-none"
                                         />
                                     </div>
                                 </>
                             ) : (
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                             Entity Name <span className="text-red-500">*</span>
                                         </label>
                                         <input
@@ -1144,15 +1166,15 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                             value={newEntityName}
                                             onChange={(e) => setNewEntityName(e.target.value)}
                                             placeholder="Will use filename if empty"
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)]"
                                         />
-                                        <p className="text-xs text-slate-500 mt-1">Leave empty to use the filename as entity name</p>
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1">Leave empty to use the filename as entity name</p>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                             Upload Excel or CSV File
                                         </label>
-                                        <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-slate-400 transition-colors">
+                                        <div className="border-2 border-dashed border-[var(--border-medium)] rounded-lg p-6 text-center hover:border-slate-400 transition-colors">
                                             <input
                                                 ref={fileInputRef}
                                                 type="file"
@@ -1176,28 +1198,28 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                             >
                                                 {isUploadingFile ? (
                                                     <>
-                                                        <Loader2 size={32} className="text-slate-400 mb-2 animate-spin" />
-                                                        <span className="text-sm text-slate-600">Processing file...</span>
+                                                        <SpinnerGap weight="light" size={32} className="text-[var(--text-tertiary)] mb-2 animate-spin" />
+                                                        <span className="text-sm text-[var(--text-secondary)]">Processing file...</span>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center mb-3">
-                                                            <FileSpreadsheet size={24} className="text-slate-600" />
+                                                        <div className="w-12 h-12 bg-[var(--bg-tertiary)] rounded-lg flex items-center justify-center mb-3">
+                                                            <Table weight="light" size={24} className="text-[var(--text-secondary)]" />
                                                         </div>
-                                                        <span className="text-sm font-medium text-slate-700 mb-1">Click to upload or drag and drop</span>
-                                                        <span className="text-xs text-slate-500">CSV, XLSX, or XLS (max 50MB)</span>
+                                                        <span className="text-sm font-medium text-[var(--text-primary)] mb-1">Click to upload or drag and drop</span>
+                                                        <span className="text-xs text-[var(--text-secondary)]">CSV, XLSX, or XLS (max 50MB)</span>
                                                     </>
                                                 )}
                                             </label>
                                         </div>
-                                        <p className="text-xs text-slate-500 mt-2">
+                                        <p className="text-xs text-[var(--text-secondary)] mt-2">
                                             The entity will be created with properties based on the columns in your file. Data will be imported automatically.
                                         </p>
                                     </div>
                                 </div>
                             )}
                         </div>
-                        <div className="border-t border-slate-200 px-6 py-4 shrink-0 flex items-center justify-end gap-3">
+                        <div className="border-t border-[var(--border-light)] px-6 py-4 shrink-0 flex items-center justify-end gap-3">
                             <button
                                 onClick={() => {
                                     setIsCreatingEntity(false);
@@ -1208,7 +1230,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                         fileInputRef.current.value = '';
                                     }
                                 }}
-                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors"
+                                className="px-4 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-selected)] rounded-lg text-sm font-medium transition-colors"
                             >
                                 Cancel
                             </button>
@@ -1216,7 +1238,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                 <button
                                     onClick={handleCreateEntity}
                                     disabled={!newEntityName.trim()}
-                                    className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    className="px-4 py-2 bg-[var(--bg-selected)] text-white rounded-lg text-sm font-medium hover:bg-[#555555] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                     Create Entity
                                 </button>
@@ -1229,18 +1251,18 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             {/* Folder Selector Modal */}
             {showFolderSelector && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 pointer-events-none" onClick={() => setShowFolderSelector(null)}>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="px-6 py-4 border-b border-slate-200">
+                        <div className="px-6 py-4 border-b border-[var(--border-light)]">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                    <Folder size={18} className="text-slate-600" />
+                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0">
+                                    <Folder weight="light" size={18} className="text-[var(--text-secondary)]" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                    <h3 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                         {showFolderSelector.itemId ? 'Select Folder' : 'Add to Folder'}
                                     </h3>
-                                    <p className="text-xs text-slate-500 mt-0.5">
+                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                                         {showFolderSelector.itemId 
                                             ? `Choose a folder to add this ${showFolderSelector.type === 'document' ? 'document' : 'entity'} to`
                                             : `Select a ${showFolderSelector.type === 'document' ? 'document' : 'entity'} to add to a folder`
@@ -1249,9 +1271,9 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                 </div>
                                 <button
                                     onClick={() => setShowFolderSelector(null)}
-                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                    className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                                 >
-                                    <X size={18} />
+                                    <X weight="light" size={18} />
                                 </button>
                             </div>
                         </div>
@@ -1262,17 +1284,17 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                 // Show folders to select
                                 folders.length === 0 ? (
                                     <div className="text-center py-8">
-                                        <Folder className="mx-auto text-slate-300 mb-3" size={32} />
-                                        <p className="text-sm text-slate-600 mb-2">No folders yet</p>
-                                        <p className="text-xs text-slate-500 mb-4">Create a folder first to organize your items</p>
+                                        <Folder weight="light" className="mx-auto text-slate-300 mb-3" size={32} />
+                                        <p className="text-sm text-[var(--text-secondary)] mb-2">No folders yet</p>
+                                        <p className="text-xs text-[var(--text-secondary)] mb-4">Create a folder first to organize your items</p>
                                         <button
                                             onClick={() => {
                                                 setShowFolderSelector(null);
                                                 setIsCreatingFolder(true);
                                             }}
-                                            className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md mx-auto"
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md mx-auto"
                                         >
-                                            <FolderPlus size={14} />
+                                            <FolderPlus weight="light" size={14} />
                                             Create Folder
                                         </button>
                                     </div>
@@ -1296,8 +1318,8 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                     }}
                                                     className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${
                                                         isInFolder
-                                                            ? 'bg-slate-50 border-slate-300'
-                                                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                                            ? 'bg-[var(--bg-tertiary)] border-[var(--border-medium)]'
+                                                            : 'bg-[var(--bg-card)] border-[var(--border-light)] hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)]'
                                                     }`}
                                                 >
                                                     <div 
@@ -1305,26 +1327,27 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                         style={{ backgroundColor: folder.color || '#3b82f6', opacity: 0.1 }}
                                                     >
                                                         <Folder 
+                                                            weight="light"
                                                             size={16} 
                                                             style={{ color: folder.color || '#3b82f6' }}
                                                         />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-medium text-slate-900 truncate">
+                                                            <span className="text-sm font-medium text-[var(--text-primary)] truncate">
                                                                 {folder.name}
                                                             </span>
                                                             {isInFolder && (
-                                                                <Check size={14} className="text-green-600 flex-shrink-0" />
+                                                                <Check weight="light" size={14} className="text-green-600 flex-shrink-0" />
                                                             )}
                                                         </div>
                                                         {folder.description && (
-                                                            <p className="text-xs text-slate-500 truncate mt-0.5">
+                                                            <p className="text-xs text-[var(--text-secondary)] truncate mt-0.5">
                                                                 {folder.description}
                                                             </p>
                                                         )}
                                                     </div>
-                                                    <div className="text-xs text-slate-500 flex-shrink-0">
+                                                    <div className="text-xs text-[var(--text-secondary)] flex-shrink-0">
                                                         {showFolderSelector.type === 'document' 
                                                             ? `${folder.documentIds.length} docs`
                                                             : `${folder.entityIds.length} entities`
@@ -1356,15 +1379,15 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                     }}
                                                     className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${
                                                         isInFolder
-                                                            ? 'bg-slate-50 border-slate-300'
-                                                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                                            ? 'bg-[var(--bg-tertiary)] border-[var(--border-medium)]'
+                                                            : 'bg-[var(--bg-card)] border-[var(--border-light)] hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)]'
                                                     }`}
                                                 >
-                                                    <FileText size={16} className="text-slate-400 flex-shrink-0" />
-                                                    <span className="text-sm font-medium text-slate-900 truncate flex-1">
+                                                    <FileText weight="light" size={16} className="text-[var(--text-tertiary)] flex-shrink-0" />
+                                                    <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1">
                                                         {doc.name}
                                                     </span>
-                                                    {isInFolder && <Check size={14} className="text-green-600 flex-shrink-0" />}
+                                                    {isInFolder && <Check weight="light" size={14} className="text-green-600 flex-shrink-0" />}
                                                 </button>
                                             );
                                         })
@@ -1386,15 +1409,15 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                     }}
                                                     className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${
                                                         isInFolder
-                                                            ? 'bg-slate-50 border-slate-300'
-                                                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                                            ? 'bg-[var(--bg-tertiary)] border-[var(--border-medium)]'
+                                                            : 'bg-[var(--bg-card)] border-[var(--border-light)] hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)]'
                                                     }`}
                                                 >
-                                                    <Database size={16} className="text-slate-400 flex-shrink-0" />
-                                                    <span className="text-sm font-medium text-slate-900 truncate flex-1">
+                                                    <Database weight="light" size={16} className="text-[var(--text-tertiary)] flex-shrink-0" />
+                                                    <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1">
                                                         {entity.name}
                                                     </span>
-                                                    {isInFolder && <Check size={14} className="text-green-600 flex-shrink-0" />}
+                                                    {isInFolder && <Check weight="light" size={14} className="text-green-600 flex-shrink-0" />}
                                                 </button>
                                             );
                                         })
@@ -1404,10 +1427,10 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-slate-200 flex gap-2 justify-end">
+                        <div className="px-6 py-4 border-t border-[var(--border-light)] flex gap-2 justify-end">
                             <button
                                 onClick={() => setShowFolderSelector(null)}
-                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                             >
                                 Cancel
                             </button>
@@ -1417,9 +1440,9 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                         setShowFolderSelector(null);
                                         setIsCreatingFolder(true);
                                     }}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                                 >
-                                    <FolderPlus size={14} />
+                                    <FolderPlus weight="light" size={14} />
                                     Create Folder
                                 </button>
                             )}
@@ -1427,6 +1450,9 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                     </div>
                 </div>
             )}
+            
+            {/* Toast Notifications */}
+            <ToastContainer notifications={notifications} onDismiss={removeNotification} position="bottom-right" />
         </div>
     );
 };

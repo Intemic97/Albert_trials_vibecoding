@@ -1,28 +1,29 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, MessageSquare } from 'lucide-react';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import {
-  LayoutDashboard,
+  SquaresFour,
   Database,
-  Workflow,
-  Settings,
+  FlowArrow,
+  GearSix,
   FileText,
-  Home,
-  Sparkles,
-  Activity,
+  House,
+  Sparkle,
+  ChartLineUp,
   Plug,
-  HelpCircle,
+  Question,
   BookOpen,
   Bug,
-  ChevronDown,
-  ChevronUp,
-  FileCheck,
-  Clipboard,
-  Sliders
-} from 'lucide-react';
+  CaretDown,
+  CaretUp,
+  Checks,
+  ClipboardText,
+  Sliders,
+  MagnifyingGlass,
+  ChatCircle
+} from '@phosphor-icons/react';
 
 interface SidebarProps {
   activeView: string;
@@ -130,32 +131,33 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
       clearTimeout(timeoutId);
     };
   }, [searchQuery]);
+
   const NavItem = ({ icon: Icon, label, view, active = false, onClick, onNavigate }: { icon: any, label: string, view?: string, active?: boolean, onClick?: () => void, onNavigate?: () => void }) => {
     const route = view ? viewToRoute[view] || `/${view}` : '#';
     
     const baseClasses = "flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out w-full text-left group";
     const activeClasses = active 
-      ? 'bg-white/60 text-black shadow-[0_1px_2px_rgba(0,0,0,0.05),0_0_0_1px_rgba(0,0,0,0.02)]' 
-      : 'text-slate-600 hover:text-slate-800 hover:bg-white/30';
+      ? 'bg-[var(--sidebar-bg-active)] text-[var(--sidebar-text-active)] font-medium' 
+      : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]';
+    
+    const iconClasses = `mr-3 transition-colors duration-200 ease-in-out ${active ? 'text-[var(--sidebar-icon-active)]' : 'text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]'}`;
     
     if (onClick) {
-      // Clickable item with custom handler (like Quickstart)
       return (
         <button
           onClick={onClick}
           className={`${baseClasses} ${activeClasses}`}
         >
-          <Icon size={16} className={`mr-3 transition-colors duration-200 ease-in-out ${active ? 'text-black' : 'text-slate-500 group-hover:text-slate-700'}`} />
+          <Icon size={16} weight="light" className={iconClasses} />
           <span className="transition-colors duration-200 ease-in-out">{label}</span>
         </button>
       );
     }
     
     if (!view) {
-      // Non-navigable item (like Documentation)
       return (
         <div className={`${baseClasses} ${activeClasses}`}>
-          <Icon size={16} className={`mr-3 transition-colors duration-200 ease-in-out ${active ? 'text-black' : 'text-slate-500 group-hover:text-slate-700'}`} />
+          <Icon size={16} weight="light" className={iconClasses} />
           <span className="transition-colors duration-200 ease-in-out">{label}</span>
         </div>
       );
@@ -174,31 +176,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         className={`${baseClasses} ${activeClasses}`}
         onClick={handleClick}
       >
-        <Icon size={16} className={`mr-3 transition-colors duration-200 ease-in-out ${active ? 'text-black' : 'text-slate-500 group-hover:text-slate-700'}`} />
+        <Icon size={16} weight="light" className={iconClasses} />
         <span className="transition-colors duration-200 ease-in-out">{label}</span>
       </Link>
     );
   };
 
   const SectionLabel = ({ label }: { label: string }) => (
-    <div className="px-3 mt-6 mb-2 first:mt-0 text-[10px] font-light text-slate-400 uppercase tracking-wider">
+    <div className="px-3 mt-6 mb-2 first:mt-0 text-[10px] font-light text-[var(--sidebar-section-label)] uppercase tracking-wider">
       {label}
     </div>
   );
 
   return (
-    <div data-tutorial="sidebar" className="w-60 bg-slate-50 border-r border-slate-200 h-screen flex flex-col sticky top-0 font-sans z-40">
+    <div data-tutorial="sidebar" className="w-60 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] h-screen flex flex-col sticky top-0 font-sans z-40 transition-colors duration-200">
       {/* Header */}
-      <div className="px-6 pt-5 pb-5 border-b border-slate-200 bg-slate-50">
+      <div className="px-6 pt-5 pb-5 border-b border-[var(--sidebar-border)]">
         <div className="flex items-center mb-5 pl-1">
           <img
             src="/logo.svg"
             alt="Intemic"
-            className="h-5 w-auto object-contain"
+            className="h-5 w-auto object-contain transition-all duration-200"
+            style={{ filter: 'var(--logo-filter)' }}
           />
         </div>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+          <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sidebar-icon)]" size={14} weight="light" />
           <input
             type="text"
             ref={searchRef}
@@ -221,17 +224,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
               }
             }}
             placeholder="Search"
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 text-slate-700 placeholder:text-slate-400 transition-all"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-[var(--bg-input)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] focus:border-[var(--border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] transition-all duration-200"
           />
           {showResults && (
-            <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-lg shadow-xl text-sm z-20 overflow-hidden">
-              <div className="px-3 py-2 text-xs font-medium text-slate-500 border-b border-slate-100 bg-slate-50/50">
+            <div className="absolute left-0 right-0 mt-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-lg text-sm z-20 overflow-hidden">
+              <div className="px-3 py-2 text-xs font-medium text-[var(--text-secondary)] border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
                 {isSearching ? 'Searching...' : 'Results'}
               </div>
               <div className="max-h-64 overflow-y-auto">
                 {searchResults.workflows.length > 0 && (
                   <div className="py-1.5">
-                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-400 font-normal">Workflows</div>
+                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-normal">Workflows</div>
                     {searchResults.workflows.map(item => (
                       <button
                         key={item.id}
@@ -239,18 +242,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
                           navigate(`/workflow/${item.id}`);
                           setShowResults(false);
                         }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 text-left transition-colors"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--bg-hover)] text-left transition-colors"
                       >
-                        <Workflow size={14} className="text-slate-400 flex-shrink-0" />
-                        <span className="truncate text-sm text-slate-700">{item.name}</span>
+                        <FlowArrow size={14} weight="light" className="text-[var(--text-tertiary)] flex-shrink-0" />
+                        <span className="truncate text-sm text-[var(--text-primary)]">{item.name}</span>
                       </button>
                     ))}
                   </div>
                 )}
 
                 {searchResults.chats.length > 0 && (
-                  <div className="py-1.5 border-t border-slate-100">
-                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-400 font-normal">Chats</div>
+                  <div className="py-1.5 border-t border-[var(--border-light)]">
+                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-normal">Chats</div>
                     {searchResults.chats.map(item => (
                       <button
                         key={item.id}
@@ -258,18 +261,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
                           navigate(`/copilots?chatId=${item.id}`);
                           setShowResults(false);
                         }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 text-left transition-colors"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--bg-hover)] text-left transition-colors"
                       >
-                        <MessageSquare size={14} className="text-slate-400 flex-shrink-0" />
-                        <span className="truncate text-sm text-slate-700">{item.title}</span>
+                        <ChatCircle size={14} weight="light" className="text-[var(--text-tertiary)] flex-shrink-0" />
+                        <span className="truncate text-sm text-[var(--text-primary)]">{item.title}</span>
                       </button>
                     ))}
                   </div>
                 )}
 
                 {searchResults.entities.length > 0 && (
-                  <div className="py-1.5 border-t border-slate-100">
-                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-400 font-normal">Knowledge Base</div>
+                  <div className="py-1.5 border-t border-[var(--border-light)]">
+                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-normal">Knowledge Base</div>
                     {searchResults.entities.map(item => (
                       <button
                         key={item.id}
@@ -277,17 +280,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
                           navigate(`/database/${item.id}`);
                           setShowResults(false);
                         }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 text-left transition-colors"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--bg-hover)] text-left transition-colors"
                       >
-                        <Database size={14} className="text-slate-400 flex-shrink-0" />
-                        <span className="truncate text-sm text-slate-700">{item.name}</span>
+                        <Database size={14} weight="light" className="text-[var(--text-tertiary)] flex-shrink-0" />
+                        <span className="truncate text-sm text-[var(--text-primary)]">{item.name}</span>
                       </button>
                     ))}
                   </div>
                 )}
 
                 {searchResults.workflows.length === 0 && searchResults.chats.length === 0 && searchResults.entities.length === 0 && !isSearching && (
-                  <div className="px-3 py-4 text-xs text-slate-500 text-center">No results found</div>
+                  <div className="px-3 py-4 text-xs text-[var(--text-tertiary)] text-center">No results found</div>
                 )}
               </div>
             </div>
@@ -300,27 +303,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         <nav className="px-3 py-2">
           <SectionLabel label="Company" />
           <div className="space-y-0.5">
-            <NavItem icon={Home} label="Overview" view="overview" active={activeView === 'overview'} />
-            <NavItem icon={LayoutDashboard} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
+            <NavItem icon={House} label="Overview" view="overview" active={activeView === 'overview'} />
+            <NavItem icon={SquaresFour} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
             <NavItem icon={Sliders} label="Simulations" view="simulations" active={activeView === 'simulations'} />
           </div>
 
           <SectionLabel label="Data Modeling" />
           <div className="space-y-0.5">
-            <NavItem icon={Workflow} label="Workflows" view="workflows" active={activeView === 'workflows'} />
+            <NavItem icon={FlowArrow} label="Workflows" view="workflows" active={activeView === 'workflows'} />
             <NavItem icon={Database} label="Knowledge Base" view="database" active={activeView === 'database'} />
-            <NavItem icon={Sparkles} label="Copilots" view="copilots" active={activeView === 'copilots'} />
+            <NavItem icon={Sparkle} label="Copilots" view="copilots" active={activeView === 'copilots'} />
           </div>
 
           <SectionLabel label="Reports" />
           <div className="space-y-0.5">
             <NavItem icon={FileText} label="Templates" view="templates" active={activeView === 'templates'} />
-            <NavItem icon={FileCheck} label="Documents" view="documents" active={activeView === 'documents'} />
+            <NavItem icon={Checks} label="Documents" view="documents" active={activeView === 'documents'} />
           </div>
 
           <SectionLabel label="Operations" />
           <div className="space-y-0.5">
-            <NavItem icon={Activity} label="Executions" view="logs" active={activeView === 'logs'} />
             <NavItem icon={Plug} label="Connections" view="connections" active={activeView === 'connections'} />
           </div>
 
@@ -328,27 +330,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-3 border-t border-slate-200">
+      <div className="px-3 py-3 border-t border-[var(--sidebar-border)]">
         {/* Help Dropdown */}
         <div className="mb-2">
           <button
             onClick={() => setShowHelpDropdown(!showHelpDropdown)}
-            className="flex items-center justify-between w-full px-3 py-2 text-sm rounded-lg cursor-pointer transition-colors duration-200 ease-in-out text-slate-600 hover:bg-white/30 hover:text-slate-800 group"
+            className="flex items-center justify-between w-full px-3 py-2 text-sm rounded-lg cursor-pointer transition-colors duration-200 ease-in-out text-[var(--sidebar-text)] hover:bg-[var(--sidebar-bg-hover)] hover:text-[var(--sidebar-text-hover)] group"
           >
             <div className="flex items-center">
-              <HelpCircle size={16} className="mr-3 text-slate-500 group-hover:text-slate-700 transition-colors duration-200 ease-in-out" />
+              <Question size={16} weight="light" className="mr-3 text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)] transition-colors duration-200 ease-in-out" />
               <span className="transition-colors duration-200 ease-in-out">Help</span>
             </div>
             {showHelpDropdown ? (
-              <ChevronUp size={16} className="text-slate-400" />
+              <CaretUp size={16} weight="light" className="text-[var(--sidebar-icon)]" />
             ) : (
-              <ChevronDown size={16} className="text-slate-400" />
+              <CaretDown size={16} weight="light" className="text-[var(--sidebar-icon)]" />
             )}
           </button>
           {showHelpDropdown && (
-            <div className="ml-4 mt-1 space-y-0.5 border-l border-slate-200 pl-3">
+            <div className="ml-4 mt-1 space-y-0.5 border-l border-[var(--sidebar-border)] pl-3">
               <NavItem 
-                icon={HelpCircle} 
+                icon={Question} 
                 label="Quickstart" 
                 onClick={() => {
                   setShowHelpDropdown(false);
@@ -380,19 +382,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         </div>
         
         <div className="mb-2">
-          <NavItem icon={Settings} label="Settings" view="settings" active={activeView === 'settings'} />
+          <NavItem icon={GearSix} label="Settings" view="settings" active={activeView === 'settings'} />
         </div>
         <ProfileMenu
           onNavigate={onNavigate}
           menuPlacement="top-right"
-          triggerClassName="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-white/30 transition-colors duration-200 ease-in-out text-left border border-transparent hover:border-slate-200"
+          triggerClassName="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--sidebar-bg-hover)] transition-colors duration-200 ease-in-out text-left border border-transparent hover:border-[var(--sidebar-border)]"
           triggerContent={(
             <>
               <UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="md" />
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-normal text-slate-900 truncate">{user?.name || 'User'}</div>
+                <div className="text-sm font-normal text-[var(--sidebar-text)] truncate">{user?.name || 'User'}</div>
                 {currentOrg && (
-                  <div className="text-xs text-slate-500 truncate">
+                  <div className="text-xs text-[var(--text-tertiary)] truncate">
                     {currentOrg.name}
                   </div>
                 )}

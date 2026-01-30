@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { Lock, ArrowLeft, Loader2, CheckCircle, XCircle, KeyRound } from 'lucide-react';
+import { Lock, ArrowLeft, SpinnerGap, CheckCircle, XCircle, Key } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 
 export function ResetPassword() {
@@ -91,9 +91,9 @@ export function ResetPassword() {
     // Loading state
     if (status === 'loading') {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+            <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
                 <div className="w-full max-w-md text-center">
-                    <Loader2 className="w-12 h-12 text-blue-400 animate-spin mx-auto mb-4" />
+                    <SpinnerGap weight="light" className="w-12 h-12 text-blue-400 animate-spin mx-auto mb-4" />
                     <p className="text-slate-400">Validating reset link...</p>
                 </div>
             </div>
@@ -103,15 +103,15 @@ export function ResetPassword() {
     // Invalid token
     if (status === 'invalid') {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+            <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
                 <div className="w-full max-w-md">
-                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
+                    <div className="bg-[var(--bg-selected)]/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
                         <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <XCircle className="w-8 h-8 text-red-400" />
+                            <XCircle weight="light" className="w-8 h-8 text-red-400" />
                         </div>
                         <h1 className="text-2xl font-normal text-white mb-2">Invalid or Expired Link</h1>
                         <p className="text-slate-400 mb-6">{error}</p>
-                        <p className="text-slate-500 text-sm mb-6">
+                        <p className="text-[var(--text-secondary)] text-sm mb-6">
                             Password reset links expire after 1 hour. Please request a new one.
                         </p>
                         <div className="space-y-3">
@@ -137,11 +137,11 @@ export function ResetPassword() {
     // Success state
     if (status === 'success') {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+            <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
                 <div className="w-full max-w-md">
-                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
+                    <div className="bg-[var(--bg-selected)]/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
                         <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <CheckCircle className="w-8 h-8 text-emerald-400" />
+                            <CheckCircle weight="light" className="w-8 h-8 text-emerald-400" />
                         </div>
                         <h1 className="text-2xl font-normal text-white mb-2">Password Reset!</h1>
                         <p className="text-slate-400 mb-6">
@@ -161,13 +161,13 @@ export function ResetPassword() {
 
     // Reset form
     return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
             <div className="w-full max-w-md">
-                <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl">
+                <div className="bg-[var(--bg-selected)]/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl">
                     {/* Header */}
                     <div className="text-center mb-8">
                         <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <KeyRound className="w-8 h-8 text-blue-400" />
+                            <Key weight="light" className="w-8 h-8 text-blue-400" />
                         </div>
                         <h1 className="text-2xl font-normal text-white mb-2">Set New Password</h1>
                         <p className="text-slate-400">
@@ -180,11 +180,11 @@ export function ResetPassword() {
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-slate-300">New Password</label>
                             <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                                <Lock weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-secondary)]" />
                                 <input
                                     type="password"
                                     required
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                                     placeholder="••••••••"
                                     value={formData.password}
                                     onChange={e => setFormData({ ...formData, password: e.target.value })}
@@ -195,11 +195,11 @@ export function ResetPassword() {
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-slate-300">Confirm New Password</label>
                             <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                                <Lock weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-secondary)]" />
                                 <input
                                     type="password"
                                     required
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                                     placeholder="••••••••"
                                     value={formData.confirmPassword}
                                     onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
@@ -219,7 +219,7 @@ export function ResetPassword() {
                             className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {status === 'submitting' ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <SpinnerGap weight="light" className="w-5 h-5 animate-spin" />
                             ) : (
                                 'Reset Password'
                             )}
@@ -231,7 +231,7 @@ export function ResetPassword() {
                             to="/login"
                             className="text-sm text-slate-400 hover:text-white transition-colors flex items-center justify-center gap-2"
                         >
-                            <ArrowLeft className="w-4 h-4" />
+                            <ArrowLeft weight="light" className="w-4 h-4" />
                             Back to Login
                         </Link>
                     </div>

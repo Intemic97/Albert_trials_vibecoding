@@ -1,22 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-    AlertTriangle, 
-    CheckCircle2, 
+    Warning as AlertTriangle, 
+    CheckCircle, 
     Clock, 
     XCircle, 
-    Filter, 
-    Search, 
-    ChevronDown, 
-    ChevronRight,
-    ChevronLeft,
-    RefreshCw,
+    Funnel as Filter, 
+    MagnifyingGlass as Search, 
+    CaretDown as ChevronDown, 
+    CaretRight as ChevronRight,
+    CaretLeft as ChevronLeft,
+    ArrowsClockwise as RefreshCw,
     Calendar,
-    Workflow,
-    Loader2,
+    FlowArrow as Workflow,
+    SpinnerGap as Loader2,
     Info,
-    AlertCircle
-} from 'lucide-react';
+    WarningCircle as AlertCircle
+} from '@phosphor-icons/react';
+import { PageHeader } from './PageHeader';
 import { API_BASE } from '../config';
 
 interface Execution {
@@ -206,15 +207,15 @@ export const LogsAndAlerts: React.FC = () => {
     const getStatusIcon = (status: string) => {
         switch (status) {
             case 'completed':
-                return <CheckCircle2 size={16} className="text-emerald-600" />;
+                return <CheckCircle size={16} weight="light" className="text-emerald-600" />;
             case 'running':
-                return <Loader2 size={16} className="text-blue-600 animate-spin" />;
+                return <Loader2 size={16} weight="light" className="text-blue-600 animate-spin" />;
             case 'failed':
-                return <XCircle size={16} className="text-red-600" />;
+                return <XCircle size={16} weight="light" className="text-red-600" />;
             case 'pending':
-                return <Clock size={16} className="text-amber-600" />;
+                return <Clock size={16} weight="light" className="text-amber-600" />;
             default:
-                return <Info size={16} className="text-slate-400" />;
+                return <Info size={16} weight="light" className="text-slate-400" />;
         }
     };
 
@@ -225,7 +226,7 @@ export const LogsAndAlerts: React.FC = () => {
             failed: 'bg-red-50 text-red-700 border-red-200',
             pending: 'bg-amber-50 text-amber-700 border-amber-200'
         };
-        return styles[status as keyof typeof styles] || 'bg-slate-50 text-slate-700 border-slate-200';
+        return styles[status as keyof typeof styles] || 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--border-light)]';
     };
 
     const formatDate = (dateString: string) => {
@@ -318,42 +319,38 @@ export const LogsAndAlerts: React.FC = () => {
     }, [statusFilter, typeFilter, searchQuery, dateFilter]);
 
     return (
-        <div className="flex flex-col h-full bg-slate-50">
+        <div className="flex flex-col h-full bg-[var(--bg-primary)]">
             {/* Header */}
-            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
-                <div>
-                    <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Executions</h1>
-                    <p className="text-[11px] text-slate-500">Monitor workflow executions and system alerts</p>
-                </div>
+            <PageHeader title="Executions" subtitle="Monitor workflow executions and system alerts">
                 <button
                     onClick={handleRefresh}
                     disabled={isRefreshing}
-                    className="flex items-center gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] rounded-lg border border-[var(--border-light)] transition-colors disabled:opacity-50"
                 >
-                    <RefreshCw size={16} className={`text-slate-600 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    <span className="text-sm font-medium text-slate-700">Refresh</span>
+                    <RefreshCw size={16} weight="light" className={`text-[var(--text-secondary)] ${isRefreshing ? 'animate-spin' : ''}`} />
+                    <span className="text-sm font-medium text-[var(--text-primary)]">Refresh</span>
                 </button>
-            </header>
+            </PageHeader>
 
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-7xl mx-auto space-y-6">
                     {/* Filters */}
-                    <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
+                    <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 shadow-sm">
                         <div className="flex flex-wrap items-center gap-4">
                             {/* Type Filter */}
                             <div className="relative flex items-center gap-2">
-                                <Filter size={16} className="text-slate-400" />
+                                <Filter size={16} weight="light" className="text-slate-400" />
                                 <select
                                     value={typeFilter}
                                     onChange={(e) => setTypeFilter(e.target.value)}
-                                    className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 appearance-none cursor-pointer pr-8 hover:border-slate-300 transition-colors"
+                                    className="px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] font-medium focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] appearance-none cursor-pointer pr-8 hover:border-[var(--border-medium)] transition-colors"
                                 >
                                     <option value="all">All</option>
                                     <option value="executions">Executions</option>
                                     <option value="alerts">Alerts</option>
                                 </select>
-                                <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                <ChevronDown size={14} weight="light" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                             </div>
 
                             {/* Status Filter */}
@@ -362,7 +359,7 @@ export const LogsAndAlerts: React.FC = () => {
                                     <select
                                         value={statusFilter}
                                         onChange={(e) => setStatusFilter(e.target.value)}
-                                        className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 appearance-none cursor-pointer pr-8 hover:border-slate-300 transition-colors"
+                                        className="px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] font-medium focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] appearance-none cursor-pointer pr-8 hover:border-[var(--border-medium)] transition-colors"
                                     >
                                         <option value="all">All Status</option>
                                         <option value="completed">Completed</option>
@@ -370,7 +367,7 @@ export const LogsAndAlerts: React.FC = () => {
                                         <option value="failed">Failed</option>
                                         <option value="pending">Pending</option>
                                     </select>
-                                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                    <ChevronDown size={14} weight="light" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                                 </div>
                             )}
 
@@ -379,26 +376,26 @@ export const LogsAndAlerts: React.FC = () => {
                                 <select
                                     value={dateFilter}
                                     onChange={(e) => setDateFilter(e.target.value)}
-                                    className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 appearance-none cursor-pointer pr-8 hover:border-slate-300 transition-colors"
+                                    className="px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] font-medium focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] appearance-none cursor-pointer pr-8 hover:border-[var(--border-medium)] transition-colors"
                                 >
                                     <option value="all">All Time</option>
                                     <option value="today">Today</option>
                                     <option value="week">Last 7 Days</option>
                                     <option value="month">Last 30 Days</option>
                                 </select>
-                                <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                <ChevronDown size={14} weight="light" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                             </div>
 
                             {/* Search */}
                             <div className="flex-1 min-w-[240px]">
                                 <div className="relative">
-                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <Search size={16} weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                     <input
                                         type="text"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         placeholder="Search..."
-                                        className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 hover:border-slate-300 transition-colors"
+                                        className="w-full pl-9 pr-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-slate-400 hover:border-[var(--border-medium)] transition-colors"
                                     />
                                 </div>
                             </div>
@@ -407,51 +404,51 @@ export const LogsAndAlerts: React.FC = () => {
 
                     {/* Executions List */}
                     {(typeFilter === 'all' || typeFilter === 'executions') && (
-                        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                            <div className="px-6 py-4 border-b border-slate-200 bg-white">
-                                <h2 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Share Tech Mono', monospace" }}>
+                        <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg overflow-hidden shadow-sm">
+                            <div className="px-6 py-4 border-b border-[var(--border-light)] bg-[var(--bg-card)]">
+                                <h2 className="text-base font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Share Tech Mono', monospace" }}>
                                     Workflow Executions ({filteredExecutions.length})
                                 </h2>
                             </div>
                             <div className="divide-y divide-slate-100">
                                 {isLoading ? (
                                     <div className="flex items-center justify-center py-12">
-                                        <Loader2 className="animate-spin text-slate-400" size={24} />
+                                        <Loader2 className="animate-spin text-slate-400" size={24} weight="light" />
                                     </div>
                                 ) : filteredExecutions.length === 0 ? (
                                     <div className="text-center py-12">
-                                        <Workflow className="mx-auto text-slate-300" size={40} />
-                                        <p className="text-slate-500 mt-2 text-sm">No executions found</p>
+                                        <Workflow className="mx-auto text-slate-300" size={40} weight="light" />
+                                        <p className="text-[var(--text-secondary)] mt-2 text-sm">No executions found</p>
                                     </div>
                                 ) : (
                                     paginatedExecutions.map((execution) => {
                                         const isExpanded = expandedExecutions.has(execution.id);
                                         const logs = executionLogs[execution.id] || [];
                                         return (
-                                            <div key={execution.id} className="hover:bg-slate-50 transition-colors">
+                                            <div key={execution.id} className="hover:bg-[var(--bg-tertiary)] transition-colors">
                                                 <div
                                                     className="px-6 py-2.5 flex items-center justify-between cursor-pointer"
                                                     onClick={() => toggleExecutionExpanded(execution.id)}
                                                 >
                                                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                        <button className="text-slate-400 hover:text-slate-600">
+                                                        <button className="text-slate-400 hover:text-[var(--text-secondary)]">
                                                             {isExpanded ? (
-                                                                <ChevronDown size={16} />
+                                                                <ChevronDown size={16} weight="light" />
                                                             ) : (
-                                                                <ChevronRight size={16} />
+                                                                <ChevronRight size={16} weight="light" />
                                                             )}
                                                         </button>
                                                         {getStatusIcon(execution.status)}
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-2">
-                                                                <span className="text-sm font-medium text-slate-900">
+                                                                <span className="text-sm font-medium text-[var(--text-primary)]">
                                                                     {execution.workflowName || execution.workflowId}
                                                                 </span>
                                                                 <span className={`px-2 py-0.5 rounded-md border text-xs font-medium ${getStatusBadge(execution.status)}`}>
                                                                     {execution.status}
                                                                 </span>
                                                             </div>
-                                                            <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-500">
+                                                            <div className="flex items-center gap-3 mt-0.5 text-xs text-[var(--text-secondary)]">
                                                                 <span>ID: {execution.id.slice(0, 8)}...</span>
                                                                 {execution.duration && (
                                                                     <span>Duration: {formatDuration(execution.duration)}</span>
@@ -461,17 +458,17 @@ export const LogsAndAlerts: React.FC = () => {
                                                         </div>
                                                     </div>
                                                     {execution.error && (
-                                                        <AlertTriangle size={14} className="text-red-500 flex-shrink-0" />
+                                                        <AlertTriangle size={14} weight="light" className="text-red-500 flex-shrink-0" />
                                                     )}
                                                 </div>
                                                 
                                                 {/* Expanded Logs */}
                                                 {isExpanded && (
-                                                    <div className="px-6 py-3 bg-slate-50 border-t border-slate-100">
+                                                    <div className="px-6 py-3 bg-[var(--bg-tertiary)] border-t border-[var(--border-light)]">
                                                         {execution.error && (
                                                             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                                                                 <div className="flex items-start gap-2">
-                                                                    <XCircle size={16} className="text-red-600 mt-0.5 flex-shrink-0" />
+                                                                    <XCircle size={16} weight="light" className="text-red-600 mt-0.5 flex-shrink-0" />
                                                                     <div className="flex-1">
                                                                         <p className="text-sm font-medium text-red-900">Error</p>
                                                                         <p className="text-xs text-red-700 mt-1">{execution.error}</p>
@@ -482,23 +479,23 @@ export const LogsAndAlerts: React.FC = () => {
                                                         
                                                         {logs.length > 0 ? (
                                                             <div className="space-y-2">
-                                                                <p className="text-xs font-normal text-slate-600 uppercase tracking-wide mb-2">
+                                                                <p className="text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wide mb-2">
                                                                     Execution Logs ({logs.length})
                                                                 </p>
                                                                 {logs.map((log) => (
                                                                     <div
                                                                         key={log.id}
-                                                                        className="bg-white border border-slate-200 rounded-lg p-3"
+                                                                        className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-3"
                                                                     >
                                                                         <div className="flex items-center justify-between mb-2">
                                                                             <div className="flex items-center gap-2">
                                                                                 {getStatusIcon(log.status)}
-                                                                                <span className="text-sm font-medium text-slate-900">
+                                                                                <span className="text-sm font-medium text-[var(--text-primary)]">
                                                                                     {log.nodeLabel || log.nodeType}
                                                                                 </span>
                                                                                 <span className="text-xs text-slate-400">{log.nodeType}</span>
                                                                             </div>
-                                                                            <div className="flex items-center gap-3 text-xs text-slate-500">
+                                                                            <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
                                                                                 {log.duration && (
                                                                                     <span>{formatDuration(log.duration)}</span>
                                                                                 )}
@@ -513,8 +510,8 @@ export const LogsAndAlerts: React.FC = () => {
                                                             </div>
                                                         ) : (
                                                             <div className="text-center py-4">
-                                                                <Loader2 className="animate-spin text-slate-400 mx-auto" size={20} />
-                                                                <p className="text-xs text-slate-500 mt-2">Loading logs...</p>
+                                                                <Loader2 className="animate-spin text-slate-400 mx-auto" size={20} weight="light" />
+                                                                <p className="text-xs text-[var(--text-secondary)] mt-2">Loading logs...</p>
                                                             </div>
                                                         )}
                                                     </div>
@@ -526,27 +523,27 @@ export const LogsAndAlerts: React.FC = () => {
                             </div>
                             {/* Pagination for Executions */}
                             {filteredExecutions.length > itemsPerPage && (
-                                <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
-                                    <div className="text-sm text-slate-600">
+                                <div className="px-6 py-4 border-t border-[var(--border-light)] flex items-center justify-between">
+                                    <div className="text-sm text-[var(--text-secondary)]">
                                         Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredExecutions.length)} of {filteredExecutions.length}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button
                                             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                                             disabled={currentPage === 1}
-                                            className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            className="px-3 py-1.5 text-sm border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                         >
-                                            <ChevronLeft size={16} />
+                                            <ChevronLeft size={16} weight="light" />
                                         </button>
-                                        <span className="text-sm text-slate-600 px-2">
+                                        <span className="text-sm text-[var(--text-secondary)] px-2">
                                             Page {currentPage} of {totalExecutionsPages}
                                         </span>
                                         <button
                                             onClick={() => setCurrentPage(prev => Math.min(totalExecutionsPages, prev + 1))}
                                             disabled={currentPage === totalExecutionsPages}
-                                            className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            className="px-3 py-1.5 text-sm border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                         >
-                                            <ChevronRight size={16} />
+                                            <ChevronRight size={16} weight="light" />
                                         </button>
                                     </div>
                                 </div>
@@ -556,25 +553,25 @@ export const LogsAndAlerts: React.FC = () => {
 
                     {/* Alerts List */}
                     {(typeFilter === 'all' || typeFilter === 'alerts') && (
-                        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                            <div className="px-6 py-4 border-b border-slate-200 bg-white">
-                                <h2 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                        <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg overflow-hidden shadow-sm">
+                            <div className="px-6 py-4 border-b border-[var(--border-light)] bg-[var(--bg-card)]">
+                                <h2 className="text-base font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                     Alerts ({filteredAlerts.length})
                                 </h2>
                             </div>
                             <div className="divide-y divide-slate-100">
                                 {filteredAlerts.length === 0 ? (
                                     <div className="text-center py-12">
-                                        <AlertCircle className="mx-auto text-slate-300" size={40} />
-                                        <p className="text-slate-500 mt-2 text-sm">No alerts</p>
+                                        <AlertCircle className="mx-auto text-slate-300" size={40} weight="light" />
+                                        <p className="text-[var(--text-secondary)] mt-2 text-sm">No alerts</p>
                                     </div>
                                 ) : (
                                     paginatedAlerts.map((alert) => {
                                         const alertIcons = {
-                                            error: <XCircle size={16} className="text-red-600" />,
-                                            warning: <AlertTriangle size={16} className="text-amber-600" />,
-                                            info: <Info size={16} className="text-blue-600" />,
-                                            success: <CheckCircle2 size={16} className="text-emerald-600" />
+                                            error: <XCircle size={16} weight="light" className="text-red-600" />,
+                                            warning: <AlertTriangle size={16} weight="light" className="text-amber-600" />,
+                                            info: <Info size={16} weight="light" className="text-blue-600" />,
+                                            success: <CheckCircle size={16} weight="light" className="text-emerald-600" />
                                         };
                                         const alertStyles = {
                                             error: 'bg-red-50 border-red-200',
@@ -585,18 +582,18 @@ export const LogsAndAlerts: React.FC = () => {
                                         return (
                                             <div
                                                 key={alert.id}
-                                                className={`px-6 py-4 hover:bg-slate-50 transition-colors ${alertStyles[alert.type]}`}
+                                                className={`px-6 py-4 hover:bg-[var(--bg-tertiary)] transition-colors ${alertStyles[alert.type]}`}
                                             >
                                                 <div className="flex items-start gap-3">
                                                     {alertIcons[alert.type]}
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 mb-1">
-                                                            <p className="text-sm font-normal text-slate-900">{alert.title}</p>
+                                                            <p className="text-sm font-normal text-[var(--text-primary)]">{alert.title}</p>
                                                             {alert.workflowName && (
-                                                                <span className="text-xs text-slate-500">• {alert.workflowName}</span>
+                                                                <span className="text-xs text-[var(--text-secondary)]">• {alert.workflowName}</span>
                                                             )}
                                                         </div>
-                                                        <p className="text-xs text-slate-600">{alert.message}</p>
+                                                        <p className="text-xs text-[var(--text-secondary)]">{alert.message}</p>
                                                         <p className="text-xs text-slate-400 mt-2">{formatDate(alert.timestamp)}</p>
                                                     </div>
                                                 </div>
@@ -607,27 +604,27 @@ export const LogsAndAlerts: React.FC = () => {
                             </div>
                             {/* Pagination for Alerts */}
                             {filteredAlerts.length > itemsPerPage && (
-                                <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
-                                    <div className="text-sm text-slate-600">
+                                <div className="px-6 py-4 border-t border-[var(--border-light)] flex items-center justify-between">
+                                    <div className="text-sm text-[var(--text-secondary)]">
                                         Showing {(currentAlertsPage - 1) * itemsPerPage + 1} to {Math.min(currentAlertsPage * itemsPerPage, filteredAlerts.length)} of {filteredAlerts.length}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button
                                             onClick={() => setCurrentAlertsPage(prev => Math.max(1, prev - 1))}
                                             disabled={currentAlertsPage === 1}
-                                            className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            className="px-3 py-1.5 text-sm border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                         >
-                                            <ChevronLeft size={16} />
+                                            <ChevronLeft size={16} weight="light" />
                                         </button>
-                                        <span className="text-sm text-slate-600 px-2">
+                                        <span className="text-sm text-[var(--text-secondary)] px-2">
                                             Page {currentAlertsPage} of {totalAlertsPages}
                                         </span>
                                         <button
                                             onClick={() => setCurrentAlertsPage(prev => Math.min(totalAlertsPages, prev + 1))}
                                             disabled={currentAlertsPage === totalAlertsPages}
-                                            className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            className="px-3 py-1.5 text-sm border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                         >
-                                            <ChevronRight size={16} />
+                                            <ChevronRight size={16} weight="light" />
                                         </button>
                                     </div>
                                 </div>

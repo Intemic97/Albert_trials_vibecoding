@@ -1,11 +1,11 @@
 import React, { ReactNode, useEffect } from 'react';
-import { X, LucideIcon } from 'lucide-react';
+import { X } from '@phosphor-icons/react';
 
 interface NodeConfigSidePanelProps {
     isOpen: boolean;
     onClose: () => void;
     title: string;
-    icon: LucideIcon;
+    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
     iconBgColor?: string;
     description?: string;
     children: ReactNode;
@@ -18,7 +18,7 @@ export const NodeConfigSidePanel: React.FC<NodeConfigSidePanelProps> = ({
     onClose,
     title,
     icon: Icon,
-    iconBgColor = 'bg-slate-100',
+    iconBgColor = 'bg-[var(--bg-tertiary)]',
     description,
     children,
     footer,
@@ -65,7 +65,7 @@ export const NodeConfigSidePanel: React.FC<NodeConfigSidePanelProps> = ({
 
             {/* Side Panel */}
             <div 
-                className={`fixed top-[63px] right-0 ${width} bg-white border-l border-slate-200 z-40 flex flex-col transform transition-transform duration-300 ease-out translate-x-0`}
+                className={`fixed top-[63px] right-0 ${width} bg-[var(--bg-card)] border-l border-[var(--border-light)] z-40 flex flex-col transform transition-transform duration-300 ease-out translate-x-0`}
                 style={{
                     animation: 'slideInRight 0.3s ease-out',
                     height: 'calc(100vh - 63px)',
@@ -74,17 +74,17 @@ export const NodeConfigSidePanel: React.FC<NodeConfigSidePanelProps> = ({
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 shrink-0">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border-light)] shrink-0">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center shrink-0">
-                            <Icon size={14} className="text-slate-600" />
+                        <div className="w-6 h-6 rounded-md bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0">
+                            <Icon size={14} weight="light" className="text-[var(--text-secondary)]" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h3 className="text-xs font-medium text-slate-900 truncate">
+                            <h3 className="text-xs font-medium text-[var(--text-primary)] truncate">
                                 {title}
                             </h3>
                             {description && (
-                                <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">
+                                <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5 line-clamp-1">
                                     {description}
                                 </p>
                             )}
@@ -92,10 +92,10 @@ export const NodeConfigSidePanel: React.FC<NodeConfigSidePanelProps> = ({
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-1 hover:bg-slate-100 rounded-md transition-colors shrink-0 ml-2"
+                        className="p-1 hover:bg-[var(--bg-tertiary)] rounded-md transition-colors shrink-0 ml-2"
                         aria-label="Close panel"
                     >
-                        <X size={14} className="text-slate-400" />
+                        <X size={14} weight="light" className="text-[var(--text-tertiary)]" />
                     </button>
                 </div>
                 
@@ -106,7 +106,7 @@ export const NodeConfigSidePanel: React.FC<NodeConfigSidePanelProps> = ({
                 
                 {/* Footer */}
                 {footer && (
-                    <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-200 shrink-0">
+                    <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-[var(--border-light)] shrink-0">
                         {footer}
                     </div>
                 )}

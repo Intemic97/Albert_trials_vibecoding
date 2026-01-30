@@ -1,37 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-    LayoutDashboard, 
-    TrendingUp, 
-    TrendingDown,
-    Settings, 
-    Plus, 
-    X, 
-    Bell, 
-    CheckCircle, 
-    XCircle,
-    Clock,
-    Workflow,
-    ChevronRight,
-    ChevronLeft,
-    AlertCircle,
+    FlowArrow,
+    CaretRight,
+    CaretLeft,
+    WarningCircle,
     Hash,
-    Calculator,
-    AlertTriangle,
-    Leaf,
-    DollarSign,
     Target,
-    Info,
-    Bot,
+    Robot,
     ArrowUpRight,
     ArrowDownRight,
-    Activity,
-    Sparkles,
-    MessageSquare
-} from 'lucide-react';
+    Pulse,
+    Sparkle
+} from '@phosphor-icons/react';
 import { Entity } from '../types';
 import { API_BASE } from '../config';
 import { DynamicChart } from './DynamicChart';
+import { generateUUID } from '../utils/uuid';
 
 interface KPIConfig {
     id: string;
@@ -63,17 +48,6 @@ interface OverviewProps {
     entitiesLoading?: boolean;
     onViewChange?: (view: string) => void;
 }
-
-const generateUUID = (): string => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID();
-    }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-};
 
 const KPI_COLORS = [
     { bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-700', icon: 'text-teal-500' },
@@ -512,33 +486,26 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
     };
 
     const severityStyles: Record<string, string> = {
-        critical: 'bg-red-50 text-red-700 border-red-200',
-        warning: 'bg-amber-50 text-amber-700 border-amber-200',
-        info: 'bg-slate-100 text-slate-600 border-slate-200'
+        critical: 'bg-[var(--bg-tertiary)] text-red-600 border-[var(--border-light)]',
+        warning: 'bg-[var(--bg-tertiary)] text-amber-600 border-[var(--border-light)]',
+        info: 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-light)]'
     };
 
     const statusStyles: Record<string, string> = {
-        running: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        paused: 'bg-amber-50 text-amber-700 border-amber-200',
-        error: 'bg-red-50 text-red-700 border-red-200'
+        running: 'bg-[var(--bg-tertiary)] text-emerald-600 border-[var(--border-light)]',
+        paused: 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] border-[var(--border-light)]',
+        error: 'bg-[var(--bg-tertiary)] text-red-600 border-[var(--border-light)]'
     };
 
     // Show loading state when entities are being fetched
     if (entitiesLoading) {
         return (
-            <div className="flex flex-col h-full bg-slate-50">
-                {/* Header */}
-                <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-20 shrink-0">
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Overview</h1>
-                    </div>
-                    <div />
-                </header>
+            <div className="flex flex-col h-full bg-[var(--bg-primary)]">
                 {/* Loading state */}
                 <div className="flex-1 flex items-center justify-center">
                     <div className="text-center">
                         <div className="w-12 h-12 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin mx-auto mb-4"></div>
-                        <p className="text-sm text-slate-500">Loading your data...</p>
+                        <p className="text-sm text-[var(--text-secondary)]">Loading your data...</p>
                     </div>
                 </div>
             </div>
@@ -546,15 +513,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
     }
 
     return (
-        <div className="flex flex-col h-full bg-slate-50" data-tutorial="overview-content">
-            {/* Header */}
-            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-20 shrink-0">
-                <div className="flex items-center gap-3">
-                    <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Overview</h1>
-                </div>
-                <div />
-            </header>
-
+        <div className="flex flex-col h-full bg-[var(--bg-primary)]" data-tutorial="overview-content">
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-7xl mx-auto space-y-6">
@@ -562,65 +521,65 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                     <section>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {/* Active Workflows */}
-                            <div className="bg-white border border-slate-200 rounded-lg p-5">
+                            <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5">
                                 <div className="flex items-start justify-between">
-                                    <div className="w-10 h-10 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600">
-                                        <Workflow size={18} />
+                                    <div className="w-10 h-10 rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-secondary)]">
+                                        <FlowArrow size={18} weight="light" />
                                     </div>
                                 </div>
                                 <div className="mt-4">
-                                    <p className="text-xs text-slate-500 mb-1">Active Workflows</p>
-                                    <p className="text-2xl font-normal text-slate-900">
+                                    <p className="text-xs text-[var(--text-secondary)] mb-1">Active Workflows</p>
+                                    <p className="text-2xl font-normal text-[var(--text-primary)]">
                                         {isLoadingStats ? '...' : (overviewStats?.activeWorkflows || 0)}
                                     </p>
                                 </div>
                             </div>
                             
                             {/* Events Triggered */}
-                            <div className="bg-white border border-slate-200 rounded-lg p-5">
+                            <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5">
                                 <div className="flex items-start justify-between">
-                                    <div className="w-10 h-10 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600">
-                                        <Activity size={18} />
+                                    <div className="w-10 h-10 rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-secondary)]">
+                                        <Pulse size={18} weight="light" />
                                     </div>
                                     {overviewStats && overviewStats.eventsChange !== 0 && (
                                         <div className={`flex items-center gap-1 text-xs font-medium ${overviewStats.eventsChange > 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
                                             {overviewStats.eventsChange > 0 ? (
-                                                <ArrowUpRight size={12} />
+                                                <ArrowUpRight size={12} weight="light" />
                                             ) : (
-                                                <ArrowDownRight size={12} />
+                                                <ArrowDownRight size={12} weight="light" />
                                             )}
                                             {overviewStats.eventsChange > 0 ? '+' : ''}{overviewStats.eventsChange.toFixed(1)}%
                                         </div>
                                     )}
                                 </div>
                                 <div className="mt-4">
-                                    <p className="text-xs text-slate-500 mb-1">Events Triggered</p>
-                                    <p className="text-2xl font-normal text-slate-900">
+                                    <p className="text-xs text-[var(--text-secondary)] mb-1">Events Triggered</p>
+                                    <p className="text-2xl font-normal text-[var(--text-primary)]">
                                         {isLoadingStats ? '...' : (overviewStats?.eventsTriggered || 0).toLocaleString()}
                                     </p>
                                 </div>
                             </div>
                             
                             {/* Copilot Sessions */}
-                            <div className="bg-white border border-slate-200 rounded-lg p-5">
+                            <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5">
                                 <div className="flex items-start justify-between">
-                                    <div className="w-10 h-10 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600">
-                                        <Bot size={18} />
+                                    <div className="w-10 h-10 rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-secondary)]">
+                                        <Robot size={18} weight="light" />
                                     </div>
                                 </div>
                                 <div className="mt-4">
-                                    <p className="text-xs text-slate-500 mb-1">Copilot Sessions</p>
-                                    <p className="text-2xl font-normal text-slate-900">—</p>
+                                    <p className="text-xs text-[var(--text-secondary)] mb-1">Copilot Sessions</p>
+                                    <p className="text-2xl font-normal text-[var(--text-primary)]">—</p>
                                 </div>
                             </div>
                         </div>
                     </section>
 
                     <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-lg p-4">
+                        <div className="lg:col-span-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-4">
                             <div className="flex items-center justify-between mb-3">
-                                <h2 className="text-base font-normal text-slate-900">Overview</h2>
-                                <div className="flex items-center gap-3 text-xs text-slate-500">
+                                <h2 className="text-base font-normal text-[var(--text-primary)]">Overview</h2>
+                                <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
                                     <div className="flex items-center gap-1">
                                         <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                                         Events Triggered
@@ -634,29 +593,29 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                             <DynamicChart config={overviewChartConfig} />
                         </div>
 
-                        <div className="bg-white border border-slate-200 rounded-lg p-4">
+                        <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-4">
                             <div className="flex items-center justify-between mb-3">
-                                <h2 className="text-base font-normal text-slate-900">Your Copilots</h2>
+                                <h2 className="text-base font-normal text-[var(--text-primary)]">Your Copilots</h2>
                                 <button 
                                     onClick={() => navigate('/copilots')}
-                                    className="text-xs text-slate-500 hover:text-slate-700"
+                                    className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                                 >
                                     View all
                                 </button>
                             </div>
                             <div className="space-y-3">
                                 {isLoadingCopilots ? (
-                                    <div className="text-center py-4 text-sm text-slate-500">Loading...</div>
+                                    <div className="text-center py-4 text-sm text-[var(--text-secondary)]">Loading...</div>
                                 ) : copilots.length > 0 ? (
                                     copilots.map(copilot => (
-                                        <div key={copilot.id} className="flex items-start gap-3 border border-slate-100 rounded-lg p-3 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => navigate(`/copilots?chatId=${copilot.id}`)}>
+                                        <div key={copilot.id} className="flex items-start gap-3 border border-[var(--border-light)] rounded-lg p-3 hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer" onClick={() => navigate(`/copilots?chatId=${copilot.id}`)}>
                                             <div className="p-2 bg-indigo-50 rounded-lg flex-shrink-0">
-                                                <Sparkles size={16} className="text-indigo-600" />
+                                                <Sparkle size={16} weight="light" className="text-indigo-600" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-normal text-slate-900 truncate">{copilot.title}</p>
-                                                <p className="text-xs text-slate-500 truncate">{copilot.messageCount || 0} messages</p>
-                                                <p className="text-xs text-slate-400 mt-1">{formatTimeAgo(copilot.updatedAt)}</p>
+                                                <p className="text-sm font-normal text-[var(--text-primary)] truncate">{copilot.title}</p>
+                                                <p className="text-xs text-[var(--text-secondary)] truncate">{copilot.messageCount || 0} messages</p>
+                                                <p className="text-xs text-[var(--text-tertiary)] mt-1">{formatTimeAgo(copilot.updatedAt)}</p>
                                             </div>
                                             <button 
                                                 onClick={(e) => {
@@ -670,7 +629,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="text-center py-4 text-sm text-slate-500">
+                                    <div className="text-center py-4 text-sm text-[var(--text-secondary)]">
                                         <p className="mb-2">No copilots yet</p>
                                         <button
                                             onClick={() => navigate('/copilots')}
@@ -684,20 +643,20 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                         </div>
                     </section>
 
-                    <section className="bg-white border border-slate-200 rounded-lg">
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-                            <h2 className="text-base font-normal text-slate-900">Workflows</h2>
+                    <section className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)]">
+                            <h2 className="text-base font-normal text-[var(--text-primary)]">Workflows</h2>
                             <button 
                                 onClick={() => navigate('/logs')}
-                                className="text-xs text-slate-500 hover:text-slate-700 transition-colors"
+                                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                             >
                                 View all
                             </button>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs">
-                                <thead className="text-slate-500">
-                                    <tr className="border-b border-slate-100">
+                                <thead className="text-[var(--text-secondary)]">
+                                    <tr className="border-b border-[var(--border-light)]">
                                         <th className="px-4 py-2 font-medium">Name</th>
                                         <th className="px-4 py-2 font-medium">Status</th>
                                         <th className="px-4 py-2 font-medium">Last Run</th>
@@ -709,7 +668,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                 <tbody>
                                     {isLoadingStats ? (
                                         <tr>
-                                            <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
+                                            <td colSpan={6} className="px-4 py-8 text-center text-sm text-[var(--text-secondary)]">
                                                 Loading workflows...
                                             </td>
                                         </tr>
@@ -717,16 +676,16 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                         overviewStats.recentWorkflows
                                             .slice((workflowsPage - 1) * workflowsPerPage, workflowsPage * workflowsPerPage)
                                             .map(workflow => (
-                                            <tr key={workflow.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                                                <td className="px-4 py-2 text-slate-900 font-medium">{workflow.name}</td>
+                                            <tr key={workflow.id} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-tertiary)]">
+                                                <td className="px-4 py-2 text-[var(--text-primary)] font-medium">{workflow.name}</td>
                                                 <td className="px-4 py-2">
                                                     <span className={`px-2 py-0.5 rounded-full border text-xs font-medium ${statusStyles[workflow.status] || statusStyles.paused}`}>
                                                         {workflow.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-2 text-slate-600">{formatTimeAgo(workflow.lastExecutionAt)}</td>
-                                                <td className="px-4 py-2 text-slate-600">{workflow.executionCount.toLocaleString()}</td>
-                                                <td className="px-4 py-2 text-slate-600">—</td>
+                                                <td className="px-4 py-2 text-[var(--text-secondary)]">{formatTimeAgo(workflow.lastExecutionAt)}</td>
+                                                <td className="px-4 py-2 text-[var(--text-secondary)]">{workflow.executionCount.toLocaleString()}</td>
+                                                <td className="px-4 py-2 text-[var(--text-secondary)]">—</td>
                                                 <td className="px-4 py-2 text-right">
                                                     <button 
                                                         onClick={() => navigate(`/workflow/${workflow.id}`)}
@@ -739,7 +698,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
+                                            <td colSpan={6} className="px-4 py-8 text-center text-sm text-[var(--text-secondary)]">
                                                 {overviewStats ? 'No workflows yet' : 'Failed to load workflows'}
                                             </td>
                                         </tr>
@@ -750,26 +709,26 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                         {/* Pagination for Workflows */}
                         {overviewStats && overviewStats.recentWorkflows && overviewStats.recentWorkflows.length > workflowsPerPage && (
                             <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between">
-                                <div className="text-sm text-slate-600">
+                                <div className="text-sm text-[var(--text-secondary)]">
                                     Showing {(workflowsPage - 1) * workflowsPerPage + 1} to {Math.min(workflowsPage * workflowsPerPage, overviewStats.recentWorkflows.length)} of {overviewStats.recentWorkflows.length}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={() => setWorkflowsPage(prev => Math.max(1, prev - 1))}
                                         disabled={workflowsPage === 1}
-                                        className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        className="px-3 py-1.5 text-sm border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                     >
-                                        <ChevronLeft size={16} />
+                                        <CaretLeft size={16} weight="light" />
                                     </button>
-                                    <span className="text-sm text-slate-600 px-2">
+                                    <span className="text-sm text-[var(--text-secondary)] px-2">
                                         Page {workflowsPage} of {Math.ceil(overviewStats.recentWorkflows.length / workflowsPerPage)}
                                     </span>
                                     <button
                                         onClick={() => setWorkflowsPage(prev => Math.min(Math.ceil(overviewStats.recentWorkflows.length / workflowsPerPage), prev + 1))}
                                         disabled={workflowsPage === Math.ceil(overviewStats.recentWorkflows.length / workflowsPerPage)}
-                                        className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        className="px-3 py-1.5 text-sm border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                     >
-                                        <ChevronRight size={16} />
+                                        <CaretRight size={16} weight="light" />
                                     </button>
                                 </div>
                             </div>
@@ -786,24 +745,24 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                     onClick={() => { setShowAddKpiModal(false); setEditingKpi(null); resetForm(); }}
                 >
                     <div 
-                        className="bg-white rounded-lg border border-slate-200 shadow-xl p-6 w-[450px]"
+                        className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl p-6 w-[450px]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center gap-3 mb-6">
                             <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
-                                <Hash size={20} className="text-teal-600" />
+                                <Hash size={20} weight="light" className="text-teal-600" />
                             </div>
                             <div>
                                 <h3 className="text-lg font-normal text-slate-800">
                                     {editingKpi ? 'Edit KPI' : 'New KPI'}
                                 </h3>
-                                <p className="text-sm text-slate-500">Configure a company metric</p>
+                                <p className="text-sm text-[var(--text-secondary)]">Configure a company metric</p>
                             </div>
                         </div>
 
                         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                                     KPI Name
                                 </label>
                                 <input
@@ -811,25 +770,25 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                     value={kpiTitle}
                                     onChange={(e) => setKpiTitle(e.target.value)}
                                     placeholder="e.g., Total Sales, Active Customers..."
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                    className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">
-                                    Description <span className="text-slate-400 font-normal">(optional)</span>
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                                    Description <span className="text-[var(--text-tertiary)] font-normal">(optional)</span>
                                 </label>
                                 <textarea
                                     value={kpiDescription}
                                     onChange={(e) => setKpiDescription(e.target.value)}
                                     placeholder="Explain what this KPI measures and why it matters..."
                                     rows={2}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                                    className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                                     Entity
                                 </label>
                                 <select
@@ -838,7 +797,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                         setKpiEntityId(e.target.value);
                                         setKpiPropertyName('');
                                     }}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                    className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-teal-500"
                                 >
                                     <option value="">Select an entity...</option>
                                     {entities.map(entity => (
@@ -849,14 +808,14 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
 
                             {kpiEntityId && (
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                                         Property (numeric)
                                     </label>
                                     {getNumericProperties(kpiEntityId).length > 0 ? (
                                         <select
                                             value={kpiPropertyName}
                                             onChange={(e) => setKpiPropertyName(e.target.value)}
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 appearance-none cursor-pointer hover:border-slate-300 transition-colors"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] appearance-none cursor-pointer hover:border-[var(--border-medium)] transition-colors"
                                         >
                                             <option value="">Select a property...</option>
                                             {getNumericProperties(kpiEntityId).map(prop => (
@@ -864,8 +823,8 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                             ))}
                                         </select>
                                     ) : (
-                                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center gap-2">
-                                            <AlertCircle size={16} />
+                                        <div className="p-3 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-secondary)] flex items-center gap-2">
+                                            <WarningCircle size={16} weight="light" />
                                             This entity has no numeric properties
                                         </div>
                                     )}
@@ -873,13 +832,13 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                             )}
 
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                                     Operation
                                 </label>
                                 <select
                                     value={kpiOperation}
                                     onChange={(e) => setKpiOperation(e.target.value as any)}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                    className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                                 >
                                     <option value="sum">Sum (total)</option>
                                     <option value="average">Average</option>
@@ -890,26 +849,26 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">
-                                    Target Value <span className="text-slate-400 font-normal">(optional)</span>
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                                    Target Value <span className="text-[var(--text-tertiary)] font-normal">(optional)</span>
                                 </label>
                                 <div className="flex items-center gap-2">
-                                    <Target size={16} className="text-slate-400" />
+                                    <Target size={16} weight="light" className="text-[var(--text-tertiary)]" />
                                     <input
                                         type="number"
                                         value={kpiTarget}
                                         onChange={(e) => setKpiTarget(e.target.value)}
                                         placeholder="e.g., 100, 5.5, 0"
-                                        className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                        className="flex-1 px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                                     />
                                 </div>
-                                <p className="text-xs text-slate-500 mt-1">
+                                <p className="text-xs text-[var(--text-secondary)] mt-1">
                                     Set a target to track performance. Values at or below target are shown as "On target".
                                 </p>
                             </div>
                         </div>
 
-                        <div className="flex gap-2 justify-end mt-6 pt-4 border-t border-slate-100">
+                        <div className="flex gap-2 justify-end mt-6 pt-4 border-t border-[var(--border-light)]">
                             <button
                                 onClick={() => { setShowAddKpiModal(false); setEditingKpi(null); resetForm(); }}
                                 className="btn-3d btn-secondary-3d text-sm font-medium"

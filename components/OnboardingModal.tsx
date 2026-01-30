@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Briefcase, Building2, Target, Megaphone, ArrowRight, Loader2 } from 'lucide-react';
+import { Sparkle, Briefcase, Building, Target, Megaphone, ArrowRight, SpinnerGap } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 
 interface OnboardingModalProps {
@@ -27,7 +27,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
         },
         {
             key: 'industry',
-            icon: Building2,
+            icon: Building,
             title: 'In what industry do you work?',
             placeholder: 'e.g., Food & Beverage, Chemical Manufacturing, Water Treatment, Pharma...',
             color: 'purple'
@@ -74,10 +74,10 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
 
     const getColorClasses = (color: string) => {
         const colors: Record<string, { bg: string; icon: string; border: string; ring: string }> = {
-            blue: { bg: 'bg-slate-50', icon: 'text-slate-900', border: 'border-slate-200', ring: 'ring-slate-300' },
-            purple: { bg: 'bg-slate-50', icon: 'text-slate-900', border: 'border-slate-200', ring: 'ring-slate-300' },
-            teal: { bg: 'bg-slate-50', icon: 'text-slate-900', border: 'border-slate-200', ring: 'ring-slate-300' },
-            orange: { bg: 'bg-slate-50', icon: 'text-slate-900', border: 'border-slate-200', ring: 'ring-slate-300' }
+            blue: { bg: 'bg-slate-50', icon: 'text-[var(--text-primary)]', border: 'border-[var(--border-light)]', ring: 'ring-[var(--border-medium)]' },
+            purple: { bg: 'bg-slate-50', icon: 'text-[var(--text-primary)]', border: 'border-[var(--border-light)]', ring: 'ring-[var(--border-medium)]' },
+            teal: { bg: 'bg-slate-50', icon: 'text-[var(--text-primary)]', border: 'border-[var(--border-light)]', ring: 'ring-[var(--border-medium)]' },
+            orange: { bg: 'bg-slate-50', icon: 'text-[var(--text-primary)]', border: 'border-[var(--border-light)]', ring: 'ring-[var(--border-medium)]' }
         };
         return colors[color] || colors.blue;
     };
@@ -87,12 +87,12 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
 
     return (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-lg overflow-hidden">
+            <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl w-full max-w-lg overflow-hidden">
                 {/* Header */}
-                <div className="px-6 py-5 text-slate-900 border-b border-slate-200 bg-white">
+                <div className="px-6 py-5 text-[var(--text-primary)] border-b border-[var(--border-light)] bg-[var(--bg-card)]">
                     <div>
                         <h1 className="text-lg font-normal">Welcome to Intemic</h1>
-                        <p className="text-slate-500 text-xs">Hi {user?.name}, let's get to know you</p>
+                        <p className="text-[var(--text-secondary)] text-xs">Hi {user?.name}, let's get to know you</p>
                     </div>
                     
                     {/* Progress bar */}
@@ -101,7 +101,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                             <div 
                                 key={i}
                                 className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                                    i <= step ? 'bg-slate-900' : 'bg-slate-200'
+                                    i <= step ? 'bg-[var(--bg-selected)]' : 'bg-[var(--border-light)]'
                                 }`}
                             />
                         ))}
@@ -111,14 +111,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                 {/* Content */}
                 <div className="p-6">
                     <div className="mb-6">
-                        <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-slate-50 rounded-md mb-3 border border-slate-200">
-                            <Icon size={14} className="text-slate-600" />
-                            <span className="text-xs font-medium text-slate-600">
+                        <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-slate-50 rounded-md mb-3 border border-[var(--border-light)]">
+                            <Icon size={14} className="text-[var(--text-secondary)]" weight="light" />
+                            <span className="text-xs font-medium text-[var(--text-secondary)]">
                                 Question {step + 1} of {questions.length}
                             </span>
                         </div>
                         
-                        <h2 className="text-base font-normal text-slate-900 mb-2 tracking-tight">
+                        <h2 className="text-base font-normal text-[var(--text-primary)] mb-2 tracking-tight">
                             {currentQuestion.title}
                         </h2>
                     </div>
@@ -128,7 +128,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                         value={formData[currentQuestion.key as keyof typeof formData]}
                         onChange={(e) => handleInputChange(e.target.value)}
                         placeholder={currentQuestion.placeholder}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 transition-all bg-white text-slate-900 placeholder:text-slate-400 text-sm"
+                        className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] transition-all bg-[var(--bg-card)] text-[var(--text-primary)] placeholder:text-slate-400 text-sm"
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && canProceed) {
                                 handleNext();
@@ -146,7 +146,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                 <div className="px-6 pb-6 flex justify-between items-center">
                     <button
                         onClick={() => step > 0 && setStep(step - 1)}
-                        className={`text-xs text-slate-500 hover:text-slate-700 transition-colors ${
+                        className={`text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors ${
                             step === 0 ? 'invisible' : ''
                         }`}
                     >
@@ -156,7 +156,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                     <button
                         onClick={handleNext}
                         disabled={!canProceed || isSubmitting}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-selected)] text-white rounded-lg text-sm font-medium hover:bg-[#555555] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {isSubmitting ? (
                             <>

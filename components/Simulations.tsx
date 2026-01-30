@@ -2,27 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Entity } from '../types';
 import { 
-    Database, X, Plus, Trash2, Edit2, Save, Sparkles, ChevronRight, 
-    ChevronDown, Search, Filter, BarChart3, TrendingUp, Settings, 
-    Play, Copy, Check, AlertCircle, Info, Sliders, Zap, FileText,
-    ArrowLeft, MoreVertical, Eye, EyeOff, Share2, ExternalLink, Loader2
-} from 'lucide-react';
+    Database, X, Plus, Trash, PencilSimple, FloppyDisk, Sparkles, CaretRight, 
+    CaretDown, MagnifyingGlass, Funnel, ChartBar, TrendUp, GearSix, 
+    Play, Copy, Check, WarningCircle, Info, Sliders, Lightning, FileText,
+    ArrowLeft, DotsThreeVertical, Eye, EyeSlash, Share, ArrowSquareOut, SpinnerGap
+} from '@phosphor-icons/react';
+import { PageHeader } from './PageHeader';
 import { PromptInput } from './PromptInput';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { API_BASE } from '../config';
 import { AIPromptSection } from './AIPromptSection';
-
-// Generate UUID
-const generateUUID = (): string => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID();
-    }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-};
+import { generateUUID } from '../utils/uuid';
 
 interface Simulation {
     id: string;
@@ -469,16 +459,10 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
 
     if (isLoading) {
         return (
-            <div className="flex flex-col flex-1 min-h-0 bg-slate-50 relative">
-                <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
-                    <div>
-                        <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Simulations</h1>
-                        <p className="text-[11px] text-slate-500">Create what-if scenarios and analyze different outcomes</p>
-                    </div>
-                    <div />
-                </header>
+            <div className="flex flex-col flex-1 min-h-0 bg-[var(--bg-primary)] relative">
+                <PageHeader title="Simulations" subtitle="Create what-if scenarios and analyze different outcomes" />
                 <div className="flex-1 flex items-center justify-center min-h-0">
-                    <Loader2 className="animate-spin text-slate-400" size={24} />
+                    <SpinnerGap className="animate-spin text-[var(--text-tertiary)]" size={24} weight="light" />
                 </div>
             </div>
         );
@@ -487,15 +471,9 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
     // List view
     if (!selectedSimulationId) {
         return (
-            <div className="flex flex-col flex-1 min-h-0 bg-slate-50 relative">
+            <div className="flex flex-col flex-1 min-h-0 bg-[var(--bg-primary)] relative">
                 {/* Header */}
-                <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
-                    <div>
-                        <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Simulations</h1>
-                        <p className="text-[11px] text-slate-500">Create what-if scenarios and analyze different outcomes</p>
-                    </div>
-                    <div />
-                </header>
+                <PageHeader title="Simulations" subtitle="Create what-if scenarios and analyze different outcomes" />
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-8 custom-scrollbar min-h-0">
@@ -503,14 +481,14 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                         {/* Header Section */}
                         <div className="flex items-center justify-between">
                             <div>
-                                <h2 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>My Simulations</h2>
-                                <p className="text-xs text-slate-500 mt-1">{simulations.length} simulation{simulations.length !== 1 ? 's' : ''}</p>
+                                <h2 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>My Simulations</h2>
+                                <p className="text-xs text-[var(--text-secondary)] mt-1">{simulations.length} simulation{simulations.length !== 1 ? 's' : ''}</p>
                             </div>
                             <button
                                 onClick={() => setShowCreateSimulationModal(true)}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                             >
-                                <Plus size={14} />
+                                <Plus size={14} weight="light" />
                                 New Simulation
                             </button>
                         </div>
@@ -518,13 +496,13 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                         {/* Search */}
                         {simulations.length > 0 && (
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={14} weight="light" />
                                 <input
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     placeholder="Search simulations..."
-                                    className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-300 focus:border-slate-300 outline-none placeholder:text-slate-400 hover:border-slate-300 transition-colors"
+                                    className="w-full pl-8 pr-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] outline-none placeholder:text-[var(--text-tertiary)] hover:border-[var(--border-medium)] transition-colors"
                                 />
                             </div>
                         )}
@@ -532,15 +510,15 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                         {/* Simulations Grid */}
                         <div>
                             {filteredSimulations.length === 0 ? (
-                                <div className="bg-white rounded-lg border border-dashed border-slate-200 p-12 text-center">
-                                    <Sliders size={48} className="mx-auto text-slate-300 mb-4" />
-                                    <p className="text-slate-600 mt-4 text-sm font-medium">No simulations yet</p>
-                                    <p className="text-slate-400 text-xs mt-1">Create your first simulation to start analyzing what-if scenarios</p>
+                                <div className="bg-[var(--bg-card)] rounded-lg border border-dashed border-[var(--border-light)] p-12 text-center">
+                                    <Sliders size={48} className="mx-auto text-slate-300 mb-4" weight="light" />
+                                    <p className="text-[var(--text-secondary)] mt-4 text-sm font-medium">No simulations yet</p>
+                                    <p className="text-[var(--text-tertiary)] text-xs mt-1">Create your first simulation to start analyzing what-if scenarios</p>
                                     <button
                                         onClick={() => setShowCreateSimulationModal(true)}
-                                        className="mt-6 flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
+                                        className="mt-6 flex items-center gap-2 px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
                                     >
-                                        <Plus size={16} />
+                                        <Plus size={16} weight="light" />
                                         Create Simulation
                                     </button>
                                 </div>
@@ -553,7 +531,7 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                                                 setSelectedSimulationId(simulation.id);
                                                 navigate(`/simulations/${simulation.id}`);
                                             }}
-                                            className="group relative bg-white border border-slate-200 rounded-lg p-5 hover:border-slate-300 hover:shadow-md transition-all cursor-pointer flex flex-col"
+                                            className="group relative bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 hover:border-[var(--border-medium)] hover:shadow-md transition-all cursor-pointer flex flex-col"
                                         >
                                             {/* Delete button */}
                                             <button
@@ -563,16 +541,16 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                                                 }}
                                                 className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 z-10"
                                             >
-                                                <Trash2 size={16} />
+                                                <Trash size={16} weight="light" />
                                             </button>
 
                                             {/* Header with icon and title */}
                                             <div className="flex items-start gap-3 pr-12 mb-3">
-                                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center shrink-0 group-hover:from-slate-100 group-hover:to-slate-200 transition-all">
-                                                    <Sliders size={20} className="text-slate-600" />
+                                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-light)] flex items-center justify-center shrink-0 hover:bg-[var(--bg-selected)] transition-all">
+                                                    <Sliders size={20} className="text-[var(--text-secondary)]" weight="light" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="font-normal text-sm text-slate-900 group-hover:text-slate-700 transition-colors leading-tight" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                    <h3 className="font-normal text-sm text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors leading-tight" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                                         {simulation.name}
                                                     </h3>
                                                 </div>
@@ -580,16 +558,16 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
 
                                             {/* Description */}
                                             {simulation.description && (
-                                                <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">
+                                                <p className="text-xs text-[var(--text-secondary)] line-clamp-2 mb-4 leading-relaxed">
                                                     {simulation.description}
                                                 </p>
                                             )}
                                             
                                             {/* Footer stats */}
-                                            <div className="mt-auto pt-3 border-t border-slate-100 flex items-center gap-3 text-xs text-slate-500">
+                                            <div className="mt-auto pt-3 border-t border-[var(--border-light)] flex items-center gap-3 text-xs text-[var(--text-secondary)]">
                                                 <div className="flex items-center gap-1.5">
-                                                    <Database size={12} className="text-slate-400" />
-                                                    <span className="font-medium text-slate-600">{simulation.scenarios.length}</span>
+                                                    <Database size={12} className="text-[var(--text-tertiary)]" weight="light" />
+                                                    <span className="font-medium text-[var(--text-secondary)]">{simulation.scenarios.length}</span>
                                                     <span>scenario{simulation.scenarios.length !== 1 ? 's' : ''}</span>
                                                 </div>
                                                 {simulation.baseDatasetName && (
@@ -610,56 +588,56 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                 {/* Create Simulation Modal */}
                 {showCreateSimulationModal && (
                     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 pointer-events-none" onClick={() => setShowCreateSimulationModal(false)}>
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                             {/* Header */}
-                            <div className="px-6 py-4 border-b border-slate-200">
+                            <div className="px-6 py-4 border-b border-[var(--border-light)]">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                        <Sliders size={18} className="text-slate-600" />
+                                    <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0">
+                                        <Sliders size={18} className="text-[var(--text-secondary)]" weight="light" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                        <h3 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                             Create Simulation
                                         </h3>
-                                        <p className="text-xs text-slate-500 mt-0.5">Create a new what-if analysis scenario</p>
+                                        <p className="text-xs text-[var(--text-secondary)] mt-0.5">Create a new what-if analysis scenario</p>
                                     </div>
                                     <button
                                         onClick={() => setShowCreateSimulationModal(false)}
-                                        className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                        className="p-2 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                                     >
-                                        <X size={18} />
+                                        <X size={18} weight="light" />
                                     </button>
                                 </div>
                             </div>
                             {/* Content */}
                             <div className="px-6 py-4 space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">Name <span className="text-red-500">*</span></label>
+                                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Name <span className="text-red-500">*</span></label>
                                     <input
                                         type="text"
                                         value={newSimulationName}
                                         onChange={(e) => setNewSimulationName(e.target.value)}
                                         placeholder="My Simulation"
-                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                        className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                         autoFocus
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">Description</label>
+                                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Description</label>
                                     <textarea
                                         value={newSimulationDescription}
                                         onChange={(e) => setNewSimulationDescription(e.target.value)}
                                         placeholder="Describe what this simulation analyzes..."
                                         rows={3}
-                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 resize-none placeholder:text-slate-400"
+                                        className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] resize-none placeholder:text-[var(--text-tertiary)]"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">Base Dataset</label>
+                                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Base Dataset</label>
                                     <select
                                         value={selectedBaseDataset}
                                         onChange={(e) => setSelectedBaseDataset(e.target.value)}
-                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                        className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
                                     >
                                         <option value="">None</option>
                                         {entities.map(entity => (
@@ -670,7 +648,7 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                             </div>
 
                             {/* Footer */}
-                            <div className="px-6 py-4 border-t border-slate-200 flex gap-2 justify-end">
+                            <div className="px-6 py-4 border-t border-[var(--border-light)] flex gap-2 justify-end">
                                 <button
                                     onClick={() => {
                                         setShowCreateSimulationModal(false);
@@ -678,14 +656,14 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                                         setNewSimulationDescription('');
                                         setSelectedBaseDataset('');
                                     }}
-                                    className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                    className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-primary)] transition-colors"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleCreateSimulation}
                                     disabled={!newSimulationName.trim()}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Create Simulation
                                 </button>
@@ -699,9 +677,9 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
 
     // Simulation detail view
     return (
-        <div className="flex flex-col flex-1 min-h-0 bg-slate-50 relative">
+        <div className="flex flex-col flex-1 min-h-0 bg-[var(--bg-primary)] relative">
             {/* Header */}
-            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
+            <header className="h-16 bg-[var(--bg-primary)] border-b border-[var(--border-light)] flex items-center justify-between px-8 z-10 shrink-0">
                 <div className="flex items-center gap-4 flex-1 min-w-0">
                     <button
                         onClick={() => {
@@ -709,30 +687,30 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                             setSelectedScenarioId(null);
                             navigate('/simulations');
                         }}
-                        className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600 flex-shrink-0"
+                        className="p-2 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors text-[var(--text-secondary)] flex-shrink-0"
                     >
-                        <ArrowLeft size={18} />
+                        <ArrowLeft size={18} weight="light" />
                     </button>
                     <div className="flex-1 min-w-0">
-                        <h1 className="text-lg font-normal text-slate-900 truncate" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                        <h1 className="text-lg font-normal text-[var(--text-primary)] truncate" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                             {selectedSimulation?.name || 'Simulation'}
                         </h1>
                         {selectedSimulation?.description && (
-                            <p className="text-[11px] text-slate-500 truncate">{selectedSimulation.description}</p>
+                            <p className="text-[11px] text-[var(--text-secondary)] truncate">{selectedSimulation.description}</p>
                         )}
                     </div>
                     <button
                         onClick={() => setShowShareModal(true)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-medium transition-colors flex-shrink-0"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-primary)] text-[var(--text-primary)] rounded-lg text-xs font-medium transition-colors flex-shrink-0"
                     >
-                        <Share2 size={14} />
+                        <Share size={14} weight="light" />
                         Share
                     </button>
                 </div>
             </header>
 
             {/* Scenarios Tabs */}
-            <div className="bg-white border-b border-slate-200 px-8 py-3">
+            <div className="bg-[var(--bg-primary)] border-b border-[var(--border-light)] px-8 py-3">
                 <div className="flex items-center gap-2 overflow-x-auto pb-2">
                     {selectedSimulation?.scenarios.map(scenario => (
                         <button
@@ -743,8 +721,8 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                             }}
                             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                                 selectedScenarioId === scenario.id
-                                    ? 'bg-slate-900 text-white shadow-sm'
-                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                    ? 'bg-[var(--bg-selected)] text-white shadow-sm'
+                                    : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-selected)]'
                             }`}
                         >
                             {scenario.name}
@@ -752,9 +730,9 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                     ))}
                     <button
                         onClick={() => setShowCreateScenarioModal(true)}
-                        className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 whitespace-nowrap"
+                        className="px-3 py-1.5 bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-lg text-xs font-medium transition-colors flex items-center gap-2 whitespace-nowrap"
                     >
-                        <Plus size={14} />
+                        <Plus size={14} weight="light" />
                         New Scenario
                     </button>
                 </div>
@@ -765,48 +743,48 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                 <div className="flex-1 overflow-y-auto p-8 custom-scrollbar min-h-0">
                     <div className="max-w-7xl mx-auto space-y-6">
                         {/* Scenario Header */}
-                        <div className="bg-white rounded-lg border border-slate-200 p-6">
+                        <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-6">
                             <div className="flex items-start justify-between">
                                 <div className="flex-1">
-                                    <h2 className="text-lg font-normal text-slate-900 mb-1" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                    <h2 className="text-lg font-normal text-[var(--text-primary)] mb-1" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                         {selectedScenario.name}
                                     </h2>
                                     {selectedScenario.description && (
-                                        <p className="text-sm text-slate-500">{selectedScenario.description}</p>
+                                        <p className="text-sm text-[var(--text-secondary)]">{selectedScenario.description}</p>
                                     )}
                                 </div>
                                 <button
                                     onClick={() => handleDeleteScenario(selectedScenarioId)}
-                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                    className="p-2 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                 >
-                                    <Trash2 size={18} />
+                                    <Trash size={18} weight="light" />
                                 </button>
                             </div>
                         </div>
 
                         {/* List Items Section */}
-                        <div className="bg-white rounded-lg border border-slate-200 p-6">
+                        <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-6">
                             <div className="flex items-center justify-between mb-4">
                                 <div>
-                                    <h3 className="text-base font-normal text-slate-900 mb-1" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                    <h3 className="text-base font-normal text-[var(--text-primary)] mb-1" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                         Configuration List
                                     </h3>
-                                    <p className="text-xs text-slate-500">Configure items manually or generate with AI</p>
+                                    <p className="text-xs text-[var(--text-secondary)]">Configure items manually or generate with AI</p>
                                 </div>
                                 <button
                                     onClick={handleAddListItem}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                                 >
-                                    <Plus size={14} />
+                                    <Plus size={14} weight="light" />
                                     Add Item
                                 </button>
                             </div>
 
                             {/* AI Generation */}
-                            <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                            <div className="mb-6 p-4 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-light)]">
                                 <div className="flex items-center gap-2 mb-3">
-                                    <Sparkles size={14} className="text-slate-600" />
-                                    <span className="text-sm font-medium text-slate-900">Generate with AI</span>
+                                    <Sparkles size={14} className="text-[var(--text-secondary)]" weight="light" />
+                                    <span className="text-sm font-medium text-[var(--text-primary)]">Generate with AI</span>
                                 </div>
                                 <AIPromptSection
                                     onSubmit={handleGenerateListWithLLM}
@@ -819,10 +797,10 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                             {/* List Items */}
                             <div className="space-y-3">
                                 {selectedScenario.listItems.length === 0 ? (
-                                    <div className="text-center py-12 border border-dashed border-slate-200 rounded-lg">
-                                        <FileText size={32} className="mx-auto mb-3 text-slate-300" />
-                                        <p className="text-sm text-slate-600 font-medium mb-1">No items yet</p>
-                                        <p className="text-xs text-slate-500">Add items manually or generate with AI</p>
+                                    <div className="text-center py-12 border border-dashed border-[var(--border-light)] rounded-lg">
+                                        <FileText size={32} className="mx-auto mb-3 text-slate-300" weight="light" />
+                                        <p className="text-sm text-[var(--text-secondary)] font-medium mb-1">No items yet</p>
+                                        <p className="text-xs text-[var(--text-secondary)]">Add items manually or generate with AI</p>
                                     </div>
                                 ) : (
                                     selectedScenario.listItems.map(item => (
@@ -844,11 +822,11 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                         </div>
 
                         {/* Variables Section */}
-                        <div className="bg-white rounded-lg border border-slate-200 p-6">
-                            <h3 className="text-base font-normal text-slate-900 mb-4" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                        <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-6">
+                            <h3 className="text-base font-normal text-[var(--text-primary)] mb-4" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                 Variables
                             </h3>
-                            <div className="text-sm text-slate-500">
+                            <div className="text-sm text-[var(--text-secondary)]">
                                 Variables will be available for what-if analysis
                             </div>
                         </div>
@@ -857,15 +835,15 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
             ) : (
                 <div className="flex-1 overflow-y-auto p-8 custom-scrollbar min-h-0">
                     <div className="max-w-7xl mx-auto">
-                        <div className="bg-white rounded-lg border border-dashed border-slate-200 p-12 text-center">
-                            <Sliders size={48} className="mx-auto text-slate-300 mb-4" />
-                            <p className="text-slate-600 mt-4 text-sm font-medium">No scenario selected</p>
-                            <p className="text-slate-400 text-xs mt-1">Create a new scenario to get started</p>
+                        <div className="bg-[var(--bg-card)] rounded-lg border border-dashed border-[var(--border-light)] p-12 text-center">
+                            <Sliders size={48} className="mx-auto text-slate-300 mb-4" weight="light" />
+                            <p className="text-[var(--text-secondary)] mt-4 text-sm font-medium">No scenario selected</p>
+                            <p className="text-[var(--text-tertiary)] text-xs mt-1">Create a new scenario to get started</p>
                             <button
                                 onClick={() => setShowCreateScenarioModal(true)}
-                                className="mt-6 flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
+                                className="mt-6 flex items-center gap-2 px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
                             >
-                                <Plus size={16} />
+                                <Plus size={16} weight="light" />
                                 Create Scenario
                             </button>
                         </div>
@@ -876,18 +854,18 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
             {/* Create Scenario Modal */}
             {showCreateScenarioModal && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 pointer-events-none" onClick={() => setShowCreateScenarioModal(false)}>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="px-6 py-4 border-b border-slate-200">
+                        <div className="px-6 py-4 border-b border-[var(--border-light)]">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                    <Plus size={18} className="text-slate-600" />
+                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0">
+                                    <Plus size={18} className="text-[var(--text-secondary)]" weight="light" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                    <h3 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                         Create Scenario
                                     </h3>
-                                    <p className="text-xs text-slate-500 mt-0.5">Add a new scenario to this simulation</p>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Add a new scenario to this simulation</p>
                                 </div>
                                 <button
                                     onClick={() => {
@@ -895,9 +873,9 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                                         setNewScenarioName('');
                                         setNewScenarioDescription('');
                                     }}
-                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                    className="p-2 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                                 >
-                                    <X size={18} />
+                                    <X size={18} weight="light" />
                                 </button>
                             </div>
                         </div>
@@ -905,44 +883,44 @@ export const Simulations: React.FC<SimulationsProps> = ({ entities, onNavigate }
                         {/* Content */}
                         <div className="px-6 py-4 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Name <span className="text-red-500">*</span></label>
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Name <span className="text-red-500">*</span></label>
                                 <input
                                     type="text"
                                     value={newScenarioName}
                                     onChange={(e) => setNewScenarioName(e.target.value)}
                                     placeholder="Optimistic Scenario"
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                    className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                     autoFocus
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Description</label>
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Description</label>
                                 <textarea
                                     value={newScenarioDescription}
                                     onChange={(e) => setNewScenarioDescription(e.target.value)}
                                     placeholder="Describe this scenario..."
                                     rows={3}
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 resize-none placeholder:text-slate-400"
+                                    className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] resize-none placeholder:text-[var(--text-tertiary)]"
                                 />
                             </div>
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-slate-200 flex gap-2 justify-end">
+                        <div className="px-6 py-4 border-t border-[var(--border-light)] flex gap-2 justify-end">
                             <button
                                 onClick={() => {
                                     setShowCreateScenarioModal(false);
                                     setNewScenarioName('');
                                     setNewScenarioDescription('');
                                 }}
-                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-primary)] transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleCreateScenario}
                                 disabled={!newScenarioName.trim()}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Create Scenario
                             </button>
@@ -997,25 +975,25 @@ const ListItemEditor: React.FC<ListItemEditorProps> = ({
 
     if (!isEditing) {
         return (
-            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors group">
+            <div className="flex items-center gap-3 p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-light)] hover:bg-[var(--bg-tertiary)] transition-colors group">
                 <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-slate-900">{item.label}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">
+                    <div className="text-sm font-medium text-[var(--text-primary)]">{item.label}</div>
+                    <div className="text-xs text-[var(--text-secondary)] mt-0.5">
                         {item.type === 'formula' ? `Formula: ${item.formula}` : `Value: ${String(item.value)}`}
                     </div>
                 </div>
                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                         onClick={onEdit}
-                        className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-white rounded transition-colors"
+                        className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] rounded transition-colors"
                     >
-                        <Edit2 size={14} />
+                        <PencilSimple size={14} weight="light" />
                     </button>
                     <button
                         onClick={onDelete}
                         className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
                     >
-                        <Trash2 size={14} />
+                        <Trash size={14} weight="light" />
                     </button>
                 </div>
             </div>
@@ -1023,23 +1001,23 @@ const ListItemEditor: React.FC<ListItemEditorProps> = ({
     }
 
     return (
-        <div className="p-4 bg-white rounded-lg border-2 border-slate-300 shadow-sm">
+        <div className="p-4 bg-[var(--bg-card)] rounded-lg border-2 border-[var(--border-medium)] shadow-sm">
             <div className="space-y-3">
                 <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Label</label>
+                    <label className="block text-xs font-medium text-[var(--text-primary)] mb-1">Label</label>
                     <input
                         type="text"
                         value={label}
                         onChange={(e) => setLabel(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+                        className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--border-medium)]"
                     />
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Type</label>
+                    <label className="block text-xs font-medium text-[var(--text-primary)] mb-1">Type</label>
                     <select
                         value={type}
                         onChange={(e) => setType(e.target.value as ListItem['type'])}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+                        className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--border-medium)]"
                     >
                         <option value="number">Number</option>
                         <option value="string">String</option>
@@ -1049,18 +1027,18 @@ const ListItemEditor: React.FC<ListItemEditorProps> = ({
                 </div>
                 {type === 'formula' ? (
                     <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Formula</label>
+                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1">Formula</label>
                         <input
                             type="text"
                             value={formula}
                             onChange={(e) => setFormula(e.target.value)}
                             placeholder="e.g., SUM(A1:A10)"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+                            className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--border-medium)]"
                         />
                     </div>
                 ) : (
                     <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Value</label>
+                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1">Value</label>
                         <input
                             type={type === 'number' ? 'number' : type === 'boolean' ? 'checkbox' : 'text'}
                             checked={type === 'boolean' ? Boolean(value) : undefined}
@@ -1072,20 +1050,20 @@ const ListItemEditor: React.FC<ListItemEditorProps> = ({
                                     setValue(e.target.value);
                                 }
                             }}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+                            className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--border-medium)]"
                         />
                     </div>
                 )}
                 <div className="flex items-center justify-end gap-2 pt-2">
                     <button
                         onClick={onCancel}
-                        className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium transition-colors"
+                        className="px-3 py-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded-lg text-sm font-medium transition-colors"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleSave}
-                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors"
+                        className="px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-colors"
                     >
                         Save
                     </button>

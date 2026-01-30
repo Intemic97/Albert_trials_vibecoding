@@ -1,0 +1,201 @@
+# Intemic Structure Manager - Cursor Rules
+
+## Descripción del Proyecto
+Intemic es una plataforma de gestión de datos empresariales con workflows automatizados, dashboards, reportes y asistentes de IA (Copilots).
+
+---
+
+## Stack Tecnológico
+
+### Frontend
+- **Framework**: React 19 + TypeScript
+- **Build Tool**: Vite
+- **Estilos**: Tailwind CSS (cargado via CDN en index.html)
+- **Iconos**: Lucide React
+- **Gráficos**: Recharts (via DynamicChart.tsx)
+- **Grid Layout**: react-grid-layout + react-resizable
+
+### Backend
+- **Runtime**: Node.js + Express
+- **Base de datos**: SQLite3
+- **Autenticación**: JWT + bcrypt
+- **AI**: OpenAI API
+- **Orquestación**: Prefect (Python microservice)
+
+---
+
+## Design System - Normas de Estilo
+
+### Colores Principales
+
+```typescript
+// Color de fondo global - USAR EN TODOS LOS FONDOS
+BACKGROUND_COLOR = "#F8F8F8"  // Gris claro neutro
+BACKGROUND_CLASS = "bg-[#F8F8F8]"
+
+// Color de texto principal - NO usar negro puro
+TEXT_PRIMARY = "text-slate-700"  // Gris oscuro, NO text-slate-900
+
+// Sidebar - Mantiene su propio fondo
+SIDEBAR_BG = "bg-slate-50"  // El sidebar NO usa el fondo global
+```
+
+### Tipografía
+- **Fuente principal**: `'Helvetica Neue', Helvetica, Arial, sans-serif`
+- **Fuente sistema**: `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`
+- **Tamaño base**: `text-[15px]`
+- **Line-height para contenido**: `1.6`
+- **Letter-spacing**: `0.01em`
+
+### Botones
+- **Primario**: `bg-slate-900 hover:bg-slate-800 text-white rounded-lg`
+- **Secundario**: `bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg`
+
+### Headers
+- **Font-weight**: `font-normal` (NO font-bold ni font-semibold para títulos)
+- Aplicar via CSS global en index.html
+
+---
+
+## Estructura de Archivos
+
+```
+/
+├── App.tsx                 # Router principal y layout
+├── index.html              # HTML base + estilos globales
+├── design-system.ts        # Tokens de diseño centralizados
+├── config.ts               # API_BASE y configuración
+├── types.ts                # TypeScript interfaces
+├── components/             # Componentes React
+│   ├── Sidebar.tsx         # Navegación lateral
+│   ├── TopNav.tsx          # Barra superior
+│   ├── Dashboard.tsx       # Dashboards con widgets
+│   ├── Workflows.tsx       # Editor de workflows (canvas)
+│   ├── Copilots.tsx        # Chat con IA
+│   ├── KnowledgeBase.tsx   # Entities, folders, documents
+│   ├── Overview.tsx        # Vista general
+│   ├── Settings.tsx        # Configuración
+│   └── ...
+├── context/
+│   └── AuthContext.tsx     # Estado de autenticación
+├── utils/
+│   ├── logger.ts           # Sistema de logging
+│   ├── errorHandler.ts     # Manejo de errores
+│   └── uuid.ts             # Generación de UUIDs
+├── config/
+│   └── constants.ts        # Constantes de configuración
+└── server/                 # Backend Node.js
+    ├── index.js            # Express server
+    ├── auth.js             # Autenticación
+    ├── db.js               # SQLite
+    └── prefect-worker/     # Microservicio Python
+```
+
+---
+
+## Aprendizajes y Lecciones
+
+### CSS y Estilos
+
+1. **Cambios de color de fondo**: Deben aplicarse en TODOS estos lugares:
+   - `index.html` (body y #root)
+   - `App.tsx` (contenedor principal y main)
+   - `design-system.ts` (constantes)
+   - TODOS los componentes que tengan fondos propios
+
+2. **Tailwind con colores custom**: Usar `bg-[#F8F8F8]` para colores específicos
+
+3. **Sidebar**: Mantiene su propio color (`bg-slate-50`), NO usa el fondo global
+
+4. **Textos**: Usar `text-slate-700` en lugar de `text-slate-900` para un look más suave
+
+### Workflows (canvas)
+
+1. **Conectores**: Los círculos de conexión usan `w-5 h-5` (20px)
+2. **Cálculo de coordenadas**: Considerar `NODE_WIDTH = 320px`, `CONNECTOR_RADIUS = 10px`
+3. **CSS transforms**: `translate-x-1/2` y `translate-y-1/2` afectan el posicionamiento
+
+### Dashboard
+
+1. **react-grid-layout**: Requiere estilos CSS explícitos para handles de resize
+2. **Estilos de resize**: Definidos en `index.html` con selectores `.react-resizable-handle`
+3. **GridStack**: Se intentó pero causó problemas de renderizado; se revirtió a react-grid-layout
+
+### Componentes Públicos
+
+Los siguientes componentes son accesibles sin autenticación:
+- `LoginPage.tsx`
+- `VerifyEmail.tsx`
+- `ForgotPassword.tsx`
+- `ResetPassword.tsx`
+- `AcceptInvite.tsx`
+- `LandingPage.tsx`
+- `PublicWorkflowForm.tsx`
+
+---
+
+## Patrones de Código
+
+### Contenedor Principal de Componente
+```tsx
+// Patrón estándar para componentes de página
+return (
+    <div className="flex flex-col h-full bg-[#F8F8F8]" data-tutorial="component-content">
+        {/* Header */}
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm">
+            <h1 className="text-lg font-normal text-slate-700">Título</h1>
+        </header>
+        
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+            {/* contenido */}
+        </div>
+    </div>
+);
+```
+
+### Modales
+```tsx
+// Overlay + contenido centrado
+<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+        {/* contenido */}
+    </div>
+</div>
+```
+
+---
+
+## Comandos Útiles
+
+```bash
+# Desarrollo frontend
+npm run dev
+
+# Backend
+cd server && npm run dev
+
+# Prefect worker
+cd server/prefect-worker && python start_service.py
+```
+
+---
+
+## Notas Importantes
+
+1. **Responder siempre en español** - Configuración del usuario
+2. **No crear archivos innecesarios** - Preferir editar existentes
+3. **Verificar linting después de ediciones** - Usar ReadLints
+4. **Cambios de diseño globales** - Actualizar design-system.ts primero, luego aplicar en todos los componentes
+5. **Git**: Rama principal de desarrollo es `Mateo2`
+
+---
+
+## Historial de Decisiones de Diseño
+
+| Fecha | Decisión | Razón |
+|-------|----------|-------|
+| 2026-01-30 | Fondo #F8F8F8 | Gris claro neutro, estilo moderno |
+| 2026-01-30 | Textos text-slate-700 | Más suave que negro puro |
+| 2026-01-30 | Sidebar bg-slate-50 | Mantiene contraste con fondo principal |
+| 2026-01-30 | font-normal en títulos | Estilo Helvetica Neue limpio |

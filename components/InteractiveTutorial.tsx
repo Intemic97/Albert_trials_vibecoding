@@ -2,12 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
     X, 
-    ChevronRight, 
-    ChevronLeft,
-    Sparkles,
-    MousePointer,
-    GripVertical
-} from 'lucide-react';
+    CaretRight, 
+    CaretLeft,
+    Sparkle,
+    CursorClick,
+    DotsSixVertical
+} from '@phosphor-icons/react';
 
 interface TutorialMedia {
     type: 'video' | 'gif' | 'image';
@@ -431,7 +431,7 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                 }}
             >
                 {/* Progress bar */}
-                <div className="h-1 bg-slate-100 shrink-0">
+                <div className="h-1 bg-[var(--bg-tertiary)] shrink-0">
                     <div 
                         className="h-full bg-gradient-to-r from-teal-500 to-blue-500 transition-all duration-500"
                         style={{ width: `${progress}%` }}
@@ -443,17 +443,17 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                     {/* Step indicator */}
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2 text-teal-600">
-                            <Sparkles size={16} />
+                            <Sparkle size={16} weight="light" />
                             <span className="text-xs font-medium">
                                 Step {currentStep + 1} of {TUTORIAL_STEPS.length}
                             </span>
                         </div>
                         <button
                             onClick={handleSkip}
-                            className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-100 rounded transition-colors"
+                            className="text-slate-400 hover:text-[var(--text-secondary)] p-1 hover:bg-[var(--bg-tertiary)] rounded transition-colors"
                             title="Skip tutorial"
                         >
-                            <X size={18} />
+                            <X size={18} weight="light" />
                         </button>
                     </div>
 
@@ -463,13 +463,13 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                     </h3>
 
                     {/* Description */}
-                    <p className="text-slate-600 text-sm leading-relaxed mb-4">
+                    <p className="text-[var(--text-secondary)] text-sm leading-relaxed mb-4">
                         {step.description}
                     </p>
 
                     {/* Media (video/gif/image) */}
                     {step.media && (
-                        <div className="mb-4 rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+                        <div className="mb-4 rounded-lg overflow-hidden border border-slate-200 bg-[var(--bg-tertiary)]">
                             {step.media.type === 'video' ? (
                                 <video
                                     src={step.media.src}
@@ -496,12 +496,12 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                         <div className="flex items-center gap-2 text-xs text-teal-600 bg-teal-50 px-3 py-2 rounded-lg mb-4">
                             {step.fullPage ? (
                                 <>
-                                    <GripVertical size={14} />
+                                    <DotsSixVertical size={14} weight="light" />
                                     <span>Try it! Drag components onto the canvas, then click Next</span>
                                 </>
                             ) : (
                                 <>
-                                    <MousePointer size={14} />
+                                    <CursorClick size={14} weight="light" />
                                     <span>Click the highlighted element to continue</span>
                                 </>
                             )}
@@ -516,10 +516,10 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                             className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                                 isFirstStep
                                     ? 'text-slate-300 cursor-not-allowed'
-                                    : 'text-slate-600 hover:bg-slate-100'
+                                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                             }`}
                         >
-                            <ChevronLeft size={16} />
+                            <CaretLeft size={16} weight="light" />
                             Back
                         </button>
 
@@ -532,7 +532,7 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                                             ? 'w-4 bg-teal-500'
                                             : index < currentStep
                                                 ? 'bg-teal-300'
-                                                : 'bg-slate-200'
+                                                : 'bg-[var(--bg-selected)]'
                                     }`}
                                 />
                             ))}
@@ -547,7 +547,7 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                             }`}
                         >
                             {isLastStep ? 'Finish' : 'Next'}
-                            <ChevronRight size={16} />
+                            <CaretRight size={16} weight="light" />
                         </button>
                     </div>
                 </div>

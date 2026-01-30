@@ -1,35 +1,58 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Entity } from '../types';
-import { Database, Sparkles, X, Info, Plus, Share2, ChevronDown, Copy, Check, Trash2, Link, ExternalLink, LayoutDashboard, Search, ArrowLeft, Calendar, Clock, ChevronRight, Sliders, GripVertical, Maximize2, BarChart3, LineChart, PieChart, AreaChart, TrendingUp, Table2 } from 'lucide-react';
+import { Database, Sparkle, X, Info, Plus, Share, CaretDown, Copy, Check, Trash, Link, ArrowSquareOut, Layout, MagnifyingGlass, ArrowLeft, Calendar, Clock, CaretRight, DotsSixVertical } from '@phosphor-icons/react';
 import { PromptInput } from './PromptInput';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { Pagination } from './Pagination';
+import { PageHeader } from './PageHeader';
 import { API_BASE } from '../config';
-import GridLayout, { Layout } from 'react-grid-layout';
+import GridLayout, { Layout as LayoutItem } from 'react-grid-layout';
+import { useNotifications } from '../hooks/useNotifications';
+import { ToastContainer } from './ui/Toast';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
 // Custom styles to ensure resize handles are visible
+// Documentation: https://github.com/react-grid-layout/react-grid-layout
 const gridLayoutStyles = `
   .react-grid-item {
-    transition: none !important;
+    transition: all 200ms ease;
+    transition-property: left, top, width, height;
+  }
+  .react-grid-item.cssTransforms {
+    transition-property: transform, width, height;
+  }
+  .react-grid-item.resizing {
+    z-index: 1;
+    will-change: width, height;
+  }
+  .react-grid-item.react-draggable-dragging {
+    transition: none;
+    z-index: 3;
+    will-change: transform;
+  }
+  .react-grid-item.dropping {
+    visibility: hidden;
   }
   .react-grid-item > .react-resizable-handle {
     position: absolute;
     width: 20px;
     height: 20px;
-    z-index: 1000;
+    z-index: 10;
   }
   .react-grid-item > .react-resizable-handle::after {
     content: "";
     position: absolute;
     right: 3px;
     bottom: 3px;
-    width: 5px;
-    height: 5px;
-    border-right: 2px solid rgba(0, 0, 0, 0.4);
-    border-bottom: 2px solid rgba(0, 0, 0, 0.4);
+    width: 6px;
+    height: 6px;
+    border-right: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+    border-bottom: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+  }
+  .react-grid-item:hover > .react-resizable-handle::after {
+    border-color: var(--accent-primary, #2383E2);
   }
   .react-grid-item > .react-resizable-handle-se {
     bottom: 0;
@@ -39,44 +62,112 @@ const gridLayoutStyles = `
   .react-grid-item > .react-resizable-handle-s {
     bottom: 0;
     left: 50%;
-    transform: translateX(-50%);
+    margin-left: -10px;
     cursor: s-resize;
+  }
+  .react-grid-item > .react-resizable-handle-s::after {
+    left: 50%;
+    margin-left: -3px;
+    bottom: 3px;
+    width: 6px;
+    height: 2px;
+    border: none;
+    border-bottom: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
   }
   .react-grid-item > .react-resizable-handle-e {
     right: 0;
     top: 50%;
-    transform: translateY(-50%);
+    margin-top: -10px;
     cursor: e-resize;
+  }
+  .react-grid-item > .react-resizable-handle-e::after {
+    top: 50%;
+    margin-top: -3px;
+    right: 3px;
+    width: 2px;
+    height: 6px;
+    border: none;
+    border-right: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
   }
   .react-grid-item > .react-resizable-handle-w {
     left: 0;
     top: 50%;
-    transform: translateY(-50%);
+    margin-top: -10px;
     cursor: w-resize;
+  }
+  .react-grid-item > .react-resizable-handle-w::after {
+    top: 50%;
+    margin-top: -3px;
+    left: 3px;
+    width: 2px;
+    height: 6px;
+    border: none;
+    border-left: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
   }
   .react-grid-item > .react-resizable-handle-n {
     top: 0;
     left: 50%;
-    transform: translateX(-50%);
+    margin-left: -10px;
     cursor: n-resize;
+  }
+  .react-grid-item > .react-resizable-handle-n::after {
+    left: 50%;
+    margin-left: -3px;
+    top: 3px;
+    width: 6px;
+    height: 2px;
+    border: none;
+    border-top: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
   }
   .react-grid-item > .react-resizable-handle-ne {
     top: 0;
     right: 0;
     cursor: ne-resize;
   }
+  .react-grid-item > .react-resizable-handle-ne::after {
+    right: 3px;
+    top: 3px;
+    border-right: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+    border-top: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+    border-bottom: none;
+    border-left: none;
+  }
   .react-grid-item > .react-resizable-handle-nw {
     top: 0;
     left: 0;
     cursor: nw-resize;
+  }
+  .react-grid-item > .react-resizable-handle-nw::after {
+    left: 3px;
+    top: 3px;
+    border-left: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+    border-top: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+    border-bottom: none;
+    border-right: none;
   }
   .react-grid-item > .react-resizable-handle-sw {
     bottom: 0;
     left: 0;
     cursor: sw-resize;
   }
+  .react-grid-item > .react-resizable-handle-sw::after {
+    left: 3px;
+    bottom: 3px;
+    border-left: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+    border-bottom: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+    border-top: none;
+    border-right: none;
+  }
   .react-grid-item:hover > .react-resizable-handle {
-    background: rgba(59, 130, 246, 0.1);
+    background: rgba(35, 131, 226, 0.05);
+    border-radius: 4px;
+  }
+  .react-grid-placeholder {
+    background: var(--accent-primary, #2383E2);
+    opacity: 0.2;
+    transition-duration: 100ms;
+    z-index: 2;
+    border-radius: 8px;
   }
 `;
 
@@ -91,18 +182,7 @@ if (typeof document !== 'undefined') {
     }
 }
 
-// Generate UUID that works in non-HTTPS contexts
-const generateUUID = (): string => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID();
-    }
-    // Fallback for HTTP contexts
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-};
+import { generateUUID } from '../utils/uuid';
 
 interface DashboardData {
     id: string;
@@ -143,12 +223,17 @@ const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = 
     const [showExplanation, setShowExplanation] = useState(false);
     
     return (
-        <div className="bg-white rounded-lg border border-slate-200 shadow-sm h-full flex flex-col relative" style={{ overflow: 'visible', height: '100%' }}>
+        <div 
+            className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-sm flex flex-col relative" 
+            style={{ height: '100%', width: '100%', overflow: 'hidden' }}
+        >
             {/* Drag Handle - Entire header is draggable */}
-            <div className="drag-handle cursor-move p-1.5 border-b border-slate-100 flex items-center justify-between group hover:bg-slate-50 transition-colors select-none flex-shrink-0" style={{ pointerEvents: 'auto', touchAction: 'none' }}>
+            <div className="drag-handle cursor-move px-3 py-2 border-b border-[var(--border-light)] flex items-center justify-between group hover:bg-[var(--bg-hover)] transition-all select-none flex-shrink-0 rounded-t-lg" style={{ pointerEvents: 'auto', touchAction: 'none' }}>
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <GripVertical size={14} className="text-slate-400 group-hover:text-slate-600 transition-colors flex-shrink-0" />
-                    <h3 className="text-sm font-medium text-slate-900 truncate">{widget.title}</h3>
+                    <div className="flex items-center justify-center w-5 h-5 rounded bg-[var(--bg-tertiary)] group-hover:bg-[var(--border-light)] transition-colors">
+                        <DotsSixVertical size={12} weight="bold" className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] transition-colors" />
+                    </div>
+                    <h3 className="text-sm font-medium text-[var(--text-primary)] truncate">{widget.title}</h3>
                 </div>
                 <button
                     onClick={(e) => {
@@ -157,32 +242,33 @@ const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = 
                         onRemove();
                     }}
                     onMouseDown={(e) => e.stopPropagation()}
-                    className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0 z-10"
+                    className="p-1.5 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0 z-10"
                     title="Delete Widget"
                 >
-                    <X size={14} />
+                    <X size={14} weight="light" />
                 </button>
             </div>
-            <div className="flex-1 flex flex-col min-h-0" style={{ overflow: 'auto' }}>
+            {/* Chart container - takes all remaining space */}
+            <div className="flex-1 flex flex-col min-h-0" style={{ overflow: 'hidden' }}>
                 {widget.description && (
                     <div className="px-3 pt-2 pb-1 flex-shrink-0">
-                        <p className="text-xs text-slate-500">{widget.description}</p>
+                        <p className="text-xs text-[var(--text-secondary)]">{widget.description}</p>
                     </div>
                 )}
-                <div className="flex-1 min-h-0 px-3 pb-3" style={{ overflow: 'auto' }}>
+                <div className="flex-1 p-3" style={{ minHeight: 0 }}>
                     <DynamicChart config={widget} />
                 </div>
                 {widget.explanation && (
-                    <div className="px-3 pb-2 pt-1 border-t border-slate-100 flex-shrink-0">
+                    <div className="px-3 pb-2 pt-1 border-t border-[var(--border-light)] flex-shrink-0">
                         <button
                             onClick={() => setShowExplanation(!showExplanation)}
-                            className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-800 font-medium"
+                            className="flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-slate-800 font-medium"
                         >
-                            <Info size={12} />
+                            <Info size={12} weight="light" />
                             How did I prepare this?
                         </button>
                         {showExplanation && (
-                            <div className="mt-2 p-2 bg-slate-50 rounded-lg text-xs text-slate-700 leading-relaxed">
+                            <div className="mt-2 p-2 bg-[var(--bg-tertiary)] rounded-lg text-xs text-[var(--text-primary)] leading-relaxed">
                                 {widget.explanation}
                             </div>
                         )}
@@ -224,43 +310,45 @@ const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSav
     };
 
     return (
-        <div className="bg-white rounded-lg border border-slate-200 p-4 relative group">
+        <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-4 relative group">
             <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                 {!isSaved && onSave && (
                     <button
                         onClick={() => onSave(widget)}
-                        className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
+                        className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded transition-colors"
                         title="Save to Dashboard"
+                        aria-label="Save to Dashboard"
                     >
-                        <Plus size={16} />
+                        <Plus size={16} weight="light" aria-hidden="true" />
                     </button>
                 )}
                 <button
                     onClick={onRemove}
-                    className="p-1 text-slate-400 rounded transition-colors hover:text-red-500 hover:bg-red-50"
+                    className="p-1 text-[var(--text-tertiary)] rounded transition-colors hover:text-red-500 hover:bg-red-50"
                     title={isSaved ? "Delete Widget" : "Remove"}
+                    aria-label={isSaved ? "Delete Widget" : "Remove"}
                 >
-                    <X size={14} />
+                    <X size={14} weight="light" aria-hidden="true" />
                 </button>
             </div>
 
-            <h3 className="text-base font-normal text-slate-900 mb-1">{widget.title}</h3>
-            <p className="text-xs text-slate-500 mb-3">{widget.description}</p>
+            <h3 className="text-base font-normal text-[var(--text-primary)] mb-1">{widget.title}</h3>
+            <p className="text-xs text-[var(--text-secondary)] mb-3">{widget.description}</p>
 
             <DynamicChart config={widget} />
 
             {widget.explanation && (
-                <div className="mt-3 pt-3 border-t border-slate-100">
+                <div className="mt-3 pt-3 border-t border-[var(--border-light)]">
                     <button
                         onClick={() => setShowExplanation(!showExplanation)}
-                        className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-800 font-medium"
+                        className="flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-slate-800 font-medium"
                     >
-                        <Info size={12} />
+                        <Info size={12} weight="light" />
                         How did I prepare this?
                     </button>
 
                     {showExplanation && (
-                        <div className="mt-2 p-3 bg-slate-50 rounded-lg text-xs text-slate-700 leading-relaxed animate-in fade-in slide-in-from-top-1 whitespace-pre-wrap">
+                        <div className="mt-2 p-3 bg-[var(--bg-tertiary)] rounded-lg text-xs text-[var(--text-primary)] leading-relaxed animate-in fade-in slide-in-from-top-1 whitespace-pre-wrap">
                             {renderExplanation(widget.explanation)}
                         </div>
                     )}
@@ -273,6 +361,9 @@ const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSav
 export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onViewChange }) => {
     const { dashboardId: urlDashboardId } = useParams();
     const navigate = useNavigate();
+    
+    // Notifications
+    const { notifications, removeNotification, success, error: showError, warning } = useNotifications(3000);
     
     // Dashboard state
     const [dashboards, setDashboards] = useState<DashboardData[]>([]);
@@ -309,7 +400,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     const generatedWidgetsRef = useRef<HTMLDivElement>(null);
     
     // Grid layout state
-    const [layout, setLayout] = useState<Layout[]>([]);
+    const [layout, setLayout] = useState<LayoutItem[]>([]);
     const [isDragging, setIsDragging] = useState(false);
     const [gridWidth, setGridWidth] = useState(1200);
     
@@ -416,10 +507,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     ...w.config,
                     id: w.id,
                     position: w.position,
-                    gridX: w.gridX || 0,
-                    gridY: w.gridY || 0,
-                    gridWidth: w.gridWidth || 4,
-                    gridHeight: w.gridHeight || 3
+                    gridX: w.gridX ?? 0,
+                    gridY: w.gridY ?? 0,
+                    gridWidth: w.gridWidth ?? 6,
+                    gridHeight: w.gridHeight ?? 4
                 }));
                 setSavedWidgets(widgets);
                 
@@ -427,9 +518,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 const newLayout = widgets.map((w: SavedWidget, index: number) => ({
                     i: w.id,
                     x: w.gridX ?? (index % 2) * 6,
-                    y: w.gridY ?? Math.floor(index / 2) * 3,
-                    w: w.gridWidth ?? 4,
-                    h: w.gridHeight ?? 3,
+                    y: w.gridY ?? Math.floor(index / 2) * 4,
+                    w: w.gridWidth ?? 6,
+                    h: w.gridHeight ?? 4,
                     minW: 2,
                     minH: 2,
                     maxW: 12,
@@ -475,7 +566,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             }
         } catch (error) {
             console.error('Error creating dashboard:', error);
-            alert('Failed to create dashboard.');
+            showError('Failed to create dashboard', 'Please try again');
         }
     };
 
@@ -561,7 +652,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             }
         } catch (error) {
             console.error('Error deleting dashboard:', error);
-            alert('Failed to delete dashboard.');
+            showError('Failed to delete dashboard', 'Please try again');
         }
     };
 
@@ -589,7 +680,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             }
         } catch (error) {
             console.error('Error sharing dashboard:', error);
-            alert('Failed to share dashboard.');
+            showError('Failed to share dashboard', 'Please try again');
         }
     };
 
@@ -666,7 +757,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             setGeneratedWidgets(prev => [widgetConfig, ...prev]);
         } catch (error) {
             console.error('Error generating widget:', error);
-            alert('Failed to generate widget. Please try again.');
+            showError('Failed to generate widget', 'Please try again');
         } finally {
             setIsGenerating(false);
         }
@@ -674,12 +765,52 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
 
     const handleSaveWidget = async (widget: WidgetConfig, gridPosition?: { x: number; y: number; w: number; h: number }) => {
         if (!selectedDashboardId) {
-            alert('Please select or create a dashboard first.');
+            warning('No dashboard selected', 'Please select or create a dashboard first');
             return;
         }
         
         try {
             const id = generateUUID();
+            
+            // Calculate smart position if not provided
+            let finalPosition = gridPosition;
+            if (!finalPosition) {
+                // Find the best position for the new widget
+                const defaultWidth = 6; // Half width (6 of 12 columns)
+                const defaultHeight = 4;
+                
+                if (layout.length === 0) {
+                    // First widget goes at top-left
+                    finalPosition = { x: 0, y: 0, w: defaultWidth, h: defaultHeight };
+                } else {
+                    // Find the last row and check for space
+                    const lastWidget = layout.reduce((latest, item) => {
+                        // Find the widget that was added most recently (highest y, or rightmost at highest y)
+                        if (item.y > latest.y || (item.y === latest.y && item.x > latest.x)) {
+                            return item;
+                        }
+                        return latest;
+                    }, layout[0]);
+                    
+                    // Calculate the rightmost point in the last row
+                    const lastRowY = lastWidget.y;
+                    const widgetsInLastRow = layout.filter(item => 
+                        item.y < lastRowY + lastWidget.h && item.y + item.h > lastRowY
+                    );
+                    const rightmostInRow = Math.max(...widgetsInLastRow.map(item => item.x + item.w));
+                    
+                    // Check if there's space to the right in the last row
+                    if (rightmostInRow + defaultWidth <= 12) {
+                        // Place next to the rightmost widget in the last row
+                        finalPosition = { x: rightmostInRow, y: lastRowY, w: defaultWidth, h: defaultHeight };
+                    } else {
+                        // No space in the last row, create a new row
+                        const maxY = Math.max(...layout.map(item => item.y + item.h));
+                        finalPosition = { x: 0, y: maxY, w: defaultWidth, h: defaultHeight };
+                    }
+                }
+            }
+            
             const res = await fetch(`${API_BASE}/dashboards/${selectedDashboardId}/widgets`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -688,10 +819,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     title: widget.title,
                     description: widget.description,
                     config: widget,
-                    gridX: gridPosition?.x || 0,
-                    gridY: gridPosition?.y || 0,
-                    gridWidth: gridPosition?.w || 4,
-                    gridHeight: gridPosition?.h || 3
+                    gridX: finalPosition.x,
+                    gridY: finalPosition.y,
+                    gridWidth: finalPosition.w,
+                    gridHeight: finalPosition.h
                 }),
                 credentials: 'include'
             });
@@ -702,7 +833,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             }
         } catch (error) {
             console.error('Error saving widget:', error);
-            alert('Failed to save widget.');
+            showError('Failed to save widget', 'Please try again');
         }
     };
 
@@ -722,7 +853,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         }
     };
 
-    const handleLayoutChange = useCallback(async (newLayout: Layout[]) => {
+    const handleLayoutChange = useCallback(async (newLayout: LayoutItem[]) => {
         setLayout(newLayout);
         
         // Update widget positions in backend
@@ -761,13 +892,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         setIsDragging(true);
     };
     
-    const handleDragStop = useCallback((layout: Layout[]) => {
+    const handleDragStop = useCallback((layout: LayoutItem[]) => {
         setIsDragging(false);
         // Force save layout after drag stops
         setLayout(layout);
         if (selectedDashboardId) {
             // Save immediately after drag stops
             setTimeout(async () => {
+                let savedCount = 0;
                 for (const item of layout) {
                     try {
                         await fetch(`${API_BASE}/widgets/${item.i}/grid`, {
@@ -781,13 +913,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                 gridHeight: item.h
                             })
                         });
+                        savedCount++;
                     } catch (error) {
                         console.error('Error updating widget position:', error);
                     }
                 }
+                if (savedCount > 0) {
+                    success('Layout saved');
+                }
             }, 100);
         }
-    }, [selectedDashboardId]);
+    }, [selectedDashboardId, success]);
 
     const openShareModalIfShared = () => {
         if (selectedDashboard?.shareToken) {
@@ -803,14 +939,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     const [currentDashboardPage, setCurrentDashboardPage] = useState(1);
     const dashboardsPerPage = 6;
     
-    const filteredDashboards = dashboards.filter(d => 
-        d.name.toLowerCase().includes(dashboardSearchQuery.toLowerCase())
+    // Memoized filtered dashboards to avoid recalculating on every render
+    const filteredDashboards = useMemo(() => 
+        dashboards.filter(d => 
+            d.name.toLowerCase().includes(dashboardSearchQuery.toLowerCase())
+        ), [dashboards, dashboardSearchQuery]
     );
     
-    const totalDashboardPages = Math.ceil(filteredDashboards.length / dashboardsPerPage);
-    const paginatedDashboards = filteredDashboards.slice(
-        (currentDashboardPage - 1) * dashboardsPerPage,
-        currentDashboardPage * dashboardsPerPage
+    const totalDashboardPages = useMemo(() => 
+        Math.ceil(filteredDashboards.length / dashboardsPerPage),
+        [filteredDashboards.length]
+    );
+    
+    const paginatedDashboards = useMemo(() => 
+        filteredDashboards.slice(
+            (currentDashboardPage - 1) * dashboardsPerPage,
+            currentDashboardPage * dashboardsPerPage
+        ), [filteredDashboards, currentDashboardPage]
     );
     
     // Reset to page 1 when search changes
@@ -820,20 +965,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
 
 
     return (
-        <div className="flex flex-col h-full bg-slate-50" data-tutorial="dashboard-content">
+        <div className="flex flex-col h-full bg-[var(--bg-primary)]" data-tutorial="dashboard-content">
             {/* Top Header - Only show when no dashboard is selected */}
             {!selectedDashboardId && (
-                <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
-                    <div>
-                        <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Dashboards</h1>
-                        <p className="text-[11px] text-slate-500">Create and manage your data visualizations</p>
-                    </div>
-                    <div />
-                </header>
+                <PageHeader title="Dashboards" subtitle="Create and manage your data visualizations" />
             )}
 
             {/* Content */}
-            <div className="flex-1 flex flex-col overflow-hidden bg-white">
+            <div className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-primary)]">
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
             {!selectedDashboardId ? (
                 /* Dashboards List View */
@@ -844,24 +983,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-4">
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                    <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={14} weight="light" aria-hidden="true" />
                                     <input
                                         type="text"
                                         placeholder="Search dashboards..."
                                         value={dashboardSearchQuery}
                                         onChange={(e) => setDashboardSearchQuery(e.target.value)}
-                                        className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 w-60 placeholder:text-slate-400"
+                                        className="pl-8 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] w-60 placeholder:text-[var(--text-tertiary)]"
+                                        aria-label="Search dashboards"
                                     />
                                 </div>
-                                <p className="text-sm text-slate-500">
+                                <p className="text-sm text-[var(--text-secondary)]">
                                     {filteredDashboards.length} {filteredDashboards.length === 1 ? 'dashboard' : 'dashboards'}
                                 </p>
                             </div>
                             <button
                                 onClick={handleCreateDashboard}
-                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                             >
-                                <Plus size={14} className="mr-2" />
+                                <Plus size={14} weight="light" className="mr-2" />
                                 Create Dashboard
                             </button>
                         </div>
@@ -872,21 +1012,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                 <div
                                     key={dashboard.id}
                                     onClick={() => selectDashboard(dashboard.id)}
-                                    className="bg-white border border-slate-200 rounded-lg p-5 cursor-pointer group relative flex flex-col justify-between min-h-[200px] overflow-hidden"
+                                    className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 cursor-pointer group relative flex flex-col justify-between min-h-[200px] overflow-hidden"
                                 >
                                     <div className="flex-1">
                                         <div className="flex items-start justify-between mb-4">
                                             <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center flex-shrink-0 group-hover:from-slate-100 group-hover:to-slate-200 transition-all">
-                                                    <LayoutDashboard size={18} className="text-slate-600" />
+                                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-light)] flex items-center justify-center flex-shrink-0 hover:bg-[var(--bg-selected)] transition-all">
+                                                    <Layout size={18} weight="light" className="text-[var(--text-secondary)]" />
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2">
-                                                        <h3 className="text-base font-normal text-slate-900 group-hover:text-slate-700 transition-colors truncate" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                        <h3 className="text-base font-normal text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors truncate" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                                                             {dashboard.name}
                                                         </h3>
                                                         {dashboard.isPublic === 1 && (
-                                                            <Link size={14} className="text-slate-400 flex-shrink-0" />
+                                                            <Link size={14} weight="light" className="text-[var(--text-tertiary)] flex-shrink-0" />
                                                         )}
                                                     </div>
                                                 </div>
@@ -897,37 +1037,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                                     handleDeleteDashboard(dashboard.id);
                                                 }}
                                                 className="text-slate-300 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                                aria-label={`Delete dashboard ${dashboard.name}`}
                                             >
-                                                <Trash2 size={16} />
+                                                <Trash size={16} weight="light" aria-hidden="true" />
                                             </button>
                                         </div>
 
                                         {dashboard.description && (
-                                            <p className="text-sm text-slate-600 mb-4 line-clamp-2 leading-relaxed">
+                                            <p className="text-sm text-[var(--text-secondary)] mb-4 line-clamp-2 leading-relaxed">
                                                 {dashboard.description}
                                             </p>
                                         )}
 
-                                        <div className="space-y-2 mt-5 pt-4 border-t border-slate-100">
+                                        <div className="space-y-2 mt-5 pt-4 border-t border-[var(--border-light)]">
                                             {dashboard.createdAt && (
-                                                <div className="flex items-center gap-2 text-xs text-slate-500">
-                                                    <Calendar size={12} className="text-slate-400" />
+                                                <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                    <Calendar size={12} weight="light" className="text-[var(--text-tertiary)]" />
                                                     <span>Created {new Date(dashboard.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                                                 </div>
                                             )}
                                             {dashboard.updatedAt && (
-                                                <div className="flex items-center gap-2 text-xs text-slate-500">
-                                                    <Clock size={12} className="text-slate-400" />
+                                                <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                    <Clock size={12} weight="light" className="text-[var(--text-tertiary)]" />
                                                     <span>Updated {new Date(dashboard.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-100">
-                                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                                            <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            <span className="opacity-0 group-hover:opacity-100 transition-opacity font-medium text-slate-900">Open dashboard</span>
+                                    <div className="flex items-center justify-between mt-5 pt-4 border-t border-[var(--border-light)]">
+                                        <div className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary)]">
+                                            <CaretRight size={14} weight="light" className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            <span className="opacity-0 group-hover:opacity-100 transition-opacity font-medium text-[var(--text-primary)]">Open dashboard</span>
                                         </div>
                                     </div>
                                 </div>
@@ -937,10 +1078,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                             {totalDashboardPages <= 1 && (
                                 <div
                                     onClick={handleCreateDashboard}
-                                    className="border border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center min-h-[200px] text-slate-400 cursor-pointer group"
+                                    className="border border-dashed border-[var(--border-medium)] rounded-lg flex flex-col items-center justify-center min-h-[200px] text-[var(--text-tertiary)] cursor-pointer group"
                                 >
-                                    <div className="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center mb-4">
-                                        <Plus size={24} className="text-slate-400" />
+                                    <div className="w-12 h-12 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center mb-4">
+                                        <Plus size={24} weight="light" className="text-[var(--text-tertiary)]" />
                                     </div>
                                     <span className="font-medium text-sm">Create new dashboard</span>
                                 </div>
@@ -964,22 +1105,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             ) : selectedDashboardId ? (
                 <>
                     {/* Header */}
-                    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-20 shrink-0">
+                    <header className="h-16 bg-[var(--bg-primary)] border-b border-[var(--border-light)] flex items-center justify-between px-8 z-20 shrink-0">
                         <div className="flex items-center gap-4">
                             <button
                                 onClick={() => {
                                     setSelectedDashboardId(null);
                                     navigate('/dashboard', { replace: true });
                                 }}
-                                className="flex items-center gap-2 px-2 py-1.5 text-slate-600 hover:bg-slate-100 rounded-md transition-colors text-sm"
+                                className="flex items-center gap-2 px-2 py-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors text-sm"
                             >
-                                <ArrowLeft size={14} />
-                                <span className="font-medium">Back</span>
+                                <ArrowLeft size={14} weight="light" />
+                                <span className="font-medium">Back to Dashboards</span>
                             </button>
-                            <div className="h-6 w-px bg-slate-200"></div>
-                            <span className="font-medium text-slate-900 text-sm">
-                                {selectedDashboard?.name || 'Dashboard'}
-                            </span>
                             
                             {/* Dashboard Actions */}
                             {selectedDashboard && (
@@ -988,19 +1125,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                         onClick={openShareModalIfShared}
                                         className={`p-1.5 rounded-md transition-colors ${
                                             selectedDashboard.isPublic 
-                                                ? 'text-slate-700 hover:bg-slate-100' 
-                                                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+                                                ? 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]' 
+                                                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                                         }`}
                                         title={selectedDashboard.isPublic ? "Manage Share Link" : "Share Dashboard"}
                                     >
-                                        <Share2 size={16} />
+                                        <Share size={16} weight="light" />
                                     </button>
                                     <button
                                         onClick={handleDeleteDashboard}
-                                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                                        className="p-1.5 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
                                         title="Delete Dashboard"
                                     >
-                                        <Trash2 size={16} />
+                                        <Trash size={16} weight="light" />
                                     </button>
                                 </div>
                             )}
@@ -1024,7 +1161,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                         onChange={e => setEditingTitle(e.target.value)}
                                         onBlur={handleSaveTitle}
                                         onKeyDown={e => e.key === 'Enter' && handleSaveTitle()}
-                                        className="text-base font-normal text-slate-900 bg-transparent border-b border-slate-300 focus:border-slate-400 focus:outline-none w-full"
+                                        className="text-base font-normal text-[var(--text-primary)] bg-transparent border-b border-[var(--border-medium)] focus:border-slate-400 focus:outline-none w-full"
                                         autoFocus
                                     />
                                 ) : (
@@ -1033,7 +1170,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                             setEditingTitle(selectedDashboard.name);
                                             setIsEditingTitle(true);
                                         }}
-                                        className="text-base font-normal text-slate-900 cursor-pointer hover:text-slate-700 transition-colors"
+                                        className="text-base font-normal text-[var(--text-primary)] cursor-pointer hover:text-[var(--text-primary)] transition-colors"
                                         title="Click to edit"
                                     >
                                         {selectedDashboard.name}
@@ -1051,7 +1188,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                         onBlur={handleSaveDescription}
                                         onKeyDown={e => e.key === 'Enter' && handleSaveDescription()}
                                         placeholder="Add a description..."
-                                        className="text-sm text-slate-500 bg-transparent border-b border-slate-200 focus:border-slate-400 focus:outline-none w-full"
+                                        className="text-sm text-[var(--text-secondary)] bg-transparent border-b border-[var(--border-light)] focus:border-slate-400 focus:outline-none w-full"
                                         autoFocus
                                     />
                                 ) : (
@@ -1060,7 +1197,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                             setEditingDescription(selectedDashboard.description || '');
                                             setIsEditingDescription(true);
                                         }}
-                                        className="text-sm text-slate-500 cursor-pointer hover:text-slate-700 transition-colors"
+                                        className="text-sm text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)] transition-colors"
                                         title="Click to edit"
                                     >
                                         {selectedDashboard.description || 'Click to add description...'}
@@ -1087,6 +1224,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                             // Save immediately after resize stops
                                             if (selectedDashboardId) {
                                                 setTimeout(async () => {
+                                                    let savedCount = 0;
                                                     for (const item of layout) {
                                                         try {
                                                             await fetch(`${API_BASE}/widgets/${item.i}/grid`, {
@@ -1100,9 +1238,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                                                     gridHeight: item.h
                                                                 })
                                                             });
+                                                            savedCount++;
                                                         } catch (error) {
                                                             console.error('Error updating widget size:', error);
                                                         }
+                                                    }
+                                                    if (savedCount > 0) {
+                                                        success('Layout saved');
                                                     }
                                                 }, 100);
                                             }
@@ -1113,25 +1255,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                         margin={[16, 16]}
                                         containerPadding={[16, 16]}
                                         compactType={null}
-                                        preventCollision={false}
+                                        preventCollision={true}
                                         useCSSTransforms={true}
                                         resizeHandles={['se', 's', 'e', 'sw', 'nw', 'ne', 'n', 'w']}
                                         allowOverlap={false}
                                         style={{ position: 'relative' }}
                                     >
                                         {savedWidgets.map((widget) => (
-                                            <GridWidgetCard
-                                                key={widget.id}
-                                                widget={widget}
-                                                onRemove={() => removeWidget(widget.id)}
-                                            />
+                                            <div key={widget.id} className="h-full">
+                                                <GridWidgetCard
+                                                    widget={widget}
+                                                    onRemove={() => removeWidget(widget.id)}
+                                                />
+                                            </div>
                                         ))}
                                     </GridLayout>
                                 ) : (
-                                    <div className="bg-white rounded-lg border-2 border-dashed border-slate-300 p-12 text-center">
-                                        <Database className="mx-auto text-slate-300 mb-3" size={40} />
-                                        <h3 className="text-base font-normal text-slate-700 mb-2">No widgets yet</h3>
-                                        <p className="text-xs text-slate-500 max-w-md mx-auto mb-4">
+                                    <div className="bg-[var(--bg-card)] rounded-lg border-2 border-dashed border-[var(--border-medium)] p-12 text-center">
+                                        <Database className="mx-auto text-slate-300 mb-3" size={40} weight="light" />
+                                        <h3 className="text-base font-normal text-[var(--text-primary)] mb-2">No widgets yet</h3>
+                                        <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto mb-4">
                                             Click the + button to add widgets and create custom visualizations.
                                         </p>
                                     </div>
@@ -1141,10 +1284,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                             {/* Generated Widgets Preview Section (temporary, before adding to grid) */}
                             {generatedWidgets.length > 0 && (
                                 <div ref={generatedWidgetsRef} className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500 mt-6">
-                                    <h3 className="text-base font-normal text-slate-900 flex items-center gap-2">
-                                        <Sparkles size={14} className="text-slate-500" />
+                                    <h3 className="text-base font-normal text-[var(--text-primary)] flex items-center gap-2">
+                                        <Sparkle size={14} weight="light" className="text-[var(--text-secondary)]" />
                                         New Widgets
-                                        <span className="text-xs font-normal text-slate-500">(click + to add to dashboard)</span>
+                                        <span className="text-xs font-normal text-[var(--text-secondary)]">(click + to add to dashboard)</span>
                                     </h3>
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                         {generatedWidgets.map((widget, index) => (
@@ -1169,47 +1312,77 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                             {selectedDashboard && (
                                 <button
                                     onClick={() => setShowAddWidgetModal(true)}
-                                    className="fixed bottom-8 right-8 bg-slate-900 text-white rounded-full p-4 shadow-lg hover:bg-slate-800 transition-colors z-50 flex items-center gap-2 group"
+                                    className="fixed bottom-8 right-8 bg-[var(--bg-selected)] text-white rounded-full p-4 shadow-lg hover:bg-[#555555] transition-colors z-50 flex items-center gap-2 group"
                                     title="Add Widget"
                                 >
-                                    <Plus size={20} className="group-hover:rotate-90 transition-transform duration-200" />
+                                    <Plus size={20} weight="light" className="group-hover:rotate-90 transition-transform duration-200" />
                                     <span className="text-sm font-medium pr-2 hidden sm:inline">Add Widget</span>
                                 </button>
                             )}
 
                             {/* Add Widget Modal */}
                             {showAddWidgetModal && (
-                                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => {
-                                    setShowAddWidgetModal(false);
-                                    setSelectedVisualizationType(''); // Reset when closing
-                                }}>
-                                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-                                        <div className="bg-white border-b border-slate-200 px-6 py-5 shrink-0 flex items-center justify-between">
-                                            <div>
-                                                <h2 className="text-lg font-normal text-slate-900">Add Widget</h2>
-                                                <p className="text-xs text-slate-500 mt-1">Describe what you want to visualize and how</p>
+                                <div 
+                                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                                    role="dialog"
+                                    aria-modal="true"
+                                >
+                                    {/* Overlay with blur */}
+                                    <div 
+                                        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-200"
+                                        onClick={() => {
+                                            setShowAddWidgetModal(false);
+                                            setSelectedVisualizationType('');
+                                        }}
+                                    />
+                                    
+                                    {/* Modal Content */}
+                                    <div 
+                                        className="relative w-full max-w-2xl bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl transform transition-all duration-200 animate-in fade-in zoom-in-95 max-h-[90vh] flex flex-col"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        {/* Header */}
+                                        <div className="flex items-start justify-between p-5 border-b border-[var(--border-light)] shrink-0">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2.5 bg-[var(--bg-tertiary)] rounded-lg">
+                                                    <Sparkle size={20} weight="light" className="text-[var(--text-secondary)]" />
+                                                </div>
+                                                <div>
+                                                    <h2 
+                                                        className="text-lg font-medium text-[var(--text-primary)]"
+                                                        style={{ fontFamily: "'Berkeley Mono', monospace" }}
+                                                    >
+                                                        Add Widget
+                                                    </h2>
+                                                    <p className="text-sm text-[var(--text-secondary)] mt-0.5">
+                                                        Describe what you want to visualize
+                                                    </p>
+                                                </div>
                                             </div>
                                             <button
                                                 onClick={() => {
                                                     setShowAddWidgetModal(false);
-                                                    setSelectedVisualizationType(''); // Reset when closing
+                                                    setSelectedVisualizationType('');
                                                 }}
-                                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                                className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                                                aria-label="Close modal"
                                             >
-                                                <X size={18} />
+                                                <X size={18} weight="light" />
                                             </button>
                                         </div>
-                                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                                        
+                                        {/* Body */}
+                                        <div className="flex-1 overflow-y-auto p-5 space-y-5">
                                             {/* Visualization Type Selector */}
                                             <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                                     Visualization Type
                                                 </label>
                                                 <div className="relative">
                                                     <select
                                                         value={selectedVisualizationType}
                                                         onChange={(e) => setSelectedVisualizationType(e.target.value)}
-                                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-300 appearance-none cursor-pointer"
+                                                        className="w-full px-4 py-2.5 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20 focus:border-[var(--accent-primary)] appearance-none cursor-pointer transition-all"
                                                     >
                                                         <option value="auto">Auto (let AI decide)</option>
                                                         <option value="Bar chart">Bar Chart</option>
@@ -1222,34 +1395,47 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                                         <option value="Gauge">Gauge</option>
                                                         <option value="Funnel chart">Funnel Chart</option>
                                                     </select>
-                                                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                                    <CaretDown size={16} weight="light" className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" />
                                                 </div>
                                             </div>
 
-                                            <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                                            {/* Prompt Input */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                                                    Describe your visualization
+                                                </label>
                                                 <PromptInput
                                                     entities={entities}
                                                     onGenerate={(prompt, mentionedEntityIds) => {
                                                         handleGenerateWidget(prompt, mentionedEntityIds, selectedVisualizationType);
                                                         setShowAddWidgetModal(false);
-                                                        setSelectedVisualizationType(''); // Reset after generation
+                                                        setSelectedVisualizationType('');
                                                     }}
                                                     isGenerating={isGenerating}
-                                                    placeholder="Describe your data... e.g. '@Customers by total orders' or 'Connect to workflow output SalesReport'"
+                                                    placeholder="e.g. '@Customers by total orders' or 'Monthly revenue trend'"
                                                     buttonLabel="Generate Widget"
-                                                    className="text-slate-800"
                                                 />
                                             </div>
-                                            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+
+                                            {/* Tips Section */}
+                                            <div className="p-4 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
                                                 <div className="flex items-start gap-3">
-                                                    <Info size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
-                                                    <div className="text-xs text-blue-800">
-                                                        <p className="font-medium mb-1">Tips:</p>
-                                                        <ul className="list-disc list-inside space-y-1 text-blue-700">
-                                                            <li>Use @ to mention entities (e.g., @Customers)</li>
-                                                            <li>Use . to access attributes (e.g., @Customers.totalOrders)</li>
-                                                            <li>Describe the visualization type (bar chart, line chart, pie chart, etc.)</li>
-                                                            <li>You can connect to workflow outputs by mentioning the workflow name</li>
+                                                    <Info size={16} weight="light" className="text-[var(--text-secondary)] mt-0.5 flex-shrink-0" />
+                                                    <div className="text-xs text-[var(--text-secondary)]">
+                                                        <p className="font-medium text-[var(--text-primary)] mb-2">Quick Tips</p>
+                                                        <ul className="space-y-1.5">
+                                                            <li className="flex items-center gap-2">
+                                                                <kbd className="px-1.5 py-0.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-[10px] font-mono">@</kbd>
+                                                                <span>Mention entities (e.g., @Customers)</span>
+                                                            </li>
+                                                            <li className="flex items-center gap-2">
+                                                                <kbd className="px-1.5 py-0.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-[10px] font-mono">.</kbd>
+                                                                <span>Access attributes (e.g., @Customers.totalOrders)</span>
+                                                            </li>
+                                                            <li className="flex items-center gap-2">
+                                                                <span className="w-5 h-5 flex items-center justify-center bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-[10px]">↵</span>
+                                                                <span>Press Enter or click button to generate</span>
+                                                            </li>
                                                         </ul>
                                                     </div>
                                                 </div>
@@ -1270,62 +1456,89 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
 
             {/* Share Dashboard Modal */}
             {showShareModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowShareModal(false)}>
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col" onClick={e => e.stopPropagation()}>
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                    role="dialog"
+                    aria-modal="true"
+                >
+                    {/* Overlay with blur */}
+                    <div 
+                        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-200"
+                        onClick={() => setShowShareModal(false)}
+                    />
+                    
+                    {/* Modal Content */}
+                    <div 
+                        className="relative w-full max-w-md bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl transform transition-all duration-200 animate-in fade-in zoom-in-95 flex flex-col"
+                        onClick={e => e.stopPropagation()}
+                    >
                         {/* Header */}
-                        <div className="bg-white border-b border-slate-200 px-6 py-5 shrink-0 flex items-center justify-between">
+                        <div className="flex items-start justify-between p-5 border-b border-[var(--border-light)] shrink-0">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-slate-50 rounded-lg">
-                                    <Share2 size={18} className="text-slate-600" />
+                                <div className="p-2.5 bg-[var(--bg-tertiary)] rounded-lg">
+                                    <Share size={20} weight="light" className="text-[var(--text-secondary)]" />
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-normal text-slate-900">Share Dashboard</h2>
-                                    <p className="text-xs text-slate-500 mt-0.5">Anyone with this link can view your dashboard</p>
+                                    <h2 
+                                        className="text-lg font-medium text-[var(--text-primary)]"
+                                        style={{ fontFamily: "'Berkeley Mono', monospace" }}
+                                    >
+                                        Share Dashboard
+                                    </h2>
+                                    <p className="text-sm text-[var(--text-secondary)] mt-0.5">
+                                        Anyone with this link can view
+                                    </p>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setShowShareModal(false)}
-                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                                aria-label="Close modal"
                             >
-                                <X size={18} />
+                                <X size={18} weight="light" />
                             </button>
                         </div>
 
                         {/* Content */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={shareUrl}
-                                    readOnly
-                                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                                />
-                                <button
-                                    onClick={copyShareUrl}
-                                    className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors shrink-0 ${
-                                        copied 
-                                            ? 'bg-green-50 text-green-700 border border-green-200' 
-                                            : 'bg-slate-900 text-white hover:bg-slate-800'
-                                    }`}
-                                >
-                                    {copied ? <Check size={16} /> : <Copy size={16} />}
-                                    {copied ? 'Copied' : 'Copy'}
-                                </button>
+                        <div className="p-5 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                                    Share Link
+                                </label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={shareUrl}
+                                        readOnly
+                                        className="flex-1 px-4 py-2.5 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20 focus:border-[var(--accent-primary)] transition-all"
+                                    />
+                                    <button
+                                        onClick={copyShareUrl}
+                                        className={`px-4 py-2.5 rounded-lg flex items-center gap-2 text-sm font-medium transition-all shrink-0 ${
+                                            copied 
+                                                ? 'bg-green-50 text-green-700 border border-green-200' 
+                                                : 'bg-[var(--bg-selected)] text-white hover:bg-[#555555] shadow-sm hover:shadow-md'
+                                        }`}
+                                    >
+                                        {copied ? <Check size={16} weight="light" /> : <Copy size={16} weight="light" />}
+                                        {copied ? 'Copied!' : 'Copy'}
+                                    </button>
+                                </div>
                             </div>
                             
                             <a
                                 href={shareUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors"
+                                className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"
                             >
-                                <ExternalLink size={14} />
+                                <ArrowSquareOut size={14} weight="light" />
                                 <span>Open in new tab</span>
                             </a>
                         </div>
 
                         {/* Footer */}
-                        <div className="border-t border-slate-200 px-6 py-4 shrink-0 flex items-center justify-between gap-3">
+                        <div className="border-t border-[var(--border-light)] p-5 shrink-0 flex items-center justify-between gap-3">
                             {selectedDashboard?.isPublic ? (
                                 <button
                                     onClick={handleUnshareDashboard}
@@ -1338,7 +1551,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                             )}
                             <button
                                 onClick={() => setShowShareModal(false)}
-                                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors"
+                                className="px-4 py-2.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
                             >
                                 Done
                             </button>
@@ -1346,6 +1559,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     </div>
                 </div>
             )}
+            
+            {/* Toast Notifications */}
+            <ToastContainer 
+                notifications={notifications} 
+                onDismiss={removeNotification}
+                position="bottom-right"
+            />
         </div>
     );
 };

@@ -1,207 +1,45 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Workflow, Zap, Play, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, X, Save, FolderOpen, Trash2, PlayCircle, Check, XCircle, Database, Wrench, Search, ChevronsLeft, ChevronsRight, Sparkles, Code, Edit, LogOut, MessageSquare, Globe, Leaf, Share2, UserCheck, GitMerge, FileSpreadsheet, FileText, Upload, Columns, GripVertical, Users, Mail, BookOpen, Copy, Eye, Clock, History, Maximize2, ZoomIn, ZoomOut, Bot, Smartphone, BarChart3, User, Calendar, ChevronRight, ChevronDown, ChevronUp, Plus, Folder, Shield, Terminal, Tag, MoreVertical, Webhook, FlaskConical, TrendingUp, Bell, FileCheck } from 'lucide-react';
+import { FlowArrow as Workflow, Lightning as Zap, Play, CheckCircle, WarningCircle as AlertCircle, ArrowRight, ArrowLeft, X, FloppyDisk as Save, FolderOpen, Trash, PlayCircle, Check, XCircle, Database, Wrench, MagnifyingGlass as Search, CaretDoubleLeft as ChevronsLeft, CaretDoubleRight as ChevronsRight, Sparkle as Sparkles, Code, PencilSimple as Edit, SignOut as LogOut, ChatCircle as MessageSquare, Globe, Leaf, Share as Share2, UserCheck, GitMerge, FileXls as FileSpreadsheet, FileText, UploadSimple as Upload, Columns, DotsSixVertical as GripVertical, Users, Envelope as Mail, BookOpen, Copy, Eye, Clock, ClockCounterClockwise as History, ArrowsOut as Maximize2, MagnifyingGlassPlus as ZoomIn, MagnifyingGlassMinus as ZoomOut, Robot as Bot, DeviceMobile as Smartphone, ChartBar as BarChart3, User, Calendar, CaretRight as ChevronRight, CaretDown as ChevronDown, CaretUp as ChevronUp, Plus, Folder, ShieldCheck as Shield, Terminal, Tag, DotsThreeVertical as MoreVertical, WebhooksLogo as Webhook, Flask as FlaskConical, TrendUp, Bell, FilePdf } from '@phosphor-icons/react';
 import { NodeConfigSidePanel } from './NodeConfigSidePanel';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { PromptInput } from './PromptInput';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
 import { AIPromptSection } from './AIPromptSection';
 import { Pagination } from './Pagination';
+import { PageHeader } from './PageHeader';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useCollaborativeCursors } from '../hooks/useCollaborativeCursors';
+import { generateUUID } from '../utils/uuid';
 
-// Generate UUID that works in non-HTTPS contexts
-const generateUUID = (): string => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID();
-    }
-    // Fallback for HTTP contexts
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-};
+// Import modular workflow types, constants and utilities
+// Using explicit path to avoid conflict with Workflows.tsx on case-insensitive filesystems
+import {
+  // Types
+  type WorkflowNode,
+  type Connection,
+  type DraggableItem,
+  // Constants
+  DRAGGABLE_ITEMS as WORKFLOW_DRAGGABLE_ITEMS,
+  CANVAS_CONSTANTS,
+  NODE_ICONS,
+  // Templates
+  WORKFLOW_TEMPLATES,
+  type WorkflowTemplate,
+  // Node utilities
+  getNodeDefinition,
+  getNodeDisplayName,
+  getNodeSummary,
+  getStatusStyles,
+  validateNodeConfig,
+  isTriggerNode,
+} from './workflows/index';
 
-interface WorkflowNode {
-    id: string;
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook' | 'sapFetch' | 'opcua' | 'mqtt' | 'agent' | 'limsFetch' | 'statisticalAnalysis' | 'alertAgent' | 'pdfReport';
-    label: string;
-    x: number;
-    y: number;
-    status?: 'idle' | 'running' | 'completed' | 'error' | 'waiting';
-    config?: {
-        entityId?: string;
-        entityName?: string;
-        // For condition nodes:
-        conditionField?: string;
-        conditionOperator?: string;
-        conditionValue?: string;
-        recordId?: string;
-        recordName?: string;
-        llmPrompt?: string;
-        llmContextEntities?: string[];
-        llmIncludeInput?: boolean;
-        pythonCode?: string;
-        pythonAiPrompt?: string;
-        // For manual input nodes:
-        inputVarName?: string;
-        inputVarValue?: string;
-        // For comment nodes:
-        commentText?: string;
-        // For http nodes:
-        httpUrl?: string;
-        // For esios nodes:
-        esiosArchiveId?: string;
-        esiosDate?: string;
-        // For climatiq nodes:
-        climatiqQuery?: string;
-        climatiqFactor?: number;
-        climatiqUnit?: string;
-        climatiqDescription?: string;
-        // For human approval nodes:
-        assignedUserId?: string;
-        assignedUserName?: string;
-        assignedUserPhoto?: string;
-        approvalStatus?: 'pending' | 'approved' | 'rejected';
-        // For join nodes:
-        joinStrategy?: 'concat' | 'mergeByKey';
-        joinType?: 'inner' | 'outer';  // inner = only matching, outer = all records
-        joinKey?: string;
-        // For excel input nodes:
-        fileName?: string;
-        headers?: string[];
-        parsedData?: any[];
-        previewData?: any[];  // Preview for GCS-stored data
-        rowCount?: number;
-        gcsPath?: string;     // GCS path for cloud-stored data
-        useGCS?: boolean;     // Whether data is stored in GCS
-        // For PDF input nodes:
-        pdfText?: string;
-        pages?: number;
-        info?: any;
-        metadata?: any;
-        // Processing mode (for condition, llm, etc.)
-        processingMode?: 'batch' | 'perRow';  // batch = all rows together, perRow = filter/process each row
-        // For split columns nodes:
-        columnsOutputA?: string[];  // Columns to send to output A
-        columnsOutputB?: string[];  // Columns to send to output B
-        // For MySQL nodes:
-        mysqlHost?: string;
-        mysqlPort?: string;
-        mysqlDatabase?: string;
-        mysqlUsername?: string;
-        mysqlPassword?: string;
-        mysqlQuery?: string;
-        // For Send Email nodes:
-        emailTo?: string;
-        emailSubject?: string;
-        emailBody?: string;
-        emailSmtpHost?: string;
-        emailSmtpPort?: string;
-        emailSmtpUser?: string;
-        emailSmtpPass?: string;
-        // For Send SMS nodes:
-        smsTo?: string;
-        smsBody?: string;
-        twilioAccountSid?: string;
-        twilioAuthToken?: string;
-        twilioFromNumber?: string;
-        // For Data Visualization nodes:
-        visualizationPrompt?: string;
-        generatedWidget?: WidgetConfig;
-        // For SAP Fetch nodes:
-        sapConnectionName?: string;
-        sapAuthType?: string;
-        sapClientId?: string;
-        sapClientSecret?: string;
-        sapTokenUrl?: string;
-        sapBaseApiUrl?: string;
-        sapServicePath?: string;
-        sapEntity?: string;
-        // Custom node name
-        customName?: string;
-        // For LIMS Fetch nodes:
-        limsServerUrl?: string;
-        limsApiKey?: string;
-        limsEndpoint?: string;
-        limsQuery?: string;
-        // For Statistical Analysis nodes:
-        statisticalMethod?: 'pca' | 'spc' | 'regression' | 'goldenBatch';
-        statisticalParams?: string; // JSON string with parameters
-        goldenBatchId?: string;
-        // For Alert Agent nodes:
-        alertConditions?: string; // JSON string with conditions
-        alertSeverity?: 'critical' | 'warning' | 'info';
-        alertActions?: string[]; // ['email', 'sms', 'webhook', 'stop']
-        alertRecipients?: string; // Comma-separated emails/phones
-        // For PDF Report nodes:
-        pdfTemplate?: string;
-        pdfReportData?: string; // JSON string with data structure
-        pdfOutputPath?: string;
-    };
-    executionResult?: string;
-    data?: any;
-    inputData?: any;
-    inputDataA?: any;  // For join nodes - input from port A
-    inputDataB?: any;  // For join nodes - input from port B
-    outputData?: any;
-    conditionResult?: boolean;  // Store evaluation result
-}
+// Use imported DRAGGABLE_ITEMS from workflows module
+const DRAGGABLE_ITEMS = WORKFLOW_DRAGGABLE_ITEMS;
 
-interface Connection {
-    id: string;
-    fromNodeId: string;
-    toNodeId: string;
-    outputType?: 'true' | 'false' | 'A' | 'B';  // For condition nodes (true/false) and splitColumns nodes (A/B)
-    inputPort?: 'A' | 'B';  // For join nodes
-}
-
-interface DraggableItem {
-    type: 'trigger' | 'action' | 'condition' | 'fetchData' | 'addField' | 'saveRecords' | 'llm' | 'python' | 'manualInput' | 'output' | 'comment' | 'http' | 'esios' | 'climatiq' | 'humanApproval' | 'join' | 'excelInput' | 'pdfInput' | 'splitColumns' | 'mysql' | 'sendEmail' | 'sendSMS' | 'dataVisualization' | 'webhook' | 'sapFetch' | 'opcua' | 'mqtt' | 'agent' | 'limsFetch' | 'statisticalAnalysis' | 'alertAgent' | 'pdfReport';
-    label: string;
-    icon: React.ElementType;
-    description: string;
-    category: 'Triggers' | 'Data' | 'Logic' | 'Actions' | 'Other';
-}
-
-const DRAGGABLE_ITEMS: DraggableItem[] = [
-    { type: 'trigger', label: 'Manual Trigger', icon: Play, description: 'Manually start the workflow', category: 'Triggers' },
-    { type: 'trigger', label: 'Schedule', icon: Workflow, description: 'Run on a specific schedule', category: 'Triggers' },
-    { type: 'webhook', label: 'Webhook', icon: Globe, description: 'Receive data from external services', category: 'Triggers' },
-    { type: 'fetchData', label: 'Fetch Data', icon: Database, description: 'Get records from an entity', category: 'Data' },
-    { type: 'excelInput', label: 'Excel/CSV Input', icon: FileSpreadsheet, description: 'Load data from Excel or CSV', category: 'Data' },
-    { type: 'pdfInput', label: 'PDF Input', icon: FileText, description: 'Extract text from PDF files', category: 'Data' },
-    { type: 'saveRecords', label: 'Save to Database', icon: Database, description: 'Create or update records', category: 'Data' },
-    { type: 'http', label: 'HTTP Request', icon: Globe, description: 'Fetch data from an external API', category: 'Data' },
-    { type: 'mysql', label: 'MySQL', icon: Database, description: 'Query data from MySQL database', category: 'Data' },
-    { type: 'sapFetch', label: 'SAP S/4HANA', icon: Database, description: 'Read data from SAP S/4HANA OData API', category: 'Data' },
-    { type: 'limsFetch', label: 'LIMS Connector', icon: FlaskConical, description: 'Fetch data from Laboratory Information Management System', category: 'Data' },
-    { type: 'esios', label: 'Energy Prices', icon: Zap, description: 'Fetch prices from Red Eléctrica', category: 'Data' },
-    { type: 'climatiq', label: 'Emission Factors', icon: Leaf, description: 'Search CO2 emission factors', category: 'Data' },
-    { type: 'manualInput', label: 'Manual Data Input', icon: Edit, description: 'Define a variable with a value', category: 'Data' },
-    { type: 'condition', label: 'If / Else', icon: AlertCircle, description: 'Branch based on conditions', category: 'Logic' },
-    { type: 'join', label: 'Join', icon: GitMerge, description: 'Combine data from two sources', category: 'Logic' },
-    { type: 'splitColumns', label: 'Split by Columns', icon: Columns, description: 'Split dataset by columns into two outputs', category: 'Logic' },
-    { type: 'agent', label: 'AI Agent', icon: Bot, description: 'Autonomous AI agent that can execute workflows and make decisions', category: 'Logic' },
-    { type: 'llm', label: 'AI Generation', icon: Sparkles, description: 'Generate text using AI', category: 'Logic' },
-    { type: 'python', label: 'Python Code', icon: Code, description: 'Run Python script', category: 'Logic' },
-    { type: 'statisticalAnalysis', label: 'Statistical Analysis', icon: TrendingUp, description: 'Perform PCA, SPC, or compare with golden batch', category: 'Logic' },
-    { type: 'alertAgent', label: 'Alert Agent', icon: Bell, description: 'Configure deterministic alerts with conditions and actions', category: 'Logic' },
-    { type: 'addField', label: 'Add Field', icon: CheckCircle, description: 'Add a new field to data', category: 'Logic' },
-    { type: 'humanApproval', label: 'Human in the Loop', icon: UserCheck, description: 'Wait for user approval to continue', category: 'Logic' },
-    { type: 'sendEmail', label: 'Send Email', icon: Mail, description: 'Send an email notification', category: 'Actions' },
-    { type: 'sendSMS', label: 'Send SMS', icon: Smartphone, description: 'Send an SMS text message via Twilio', category: 'Actions' },
-    { type: 'dataVisualization', label: 'Data Visualization', icon: BarChart3, description: 'Generate charts from data using AI', category: 'Actions' },
-    { type: 'pdfReport', label: 'PDF Report Generator', icon: FileCheck, description: 'Generate structured PDF reports from data', category: 'Actions' },
-    { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },
-    { type: 'output', label: 'Output', icon: LogOut, description: 'Display workflow output data', category: 'Actions' },
-    { type: 'comment', label: 'Comment', icon: MessageSquare, description: 'Add a note or comment', category: 'Other' },
-];
-
-// AI Workflow Assistant interfaces
+// AI Workflow Assistant interfaces (local to this component)
 interface AIWorkflowMessage {
     id: string;
     role: 'user' | 'assistant';
@@ -217,268 +55,6 @@ interface WorkflowSuggestion {
     connections?: Connection[];
     status: 'pending' | 'accepted' | 'rejected';
 }
-
-
-// Pre-defined workflow templates
-interface WorkflowTemplate {
-    id: string;
-    name: string;
-    description: string;
-    category: 'Compliance' | 'Process Optimization' | 'Planning' | 'Reporting' | 'Quality Assurance';
-    nodes: WorkflowNode[];
-    connections: Connection[];
-}
-
-const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
-    {
-        id: 'template-data-filtering',
-        name: 'Advanced control and monitorization of a chemical process',
-        description: 'Read equipment sensor data, and calculate process and product quality metrics to ensure compliance with specifications and improve efficiency.',
-        category: 'Process Optimization',
-        nodes: [
-            { id: 't1-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
-            { id: 't1-fetch', type: 'fetchData', label: 'Fetch Data', x: 300, y: 200 },
-            { id: 't1-condition', type: 'condition', label: 'Filter Records', x: 500, y: 200, config: { conditionField: 'status', conditionOperator: 'equals', conditionValue: 'active', processingMode: 'perRow' } },
-            { id: 't1-output', type: 'output', label: 'Output Results', x: 700, y: 150 },
-            { id: 't1-comment', type: 'comment', label: 'Comment', x: 500, y: 350, config: { commentText: 'This workflow filters records and outputs only those matching the condition.' } },
-        ],
-        connections: [
-            { id: 'c1-1', fromNodeId: 't1-trigger', toNodeId: 't1-fetch' },
-            { id: 'c1-2', fromNodeId: 't1-fetch', toNodeId: 't1-condition' },
-            { id: 'c1-3', fromNodeId: 't1-condition', toNodeId: 't1-output', outputType: 'true' },
-        ]
-    },
-    {
-        id: 'template-ai-enrichment',
-        name: 'Automated data collection for quality reporting in wineries',
-        description: 'Centralization of climate, laboratory, production and storage data for automated reporting to regulatory authorities, clients and stakeholders.',
-        category: 'Reporting',
-        nodes: [
-            { id: 't2-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
-            { id: 't2-fetch', type: 'fetchData', label: 'Fetch Data', x: 300, y: 200 },
-            { id: 't2-llm', type: 'llm', label: 'AI Analysis', x: 500, y: 200, config: { llmPrompt: 'Analyze this data and provide insights:', llmIncludeInput: true } },
-            { id: 't2-add-field', type: 'addField', label: 'Add Insights Field', x: 700, y: 200 },
-            { id: 't2-save', type: 'saveRecords', label: 'Save Results', x: 900, y: 200 },
-        ],
-        connections: [
-            { id: 'c2-1', fromNodeId: 't2-trigger', toNodeId: 't2-fetch' },
-            { id: 'c2-2', fromNodeId: 't2-fetch', toNodeId: 't2-llm' },
-            { id: 'c2-3', fromNodeId: 't2-llm', toNodeId: 't2-add-field' },
-            { id: 'c2-4', fromNodeId: 't2-add-field', toNodeId: 't2-save' },
-        ]
-    },
-    {
-        id: 'template-ai-enrichment-32',
-        name: 'Scope 3 emissions automated reporting',
-        description: 'Automated collection of supplier and customer data for scope 3 emissions calculation and reporting.',
-        category: 'Reporting',
-        nodes: [
-            { id: 't2-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
-            { id: 't2-fetch', type: 'fetchData', label: 'Fetch Data', x: 300, y: 200 },
-            { id: 't2-llm', type: 'llm', label: 'AI Analysis', x: 500, y: 200, config: { llmPrompt: 'Analyze this data and provide insights:', llmIncludeInput: true } },
-            { id: 't2-add-field', type: 'addField', label: 'Add Insights Field', x: 700, y: 200 },
-            { id: 't2-save', type: 'saveRecords', label: 'Save Results', x: 900, y: 200 },
-        ],
-        connections: [
-            { id: 'c2-1', fromNodeId: 't2-trigger', toNodeId: 't2-fetch' },
-            { id: 'c2-2', fromNodeId: 't2-fetch', toNodeId: 't2-llm' },
-            { id: 'c2-3', fromNodeId: 't2-llm', toNodeId: 't2-add-field' },
-            { id: 'c2-4', fromNodeId: 't2-add-field', toNodeId: 't2-save' },
-        ]
-    },
-    {
-        id: 'template-ai-enrichment-4',
-        name: 'Renewable energy assets portfolio management and reporting',
-        description: 'Automated collection of climate, asset performance & maintenance data for reporting to renewable energy asset owners and stakeholders.',
-        category: 'Reporting',
-        nodes: [
-            { id: 't2-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
-            { id: 't2-fetch', type: 'fetchData', label: 'Fetch Data', x: 300, y: 200 },
-            { id: 't2-llm', type: 'llm', label: 'AI Analysis', x: 500, y: 200, config: { llmPrompt: 'Analyze this data and provide insights:', llmIncludeInput: true } },
-            { id: 't2-add-field', type: 'addField', label: 'Add Insights Field', x: 700, y: 200 },
-            { id: 't2-save', type: 'saveRecords', label: 'Save Results', x: 900, y: 200 },
-        ],
-        connections: [
-            { id: 'c2-1', fromNodeId: 't2-trigger', toNodeId: 't2-fetch' },
-            { id: 'c2-2', fromNodeId: 't2-fetch', toNodeId: 't2-llm' },
-            { id: 'c2-3', fromNodeId: 't2-llm', toNodeId: 't2-add-field' },
-            { id: 'c2-4', fromNodeId: 't2-add-field', toNodeId: 't2-save' },
-        ]
-    },
-    {
-        id: 'template-ai-enrichment-2',
-        name: 'Predictive maintenance planning Agent',
-        description: 'Read equipment specs and documentation, sensor data and current maintenance scheduling information to provide insights, alerts and recommendations of improved plannings, as well as its estimated saving costs.',
-        category: 'Planning',
-        nodes: [
-            { id: 't2-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
-            { id: 't2-fetch', type: 'fetchData', label: 'Fetch Data', x: 300, y: 200 },
-            { id: 't2-llm', type: 'llm', label: 'AI Analysis', x: 500, y: 200, config: { llmPrompt: 'Analyze this data and provide insights:', llmIncludeInput: true } },
-            { id: 't2-add-field', type: 'addField', label: 'Add Insights Field', x: 700, y: 200 },
-            { id: 't2-save', type: 'saveRecords', label: 'Save Results', x: 900, y: 200 },
-        ],
-        connections: [
-            { id: 'c2-1', fromNodeId: 't2-trigger', toNodeId: 't2-fetch' },
-            { id: 'c2-2', fromNodeId: 't2-fetch', toNodeId: 't2-llm' },
-            { id: 'c2-3', fromNodeId: 't2-llm', toNodeId: 't2-add-field' },
-            { id: 'c2-4', fromNodeId: 't2-add-field', toNodeId: 't2-save' },
-        ]
-    },
-    {
-        id: 'template-ai-enrichment-3',
-        name: 'Overall equipment effectiveness (OEE) calculation',
-        description: 'Read production data, equipment availability and maintenance records to calculate the Overall Equipment Effectiveness (OEE) of a manufacturing process and provide it in a dashboard.',
-        category: 'Planning',
-        nodes: [
-            { id: 't2-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
-            { id: 't2-fetch', type: 'fetchData', label: 'Fetch Data', x: 300, y: 200 },
-            { id: 't2-llm', type: 'llm', label: 'AI Analysis', x: 500, y: 200, config: { llmPrompt: 'Analyze this data and provide insights:', llmIncludeInput: true } },
-            { id: 't2-add-field', type: 'addField', label: 'Add Insights Field', x: 700, y: 200 },
-            { id: 't2-save', type: 'saveRecords', label: 'Save Results', x: 900, y: 200 },
-        ],
-        connections: [
-            { id: 'c2-1', fromNodeId: 't2-trigger', toNodeId: 't2-fetch' },
-            { id: 'c2-2', fromNodeId: 't2-fetch', toNodeId: 't2-llm' },
-            { id: 'c2-3', fromNodeId: 't2-llm', toNodeId: 't2-add-field' },
-            { id: 'c2-4', fromNodeId: 't2-add-field', toNodeId: 't2-save' },
-        ]
-    },
-    
-    {
-        id: 'template-approval-flow',
-        name: 'Good Manufacturing Practices (GMP) report',
-        description: 'Read auditor observations, manufacturing process data, and products information to generate a GMP report and its CAPAs (Corrective and Preventive Actions).',
-        category: 'Compliance',
-        nodes: [
-            { id: 't3-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
-            { id: 't3-input', type: 'manualInput', label: 'Request Details', x: 300, y: 200, config: { inputVarName: 'request', inputVarValue: '' } },
-            { id: 't3-approval', type: 'humanApproval', label: 'Manager Approval', x: 500, y: 200 },
-            { id: 't3-approved', type: 'output', label: 'Approved Output', x: 700, y: 100 },
-            { id: 't3-rejected', type: 'output', label: 'Rejected Output', x: 700, y: 300 },
-        ],
-        connections: [
-            { id: 'c3-1', fromNodeId: 't3-trigger', toNodeId: 't3-input' },
-            { id: 'c3-2', fromNodeId: 't3-input', toNodeId: 't3-approval' },
-            { id: 'c3-3', fromNodeId: 't3-approval', toNodeId: 't3-approved', outputType: 'true' },
-            { id: 'c3-4', fromNodeId: 't3-approval', toNodeId: 't3-rejected', outputType: 'false' },
-        ]
-    },
-    {
-        id: 'template-approval-flow-2',
-        name: 'Regulatory compliance reporting',
-        description: 'Read regulations, reporting request, and automate the reporting of assets and activities to ensure compliance with regulations and standards.',
-        category: 'Compliance',
-        nodes: [
-            { id: 't3-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
-            { id: 't3-input', type: 'manualInput', label: 'Request Details', x: 300, y: 200, config: { inputVarName: 'request', inputVarValue: '' } },
-            { id: 't3-approval', type: 'humanApproval', label: 'Manager Approval', x: 500, y: 200 },
-            { id: 't3-approved', type: 'output', label: 'Approved Output', x: 700, y: 100 },
-            { id: 't3-rejected', type: 'output', label: 'Rejected Output', x: 700, y: 300 },
-        ],
-        connections: [
-            { id: 'c3-1', fromNodeId: 't3-trigger', toNodeId: 't3-input' },
-            { id: 'c3-2', fromNodeId: 't3-input', toNodeId: 't3-approval' },
-            { id: 'c3-3', fromNodeId: 't3-approval', toNodeId: 't3-approved', outputType: 'true' },
-            { id: 'c3-4', fromNodeId: 't3-approval', toNodeId: 't3-rejected', outputType: 'false' },
-        ]
-    },
-    {
-        id: 'template-data-merge',
-        name: 'What-if scenario analysis for production optimization',
-        description: 'Combine data from two different sources into a unified dataset.',
-        category: 'Process Optimization',
-        nodes: [
-            { id: 't4-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 250 },
-            { id: 't4-fetch1', type: 'fetchData', label: 'Source A', x: 300, y: 150 },
-            { id: 't4-fetch2', type: 'fetchData', label: 'Source B', x: 300, y: 350 },
-            { id: 't4-join', type: 'join', label: 'Merge Data', x: 550, y: 250, config: { joinStrategy: 'concat' } },
-            { id: 't4-output', type: 'output', label: 'Combined Output', x: 750, y: 250 },
-        ],
-        connections: [
-            { id: 'c4-1', fromNodeId: 't4-trigger', toNodeId: 't4-fetch1' },
-            { id: 'c4-2', fromNodeId: 't4-trigger', toNodeId: 't4-fetch2' },
-            { id: 'c4-3', fromNodeId: 't4-fetch1', toNodeId: 't4-join', inputPort: 'A' },
-            { id: 'c4-4', fromNodeId: 't4-fetch2', toNodeId: 't4-join', inputPort: 'B' },
-            { id: 'c4-5', fromNodeId: 't4-join', toNodeId: 't4-output' },
-        ]
-    },
-    {
-        id: 'template-api-integration',
-        name: 'Energy costs reduction Agent',
-        description: 'Personalized recommendations for reducing energy costs while maintaining the same quality of products and services.',
-        category: 'Process Optimization',
-        nodes: [
-            { id: 't5-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
-            { id: 't5-http', type: 'http', label: 'API Request', x: 300, y: 200, config: { httpUrl: 'https://api.example.com/data' } },
-            { id: 't5-python', type: 'python', label: 'Transform Data', x: 500, y: 200, config: { pythonCode: '# Transform the API response\nresult = input_data' } },
-            { id: 't5-save', type: 'saveRecords', label: 'Save to DB', x: 700, y: 200 },
-            { id: 't5-output', type: 'output', label: 'Show Results', x: 900, y: 200 },
-        ],
-        connections: [
-            { id: 'c5-1', fromNodeId: 't5-trigger', toNodeId: 't5-http' },
-            { id: 'c5-2', fromNodeId: 't5-http', toNodeId: 't5-python' },
-            { id: 'c5-3', fromNodeId: 't5-python', toNodeId: 't5-save' },
-            { id: 'c5-4', fromNodeId: 't5-save', toNodeId: 't5-output' },
-        ]
-    },
-    {
-        id: 'template-email-notification',
-        name: 'Real-time plastic quality prediction',
-        description: 'Usage of manufacturing sensor data to calculate plastic properties every 5 minutes to ensure the quality control and send alerts when deviations occur.',
-        category: 'Quality Assurance',
-        nodes: [
-            { id: 't6-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
-            { id: 't6-fetch', type: 'fetchData', label: 'Fetch Records', x: 300, y: 200 },
-            { id: 't6-condition', type: 'condition', label: 'Check Condition', x: 500, y: 200, config: { processingMode: 'batch' } },
-            { id: 't6-email', type: 'sendEmail', label: 'Send Alert', x: 700, y: 100 },
-            { id: 't6-output', type: 'output', label: 'Log Status', x: 700, y: 300 },
-        ],
-        connections: [
-            { id: 'c6-1', fromNodeId: 't6-trigger', toNodeId: 't6-fetch' },
-            { id: 'c6-2', fromNodeId: 't6-fetch', toNodeId: 't6-condition' },
-            { id: 'c6-3', fromNodeId: 't6-condition', toNodeId: 't6-email', outputType: 'true' },
-            { id: 'c6-4', fromNodeId: 't6-condition', toNodeId: 't6-output', outputType: 'false' },
-        ]
-    },
-    {
-        id: 'template-email-notification-2',
-        name: 'Pharmaceutical batch release validation',
-        description: 'Automated analysis of production process data and batch record documentation to approve or reject the release of a pharmaceutical products ensuring compliance with regulations and standards.',
-        category: 'Quality Assurance',
-        nodes: [
-            { id: 't6-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
-            { id: 't6-fetch', type: 'fetchData', label: 'Fetch Records', x: 300, y: 200 },
-            { id: 't6-condition', type: 'condition', label: 'Check Condition', x: 500, y: 200, config: { processingMode: 'batch' } },
-            { id: 't6-email', type: 'sendEmail', label: 'Send Alert', x: 700, y: 100 },
-            { id: 't6-output', type: 'output', label: 'Log Status', x: 700, y: 300 },
-        ],
-        connections: [
-            { id: 'c6-1', fromNodeId: 't6-trigger', toNodeId: 't6-fetch' },
-            { id: 'c6-2', fromNodeId: 't6-fetch', toNodeId: 't6-condition' },
-            { id: 'c6-3', fromNodeId: 't6-condition', toNodeId: 't6-email', outputType: 'true' },
-            { id: 'c6-4', fromNodeId: 't6-condition', toNodeId: 't6-output', outputType: 'false' },
-        ]
-    },
-    {
-        id: 'template-email-notification-3',
-        name: 'Classification of deviations and feedbacks for prioritization',
-        description: 'Automated collection and analysis of reclamations and feedbacks to classify them into categories and prioritize them for further action.',
-        category: 'Quality Assurance',
-        nodes: [
-            { id: 't6-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
-            { id: 't6-fetch', type: 'fetchData', label: 'Fetch Records', x: 300, y: 200 },
-            { id: 't6-condition', type: 'condition', label: 'Check Condition', x: 500, y: 200, config: { processingMode: 'batch' } },
-            { id: 't6-email', type: 'sendEmail', label: 'Send Alert', x: 700, y: 100 },
-            { id: 't6-output', type: 'output', label: 'Log Status', x: 700, y: 300 },
-        ],
-        connections: [
-            { id: 'c6-1', fromNodeId: 't6-trigger', toNodeId: 't6-fetch' },
-            { id: 'c6-2', fromNodeId: 't6-fetch', toNodeId: 't6-condition' },
-            { id: 'c6-3', fromNodeId: 't6-condition', toNodeId: 't6-email', outputType: 'true' },
-            { id: 'c6-4', fromNodeId: 't6-condition', toNodeId: 't6-output', outputType: 'false' },
-        ]
-    },
-];
 
 interface WorkflowsProps {
     entities: any[];
@@ -4466,15 +4042,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
     const getNodeColor = (type: string, status?: string) => {
         // Todos los nodos tienen el mismo estilo base - diseño consistente y limpio
-        const baseStyle = 'bg-white text-slate-900';
+        const baseStyle = 'bg-[var(--bg-card)] text-[var(--text-primary)]';
         
         if (status === 'completed') return `${baseStyle} border-2 border-green-200 shadow-md`;
-        if (status === 'running') return `${baseStyle} border border-slate-200 shadow-md`;
+        if (status === 'running') return `${baseStyle} border border-[var(--border-light)] shadow-md`;
         if (status === 'error') return `${baseStyle} border border-red-100 shadow-md`;
-        if (status === 'waiting') return `${baseStyle} border border-slate-200 shadow-md`;
+        if (status === 'waiting') return `${baseStyle} border border-[var(--border-light)] shadow-md`;
 
         // Idle/not executed nodes - diseño consistente
-        return `${baseStyle} border border-slate-200 shadow-sm`;
+        return `${baseStyle} border border-[var(--border-light)] shadow-sm`;
     };
 
     // Función para verificar si un nodo está configurado
@@ -4591,12 +4167,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         switch (type) {
             case 'trigger': return 'text-cyan-600';
             case 'action': return 'text-blue-600';
-            case 'condition': return 'text-slate-600';
+            case 'condition': return 'text-[var(--text-secondary)]';
             case 'fetchData': return 'text-indigo-600';
             case 'humanApproval': return 'text-sky-600';
             case 'addField': return 'text-indigo-600';
             case 'saveRecords': return 'text-blue-600';
-            case 'llm': return 'text-slate-600';
+            case 'llm': return 'text-[var(--text-secondary)]';
             case 'python': return 'text-sky-600';
             case 'manualInput': return 'text-indigo-600';
             case 'output': return 'text-indigo-600';
@@ -4620,7 +4196,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'agent': return 'text-purple-600';
             case 'opcua': return 'text-indigo-600';
             case 'mqtt': return 'text-cyan-600';
-            default: return 'text-slate-600';
+            default: return 'text-[var(--text-secondary)]';
         }
     };
 
@@ -4633,19 +4209,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // Function to get subtle colors for each category
     const getCategoryColors = (categoryName: string): { bg: string; hover: string } => {
         const colorMap: { [key: string]: { bg: string; hover: string } } = {
-            'Recents': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
-            'Triggers': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
-            'Data Sources': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
-            'Data Operations': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
-            'Control Flow': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
-            'Models': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
-            'Agents': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
-            'Code': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
-            'Output & Logging': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
-            'Notifications': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
-            'Advanced': { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' },
+            'Recents': { bg: 'bg-[var(--bg-primary)]', hover: 'hover:bg-[var(--bg-hover)]' },
+            'Triggers': { bg: 'bg-[var(--bg-primary)]', hover: 'hover:bg-[var(--bg-hover)]' },
+            'Data Sources': { bg: 'bg-[var(--bg-primary)]', hover: 'hover:bg-[var(--bg-hover)]' },
+            'Data Operations': { bg: 'bg-[var(--bg-primary)]', hover: 'hover:bg-[var(--bg-hover)]' },
+            'Control Flow': { bg: 'bg-[var(--bg-primary)]', hover: 'hover:bg-[var(--bg-hover)]' },
+            'Models': { bg: 'bg-[var(--bg-primary)]', hover: 'hover:bg-[var(--bg-hover)]' },
+            'Agents': { bg: 'bg-[var(--bg-primary)]', hover: 'hover:bg-[var(--bg-hover)]' },
+            'Code': { bg: 'bg-[var(--bg-primary)]', hover: 'hover:bg-[var(--bg-hover)]' },
+            'Output & Logging': { bg: 'bg-[var(--bg-tertiary)]', hover: 'hover:bg-[var(--bg-hover)]' },
+            'Notifications': { bg: 'bg-[var(--bg-tertiary)]', hover: 'hover:bg-[var(--bg-hover)]' },
+            'Advanced': { bg: 'bg-[var(--bg-tertiary)]', hover: 'hover:bg-[var(--bg-hover)]' },
         };
-        return colorMap[categoryName] || { bg: 'bg-slate-50', hover: 'hover:bg-slate-100' };
+        return colorMap[categoryName] || { bg: 'bg-[var(--bg-tertiary)]', hover: 'hover:bg-[var(--bg-hover)]' };
     };
 
     // Get all unique tags from workflows
@@ -4674,20 +4250,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     }, [workflowSearchQuery, selectedTagFilter]);
 
     return (
-        <div className="flex flex-col bg-slate-50" data-tutorial="workflows-content" style={{ height: '100%', maxHeight: '100vh', overflow: 'hidden' }}>
+        <div className="flex flex-col bg-[var(--bg-primary)]" data-tutorial="workflows-content" style={{ height: '100%', maxHeight: '100vh', overflow: 'hidden' }}>
             {currentView === 'list' ? (
                 /* Workflows List View */
                 <>
                     {/* Top Header */}
-                    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
-                        <div>
-                            <h1 className="text-lg font-normal text-slate-900">Workflows</h1>
-                            <p className="text-[11px] text-slate-500">Manage and execute your automation workflows</p>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                            <ProfileMenu onNavigate={onViewChange} />
-                        </div>
-                    </header>
+                    <PageHeader title="Workflows" subtitle="Manage and execute your automation workflows" />
 
                     {/* Content Area */}
                     <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
@@ -4695,23 +4263,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-4">
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={14} weight="light" />
                                     <input
                                         type="text"
                                         placeholder="Search workflows..."
                                         value={workflowSearchQuery}
                                         onChange={(e) => setWorkflowSearchQuery(e.target.value)}
-                                        className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 w-60 placeholder:text-slate-400"
+                                        className="pl-8 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] w-60 placeholder:text-[var(--text-tertiary)]"
                                     />
                                 </div>
                                 {/* Tag Filter */}
                                 {allTags.length > 0 && (
                                     <div className="relative">
-                                        <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                        <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={14} weight="light" />
                                         <select
                                             value={selectedTagFilter || ''}
                                             onChange={(e) => setSelectedTagFilter(e.target.value || null)}
-                                            className="pl-8 pr-8 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 appearance-none cursor-pointer"
+                                            className="pl-8 pr-8 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] appearance-none cursor-pointer"
                                         >
                                             <option value="">All Tags</option>
                                             {allTags.map(tag => (
@@ -4721,30 +4289,30 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         {selectedTagFilter && (
                                             <button
                                                 onClick={() => setSelectedTagFilter(null)}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                                             >
-                                                <X size={12} />
+                                                <X size={12} weight="light" />
                                             </button>
                                         )}
                                     </div>
                                 )}
-                                <p className="text-sm text-slate-500">
+                                <p className="text-sm text-[var(--text-secondary)]">
                                     {filteredWorkflows.length} {filteredWorkflows.length === 1 ? 'workflow' : 'workflows'}
                                 </p>
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => setShowTemplatesModal(true)}
-                                    className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                    className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                 >
-                                    <BookOpen size={14} className="mr-2" />
+                                    <BookOpen size={14} className="mr-2" weight="light" />
                                     Open Templates
                                 </button>
                                 <button
                                     onClick={createNewWorkflow}
-                                    className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                    className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                                 >
-                                    <Workflow size={14} className="mr-2" />
+                                    <Workflow size={14} className="mr-2" weight="light" />
                                     Create Workflow
                                 </button>
                             </div>
@@ -4756,16 +4324,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <div
                                 key={workflow.id}
                                 onClick={() => openWorkflow(workflow.id)}
-                                className="bg-white border border-slate-200 rounded-lg p-5 cursor-pointer group relative flex flex-col justify-between min-h-[200px]"
+                                className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 cursor-pointer group relative flex flex-col justify-between min-h-[200px] transition-all duration-300 ease-out hover:shadow-md hover:border-[var(--border-medium)] hover:scale-[1.01] active:scale-[0.99]"
                             >
                                 <div className="flex-1">
                                     <div className="flex items-start justify-between mb-3">
                                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                                            <div className="p-2.5 bg-slate-50 rounded-lg flex-shrink-0 group-hover:bg-slate-100 transition-colors">
-                                                <Workflow size={18} className="text-slate-600" />
+                                            <div className="p-2.5 bg-[var(--bg-tertiary)] rounded-lg flex-shrink-0 group-hover:bg-[var(--bg-hover)] transition-colors">
+                                                <Workflow size={18} className="text-[var(--text-secondary)]" weight="light" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <h3 className="text-base font-normal text-slate-900 group-hover:text-slate-700 transition-colors truncate">
+                                                <h3 className="text-base font-normal text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors truncate">
                                                     {workflow.name}
                                                 </h3>
                                                 {/* Tags - directly below title */}
@@ -4774,7 +4342,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         {workflow.tags.map((tag: string, idx: number) => (
                                                             <span
                                                                 key={idx}
-                                                                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                                                                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-light)]"
                                                             >
                                                                 {tag}
                                                             </span>
@@ -4788,28 +4356,28 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 e.stopPropagation();
                                                 deleteWorkflow(workflow.id);
                                             }}
-                                            className="text-slate-300 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                            className="text-[var(--text-tertiary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
                                         >
-                                            <Trash2 size={16} />
+                                            <Trash size={16} weight="light" />
                                         </button>
                                     </div>
 
-                                    <div className="space-y-2 mt-5 pt-4 border-t border-slate-100">
-                                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                                            <User size={12} className="text-slate-400 flex-shrink-0" />
-                                            <span className="text-slate-600">{workflow.createdByName || 'Unknown'}</span>
+                                    <div className="space-y-2 mt-5">
+                                        <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                            <User size={12} className="text-[var(--text-tertiary)] flex-shrink-0" weight="light" />
+                                            <span className="text-[var(--text-secondary)]">{workflow.createdByName || 'Unknown'}</span>
                                         </div>
-                                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                                            <Calendar size={12} className="text-slate-400 flex-shrink-0" />
-                                            <span className="text-slate-600">{workflow.createdAt ? new Date(workflow.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Unknown'}</span>
+                                        <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                            <Calendar size={12} className="text-[var(--text-tertiary)] flex-shrink-0" weight="light" />
+                                            <span className="text-[var(--text-secondary)]">{workflow.createdAt ? new Date(workflow.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Unknown'}</span>
                                         </div>
                                         {workflow.updatedAt && (
-                                            <div className="flex items-center gap-2 text-xs text-slate-500">
-                                                <Clock size={12} className="text-slate-400 flex-shrink-0" />
-                                                <span className="text-slate-600">
+                                            <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                <Clock size={12} className="text-[var(--text-tertiary)] flex-shrink-0" weight="light" />
+                                                <span className="text-[var(--text-secondary)]">
                                                     Edited {workflow.updatedAt ? new Date(workflow.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Never'}
                                                     {workflow.lastEditedByName && (
-                                                        <span className="text-slate-400"> by {workflow.lastEditedByName}</span>
+                                                        <span className="text-[var(--text-tertiary)]"> by {workflow.lastEditedByName}</span>
                                                     )}
                                                 </span>
                                             </div>
@@ -4817,10 +4385,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </div>
                                 </div>
 
-                                <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-100">
-                                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                                        <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        <span className="opacity-0 group-hover:opacity-100 transition-opacity font-medium text-slate-600">Open workflow</span>
+                                <div className="flex items-center justify-between mt-5">
+                                    <div className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary)]">
+                                        <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" weight="light" />
+                                        <span className="opacity-0 group-hover:opacity-100 transition-opacity font-medium text-[var(--text-secondary)]">Open workflow</span>
                                     </div>
                                 </div>
                             </div>
@@ -4830,16 +4398,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         <div
                             data-tutorial="create-workflow"
                             onClick={createNewWorkflow}
-                            className="border border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center min-h-[200px] text-slate-400 cursor-pointer group"
+                            className="border border-dashed border-[var(--border-medium)] rounded-lg flex flex-col items-center justify-center min-h-[200px] text-[var(--text-tertiary)] cursor-pointer group"
                         >
-                            <div className="p-4 bg-slate-100 rounded-full mb-3">
-                                <Workflow size={24} />
+                            <div className="p-4 bg-[var(--bg-tertiary)] rounded-full mb-3">
+                                <Workflow size={24} weight="light" />
                             </div>
                             <span className="font-medium">Create new workflow</span>
                         </div>
 
                         {filteredWorkflows.length === 0 && workflowSearchQuery !== '' && (
-                            <div className="col-span-full text-center py-12 text-slate-500">
+                            <div className="col-span-full text-center py-12 text-[var(--text-secondary)]">
                                 No workflows found matching "{workflowSearchQuery}"
                             </div>
                         )}
@@ -4863,21 +4431,21 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 /* Canvas View */
                 <div data-tutorial="workflow-editor" className="flex flex-col min-h-0 overflow-hidden" style={{ height: '100%', maxHeight: '100%' }}>
                     {/* Top Bar */}
-                    <div className="bg-white border-b border-slate-200 px-6 py-2 flex items-center justify-between shadow-sm z-20 shrink-0">
+                    <div className="bg-[var(--bg-card)] border-b border-[var(--border-light)] px-6 py-2 flex items-center justify-between shadow-sm z-20 shrink-0">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                             <button
                                 onClick={backToList}
-                                className="flex items-center gap-2 px-3 py-2 hover:bg-slate-100 rounded-lg transition-colors text-sm font-medium text-slate-600 flex-shrink-0"
+                                className="flex items-center gap-2 px-3 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-sm font-medium text-[var(--text-secondary)] flex-shrink-0"
                             >
-                                <ArrowLeft size={18} />
+                                <ArrowLeft size={18} weight="light" />
                                 Back
                             </button>
-                            <div className="h-6 w-px bg-slate-300 flex-shrink-0"></div>
+                            <div className="h-6 w-px bg-[var(--border-medium)] flex-shrink-0"></div>
                             <input
                                 type="text"
                                 value={workflowName}
                                 onChange={(e) => setWorkflowName(e.target.value)}
-                                className="text-lg font-normal text-slate-700 bg-transparent border-none focus:outline-none flex-1 min-w-0"
+                                className="text-lg font-normal text-[var(--text-primary)] bg-transparent border-none focus:outline-none flex-1 min-w-0"
                                 placeholder="Workflow Name"
                             />
                         </div>
@@ -4885,10 +4453,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <button
                                 onClick={() => setShowTagsModal(true)}
                                 disabled={!currentWorkflowId}
-                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                                className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors disabled:opacity-50"
                                 title="Manage Tags"
                             >
-                                <Tag size={18} className="text-slate-600" />
+                                <Tag size={18} className="text-[var(--text-secondary)]" weight="light" />
                             </button>
                             {/* Auto-save indicator */}
                             {autoSaveStatus && (
@@ -4896,11 +4464,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     {autoSaveStatus === 'saving' ? (
                                         <>
                                             <span className="animate-spin">⟳</span>
-                                            <span className="text-slate-600">Saving...</span>
+                                            <span className="text-[var(--text-secondary)]">Saving...</span>
                                         </>
                                     ) : (
                                         <>
-                                            <CheckCircle size={14} className="text-emerald-600" />
+                                            <CheckCircle size={14} className="text-emerald-600" weight="light" />
                                             <span className="text-emerald-600">Saved</span>
                                         </>
                                     )}
@@ -4909,74 +4477,72 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <button
                                 onClick={saveWorkflow}
                                 disabled={isSaving}
-                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                                className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors disabled:opacity-50"
                                 title="Save (Ctrl+S)"
                             >
-                                {isSaving ? <span className="animate-spin">⟳</span> : <Save size={18} className="text-slate-600" />}
+                                {isSaving ? <span className="animate-spin">⟳</span> : <Save size={18} className="text-[var(--text-secondary)]" weight="light" />}
                             </button>
                             <button
                                 onClick={openExecutionHistory}
                                 disabled={!currentWorkflowId}
-                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                                className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors disabled:opacity-50"
                                 title="History"
                             >
-                                <History size={18} className="text-slate-600" />
+                                <History size={18} className="text-[var(--text-secondary)]" weight="light" />
                             </button>
                             <button
                                 onClick={runWorkflow}
                                 disabled={isRunning || nodes.length === 0}
-                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
+                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
                             >
-                                <Play size={16} />
+                                <Play size={16} weight="light" />
                                 {isRunning ? 'Running...' : 'Run'}
                             </button>
                             <button
                                 onClick={openWorkflowRunner}
                                 disabled={nodes.length === 0}
-                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed gap-2"
+                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed gap-2"
                             >
-                                <Share2 size={16} />
+                                <Share2 size={16} weight="light" />
                                 Export
                             </button>
-                            <div className="h-6 w-px bg-slate-300 mx-2"></div>
-                            <ProfileMenu onNavigate={onViewChange} />
                         </div>
                     </div>
 
                     {/* Content Area (Sidebar + Canvas) */}
                     <div ref={contentAreaRef} className="flex flex-1 min-h-0 overflow-hidden" style={{ height: '100%', maxHeight: '100%' }}>
                     {/* Sidebar */}
-                    <div ref={sidebarRef} data-tutorial="node-palette" className={`${isSidebarCollapsed ? 'w-14' : 'w-64'} bg-slate-50 border-r border-slate-200 flex flex-col shadow-sm z-10 transition-all duration-300 overflow-hidden`} style={{ height: '100%', maxHeight: '100%' }}>
+                    <div ref={sidebarRef} data-tutorial="node-palette" className={`${isSidebarCollapsed ? 'w-14' : 'w-64'} bg-[var(--bg-tertiary)] border-r border-[var(--border-light)] flex flex-col shadow-sm z-10 transition-all duration-300 overflow-hidden`} style={{ height: '100%', maxHeight: '100%' }}>
 
                         {!isSidebarCollapsed ? (
                             <>
-                                <div className="p-4 border-b border-slate-200 bg-white shrink-0">
+                                <div className="p-4 border-b border-[var(--border-light)] bg-[var(--bg-card)] shrink-0">
                                     {/* Header */}
                                     <div className="flex items-center justify-between mb-4">
-                                        <h2 className="text-sm font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Components</h2>
+                                        <h2 className="text-sm font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Components</h2>
                                         <button
                                             onClick={() => setIsSidebarCollapsed(true)}
-                                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
+                                            className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors"
                                             title="Collapse panel"
                                         >
-                                            <ChevronsLeft size={16} />
+                                            <ChevronsLeft size={16} weight="light" />
                                         </button>
                                     </div>
 
                                     {/* Search */}
                                     <div className="relative mb-3">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={14} weight="light" />
                                         <input
                                             type="text"
                                             placeholder="Search"
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-slate-400"
+                                            className="w-full pl-9 pr-4 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-[var(--text-tertiary)]"
                                         />
                                     </div>
                                 </div>
 
-                                <div ref={sidebarScrollRef} className="flex-1 overflow-y-auto bg-white custom-scrollbar" style={{ minHeight: 0, height: 0, flex: '1 1 0%' }}>
+                                <div ref={sidebarScrollRef} className="flex-1 overflow-y-auto bg-[var(--bg-card)] custom-scrollbar" style={{ minHeight: 0, height: 0, flex: '1 1 0%' }}>
                                     {/* Folder Structure */}
                                     {(() => {
                                         // Organize items into folders - reorganized for better clarity
@@ -5031,7 +4597,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             if (filteredFolderItems.length === 0 && searchQuery !== '') return null;
 
                                             return (
-                                                <div key={folderName} className="border-b border-slate-100">
+                                                <div key={folderName} className="border-b border-[var(--border-light)]">
                                                     {/* Folder Header */}
                                                     <button
                                                         onClick={() => {
@@ -5046,13 +4612,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         className={`w-full flex items-center justify-between px-4 py-2 ${getCategoryColors(folderName).bg} ${getCategoryColors(folderName).hover} transition-colors text-left`}
                                                     >
                                                         <div className="flex items-center gap-2.5">
-                                                            <folder.icon size={14} className="text-slate-600 flex-shrink-0" />
-                                                            <span className="text-xs font-medium text-slate-900">{folderName}</span>
+                                                            {React.createElement(folder.icon, { size: 14, className: "text-[var(--text-secondary)] flex-shrink-0", weight: "light" })}
+                                                            <span className="text-xs font-medium text-[var(--text-primary)]">{folderName}</span>
                                                         </div>
                                                         {isExpanded ? (
-                                                            <ChevronDown size={12} className="text-slate-400 flex-shrink-0" />
+                                                            <ChevronDown size={12} className="text-[var(--text-tertiary)] flex-shrink-0" weight="light" />
                                                         ) : (
-                                                            <ChevronRight size={12} className="text-slate-400 flex-shrink-0" />
+                                                            <ChevronRight size={12} className="text-[var(--text-tertiary)] flex-shrink-0" weight="light" />
                                                         )}
                                                     </button>
 
@@ -5064,10 +4630,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     key={item.label}
                                                                     draggable
                                                                     onDragStart={(e) => handleDragStart(e, item)}
-                                                                    className="flex items-center gap-2.5 px-4 py-1.5 pl-8 hover:bg-slate-50 cursor-grab transition-colors group"
+                                                                    className="flex items-center gap-2.5 px-4 py-1.5 pl-8 hover:bg-[var(--bg-tertiary)] cursor-grab transition-colors group"
                                                                 >
-                                                                    <item.icon size={13} className={`${getNodeIconColor(item.type)} flex-shrink-0`} />
-                                                                    <span className="text-xs text-slate-700 group-hover:text-slate-900 transition-colors">{item.label}</span>
+                                                                    {React.createElement(item.icon, { size: 13, className: `${getNodeIconColor(item.type)} flex-shrink-0`, weight: "light" })}
+                                                                    <span className="text-xs text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors">{item.label}</span>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -5081,13 +4647,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         ) : (
                             /* Collapsed view - icons only */
                             <>
-                                <div className="p-2 border-b border-slate-200 bg-white flex justify-center">
+                                <div className="p-2 border-b border-[var(--border-light)] bg-[var(--bg-card)] flex justify-center">
                                     <button
                                         onClick={() => setIsSidebarCollapsed(false)}
-                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
+                                        className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors"
                                         title="Expand panel"
                                     >
-                                        <ChevronsRight size={18} />
+                                        <ChevronsRight size={18} weight="light" />
                                     </button>
                                 </div>
                                 <div className="flex-1 overflow-y-auto py-2 space-y-1.5 custom-scrollbar" style={{ minHeight: 0, height: 0, flex: '1 1 0%' }}>
@@ -5096,15 +4662,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             key={item.label}
                                             draggable
                                             onDragStart={(e) => handleDragStart(e, item)}
-                                            className="mx-2 p-1.5 bg-white border border-slate-200 rounded-md shadow-sm cursor-grab group flex items-center justify-center"
+                                            className="mx-2 p-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md shadow-sm cursor-grab group flex items-center justify-center"
                                             title={item.label}
                                         >
                                             <div className={`p-1 rounded ${item.category === 'Triggers' ? 'bg-cyan-100 text-cyan-700' :
                                                 item.category === 'Data' ? 'bg-indigo-100 text-indigo-700' :
-                                                    item.category === 'Logic' ? 'bg-slate-100 text-slate-700' :
+                                                    item.category === 'Logic' ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]' :
                                                         'bg-blue-100 text-blue-700'
                                                 }`}>
-                                                <item.icon size={16} />
+                                                {React.createElement(item.icon, { size: 16, weight: "light" })}
                                             </div>
                                         </div>
                                     ))}
@@ -5114,11 +4680,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     </div>
 
                     {/* Canvas */}
-                    <div data-tutorial="workflow-canvas" className="flex-1 flex flex-col relative overflow-hidden bg-slate-50">
+                    <div data-tutorial="workflow-canvas" className="flex-1 flex flex-col relative overflow-hidden bg-[var(--bg-primary)]">
                         {/* Canvas Area */}
-                        <div className="flex-1 relative overflow-hidden" style={{ 
-                            background: 'radial-gradient(ellipse at center, #fafbfc 0%, #f8fafc 100%)'
-                        }}>
+                        <div className="flex-1 relative overflow-hidden bg-[var(--bg-secondary)]">
 
                         <div
                             ref={canvasRef}
@@ -5228,61 +4792,62 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             })}
                             
                             {/* Canvas Controls - Centered at Bottom */}
-                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-white rounded-full shadow-sm border border-slate-200 px-4 py-2">
+                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-[var(--bg-card)] rounded-full shadow-sm border border-[var(--border-light)] px-4 py-2">
                                 {/* AI Assistant Button */}
                                 <button
                                     onClick={() => setShowAiAssistant(true)}
-                                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 rounded-lg transition-colors"
+                                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
                                     title="AI Workflow Assistant"
                                 >
-                                    <Sparkles size={16} className="text-slate-700" />
-                                    <span className="text-sm font-medium text-slate-700">Ask</span>
+                                    <Sparkles size={16} className="text-[var(--text-primary)]" weight="light" />
+                                    <span className="text-sm font-medium text-[var(--text-primary)]">Ask</span>
                                 </button>
                                 
-                                <div className="w-px h-6 bg-slate-300"></div>
+                                <div className="w-px h-6 bg-[var(--border-medium)]"></div>
                                 
                                 {/* Zoom Out */}
                                 <button
                                     onClick={() => setCanvasZoom(prev => Math.max(prev / 1.2, 0.25))}
-                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                                    className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
                                     title="Zoom Out"
                                 >
-                                    <ZoomOut size={18} className="text-slate-600" />
+                                    <ZoomOut size={18} className="text-[var(--text-secondary)]" weight="light" />
                                 </button>
                                 
                                 {/* Zoom Level */}
-                                <div className="px-3 py-1 text-sm font-medium text-slate-600 min-w-[60px] text-center">
+                                <div className="px-3 py-1 text-sm font-medium text-[var(--text-secondary)] min-w-[60px] text-center">
                                     {Math.round(canvasZoom * 100)}%
                                 </div>
                                 
                                 {/* Zoom In */}
                                 <button
                                     onClick={() => setCanvasZoom(prev => Math.min(prev * 1.2, 3))}
-                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                                    className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
                                     title="Zoom In"
                                 >
-                                    <ZoomIn size={18} className="text-slate-600" />
+                                    <ZoomIn size={18} className="text-[var(--text-secondary)]" weight="light" />
                                 </button>
                                 
-                                <div className="w-px h-6 bg-slate-300"></div>
+                                <div className="w-px h-6 bg-[var(--border-medium)]"></div>
                                 
                                 {/* Fit View */}
                                 <button
                                     onClick={resetView}
-                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                                    className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
                                     title="Fit view to screen"
                                 >
-                                    <Maximize2 size={18} className="text-slate-600" />
+                                    <Maximize2 size={18} className="text-[var(--text-secondary)]" weight="light" />
                                 </button>
                             </div>
 
                             {/* Content with transform */}
                             <div style={{
-                                transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${canvasZoom})`,
+                                transform: `translate3d(${canvasOffset.x}px, ${canvasOffset.y}px, 0) scale(${canvasZoom})`,
                                 transformOrigin: '0 0',
                                 width: '100%',
                                 height: '100%',
-                                position: 'relative'
+                                position: 'relative',
+                                willChange: isPanning || draggingNodeId ? 'transform' : 'auto',
                             }}>
                                 {/* SVG Layer for Connections */}
                                 <svg
@@ -5293,7 +4858,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         left: 0,
                                         top: 0,
                                         width: '10000px',
-                                        height: '10000px'
+                                        height: '10000px',
+                                        willChange: draggingNodeId ? 'contents' : 'auto',
                                     }}
                                 >
                                     {connections.map(conn => {
@@ -5303,16 +4869,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                         // Calculate line positions (from right of fromNode to left of toNode)
                                         // IMPORTANT: Nodes use transform: translate(-50%, -50%), so node.x and node.y are the CENTER of the node
-                                        const NODE_WIDTH = 320;
-                                        const NODE_HALF_WIDTH = NODE_WIDTH / 2; // 160px
-                                        
-                                        // Conector visual: w-5 h-5 (20px) con border-2
-                                        // El círculo visible tiene 20px de diámetro
-                                        // El contenedor tiene translate-x-1/2 o -translate-x-1/2 que mueve 50% del tamaño del contenedor
-                                        // El contenedor tiene el tamaño del círculo (20px) porque el hit area con inset-0 se ajusta al padre
-                                        // Por lo tanto, translate mueve 10px (50% de 20px)
-                                        const CONNECTOR_SIZE = 20; // w-5 h-5 = 20px (tamaño del círculo visible)
-                                        const CONNECTOR_RADIUS = CONNECTOR_SIZE / 2; // 10px (centro del círculo)
+                                        const { NODE_WIDTH, NODE_HALF_WIDTH, CONNECTOR_SIZE, CONNECTOR_RADIUS } = CANVAS_CONSTANTS;
                                         
                                         // OUTPUT CONNECTORS (right side of fromNode)
                                         // right-0 = borde derecho del nodo = node.x + 160
@@ -5320,11 +4877,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         // Centro del círculo = node.x + 160 + 10
                                         const x1 = fromNode.x + NODE_HALF_WIDTH + CONNECTOR_RADIUS;
                                         
-                                        // Calculate Y1 - connectors are positioned relative to node center
-                                        // top-1/2 = centro vertical del nodo = node.y
-                                        // -translate-y-1/2 mueve el contenedor -10px verticalmente (50% de 20px)
-                                        // Centro del círculo = node.y - 10
-                                        let y1 = fromNode.y - CONNECTOR_RADIUS;
+                                        // Calculate Y1 - connectors are positioned at vertical center
+                                        // top-1/2 + -translate-y-1/2 = centro vertical del nodo = node.y
+                                        let y1 = fromNode.y;
                                         
                                         if (fromNode.type === 'condition' || fromNode.type === 'splitColumns') {
                                             const estimatedHalfHeight = 65; // Aproximadamente 130px de altura total
@@ -5332,15 +4887,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             if ((fromNode.type === 'condition' && conn.outputType === 'true') ||
                                                 (fromNode.type === 'splitColumns' && conn.outputType === 'A')) {
                                                 // Top connector: top:28px + translate(50%, -50%)
-                                                // top:28px desde el borde superior = node.y - 65 + 28
-                                                // translate-y-1/2 mueve -10px → node.y - 65 + 28 - 10
-                                                y1 = fromNode.y - estimatedHalfHeight + 28 - CONNECTOR_RADIUS;
+                                                // Centro = node.y - halfHeight + 28
+                                                y1 = fromNode.y - estimatedHalfHeight + 28;
                                             } else if ((fromNode.type === 'condition' && conn.outputType === 'false') ||
                                                        (fromNode.type === 'splitColumns' && conn.outputType === 'B')) {
                                                 // Bottom connector: bottom:28px + translate(50%, 50%)
-                                                // bottom:28px desde el borde inferior = node.y + 65 - 28
-                                                // translate-y-1/2 mueve +10px → node.y + 65 - 28 + 10
-                                                y1 = fromNode.y + estimatedHalfHeight - 28 + CONNECTOR_RADIUS;
+                                                // Centro = node.y + halfHeight - 28
+                                                y1 = fromNode.y + estimatedHalfHeight - 28;
                                             }
                                         }
                                         
@@ -5350,31 +4903,29 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         // Centro del círculo = node.x - 160 - 10
                                         const x2 = toNode.x - NODE_HALF_WIDTH - CONNECTOR_RADIUS;
                                         
-                                        // Calculate Y2
-                                        // top-1/2 = centro vertical del nodo = node.y
-                                        // -translate-y-1/2 mueve el contenedor -10px verticalmente (50% de 20px)
-                                        // Centro del círculo = node.y - 10
-                                        let y2 = toNode.y - CONNECTOR_RADIUS;
+                                        // Calculate Y2 - connectors are positioned at vertical center
+                                        // top-1/2 + -translate-y-1/2 = centro vertical del nodo = node.y
+                                        let y2 = toNode.y;
                                         
                                         if (toNode.type === 'join') {
                                             const estimatedHalfHeight = 65; // Altura aproximada del nodo join / 2
                                             if (conn.inputPort === 'A') {
                                                 // Input A: top:60px + translate(-50%, -50%)
-                                                // top:60px desde el borde superior = node.y - 65 + 60
-                                                // translate-y-1/2 mueve -10px → node.y - 65 + 60 - 10
-                                                y2 = toNode.y - estimatedHalfHeight + 60 - CONNECTOR_RADIUS;
+                                                // Centro = node.y - halfHeight + 60
+                                                y2 = toNode.y - estimatedHalfHeight + 60;
                                             } else if (conn.inputPort === 'B') {
                                                 // Input B: top:90px + translate(-50%, -50%)
-                                                // top:90px desde el borde superior = node.y - 65 + 90
-                                                // translate-y-1/2 mueve -10px → node.y - 65 + 90 - 10
-                                                y2 = toNode.y - estimatedHalfHeight + 90 - CONNECTOR_RADIUS;
+                                                // Centro = node.y - halfHeight + 90
+                                                y2 = toNode.y - estimatedHalfHeight + 90;
                                             }
                                         }
 
-                                        // Control points for Bezier curve
-                                        const c1x = x1 + Math.abs(x2 - x1) / 2;
+                                        // Control points for Bezier curve - smoother curves
+                                        const dx = Math.abs(x2 - x1);
+                                        const curvature = Math.min(dx * 0.5, Math.max(80, dx * 0.4));
+                                        const c1x = x1 + curvature;
                                         const c1y = y1;
-                                        const c2x = x2 - Math.abs(x2 - x1) / 2;
+                                        const c2x = x2 - curvature;
                                         const c2y = y2;
 
                                         // Color based on running state
@@ -5453,7 +5004,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     strokeDasharray={isRunning ? "none" : "5,5"}
                                                     style={{ 
                                                         filter: isRunning ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' : 'none',
-                                                        transition: 'all 0.2s ease',
                                                         pointerEvents: 'none'
                                                     }}
                                                 />
@@ -5614,13 +5164,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             position: 'absolute',
                                             left: node.x,
                                             top: node.y,
-                                            transform: 'translate(-50%, -50%)', // Center on drop point
-                                            width: '320px', // Nodo aún más ancho para mejor legibilidad
-                                            minHeight: 'auto', // Altura mínima automática
+                                            transform: 'translate(-50%, -50%)',
+                                            width: '320px',
+                                            minHeight: 'auto',
                                             cursor: (node.data || ['fetchData', 'condition', 'addField', 'saveRecords', 'llm'].includes(node.type)) ? 'grab' : 'default',
-                                            zIndex: 10
+                                            zIndex: selectedNodeId === node.id ? 20 : 10,
+                                            willChange: draggingNodeId === node.id ? 'transform' : 'auto',
                                         }}
-                                        className={`flex flex-col rounded-xl shadow-md group relative select-none ${draggingNodeId === node.id ? '' : 'transition-all duration-200'} ${getNodeColor(node.type, node.status)} hover:shadow-lg ${node.status === 'completed' ? 'hover:border-green-300' : 'hover:border-slate-300'}`}
+                                        className={`flex flex-col rounded-xl shadow-md group relative select-none ${draggingNodeId === node.id ? '' : 'transition-shadow duration-150'} ${getNodeColor(node.type, node.status)} hover:shadow-lg ${node.status === 'completed' ? 'hover:border-green-300' : 'hover:border-[var(--border-medium)]'}`}
                                     >
                                         {/* Top Tag - Not Configured o Estado de Ejecución - Centrado arriba, sin solaparse */}
                                         {getNodeTopTag(node) && (
@@ -5632,7 +5183,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 }}
                                                 onMouseDown={(e) => e.stopPropagation()}
                                             >
-                                                {React.createElement(getNodeTopTag(node)!.icon, { size: 13 })}
+                                                {React.createElement(getNodeTopTag(node)!.icon, { size: 13, weight: "light" })}
                                                 <span className="truncate">{getNodeTopTag(node)!.label}</span>
                                             </div>
                                         )}
@@ -5647,10 +5198,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     e.stopPropagation();
                                                     handleRunNode(node.id);
                                                 }}
-                                                className="p-2 bg-white hover:bg-slate-50 rounded-lg shadow-md border border-slate-200 text-slate-600 hover:text-[#256A65] transition-all"
+                                                className="p-2 bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[#256A65] transition-all"
                                                 title="Run Node"
                                             >
-                                                <Play size={14} fill="currentColor" />
+                                                <Play size={14} fill="currentColor" weight="light" />
                                             </button>
                                             {((node.data && (Array.isArray(node.data) && node.data.length > 0 || (typeof node.data === 'object' && node.data !== null))) ||
                                               (node.inputData && (Array.isArray(node.inputData) && node.inputData.length > 0 || (typeof node.inputData === 'object' && node.inputData !== null))) ||
@@ -5661,10 +5212,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         e.stopPropagation();
                                                         setViewingDataNodeId(node.id);
                                                     }}
-                                                    className="p-2 bg-white hover:bg-slate-50 rounded-lg shadow-md border border-slate-200 text-slate-600 hover:text-slate-800 transition-all"
+                                                    className="p-2 bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
                                                     title="View Data"
                                                 >
-                                                    <Database size={14} />
+                                                    <Database size={14} weight="light" />
                                                 </button>
                                             )}
                                             <button
@@ -5672,20 +5223,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     e.stopPropagation();
                                                     duplicateNode(node.id);
                                                 }}
-                                                className="p-2 bg-white hover:bg-blue-50 rounded-lg shadow-md border border-slate-200 text-slate-600 hover:text-blue-600 transition-all"
+                                                className="p-2 bg-[var(--bg-card)] hover:bg-blue-50 rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-blue-600 transition-all"
                                                 title="Duplicate Node (Ctrl+D)"
                                             >
-                                                <Copy size={14} />
+                                                <Copy size={14} weight="light" />
                                             </button>
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     removeNode(node.id);
                                                 }}
-                                                className="p-2 bg-white hover:bg-red-50 rounded-lg shadow-md border border-slate-200 text-slate-600 hover:text-red-600 transition-all"
+                                                className="p-2 bg-[var(--bg-card)] hover:bg-red-50 rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-red-600 transition-all"
                                                 title="Delete Node"
                                             >
-                                                <X size={14} />
+                                                <X size={14} weight="light" />
                                             </button>
                                         </div>
 
@@ -5705,7 +5256,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             ));
                                                         }}
                                                         placeholder="Write a comment..."
-                                                        className="w-full p-3 text-sm bg-transparent border-none resize-none focus:outline-none text-slate-700 min-h-[60px] rounded-lg hover:bg-slate-50 transition-colors"
+                                                        className="w-full p-3 text-sm bg-transparent border-none resize-none focus:outline-none text-[var(--text-primary)] min-h-[60px] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
                                                         onClick={(e) => e.stopPropagation()}
                                                     />
                                                 </div>
@@ -5725,13 +5276,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             </div>
                                                         ) : (
                                                             <div className="p-2.5 rounded-lg flex-shrink-0 flex items-center justify-center">
-                                                                {React.createElement(getNodeIcon(node.type), { size: 20, className: getNodeIconBg(node.type) })}
+                                                                {React.createElement(getNodeIcon(node.type), { size: 20, className: getNodeIconBg(node.type), weight: "light" })}
                                                             </div>
                                                         )}
                                                         
                                                         {/* Title */}
                                                         <div className="flex-1 min-w-0">
-                                                            <h3 className="text-xl font-normal text-slate-900 break-words leading-snug" title={node.label} style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                            <h3 className="text-xl font-normal text-[var(--text-primary)] break-words leading-snug" title={node.label} style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                                                 {node.label}
                                                             </h3>
                                                         </div>
@@ -5793,7 +5344,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     openHumanApprovalConfig(node.id);
                                                                 }
                                                             }}
-                                                            className="absolute top-2 right-2 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                                            className="absolute top-2 right-2 p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
                                                             title="Configure"
                                                         >
                                                             <MoreVertical size={16} />
@@ -5802,7 +5353,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                                     {/* Human Approval Waiting UI - Sección de Datos Relevantes */}
                                                     {node.type === 'humanApproval' && node.status === 'waiting' && (
-                                                        <div className="mb-4 space-y-3 pt-4 border-t border-slate-100">
+                                                        <div className="mb-4 space-y-3 pt-4 border-t border-[var(--border-light)]">
                                                             <div className="text-xs text-orange-700 font-medium flex items-center gap-2">
                                                                 <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
                                                                 Waiting for approval...
@@ -5825,7 +5376,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     }}
                                                                     className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-1.5"
                                                                 >
-                                                                    <X size={14} />
+                                                                    <X size={14} weight="light" />
                                                                     Reject
                                                                 </button>
                                                             </div>
@@ -5837,151 +5388,163 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                         {/* Node Details - Consistent styling */}
                                         {node.type === 'fetchData' && node.config?.entityName && (
-                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
-                                                <p className="text-xs text-slate-600 break-words leading-relaxed">
+                                            <div className="px-5 pb-5 pt-4 border-t border-[var(--border-light)]">
+                                                <p className="text-xs text-[var(--text-secondary)] break-words leading-relaxed">
                                                     <span className="font-medium">{node.config.entityName}</span>
                                                     {node.data && (
-                                                        <span className="ml-2 text-slate-500">• {node.data.length} records</span>
+                                                        <span className="ml-2 text-[var(--text-secondary)]">• {node.data.length} records</span>
                                                     )}
                                                 </p>
                                             </div>
                                         )}
 
                                         {node.type === 'limsFetch' && node.config?.limsEndpoint && (
-                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
-                                                <p className="text-xs text-slate-600 break-words leading-relaxed">
+                                            <div className="px-5 pb-5 pt-4 border-t border-[var(--border-light)]">
+                                                <p className="text-xs text-[var(--text-secondary)] break-words leading-relaxed">
                                                     <span className="font-medium">Endpoint: {node.config.limsEndpoint}</span>
                                                     {node.data && (
-                                                        <span className="ml-2 text-slate-500">• {Array.isArray(node.data) ? node.data.length : 1} records</span>
+                                                        <span className="ml-2 text-[var(--text-secondary)]">• {Array.isArray(node.data) ? node.data.length : 1} records</span>
                                                     )}
                                                 </p>
                                             </div>
                                         )}
 
                                         {node.type === 'statisticalAnalysis' && node.config?.statisticalMethod && (
-                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
-                                                <p className="text-xs text-slate-600 break-words leading-relaxed">
+                                            <div className="px-5 pb-5 pt-4 border-t border-[var(--border-light)]">
+                                                <p className="text-xs text-[var(--text-secondary)] break-words leading-relaxed">
                                                     <span className="font-medium">Method: {node.config.statisticalMethod}</span>
                                                     {node.config.goldenBatchId && (
-                                                        <span className="ml-2 text-slate-500">• Golden Batch: {node.config.goldenBatchId}</span>
+                                                        <span className="ml-2 text-[var(--text-secondary)]">• Golden Batch: {node.config.goldenBatchId}</span>
                                                     )}
                                                 </p>
                                             </div>
                                         )}
 
                                         {node.type === 'alertAgent' && node.config?.alertSeverity && (
-                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
-                                                <p className="text-xs text-slate-600 break-words leading-relaxed">
+                                            <div className="px-5 pb-5 pt-4 border-t border-[var(--border-light)]">
+                                                <p className="text-xs text-[var(--text-secondary)] break-words leading-relaxed">
                                                     <span className="font-medium capitalize">Severity: {node.config.alertSeverity}</span>
                                                     {node.config.alertActions && node.config.alertActions.length > 0 && (
-                                                        <span className="ml-2 text-slate-500">• Actions: {node.config.alertActions.join(', ')}</span>
+                                                        <span className="ml-2 text-[var(--text-secondary)]">• Actions: {node.config.alertActions.join(', ')}</span>
                                                     )}
                                                 </p>
                                             </div>
                                         )}
 
                                         {node.type === 'pdfReport' && node.config?.pdfTemplate && (
-                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
-                                                <p className="text-xs text-slate-600 break-words leading-relaxed">
+                                            <div className="px-5 pb-5 pt-4 border-t border-[var(--border-light)]">
+                                                <p className="text-xs text-[var(--text-secondary)] break-words leading-relaxed">
                                                     <span className="font-medium">Template: {node.config.pdfTemplate}</span>
                                                     {node.data && node.data[0]?.pdfPath && (
-                                                        <span className="ml-2 text-slate-500">• Generated</span>
+                                                        <span className="ml-2 text-[var(--text-secondary)]">• Generated</span>
                                                     )}
                                                 </p>
                                             </div>
                                         )}
 
                                         {node.type === 'join' && (
-                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
+                                            <div className="px-5 pb-5 pt-4">
                                                 <div className="flex flex-col gap-2">
-                                                    <p className="text-xs text-slate-600 break-words leading-relaxed">
-                                                        <span className="font-medium">
+                                                    {/* Strategy info */}
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs font-medium text-[var(--text-secondary)]">
                                                             {node.config?.joinStrategy === 'mergeByKey'
-                                                                ? `${node.config?.joinType === 'outer' ? 'Outer' : 'Inner'} Join: ${node.config?.joinKey || 'key not set'}`
-                                                                : 'Strategy: Concatenate'}
+                                                                ? `${node.config?.joinType === 'outer' ? 'Outer' : 'Inner'} Join`
+                                                                : 'Concatenate'}
                                                         </span>
-                                                        {node.inputDataA && node.inputDataB && (
-                                                            <span className="ml-2 text-green-600 font-medium">• Ready</span>
+                                                        {node.config?.joinStrategy === 'mergeByKey' && node.config?.joinKey && (
+                                                            <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]">
+                                                                key: {node.config.joinKey}
+                                                            </span>
                                                         )}
-                                                        {(node.inputDataA || node.inputDataB) && !(node.inputDataA && node.inputDataB) && (
-                                                            <span className="ml-2 text-amber-500 font-medium">• Waiting {node.inputDataA ? 'B' : 'A'}</span>
-                                                        )}
-                                                    </p>
+                                                    </div>
+                                                    {/* Input status */}
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className={`w-2 h-2 rounded-full ${node.inputDataA ? 'bg-green-500' : 'bg-[var(--border-medium)]'}`} />
+                                                            <span className="text-[10px] text-[var(--text-tertiary)]">Input A</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className={`w-2 h-2 rounded-full ${node.inputDataB ? 'bg-green-500' : 'bg-[var(--border-medium)]'}`} />
+                                                            <span className="text-[10px] text-[var(--text-tertiary)]">Input B</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
 
                                         {node.type === 'excelInput' && (
-                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
+                                            <div className="px-5 pb-5 pt-4 border-t border-[var(--border-light)]">
                                                 {node.config?.fileName ? (
                                                     <div className="flex flex-col gap-1.5">
-                                                        <p className="text-xs text-slate-600 font-medium break-words" title={node.config.fileName}>
+                                                        <p className="text-xs text-[var(--text-secondary)] font-medium break-words" title={node.config.fileName}>
                                                             {node.config.fileName}
                                                         </p>
-                                                        <p className="text-xs text-slate-400">
+                                                        <p className="text-xs text-[var(--text-tertiary)]">
                                                             {node.config.rowCount} rows • {node.config.headers?.length || 0} cols
                                                         </p>
                                                     </div>
                                                 ) : (
-                                                    <p className="text-xs text-slate-400 italic">Click to upload file</p>
+                                                    <p className="text-xs text-[var(--text-tertiary)] italic">Click to upload file</p>
                                                 )}
                                             </div>
                                         )}
 
                                         {node.type === 'condition' && (
-                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
+                                            <div className="px-5 pb-5 pt-4 border-t border-[var(--border-light)]">
                                                 {node.config?.conditionField ? (
                                                     <div className="flex flex-col gap-2">
-                                                        <p className="text-xs text-slate-600 break-words leading-relaxed">
+                                                        <p className="text-xs text-[var(--text-secondary)] break-words leading-relaxed">
                                                             <span className="font-medium">{node.config.conditionField}</span> {node.config.conditionOperator} <span className="font-medium">{node.config.conditionValue || ''}</span>
                                                         </p>
-                                                        <span className={`text-[10px] px-2.5 py-1 rounded-full w-fit font-medium ${node.config.processingMode === 'perRow' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+                                                        <span className={`text-[10px] px-2.5 py-1 rounded-full w-fit font-medium ${node.config.processingMode === 'perRow' ? 'bg-[var(--bg-tertiary)] text-amber-600 border border-[var(--border-light)]' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]'}`}>
                                                             {node.config.processingMode === 'perRow' ? 'Per Row' : 'Batch'}
                                                         </span>
                                                     </div>
                                                 ) : (
-                                                    <p className="text-xs text-slate-400 italic">Not configured</p>
+                                                    <p className="text-xs text-[var(--text-tertiary)] italic">Not configured</p>
                                                 )}
                                             </div>
                                         )}
 
                                         {node.type === 'splitColumns' && (
-                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
+                                            <div className="px-5 pb-5 pt-4 border-t border-[var(--border-light)]">
                                                 {(node.config?.columnsOutputA?.length || 0) > 0 || (node.config?.columnsOutputB?.length || 0) > 0 ? (
                                                     <div className="flex flex-col gap-1.5">
-                                                        <p className="text-xs text-slate-600 break-words">
+                                                        <p className="text-xs text-[var(--text-secondary)] break-words">
                                                             <span className="font-medium text-blue-600">A:</span> {node.config?.columnsOutputA?.length || 0} cols
                                                         </p>
-                                                        <p className="text-xs text-slate-600 break-words">
+                                                        <p className="text-xs text-[var(--text-secondary)] break-words">
                                                             <span className="font-medium text-purple-600">B:</span> {node.config?.columnsOutputB?.length || 0} cols
                                                         </p>
                                                     </div>
                                                 ) : (
-                                                    <p className="text-xs text-slate-400 italic">Click to configure</p>
+                                                    <p className="text-xs text-[var(--text-tertiary)] italic">Click to configure</p>
                                                 )}
                                             </div>
                                         )}
 
                                         {node.type === 'llm' && (
-                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
+                                            <div className="px-5 pb-5 pt-4 border-t border-[var(--border-light)]">
                                                 {node.config?.llmPrompt ? (
                                                     <div className="flex flex-col gap-2">
-                                                        <p className="text-xs text-slate-600 break-words leading-relaxed" title={node.config.llmPrompt}>
+                                                        <p className="text-xs text-[var(--text-secondary)] break-words leading-relaxed" title={node.config.llmPrompt}>
                                                             {node.config.llmPrompt}
                                                         </p>
-                                                        <span className={`text-[10px] px-2.5 py-1 rounded-full w-fit font-medium ${node.config.processingMode === 'perRow' ? 'bg-violet-100 text-violet-700 border border-violet-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+                                                        <span className={`text-[10px] px-2.5 py-1 rounded-full w-fit font-medium ${node.config.processingMode === 'perRow' ? 'bg-violet-100 text-violet-700 border border-violet-200' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]'}`}>
                                                             {node.config.processingMode === 'perRow' ? 'Per Row' : 'Batch'}
                                                         </span>
                                                     </div>
                                                 ) : (
-                                                    <p className="text-xs text-slate-400 italic">Not configured</p>
+                                                    <p className="text-xs text-[var(--text-tertiary)] italic">Not configured</p>
                                                 )}
                                             </div>
                                         )}
 
                                         {/* Sección 3: Errores y Estado - Al final del nodo */}
-                                        {(node.executionResult || (!isNodeConfigured(node) && node.type !== 'comment')) && (
-                                            <div className="px-5 pb-5 pt-4 border-t border-slate-100">
+                                        {/* Skip "Waiting for input" messages for join nodes since they show input status above */}
+                                        {(node.executionResult && !(node.type === 'join' && node.executionResult?.includes('Waiting for input'))) || (!isNodeConfigured(node) && node.type !== 'comment' && node.type !== 'join') ? (
+                                            <div className="px-5 pb-5 pt-4 border-t border-[var(--border-light)]">
                                                 {(() => {
                                                     // Si hay executionResult, usarlo; si no, mostrar "Not Configured"
                                                     const message = node.executionResult || 'Not Configured';
@@ -5993,18 +5556,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                           message.toLowerCase().includes('not set') ||
                                                                           message.toLowerCase().includes('click to');
                                                     
-                                                    let textColor = 'text-slate-500';
-                                                    let bgColor = 'bg-slate-50';
-                                                    let borderColor = 'border-slate-200';
+                                                    let textColor = 'text-[var(--text-secondary)]';
+                                                    let bgColor = 'bg-[var(--bg-tertiary)]';
+                                                    let borderColor = 'border-[var(--border-light)]';
                                                     
                                                     if (isError) {
                                                         textColor = 'text-red-700';
                                                         bgColor = 'bg-red-50';
                                                         borderColor = 'border-red-200';
                                                     } else if (isNotConfigured) {
-                                                        textColor = 'text-amber-700';
-                                                        bgColor = 'bg-amber-50';
-                                                        borderColor = 'border-amber-200';
+                                                        textColor = 'text-[var(--text-secondary)]';
+                                                        bgColor = 'bg-[var(--bg-tertiary)]';
+                                                        borderColor = 'border-[var(--border-light)]';
                                                     }
                                                     
                                                     return (
@@ -6016,7 +5579,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     );
                                                 })()}
                                             </div>
-                                        )}
+                                        ) : null}
 
                                         {/* Connector Points - not for comment nodes */}
                                         {node.type !== 'comment' && (
@@ -6120,7 +5683,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         {/* Larger hit area for easier clicking */}
                                                         <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" />
                                                         {/* Visible connector point */}
-                                                        <div className={`w-5 h-5 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id ? 'border-[#256A65] scale-125 bg-[#256A65]/10 shadow-md' : 'border-slate-400 group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} />
+                                                        <div className={`w-5 h-5 bg-[var(--bg-card)] border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id ? 'border-[#256A65] scale-125 bg-[#256A65]/10 shadow-md' : 'border-[var(--border-medium)] group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} />
                                                     </div>
                                                 )}
                                                 
@@ -6139,7 +5702,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     }}
                                                                 />
                                                                 {/* Visible connector point */}
-                                                                <div className={`w-5 h-5 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none border-slate-400 group-hover/connector:border-cyan-500 group-hover/connector:bg-cyan-50 group-hover/connector:scale-110 group-hover/connector:shadow-md`}
+                                                                <div className={`w-5 h-5 bg-[var(--bg-card)] border-2 rounded-full transition-all shadow-sm pointer-events-none border-[var(--border-medium)] group-hover/connector:border-cyan-500 group-hover/connector:bg-cyan-50 group-hover/connector:scale-110 group-hover/connector:shadow-md`}
                                                                     title="Input A" />
                                                             </div>
                                                             {/* Input B - bottom left */}
@@ -6152,7 +5715,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     }}
                                                                 />
                                                                 {/* Visible connector point */}
-                                                                <div className={`w-5 h-5 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none border-slate-400 group-hover/connector:border-cyan-500 group-hover/connector:bg-cyan-50 group-hover/connector:scale-110 group-hover/connector:shadow-md`}
+                                                                <div className={`w-5 h-5 bg-[var(--bg-card)] border-2 rounded-full transition-all shadow-sm pointer-events-none border-[var(--border-medium)] group-hover/connector:border-cyan-500 group-hover/connector:bg-cyan-50 group-hover/connector:scale-110 group-hover/connector:shadow-md`}
                                                                     title="Input B" />
                                                             </div>
                                                         </>
@@ -6167,7 +5730,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 }}
                                                             />
                                                             {/* Visible connector point */}
-                                                            <div className={`w-5 h-5 bg-white border-2 rounded-full transition-all shadow-sm pointer-events-none border-slate-400 group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md`} />
+                                                            <div className={`w-5 h-5 bg-[var(--bg-card)] border-2 rounded-full transition-all shadow-sm pointer-events-none border-[var(--border-medium)] group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md`} />
                                                         </div>
                                                     )
                                                 )}
@@ -6184,10 +5747,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             setShowComponentSearch(true);
                                                             setComponentSearchQuery('');
                                                         }}
-                                                        className="absolute -right-14 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border-2 border-slate-300 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:border-[#256A65] hover:bg-[#256A65]/10 hover:scale-110 shadow-sm z-25 pointer-events-auto"
+                                                        className="absolute -right-14 top-1/2 -translate-y-1/2 w-6 h-6 bg-[var(--bg-card)] border-2 border-[var(--border-medium)] rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:border-[#256A65] hover:bg-[#256A65]/10 hover:scale-110 shadow-sm z-25 pointer-events-auto"
                                                         title="Quick connect component"
                                                     >
-                                                        <Plus size={14} className="text-slate-600 group-hover:text-[#256A65]" />
+                                                        <Plus size={14} className="text-[var(--text-secondary)] group-hover:text-[#256A65]" />
                                                     </button>
                                                 )}
                                             </>
@@ -6199,31 +5762,28 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 {/* Temporary Connection Line */}
                                 {dragConnectionStart && dragConnectionCurrent && (() => {
                                     const startNode = nodes.find(n => n.id === dragConnectionStart.nodeId)!;
-                                    const NODE_WIDTH = 320;
-                                    const NODE_HALF_WIDTH = NODE_WIDTH / 2; // 160px
-                                    const CONNECTOR_SIZE = 20; // w-5 h-5 = 20px
-                                    const CONNECTOR_RADIUS = CONNECTOR_SIZE / 2; // 10px
+                                    const { NODE_WIDTH, NODE_HALF_WIDTH, CONNECTOR_SIZE, CONNECTOR_RADIUS } = CANVAS_CONSTANTS;
                                     const ESTIMATED_NODE_HALF_HEIGHT = 65;
                                     
                                     // Use the actual clicked position if available, otherwise calculate
                                     // OUTPUT connector: right-0 + translate-x-1/2 = node.x + 160 + 10
                                     const startX = dragConnectionStart.x || (startNode.x + NODE_HALF_WIDTH + CONNECTOR_RADIUS);
-                                    // top-1/2 -translate-y-1/2 = node.y - 10
-                                    let startY = dragConnectionStart.y || (startNode.y - CONNECTOR_RADIUS);
+                                    // top-1/2 -translate-y-1/2 = centro vertical = node.y
+                                    let startY = dragConnectionStart.y || startNode.y;
                                     
                                     // If we need to calculate Y position for special node types
                                     if (!dragConnectionStart.y) {
                                         if (startNode.type === 'condition') {
                                             if (dragConnectionStart.outputType === 'true') {
-                                                startY = startNode.y - ESTIMATED_NODE_HALF_HEIGHT + 28 - CONNECTOR_RADIUS;
+                                                startY = startNode.y - ESTIMATED_NODE_HALF_HEIGHT + 28;
                                             } else if (dragConnectionStart.outputType === 'false') {
-                                                startY = startNode.y + ESTIMATED_NODE_HALF_HEIGHT - 28 + CONNECTOR_RADIUS;
+                                                startY = startNode.y + ESTIMATED_NODE_HALF_HEIGHT - 28;
                                             }
                                         } else if (startNode.type === 'splitColumns') {
                                             if (dragConnectionStart.outputType === 'A') {
-                                                startY = startNode.y - ESTIMATED_NODE_HALF_HEIGHT + 28 - CONNECTOR_RADIUS;
+                                                startY = startNode.y - ESTIMATED_NODE_HALF_HEIGHT + 28;
                                             } else if (dragConnectionStart.outputType === 'B') {
-                                                startY = startNode.y + ESTIMATED_NODE_HALF_HEIGHT - 28 + CONNECTOR_RADIUS;
+                                                startY = startNode.y + ESTIMATED_NODE_HALF_HEIGHT - 28;
                                             }
                                         }
                                     }
@@ -6249,24 +5809,35 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     >
                                         <defs>
                                         </defs>
-                                        {/* Shadow/glow */}
-                                        <path
-                                            d={`M ${startX} ${startY} C ${startX + 50} ${startY}, ${dragConnectionCurrent.x - 50} ${dragConnectionCurrent.y}, ${dragConnectionCurrent.x} ${dragConnectionCurrent.y}`}
-                                            stroke={strokeColor}
-                                            strokeWidth="4"
-                                            fill="none"
-                                            strokeDasharray="5,5"
-                                            opacity="0.2"
-                                        />
-                                        {/* Main line */}
-                                        <path
-                                            d={`M ${startX} ${startY} C ${startX + 50} ${startY}, ${dragConnectionCurrent.x - 50} ${dragConnectionCurrent.y}, ${dragConnectionCurrent.x} ${dragConnectionCurrent.y}`}
-                                            stroke={strokeColor}
-                                            strokeWidth="3"
-                                            fill="none"
-                                            strokeDasharray="5,5"
-                                            style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }}
-                                        />
+                                        {(() => {
+                                            const dx = Math.abs(dragConnectionCurrent.x - startX);
+                                            const curvature = Math.min(dx * 0.5, Math.max(80, dx * 0.4));
+                                            const c1x = startX + curvature;
+                                            const c2x = dragConnectionCurrent.x - curvature;
+                                            const path = `M ${startX} ${startY} C ${c1x} ${startY}, ${c2x} ${dragConnectionCurrent.y}, ${dragConnectionCurrent.x} ${dragConnectionCurrent.y}`;
+                                            return (
+                                                <>
+                                                    {/* Shadow/glow */}
+                                                    <path
+                                                        d={path}
+                                                        stroke={strokeColor}
+                                                        strokeWidth="4"
+                                                        fill="none"
+                                                        strokeDasharray="5,5"
+                                                        opacity="0.2"
+                                                    />
+                                                    {/* Main line */}
+                                                    <path
+                                                        d={path}
+                                                        stroke={strokeColor}
+                                                        strokeWidth="3"
+                                                        fill="none"
+                                                        strokeDasharray="5,5"
+                                                        style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }}
+                                                    />
+                                                </>
+                                            );
+                                        })()}
                                         {/* End point circle (replaces arrow) */}
                                         <circle
                                             cx={dragConnectionCurrent.x}
@@ -6285,11 +5856,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <div className="text-center max-w-lg px-6">
                                             <div className="mb-8">
                                                 <div className="relative mb-6">
-                                                    <div className="absolute inset-0 bg-gradient-to-br from-[#256A65]/10 to-slate-100/50 rounded-full blur-3xl"></div>
-                                                    <Workflow size={80} className="mx-auto relative text-slate-300" />
+                                                    <div className="absolute inset-0 bg-gradient-to-br from-[#256A65]/10 to-[var(--bg-tertiary)] rounded-full blur-3xl"></div>
+                                                    <Workflow size={80} className="mx-auto relative text-[var(--text-tertiary)]" />
                                                 </div>
-                                                <h3 className="text-2xl font-normal text-slate-900 mb-3">Start building your workflow</h3>
-                                                <p className="text-sm text-slate-600 mb-8 leading-relaxed">
+                                                <h3 className="text-2xl font-normal text-[var(--text-primary)] mb-3">Start building your workflow</h3>
+                                                <p className="text-sm text-[var(--text-secondary)] mb-8 leading-relaxed">
                                                     Create powerful automation workflows by dragging components from the sidebar or let AI help you build one
                                                 </p>
                                             </div>
@@ -6302,9 +5873,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     Create with AI Assistant
                                                 </button>
                                                 <div className="flex items-center gap-3 my-2">
-                                                    <span className="h-px flex-1 bg-slate-200"></span>
-                                                    <span className="text-xs text-slate-400 font-medium">OR</span>
-                                                    <span className="h-px flex-1 bg-slate-200"></span>
+                                                    <span className="h-px flex-1 bg-[var(--bg-tertiary)]"></span>
+                                                    <span className="text-xs text-[var(--text-tertiary)] font-medium">OR</span>
+                                                    <span className="h-px flex-1 bg-[var(--bg-tertiary)]"></span>
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <button
@@ -6317,9 +5888,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 handleDrop({ clientX: centerX, clientY: centerY } as any);
                                                             }
                                                         }}
-                                                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all text-sm font-medium text-slate-700 shadow-sm hover:shadow-md"
+                                                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-all text-sm font-medium text-[var(--text-primary)] shadow-sm hover:shadow-md"
                                                     >
-                                                        <Play size={16} className="text-slate-600" />
+                                                        <Play size={16} className="text-[var(--text-secondary)]" />
                                                         Add Trigger
                                                     </button>
                                                     <button
@@ -6332,13 +5903,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 handleDrop({ clientX: centerX, clientY: centerY } as any);
                                                             }
                                                         }}
-                                                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all text-sm font-medium text-slate-700 shadow-sm hover:shadow-md"
+                                                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-all text-sm font-medium text-[var(--text-primary)] shadow-sm hover:shadow-md"
                                                     >
-                                                        <Database size={16} className="text-slate-600" />
+                                                        <Database size={16} className="text-[var(--text-secondary)]" />
                                                         Add Data Source
                                                     </button>
                                                 </div>
-                                                <p className="text-xs text-slate-400 mt-4">
+                                                <p className="text-xs text-[var(--text-tertiary)] mt-4">
                                                     💡 Tip: Drag components from the sidebar to get started
                                                 </p>
                                             </div>
@@ -6352,19 +5923,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                         {/* AI Assistant Panel (Right Side) */}
                         {showAiAssistant && (
-                            <div className="fixed top-0 right-0 w-[450px] h-screen bg-white border-l border-slate-200 flex flex-col shadow-2xl z-50">
+                            <div className="fixed top-0 right-0 w-[450px] h-screen bg-[var(--bg-card)] border-l border-[var(--border-light)] flex flex-col shadow-2xl z-50">
                                 {/* Header */}
-                            <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-4 text-white flex items-center justify-between">
+                            <div className="bg-[var(--bg-secondary)] border-b border-[var(--border-light)] px-6 py-4 text-[var(--text-primary)] flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <Sparkles size={24} />
                                     <div>
                                         <h3 className="font-normal text-lg">AI Workflow Assistant</h3>
-                                        <p className="text-sm text-slate-300">Ask me about your workflow</p>
+                                        <p className="text-sm text-[var(--text-tertiary)]">Ask me about your workflow</p>
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => setShowAiAssistant(false)}
-                                    className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+                                    className="p-1 hover:bg-[var(--bg-card)]/20 rounded-lg transition-colors"
                                     title="Close"
                                 >
                                     <X size={20} />
@@ -6372,11 +5943,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             </div>
 
                             {/* Chat Messages */}
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[var(--bg-tertiary)]">
                                 {aiChatMessages.length === 0 ? (
-                                    <div className="text-center py-12 text-slate-400">
+                                    <div className="text-center py-12 text-[var(--text-tertiary)]">
                                         <Sparkles size={48} className="mx-auto mb-4 opacity-50" />
-                                        <p className="text-sm font-medium text-slate-600">AI Workflow Assistant</p>
+                                        <p className="text-sm font-medium text-[var(--text-secondary)]">AI Workflow Assistant</p>
                                         <p className="text-xs mt-2 px-6">
                                             I can help you build workflows, suggest nodes, and answer questions about your automation.
                                         </p>
@@ -6391,20 +5962,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 <div className={`max-w-[85%] rounded-lg p-3 ${
                                                     message.role === 'user'
                                                         ? 'bg-slate-700 text-white'
-                                                        : 'bg-white text-slate-700 border border-slate-200'
+                                                        : 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-light)]'
                                                 }`}>
                                                     <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                                                     
                                                     {/* Workflow Suggestion Card */}
                                                     {message.workflowSuggestion && (
-                                                        <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-300">
+                                                        <div className="mt-3 p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-medium)]">
                                                             <div className="flex items-center gap-2 mb-2">
-                                                                <Workflow size={16} className="text-slate-600" />
-                                                                <span className="text-xs font-normal text-slate-700 uppercase tracking-wide">
+                                                                <Workflow size={16} className="text-[var(--text-secondary)]" />
+                                                                <span className="text-xs font-normal text-[var(--text-primary)] uppercase tracking-wide">
                                                                     Workflow Suggestion
                                                                 </span>
                                                             </div>
-                                                            <p className="text-xs text-slate-600 mb-3">
+                                                            <p className="text-xs text-[var(--text-secondary)] mb-3">
                                                                 {message.workflowSuggestion.description}
                                                             </p>
                                                             
@@ -6419,7 +5990,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     </button>
                                                                     <button
                                                                         onClick={handleRejectWorkflowSuggestion}
-                                                                        className="flex-1 px-3 py-1.5 bg-slate-200 text-slate-700 rounded text-xs font-medium hover:bg-slate-300 transition-colors flex items-center justify-center gap-1"
+                                                                        className="flex-1 px-3 py-1.5 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded text-xs font-medium hover:bg-[var(--border-medium)] transition-colors flex items-center justify-center gap-1"
                                                                     >
                                                                         <XCircle size={14} />
                                                                         Reject
@@ -6435,7 +6006,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             )}
                                                             
                                                             {message.workflowSuggestion.status === 'rejected' && (
-                                                                <div className="flex items-center gap-2 text-slate-500 text-xs font-medium">
+                                                                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-xs font-medium">
                                                                     <XCircle size={14} />
                                                                     <span>Rejected</span>
                                                                 </div>
@@ -6451,10 +6022,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             </div>
 
                             {/* Input Area */}
-                            <div className="p-4 border-t border-slate-200 bg-white">
+                            <div className="p-4 border-t border-[var(--border-light)] bg-[var(--bg-card)]">
                                 {isAiChatLoading && (
-                                    <div className="mb-3 flex items-center gap-2 text-sm text-slate-500">
-                                        <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                                    <div className="mb-3 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                                        <div className="w-4 h-4 border-2 border-[var(--border-medium)] border-t-slate-600 rounded-full animate-spin" />
                                         <span>Thinking...</span>
                                     </div>
                                 )}
@@ -6469,14 +6040,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             }
                                         }}
                                         placeholder="Ask me to add nodes, modify connections, or explain your workflow..."
-                                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-slate-500 focus:border-transparent outline-none"
+                                        className="flex-1 px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm resize-none focus:ring-2 focus:ring-slate-500 focus:border-transparent outline-none"
                                         rows={2}
                                         disabled={isAiChatLoading}
                                     />
                                     <button
                                         onClick={handleSendWorkflowAiMessage}
                                         disabled={!aiChatInput.trim() || isAiChatLoading}
-                                        className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                        className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-[#555555] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                     >
                                         <Sparkles size={16} />
                                     </button>
@@ -6496,14 +6067,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <>
                                         <button
                                             onClick={() => setConfiguringNodeId(null)}
-                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveNodeConfig}
                                             disabled={!selectedEntityId}
-                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
@@ -6512,13 +6083,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                 <div className="space-y-5">
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Select Entity
                                         </label>
                                         <select
                                             value={selectedEntityId}
                                             onChange={(e) => setSelectedEntityId(e.target.value)}
-                                            className="w-full px-3 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                            className="w-full px-3 py-1.5 bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
                                         >
                                             <option value="">Choose entity...</option>
                                             {entities.map(entity => (
@@ -6527,10 +6098,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </select>
                                     </div>
                                     {/* Feedback Link */}
-                                    <div className="pt-3 border-t border-slate-200">
+                                    <div className="pt-3 border-t border-[var(--border-light)]">
                                         <button
                                             onClick={() => openFeedbackPopup('fetchData', 'Fetch Data')}
-                                            className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1 transition-colors"
+                                            className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1 transition-colors"
                                         >
                                             <MessageSquare size={12} />
                                             What would you like this node to do?
@@ -6551,14 +6122,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <>
                                         <button
                                             onClick={() => setConfiguringHttpNodeId(null)}
-                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveHttpConfig}
                                             disabled={!httpUrl.trim()}
-                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
@@ -6567,7 +6138,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                 <div className="space-y-5">
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             URL
                                         </label>
                                         <input
@@ -6575,17 +6146,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             value={httpUrl}
                                             onChange={(e) => setHttpUrl(e.target.value)}
                                             placeholder="https://api.example.com/data"
-                                            className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                            className="w-full px-3 py-1.5 bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                         />
-                                        <p className="text-[10px] text-slate-500 mt-1.5">
+                                        <p className="text-[10px] text-[var(--text-secondary)] mt-1.5">
                                             Enter the full URL to fetch data from (GET request).
                                         </p>
                                     </div>
                                     {/* Feedback Link */}
-                                    <div className="pt-3 border-t border-slate-200">
+                                    <div className="pt-3 border-t border-[var(--border-light)]">
                                         <button
                                             onClick={() => openFeedbackPopup('http', 'HTTP Request')}
-                                            className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1 transition-colors"
+                                            className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1 transition-colors"
                                         >
                                             <MessageSquare size={12} />
                                             What would you like this node to do?
@@ -6605,7 +6176,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 footer={
                                     <button
                                         onClick={closeWebhookConfig}
-                                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                        className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                     >
                                         Close
                                     </button>
@@ -6613,7 +6184,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                 <div className="space-y-5">
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Your Webhook URL
                                         </label>
                                         <div className="flex gap-2">
@@ -6621,14 +6192,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 type="text"
                                                 readOnly
                                                 value={webhookUrl}
-                                                className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-700"
+                                                className="flex-1 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-mono text-[var(--text-primary)]"
                                             />
                                             <button
                                                 onClick={() => {
                                                     navigator.clipboard.writeText(webhookUrl);
                                                     showToast('Webhook URL copied!', 'success');
                                                 }}
-                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                             >
                                                 Copy
                                             </button>
@@ -6636,7 +6207,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </div>
                                     
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             URL with Token (more secure)
                                         </label>
                                         <div className="flex gap-2">
@@ -6644,30 +6215,30 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 type="text"
                                                 readOnly
                                                 value={`${webhookUrl}/${webhookToken}`}
-                                                className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-700"
+                                                className="flex-1 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-mono text-[var(--text-primary)]"
                                             />
                                             <button
                                                 onClick={() => {
                                                     navigator.clipboard.writeText(`${webhookUrl}/${webhookToken}`);
                                                     showToast('Secure webhook URL copied!', 'success');
                                                 }}
-                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                             >
                                                 Copy
                                             </button>
                                         </div>
                                     </div>
 
-                                    <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
-                                            <p className="font-medium text-slate-800 mb-1">How to use:</p>
-                                            <ol className="list-decimal list-inside space-y-1 text-slate-700">
+                                    <div className="text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg p-3">
+                                            <p className="font-medium text-[var(--text-primary)] mb-1">How to use:</p>
+                                            <ol className="list-decimal list-inside space-y-1 text-[var(--text-primary)]">
                                                 <li>Copy the webhook URL above</li>
                                                 <li>Configure your external service to POST data to this URL</li>
                                                 <li>The workflow will execute automatically when data is received</li>
                                             </ol>
                                     </div>
 
-                                    <div className="text-xs text-slate-500">
+                                    <div className="text-xs text-[var(--text-secondary)]">
                                             <p className="font-medium mb-1">Example cURL:</p>
                                             <pre className="bg-slate-800 text-[#256A65] p-2 rounded overflow-x-auto">
 {`curl -X POST ${webhookUrl} \\
@@ -6690,14 +6261,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <>
                                         <button
                                             onClick={() => setConfiguringMySQLNodeId(null)}
-                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveMySQLConfig}
                                             disabled={!mysqlQuery.trim()}
-                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
@@ -6706,7 +6277,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                 <div className="space-y-5">
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Host
                                         </label>
                                             <input
@@ -6714,12 +6285,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 value={mysqlHost}
                                                 onChange={(e) => setMysqlHost(e.target.value)}
                                                 placeholder="localhost"
-                                                className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                className="w-full px-3 py-1.5 bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                             />
                                         </div>
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     Port
                                                 </label>
                                                 <input
@@ -6727,11 +6298,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     value={mysqlPort}
                                                     onChange={(e) => setMysqlPort(e.target.value)}
                                                     placeholder="3306"
-                                                    className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                    className="w-full px-3 py-1.5 bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     Database
                                                 </label>
                                                 <input
@@ -6739,12 +6310,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     value={mysqlDatabase}
                                                     onChange={(e) => setMysqlDatabase(e.target.value)}
                                                     placeholder="mydb"
-                                                    className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                    className="w-full px-3 py-1.5 bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                 />
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                 Username
                                             </label>
                                             <input
@@ -6752,11 +6323,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 value={mysqlUsername}
                                                 onChange={(e) => setMysqlUsername(e.target.value)}
                                                 placeholder="root"
-                                                className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                className="w-full px-3 py-1.5 bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                 Password
                                             </label>
                                             <input
@@ -6764,11 +6335,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 value={mysqlPassword}
                                                 onChange={(e) => setMysqlPassword(e.target.value)}
                                                 placeholder="••••••"
-                                                className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                className="w-full px-3 py-1.5 bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                 SQL Query
                                             </label>
                                             <textarea
@@ -6776,14 +6347,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 onChange={(e) => setMysqlQuery(e.target.value)}
                                                 placeholder="SELECT * FROM users"
                                                 rows={3}
-                                                className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 font-mono placeholder:text-slate-400"
+                                                className="w-full px-3 py-1.5 bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] font-mono placeholder:text-[var(--text-tertiary)]"
                                             />
                                         </div>
                                     {/* Feedback Link */}
-                                    <div className="pt-3 border-t border-slate-200">
+                                    <div className="pt-3 border-t border-[var(--border-light)]">
                                         <button
                                             onClick={() => openFeedbackPopup('mysql', 'MySQL')}
-                                            className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1 transition-colors"
+                                            className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1 transition-colors"
                                         >
                                             <MessageSquare size={12} />
                                             What would you like this node to do?
@@ -6806,14 +6377,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <>
                                         <button
                                             onClick={() => setConfiguringSAPNodeId(null)}
-                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveSAPConfig}
                                             disabled={!sapBaseApiUrl.trim() || !sapEntity.trim()}
-                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
@@ -6822,10 +6393,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                     <div className="space-y-5">
                                         {/* Connection Settings */}
-                                        <div className="border-b border-slate-200 pb-3">
-                                            <h4 className="text-xs font-medium text-slate-700 mb-3">Connection</h4>
+                                        <div className="border-b border-[var(--border-light)] pb-3">
+                                            <h4 className="text-xs font-medium text-[var(--text-primary)] mb-3">Connection</h4>
                                             <div>
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     Connection Name
                                                 </label>
                                                 <input
@@ -6833,17 +6404,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     value={sapConnectionName}
                                                     onChange={(e) => setSapConnectionName(e.target.value)}
                                                     placeholder="SAP_Production"
-                                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                    className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                 />
                                             </div>
                                         </div>
 
                                         {/* Authentication */}
-                                        <div className="border-b border-slate-200 pb-3">
-                                            <h4 className="text-xs font-medium text-slate-700 mb-3">Authentication</h4>
+                                        <div className="border-b border-[var(--border-light)] pb-3">
+                                            <h4 className="text-xs font-medium text-[var(--text-primary)] mb-3">Authentication</h4>
                                             <div className="space-y-3">
                                                 <div>
-                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                    <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                         Auth Type
                                                     </label>
                                                     <input
@@ -6851,11 +6422,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={sapAuthType}
                                                         onChange={(e) => setSapAuthType(e.target.value)}
                                                         placeholder="OAuth2_Client_Credentials"
-                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                    <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                         Client ID
                                                     </label>
                                                     <input
@@ -6863,11 +6434,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={sapClientId}
                                                         onChange={(e) => setSapClientId(e.target.value)}
                                                         placeholder="sb-83f9a9..."
-                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                    <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                         Client Secret
                                                     </label>
                                                     <input
@@ -6875,11 +6446,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={sapClientSecret}
                                                         onChange={(e) => setSapClientSecret(e.target.value)}
                                                         placeholder="********"
-                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                    <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                         Token URL
                                                     </label>
                                                     <input
@@ -6887,7 +6458,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={sapTokenUrl}
                                                         onChange={(e) => setSapTokenUrl(e.target.value)}
                                                         placeholder="https://company.authentication.eu10.hana.ondemand.com/oauth/token"
-                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                     />
                                                 </div>
                                             </div>
@@ -6895,10 +6466,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                         {/* API Configuration */}
                                         <div>
-                                            <h4 className="text-xs font-medium text-slate-700 mb-3">API Configuration</h4>
+                                            <h4 className="text-xs font-medium text-[var(--text-primary)] mb-3">API Configuration</h4>
                                             <div className="space-y-3">
                                                 <div>
-                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                    <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                         Base API URL
                                                     </label>
                                                     <input
@@ -6906,11 +6477,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={sapBaseApiUrl}
                                                         onChange={(e) => setSapBaseApiUrl(e.target.value)}
                                                         placeholder="https://company-api.s4hana.ondemand.com"
-                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                    <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                         Service Path
                                                     </label>
                                                     <input
@@ -6918,11 +6489,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={sapServicePath}
                                                         onChange={(e) => setSapServicePath(e.target.value)}
                                                         placeholder="/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV"
-                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                    <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                         Entity
                                                     </label>
                                                     <input
@@ -6930,7 +6501,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={sapEntity}
                                                         onChange={(e) => setSapEntity(e.target.value)}
                                                         placeholder="A_ProductionOrder"
-                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                     />
                                                 </div>
                                             </div>
@@ -6938,10 +6509,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </div>
 
                                     {/* Feedback Link */}
-                                    <div className="pt-3 border-t border-slate-200">
+                                    <div className="pt-3 border-t border-[var(--border-light)]">
                                         <button
                                             onClick={() => openFeedbackPopup('sapFetch', 'SAP S/4HANA')}
-                                            className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
+                                            className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
                                         >
                                             <MessageSquare size={12} />
                                             What would you like this node to do?
@@ -6963,14 +6534,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <>
                                         <button
                                             onClick={() => setConfiguringLIMSNodeId(null)}
-                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveLIMSConfig}
                                             disabled={!limsServerUrl.trim() || !limsApiKey.trim()}
-                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
@@ -6979,10 +6550,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                 <div className="space-y-5">
                                     <div>
-                                        <h4 className="text-xs font-medium text-slate-700 mb-3">Connection Settings</h4>
+                                        <h4 className="text-xs font-medium text-[var(--text-primary)] mb-3">Connection Settings</h4>
                                         <div className="space-y-3">
                                             <div>
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     LIMS Server URL
                                                 </label>
                                                 <input
@@ -6990,11 +6561,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     value={limsServerUrl}
                                                     onChange={(e) => setLimsServerUrl(e.target.value)}
                                                     placeholder="https://lims.company.com/api"
-                                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                    className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     API Key
                                                 </label>
                                                 <input
@@ -7002,17 +6573,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     value={limsApiKey}
                                                     onChange={(e) => setLimsApiKey(e.target.value)}
                                                     placeholder="Enter API key"
-                                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                    className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     Endpoint
                                                 </label>
                                                 <select
                                                     value={limsEndpoint}
                                                     onChange={(e) => setLimsEndpoint(e.target.value)}
-                                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                                    className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
                                                 >
                                                     <option value="materials">Materials (Raw Materials)</option>
                                                     <option value="batches">Batches</option>
@@ -7021,17 +6592,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     Query (Optional)
                                                 </label>
                                                 <textarea
                                                     value={limsQuery}
                                                     onChange={(e) => setLimsQuery(e.target.value)}
                                                     placeholder='{"batchId": "BATCH123", "status": "approved"}'
-                                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 font-mono"
+                                                    className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)] font-mono"
                                                     rows={3}
                                                 />
-                                                <p className="text-xs text-slate-500 mt-1">JSON query parameters</p>
+                                                <p className="text-xs text-[var(--text-secondary)] mt-1">JSON query parameters</p>
                                             </div>
                                         </div>
                                     </div>
@@ -7046,20 +6617,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 onClose={() => setConfiguringStatisticalNodeId(null)}
                                 title="Statistical Analysis"
                                 description="Perform PCA, SPC, or compare with golden batch"
-                                icon={TrendingUp}
+                                icon={TrendUp}
                                 width="w-[500px]"
                                 footer={
                                     <>
                                         <button
                                             onClick={() => setConfiguringStatisticalNodeId(null)}
-                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveStatisticalConfig}
                                             disabled={!statisticalMethod}
-                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
@@ -7068,11 +6639,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                 <div className="space-y-5">
                                     <div>
-                                        <h4 className="text-xs font-medium text-slate-700 mb-3">Analysis Method</h4>
+                                        <h4 className="text-xs font-medium text-[var(--text-primary)] mb-3">Analysis Method</h4>
                                         <select
                                             value={statisticalMethod}
                                             onChange={(e) => setStatisticalMethod(e.target.value as any)}
-                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
                                         >
                                             <option value="goldenBatch">Compare with Golden Batch</option>
                                             <option value="pca">Principal Component Analysis (PCA)</option>
@@ -7082,7 +6653,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </div>
                                     {statisticalMethod === 'goldenBatch' && (
                                         <div>
-                                            <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                 Golden Batch ID
                                             </label>
                                             <input
@@ -7090,22 +6661,22 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 value={goldenBatchId}
                                                 onChange={(e) => setGoldenBatchId(e.target.value)}
                                                 placeholder="BATCH_REF_001"
-                                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                             />
                                         </div>
                                     )}
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Parameters (JSON)
                                         </label>
                                         <textarea
                                             value={statisticalParams}
                                             onChange={(e) => setStatisticalParams(e.target.value)}
                                             placeholder='{"n_components": 3, "tolerance": 0.05}'
-                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 font-mono"
+                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)] font-mono"
                                             rows={4}
                                         />
-                                        <p className="text-xs text-slate-500 mt-1">Analysis-specific parameters in JSON format</p>
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1">Analysis-specific parameters in JSON format</p>
                                     </div>
                                 </div>
                             </NodeConfigSidePanel>
@@ -7124,14 +6695,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <>
                                         <button
                                             onClick={() => setConfiguringAlertAgentNodeId(null)}
-                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveAlertAgentConfig}
                                             disabled={!alertConditions.trim()}
-                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
@@ -7140,11 +6711,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                 <div className="space-y-5">
                                     <div>
-                                        <h4 className="text-xs font-medium text-slate-700 mb-3">Alert Severity</h4>
+                                        <h4 className="text-xs font-medium text-[var(--text-primary)] mb-3">Alert Severity</h4>
                                         <select
                                             value={alertSeverity}
                                             onChange={(e) => setAlertSeverity(e.target.value as any)}
-                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
                                         >
                                             <option value="info">Info</option>
                                             <option value="warning">Warning</option>
@@ -7152,18 +6723,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </select>
                                     </div>
                                     <div>
-                                        <h4 className="text-xs font-medium text-slate-700 mb-3">Alert Conditions (JSON)</h4>
+                                        <h4 className="text-xs font-medium text-[var(--text-primary)] mb-3">Alert Conditions (JSON)</h4>
                                         <textarea
                                             value={alertConditions}
                                             onChange={(e) => setAlertConditions(e.target.value)}
                                             placeholder='[{"field": "temperature", "operator": ">", "value": 100, "message": "Temperature exceeded limit"}]'
-                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 font-mono"
+                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)] font-mono"
                                             rows={6}
                                         />
-                                        <p className="text-xs text-slate-500 mt-1">Array of condition objects. Operators: &gt;, &lt;, &gt;=, &lt;=, ==, !=</p>
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1">Array of condition objects. Operators: &gt;, &lt;, &gt;=, &lt;=, ==, !=</p>
                                     </div>
                                     <div>
-                                        <h4 className="text-xs font-medium text-slate-700 mb-3">Actions</h4>
+                                        <h4 className="text-xs font-medium text-[var(--text-primary)] mb-3">Actions</h4>
                                         <div className="space-y-2">
                                             {['email', 'sms', 'webhook', 'stop'].map(action => (
                                                 <label key={action} className="flex items-center gap-2 cursor-pointer">
@@ -7177,15 +6748,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 setAlertActions(alertActions.filter(a => a !== action));
                                                             }
                                                         }}
-                                                        className="w-4 h-4 text-slate-600 border-slate-300 rounded focus:ring-slate-300"
+                                                        className="w-4 h-4 text-[var(--text-secondary)] border-[var(--border-medium)] rounded focus:ring-[var(--border-medium)]"
                                                     />
-                                                    <span className="text-xs text-slate-700 capitalize">{action}</span>
+                                                    <span className="text-xs text-[var(--text-primary)] capitalize">{action}</span>
                                                 </label>
                                             ))}
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Recipients (comma-separated)
                                         </label>
                                         <input
@@ -7193,9 +6764,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             value={alertRecipients}
                                             onChange={(e) => setAlertRecipients(e.target.value)}
                                             placeholder="email@example.com, +1234567890"
-                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                         />
-                                        <p className="text-xs text-slate-500 mt-1">Emails or phone numbers</p>
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1">Emails or phone numbers</p>
                                     </div>
                                 </div>
                             </NodeConfigSidePanel>
@@ -7208,20 +6779,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 onClose={() => setConfiguringPdfReportNodeId(null)}
                                 title="PDF Report Generator"
                                 description="Generate structured PDF reports from data"
-                                icon={FileCheck}
+                                icon={FilePdf}
                                 width="w-[500px]"
                                 footer={
                                     <>
                                         <button
                                             onClick={() => setConfiguringPdfReportNodeId(null)}
-                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={savePdfReportConfig}
                                             disabled={!pdfTemplate.trim()}
-                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
@@ -7230,11 +6801,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                 <div className="space-y-5">
                                     <div>
-                                        <h4 className="text-xs font-medium text-slate-700 mb-3">Report Template</h4>
+                                        <h4 className="text-xs font-medium text-[var(--text-primary)] mb-3">Report Template</h4>
                                         <select
                                             value={pdfTemplate}
                                             onChange={(e) => setPdfTemplate(e.target.value)}
-                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
                                         >
                                             <option value="standard">Standard Report</option>
                                             <option value="goldenBatch">Golden Batch Analysis</option>
@@ -7243,20 +6814,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Report Data Structure (JSON)
                                         </label>
                                         <textarea
                                             value={pdfReportData}
                                             onChange={(e) => setPdfReportData(e.target.value)}
                                             placeholder='{"title": "Batch Analysis", "sections": [...]}'
-                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400 font-mono"
+                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)] font-mono"
                                             rows={6}
                                         />
-                                        <p className="text-xs text-slate-500 mt-1">Optional: Customize report structure. Leave empty to use input data.</p>
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1">Optional: Customize report structure. Leave empty to use input data.</p>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Output Path (Optional)
                                         </label>
                                         <input
@@ -7264,9 +6835,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             value={pdfOutputPath}
                                             onChange={(e) => setPdfOutputPath(e.target.value)}
                                             placeholder="/reports/batch_analysis.pdf"
-                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                         />
-                                        <p className="text-xs text-slate-500 mt-1">Leave empty for auto-generated path</p>
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1">Leave empty for auto-generated path</p>
                                     </div>
                                 </div>
                             </NodeConfigSidePanel>
@@ -7300,14 +6871,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <>
                                             <button
                                                 onClick={() => setConfiguringEmailNodeId(null)}
-                                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                             >
                                                 Cancel
                                             </button>
                                             <button
                                                 onClick={saveEmailConfig}
                                                 disabled={!emailTo.trim()}
-                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 Save
                                             </button>
@@ -7316,7 +6887,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 >
                                         <div className="space-y-5">
                                             <div>
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     To (recipient email)
                                                 </label>
                                                 <div className="h-16">
@@ -7335,7 +6906,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </div>
 
                                             <div>
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     Subject
                                                 </label>
                                                 <div className="h-16">
@@ -7354,7 +6925,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </div>
 
                                             <div>
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     Body
                                                 </label>
                                                 <div className="h-48">
@@ -7373,21 +6944,21 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </div>
 
                                             {/* SMTP Settings (collapsible) */}
-                                            <div className="border border-slate-200 rounded-lg">
+                                            <div className="border border-[var(--border-light)] rounded-lg">
                                                 <button
                                                     type="button"
                                                     onClick={() => setShowEmailSmtpSettings(!showEmailSmtpSettings)}
-                                                    className="w-full px-4 py-2 flex items-center justify-between text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                                    className="w-full px-4 py-2 flex items-center justify-between text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
                                                 >
                                                     <span>⚙️ SMTP Settings</span>
                                                     <span>{showEmailSmtpSettings ? '▲' : '▼'}</span>
                                                 </button>
                                                 
                                                 {showEmailSmtpSettings && (
-                                                    <div className="p-4 border-t border-slate-200 space-y-3">
+                                                    <div className="p-4 border-t border-[var(--border-light)] space-y-3">
                                                         <div className="grid grid-cols-2 gap-3">
                                                             <div>
-                                                                <label className="block text-xs font-medium text-slate-600 mb-2">
+                                                                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
                                                                     SMTP Host
                                                                 </label>
                                                                 <input
@@ -7395,11 +6966,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     value={emailSmtpHost}
                                                                     onChange={(e) => setEmailSmtpHost(e.target.value)}
                                                                     placeholder="smtp.gmail.com"
-                                                                    className="w-full px-3 py-1.5 text-xs text-slate-700 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                                    className="w-full px-3 py-1.5 text-xs text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                                 />
                                                             </div>
                                                             <div>
-                                                                <label className="block text-xs font-medium text-slate-600 mb-2">
+                                                                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
                                                                     SMTP Port
                                                                 </label>
                                                                 <input
@@ -7407,12 +6978,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     value={emailSmtpPort}
                                                                     onChange={(e) => setEmailSmtpPort(e.target.value)}
                                                                     placeholder="587"
-                                                                    className="w-full px-3 py-1.5 text-xs text-slate-700 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                                    className="w-full px-3 py-1.5 text-xs text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                                 />
                                                             </div>
                                                         </div>
                                                         <div>
-                                                            <label className="block text-xs font-medium text-slate-600 mb-2">
+                                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
                                                                 SMTP Username (email)
                                                             </label>
                                                             <input
@@ -7420,11 +6991,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 value={emailSmtpUser}
                                                                 onChange={(e) => setEmailSmtpUser(e.target.value)}
                                                                 placeholder="your-email@gmail.com"
-                                                                className="w-full px-3 py-1.5 text-xs text-slate-700 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                                className="w-full px-3 py-1.5 text-xs text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="block text-xs font-medium text-slate-600 mb-2">
+                                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
                                                                 SMTP Password / App Password
                                                             </label>
                                                             <input
@@ -7432,9 +7003,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 value={emailSmtpPass}
                                                                 onChange={(e) => setEmailSmtpPass(e.target.value)}
                                                                 placeholder="••••••••••••"
-                                                                className="w-full px-3 py-1.5 text-xs text-slate-700 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                                className="w-full px-3 py-1.5 text-xs text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                             />
-                                                            <p className="text-[10px] text-slate-500 mt-1">
+                                                            <p className="text-[10px] text-[var(--text-secondary)] mt-1">
                                                                 For Gmail, use an App Password (not your regular password)
                                                             </p>
                                                         </div>
@@ -7444,12 +7015,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </div>
 
                                         {/* Feedback Link */}
-                                        <div className="pt-3 border-t border-slate-200">
+                                        <div className="pt-3 border-t border-[var(--border-light)]">
                                             <button
                                                 onClick={() => openFeedbackPopup('sendEmail', 'Send Email')}
-                                                className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
+                                                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
                                             >
-                                                <MessageSquare size={12} />
+                                                <MessageSquare size={12} weight="light" />
                                                 What would you like this node to do?
                                             </button>
                                         </div>
@@ -7485,14 +7056,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <>
                                             <button
                                                 onClick={() => setConfiguringSMSNodeId(null)}
-                                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                             >
                                                 Cancel
                                             </button>
                                             <button
                                                 onClick={saveSMSConfig}
                                                 disabled={!smsTo.trim()}
-                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 Save
                                             </button>
@@ -7501,7 +7072,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 >
                                         <div className="space-y-5">
                                             <div>
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     To (phone number with country code)
                                                 </label>
                                                 <div className="h-16">
@@ -7520,7 +7091,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </div>
 
                                             <div>
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     Message Body
                                                 </label>
                                                 <div className="h-32">
@@ -7536,26 +7107,26 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         inputData={inputDataForSMS}
                                                     />
                                                 </div>
-                                                <p className="text-[10px] text-slate-500 mt-1">
+                                                <p className="text-[10px] text-[var(--text-secondary)] mt-1">
                                                     SMS messages are limited to 160 characters (or 70 with special characters)
                                                 </p>
                                             </div>
 
                                             {/* Twilio Settings (collapsible) */}
-                                            <div className="border border-slate-200 rounded-lg">
+                                            <div className="border border-[var(--border-light)] rounded-lg">
                                                 <button
                                                     type="button"
                                                     onClick={() => setShowSMSTwilioSettings(!showSMSTwilioSettings)}
-                                                    className="w-full px-4 py-2 flex items-center justify-between text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                                    className="w-full px-4 py-2 flex items-center justify-between text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
                                                 >
                                                     <span>⚙️ Twilio Settings</span>
                                                     <span>{showSMSTwilioSettings ? '▲' : '▼'}</span>
                                                 </button>
                                                 
                                                 {showSMSTwilioSettings && (
-                                                    <div className="p-4 border-t border-slate-200 space-y-3">
+                                                    <div className="p-4 border-t border-[var(--border-light)] space-y-3">
                                                         <div>
-                                                            <label className="block text-xs font-medium text-slate-600 mb-1">
+                                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
                                                                 Account SID
                                                             </label>
                                                             <input
@@ -7563,11 +7134,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 value={twilioAccountSid}
                                                                 onChange={(e) => setTwilioAccountSid(e.target.value)}
                                                                 placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                                                                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-lime-500"
+                                                                className="w-full px-2 py-1.5 text-sm border border-[var(--border-medium)] rounded focus:outline-none focus:ring-1 focus:ring-lime-500"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="block text-xs font-medium text-slate-600 mb-1">
+                                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
                                                                 Auth Token
                                                             </label>
                                                             <input
@@ -7575,11 +7146,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 value={twilioAuthToken}
                                                                 onChange={(e) => setTwilioAuthToken(e.target.value)}
                                                                 placeholder="••••••••••••"
-                                                                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-lime-500"
+                                                                className="w-full px-2 py-1.5 text-sm border border-[var(--border-medium)] rounded focus:outline-none focus:ring-1 focus:ring-lime-500"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="block text-xs font-medium text-slate-600 mb-1">
+                                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
                                                                 From Number (Twilio phone number)
                                                             </label>
                                                             <input
@@ -7587,9 +7158,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 value={twilioFromNumber}
                                                                 onChange={(e) => setTwilioFromNumber(e.target.value)}
                                                                 placeholder="+1234567890"
-                                                                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-lime-500"
+                                                                className="w-full px-2 py-1.5 text-sm border border-[var(--border-medium)] rounded focus:outline-none focus:ring-1 focus:ring-lime-500"
                                                             />
-                                                            <p className="text-[10px] text-slate-500 mt-1">
+                                                            <p className="text-[10px] text-[var(--text-secondary)] mt-1">
                                                                 Get your credentials from twilio.com/console
                                                             </p>
                                                         </div>
@@ -7599,12 +7170,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </div>
 
                                         {/* Feedback Link */}
-                                        <div className="pt-3 border-t border-slate-200">
+                                        <div className="pt-3 border-t border-[var(--border-light)]">
                                             <button
                                                 onClick={() => openFeedbackPopup('sendSMS', 'Send SMS')}
-                                                className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
+                                                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
                                             >
-                                                <MessageSquare size={12} />
+                                                <MessageSquare size={12} weight="light" />
                                                 What would you like this node to do?
                                             </button>
                                         </div>
@@ -7643,14 +7214,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <>
                                             <button
                                                 onClick={() => { setConfiguringVisualizationNodeId(null); setGeneratedWidget(null); }}
-                                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                             >
                                                 Cancel
                                             </button>
                                             <button
                                                 onClick={saveVisualizationConfig}
                                                 disabled={!generatedWidget}
-                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 Save Visualization
                                             </button>
@@ -7659,19 +7230,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 >
                                         {/* Data Preview */}
                                         {hasInputData && (
-                                            <div className="mb-4 border border-slate-200 rounded-lg overflow-hidden">
-                                                <div className="bg-slate-50 px-3 py-2 border-b border-slate-200 flex items-center justify-between">
-                                                    <span className="text-xs font-medium text-slate-600">
+                                            <div className="mb-4 border border-[var(--border-light)] rounded-lg overflow-hidden">
+                                                <div className="bg-[var(--bg-tertiary)] px-3 py-2 border-b border-[var(--border-light)] flex items-center justify-between">
+                                                    <span className="text-xs font-medium text-[var(--text-secondary)]">
                                                         📊 Available Data ({inputDataForViz.length} rows, {dataFields.length} columns)
                                                     </span>
-                                                    <span className="text-xs text-slate-400">Preview</span>
+                                                    <span className="text-xs text-[var(--text-tertiary)]">Preview</span>
                                                 </div>
                                                 <div className="overflow-x-auto">
                                                     <table className="w-full text-xs">
-                                                        <thead className="bg-slate-100">
+                                                        <thead className="bg-[var(--bg-tertiary)]">
                                                             <tr>
                                                                 {dataFields.map((field, idx) => (
-                                                                    <th key={idx} className="px-3 py-2 text-left font-normal text-slate-700 whitespace-nowrap border-b border-slate-200">
+                                                                    <th key={idx} className="px-3 py-2 text-left font-normal text-[var(--text-primary)] whitespace-nowrap border-b border-[var(--border-light)]">
                                                                         {field}
                                                                     </th>
                                                                 ))}
@@ -7679,9 +7250,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         </thead>
                                                         <tbody>
                                                             {inputDataForViz.slice(0, 4).map((row: any, rowIdx: number) => (
-                                                                <tr key={rowIdx} className="border-b border-slate-100 hover:bg-slate-50">
+                                                                <tr key={rowIdx} className="border-b border-[var(--border-light)] hover:bg-[var(--bg-tertiary)]">
                                                                     {dataFields.map((field, colIdx) => (
-                                                                        <td key={colIdx} className="px-3 py-1.5 text-slate-600 whitespace-nowrap max-w-[120px] truncate">
+                                                                        <td key={colIdx} className="px-3 py-1.5 text-[var(--text-secondary)] whitespace-nowrap max-w-[120px] truncate">
                                                                             {row[field] !== undefined && row[field] !== null ? String(row[field]) : '-'}
                                                                         </td>
                                                                     ))}
@@ -7691,7 +7262,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     </table>
                                                 </div>
                                                 {inputDataForViz.length > 4 && (
-                                                    <div className="px-3 py-1.5 bg-slate-50 text-xs text-slate-500 text-center border-t border-slate-200">
+                                                    <div className="px-3 py-1.5 bg-[var(--bg-tertiary)] text-xs text-[var(--text-secondary)] text-center border-t border-[var(--border-light)]">
                                                         ... and {inputDataForViz.length - 4} more rows
                                                     </div>
                                                 )}
@@ -7701,13 +7272,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         {/* Prompt Input with Generate Button */}
                                         <div className="mb-4">
                                             <div className="flex items-center justify-between mb-2">
-                                                <label className="text-sm font-medium text-slate-700">
+                                                <label className="text-sm font-medium text-[var(--text-primary)]">
                                                     Describe the visualization you want
                                                 </label>
                                                 <button
                                                     onClick={generateWidgetFromPrompt}
                                                     disabled={!visualizationPrompt.trim() || !hasInputData || isGeneratingWidget}
-                                                    className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
+                                                    className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
                                                 >
                                                     {isGeneratingWidget ? (
                                                         <>
@@ -7716,7 +7287,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <Sparkles size={14} />
+                                                            <Sparkles size={14} weight="light" />
                                                             Generate
                                                         </>
                                                     )}
@@ -7726,7 +7297,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 value={visualizationPrompt}
                                                 onChange={(e) => setVisualizationPrompt(e.target.value)}
                                                 placeholder="e.g., 'Show a bar chart of sales by month' or 'Create a pie chart showing the distribution of categories'"
-                                                className="w-full px-3 py-1.5 text-xs text-slate-700 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 resize-none placeholder:text-slate-400"
+                                                className="w-full px-3 py-1.5 text-xs text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] resize-none placeholder:text-[var(--text-tertiary)]"
                                                 rows={3}
                                             />
                                             {!hasInputData && (
@@ -7738,27 +7309,27 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                         {/* Generated Widget Preview */}
                                         {generatedWidget && (
-                                            <div className="mb-4 border border-slate-200 rounded-lg overflow-hidden">
-                                                <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-                                                    <h4 className="font-medium text-xs text-slate-800">{generatedWidget.title}</h4>
-                                                    <p className="text-xs text-slate-600">{generatedWidget.description}</p>
+                                            <div className="mb-4 border border-[var(--border-light)] rounded-lg overflow-hidden">
+                                                <div className="bg-[var(--bg-tertiary)] px-4 py-2 border-b border-[var(--border-light)]">
+                                                    <h4 className="font-medium text-xs text-[var(--text-primary)]">{generatedWidget.title}</h4>
+                                                    <p className="text-xs text-[var(--text-secondary)]">{generatedWidget.description}</p>
                                                 </div>
-                                                <div className="p-4 bg-white">
+                                                <div className="p-4 bg-[var(--bg-card)]">
                                                     <DynamicChart config={generatedWidget} />
                                                 </div>
                                                 
                                                 {/* Explanation Toggle */}
                                                 {generatedWidget.explanation && (
-                                                    <div className="border-t border-slate-200">
+                                                    <div className="border-t border-[var(--border-light)]">
                                                         <button
                                                             onClick={() => setShowWidgetExplanation(!showWidgetExplanation)}
-                                                            className="w-full px-4 py-2 text-xs text-slate-600 hover:bg-slate-50 flex items-center justify-between"
+                                                            className="w-full px-4 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] flex items-center justify-between"
                                                         >
                                                             <span>How was this created?</span>
                                                             <span>{showWidgetExplanation ? '▲' : '▼'}</span>
                                                         </button>
                                                         {showWidgetExplanation && (
-                                                            <div className="px-4 pb-4 text-xs text-slate-600 whitespace-pre-wrap">
+                                                            <div className="px-4 pb-4 text-xs text-[var(--text-secondary)] whitespace-pre-wrap">
                                                                 {generatedWidget.explanation}
                                                             </div>
                                                         )}
@@ -7768,12 +7339,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         )}
 
                                         {/* Feedback Link */}
-                                        <div className="pt-3 border-t border-slate-200">
+                                        <div className="pt-3 border-t border-[var(--border-light)]">
                                             <button
                                                 onClick={() => openFeedbackPopup('dataVisualization', 'Data Visualization')}
-                                                className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
+                                                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
                                             >
-                                                <MessageSquare size={12} />
+                                                <MessageSquare size={12} weight="light" />
                                                 What would you like this node to do?
                                             </button>
                                         </div>
@@ -7792,14 +7363,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <>
                                         <button
                                             onClick={() => setConfiguringEsiosNodeId(null)}
-                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveEsiosConfig}
                                             disabled={!esiosArchiveId.trim()}
-                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
@@ -7808,7 +7379,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                     <div className="space-y-5">
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Indicator ID
                                         </label>
                                         <input
@@ -7816,32 +7387,32 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             value={esiosArchiveId}
                                             onChange={(e) => setEsiosArchiveId(e.target.value)}
                                             placeholder="e.g., 1001 for PVPC"
-                                            className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                            className="w-full px-3 py-1.5 bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                         />
-                                        <p className="text-xs text-slate-500 mt-1">
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1">
                                             1001 = PVPC prices, 1739 = Spot prices, 10211 = Market price
                                         </p>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Date
                                         </label>
                                         <input
                                             type="date"
                                             value={esiosDate}
                                             onChange={(e) => setEsiosDate(e.target.value)}
-                                            className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                            className="w-full px-3 py-1.5 bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
                                         />
                                     </div>
-                                    <div className="p-3 border border-slate-200 rounded-lg">
-                                        <p className="text-xs text-slate-700 font-medium mb-1">Using Token:</p>
-                                        <code className="text-[10px] text-slate-600 break-all">d668...da64</code>
+                                    <div className="p-3 border border-[var(--border-light)] rounded-lg">
+                                        <p className="text-xs text-[var(--text-primary)] font-medium mb-1">Using Token:</p>
+                                        <code className="text-[10px] text-[var(--text-secondary)] break-all">d668...da64</code>
                                     </div>
                                     {/* Feedback Link */}
-                                    <div className="pt-3 border-t border-slate-200">
+                                    <div className="pt-3 border-t border-[var(--border-light)]">
                                         <button
                                             onClick={() => openFeedbackPopup('esios', 'ESIOS Energy Prices')}
-                                            className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
+                                            className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
                                         >
                                             <MessageSquare size={12} />
                                             What would you like this node to do?
@@ -7864,14 +7435,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <>
                                         <button
                                             onClick={() => setConfiguringClimatiqNodeId(null)}
-                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveClimatiqConfig}
                                             disabled={climatiqSelectedIndex === null}
-                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
@@ -7880,7 +7451,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                 <div className="space-y-5">
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Search
                                         </label>
                                         <div className="flex gap-2">
@@ -7890,12 +7461,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 onChange={(e) => setClimatiqQuery(e.target.value)}
                                                 onKeyDown={(e) => e.key === 'Enter' && searchClimatiq()}
                                                 placeholder="e.g., Passenger diesel car"
-                                                className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                className="flex-1 px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                             />
                                             <button
                                                 onClick={searchClimatiq}
                                                 disabled={climatiqSearching || !climatiqQuery.trim()}
-                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
                                             >
                                                 {climatiqSearching ? (
                                                     <>
@@ -7910,7 +7481,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 )}
                                             </button>
                                         </div>
-                                        <p className="text-[10px] text-slate-500 mt-1.5">
+                                        <p className="text-[10px] text-[var(--text-secondary)] mt-1.5">
                                             Introduce your activity and click search
                                         </p>
                                     </div>
@@ -7918,7 +7489,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     {/* Results List */}
                                     {climatiqSearchResults.length > 0 && (
                                         <div>
-                                            <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                 Similar activities and its Emission factors
                                             </label>
                                             <div className="space-y-2">
@@ -7927,27 +7498,27 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         key={index}
                                                         onClick={() => setClimatiqSelectedIndex(index)}
                                                         className={`p-2.5 border rounded-lg cursor-pointer transition-all ${climatiqSelectedIndex === index
-                                                            ? 'border-slate-400 bg-slate-50'
-                                                            : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                                            ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]'
+                                                            : 'border-[var(--border-light)] hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)]'
                                                             }`}
                                                     >
                                                         <div className="flex items-start gap-2">
                                                             <div className={`mt-0.5 w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${climatiqSelectedIndex === index
                                                                 ? 'border-slate-700 bg-slate-700'
-                                                                : 'border-slate-300'
+                                                                : 'border-[var(--border-medium)]'
                                                                 }`}>
                                                                 {climatiqSelectedIndex === index && (
                                                                     <Check size={10} className="text-white" />
                                                                 )}
                                                             </div>
                                                             <div className="flex-1 min-w-0">
-                                                                <p className="font-medium text-xs text-slate-800">
+                                                                <p className="font-medium text-xs text-[var(--text-primary)]">
                                                                     {result.factor} {result.unit}
                                                                 </p>
-                                                                <p className="text-xs text-slate-600 truncate mt-0.5">
+                                                                <p className="text-xs text-[var(--text-secondary)] truncate mt-0.5">
                                                                     {result.name} ({result.region_name || result.region})
                                                                 </p>
-                                                                <p className="text-[10px] text-slate-500 mt-0.5">
+                                                                <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">
                                                                     Source: {result.source} • Year: {result.year}
                                                                 </p>
                                                             </div>
@@ -7960,18 +7531,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                     {/* No results message */}
                                     {!climatiqSearching && climatiqSearchResults.length === 0 && climatiqQuery && (
-                                        <div className="p-3 border border-slate-200 rounded-lg text-center">
-                                            <p className="text-xs text-slate-500">
+                                        <div className="p-3 border border-[var(--border-light)] rounded-lg text-center">
+                                            <p className="text-xs text-[var(--text-secondary)]">
                                                 Introduce your activity and click search
                                             </p>
                                         </div>
                                     )}
 
                                     {/* Feedback Link */}
-                                    <div className="pt-3 border-t border-slate-200">
+                                    <div className="pt-3 border-t border-[var(--border-light)]">
                                         <button
                                             onClick={() => openFeedbackPopup('climatiq', 'Climatiq Emissions')}
-                                            className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
+                                            className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
                                         >
                                             <MessageSquare size={12} />
                                             What would you like this node to do?
@@ -7993,7 +7564,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 footer={
                                     <button
                                         onClick={() => setConfiguringHumanApprovalNodeId(null)}
-                                        className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                     >
                                         Close
                                     </button>
@@ -8001,12 +7572,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                     <div className="space-y-5">
                                         <div>
-                                            <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                 Assign to
                                             </label>
                                             {organizationUsers.length === 0 ? (
-                                            <div className="flex items-center justify-center py-8 text-slate-400">
-                                                <div className="w-5 h-5 border-2 border-slate-300 border-t-teal-500 rounded-full animate-spin mr-2" />
+                                            <div className="flex items-center justify-center py-8 text-[var(--text-tertiary)]">
+                                                <div className="w-5 h-5 border-2 border-[var(--border-medium)] border-t-teal-500 rounded-full animate-spin mr-2" />
                                                 Loading users...
                                             </div>
                                         ) : (
@@ -8020,23 +7591,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             onClick={() => saveHumanApprovalConfig(user.id, user.name || user.email, user.profilePhoto)}
                                                             className={`w-full p-3 rounded-lg border-2 text-left transition-all flex items-center gap-3 ${
                                                                 isSelected
-                                                                    ? 'border-slate-400 bg-slate-50'
-                                                                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                                                                    ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]'
+                                                                    : 'border-[var(--border-light)] hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)]/50'
                                                             }`}
                                                         >
                                                             <UserAvatar name={user.name || user.email} profilePhoto={user.profilePhoto} size="sm" />
                                                             <div className="flex-1 min-w-0">
-                                                                <div className="font-medium text-slate-800 truncate">
+                                                                <div className="font-medium text-[var(--text-primary)] truncate">
                                                                     {user.name || 'Unnamed User'}
                                                                 </div>
-                                                                <div className="text-xs text-slate-500 truncate">
+                                                                <div className="text-xs text-[var(--text-secondary)] truncate">
                                                                     {user.email}
                                                                 </div>
                                                             </div>
                                                             <span className={`text-xs px-2 py-1 rounded-full ${
                                                                 user.role === 'admin' 
-                                                                    ? 'bg-slate-100 text-slate-700' 
-                                                                    : 'bg-slate-100 text-slate-600'
+                                                                    ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]' 
+                                                                    : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
                                                             }`}>
                                                                 {user.role}
                                                             </span>
@@ -8108,23 +7679,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                             return (
                                 <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-black/40 backdrop-blur-sm pointer-events-none" onClick={() => setViewingDataNodeId(null)}>
-                                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-[95vw] h-[90vh] overflow-hidden flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                                    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-[95vw] h-[90vh] overflow-hidden flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                                         {/* Header */}
-                                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white shrink-0">
+                                        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-light)] bg-[var(--bg-card)] shrink-0">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
-                                                    <Database className="text-slate-600" size={18} />
+                                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center">
+                                                    <Database className="text-[var(--text-secondary)]" size={18} />
                                                 </div>
                                                 <div>
-                                                    <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                    <h3 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                                         {node.label} - Data Preview
                                                     </h3>
-                                                    <p className="text-xs text-slate-500 mt-0.5">View node data</p>
+                                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">View node data</p>
                                                 </div>
                                             </div>
                                             <button
                                                 onClick={() => setViewingDataNodeId(null)}
-                                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                                className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                                                 aria-label="Close"
                                             >
                                                 <X size={18} />
@@ -8135,13 +7706,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <div className="flex-1 overflow-hidden flex flex-col px-6 py-4">
                                             {/* Tabs - different for splitColumns */}
                                             {isSplitColumnsNode ? (
-                                                <div className="flex gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200 mb-4 shrink-0">
+                                                <div className="flex gap-1 bg-[var(--bg-tertiary)] p-1 rounded-lg border border-[var(--border-light)] mb-4 shrink-0">
                                                     {hasInput && (
                                                         <button
                                                             onClick={() => setSplitViewTab('input')}
                                                             className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${splitViewTab === 'input'
-                                                                ? 'bg-white text-slate-900 shadow-sm'
-                                                                : 'text-slate-600 hover:text-slate-800'
+                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                                                 }`}
                                                         >
                                                             Input ({Array.isArray(nodeInputData) ? nodeInputData.length : 0})
@@ -8151,8 +7722,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         <button
                                                             onClick={() => setSplitViewTab('outputA')}
                                                             className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${splitViewTab === 'outputA'
-                                                                ? 'bg-white text-slate-900 shadow-sm'
-                                                                : 'text-slate-600 hover:text-slate-800'
+                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                                                 }`}
                                                         >
                                                             <span className="flex items-center justify-center gap-1.5">
@@ -8165,8 +7736,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         <button
                                                             onClick={() => setSplitViewTab('outputB')}
                                                             className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${splitViewTab === 'outputB'
-                                                                ? 'bg-white text-slate-900 shadow-sm'
-                                                                : 'text-slate-600 hover:text-slate-800'
+                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                                                 }`}
                                                         >
                                                             <span className="flex items-center justify-center gap-1.5">
@@ -8179,12 +7750,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             ) : (
                                                 // Only show tabs if both exist, or show single tab without tab styling
                                                 (hasInput && hasOutput) ? (
-                                                    <div className="flex gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200 mb-4 shrink-0">
+                                                    <div className="flex gap-1 bg-[var(--bg-tertiary)] p-1 rounded-lg border border-[var(--border-light)] mb-4 shrink-0">
                                                         <button
                                                             onClick={() => setDataViewTab('input')}
                                                             className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${effectiveTab === 'input'
-                                                                ? 'bg-white text-slate-900 shadow-sm'
-                                                                : 'text-slate-600 hover:text-slate-800'
+                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                                                 }`}
                                                         >
                                                             Input ({Array.isArray(nodeInputData) ? nodeInputData.length : 0})
@@ -8192,8 +7763,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         <button
                                                             onClick={() => setDataViewTab('output')}
                                                             className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${effectiveTab === 'output'
-                                                                ? 'bg-white text-slate-900 shadow-sm'
-                                                                : 'text-slate-600 hover:text-slate-800'
+                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                                                 }`}
                                                         >
                                                             Output ({Array.isArray(nodeOutputData) ? nodeOutputData.length : 0})
@@ -8202,7 +7773,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 ) : (
                                                     // Single tab - show label without tab styling
                                                     <div className="mb-4 shrink-0">
-                                                        <div className="text-sm font-medium text-slate-700">
+                                                        <div className="text-sm font-medium text-[var(--text-primary)]">
                                                             {hasInput ? `Input (${Array.isArray(nodeInputData) ? nodeInputData.length : 0})` : `Output (${Array.isArray(nodeOutputData) ? nodeOutputData.length : 0})`}
                                                         </div>
                                                     </div>
@@ -8315,18 +7886,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     return displayData && displayData.length > 0 && allKeys.length > 0 ? (
                                                         <>
                                                             {isLimited && (
-                                                                <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2.5 rounded-lg mb-4 text-sm flex items-center gap-2 shrink-0">
+                                                                <div className="bg-[var(--bg-tertiary)] border border-[var(--border-light)] text-[var(--text-secondary)] px-4 py-2.5 rounded-lg mb-4 text-sm flex items-center gap-2 shrink-0">
                                                                     <AlertCircle size={16} />
                                                                     <span>Showing first {MAX_PREVIEW_ROWS.toLocaleString()} of {totalRows.toLocaleString()} rows</span>
                                                                 </div>
                                                             )}
-                                                            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                                                            <div className="border border-[var(--border-light)] rounded-lg overflow-hidden bg-[var(--bg-card)] shadow-sm">
                                                                 <div className="overflow-auto max-h-full">
                                                                     <table className="w-full text-sm">
-                                                                        <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+                                                                        <thead className="bg-[var(--bg-tertiary)] border-b border-[var(--border-light)] sticky top-0 z-10">
                                                                             <tr>
                                                                                 {allKeys.map(key => (
-                                                                                    <th key={key} className="px-4 py-3 text-left font-medium text-slate-700 whitespace-nowrap">
+                                                                                    <th key={key} className="px-4 py-3 text-left font-medium text-[var(--text-primary)] whitespace-nowrap">
                                                                                         {key}
                                                                                     </th>
                                                                                 ))}
@@ -8334,7 +7905,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                         </thead>
                                                                         <tbody className="divide-y divide-slate-100">
                                                                             {flattenedData.map((record: any, idx: number) => (
-                                                                                <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                                                                <tr key={idx} className="hover:bg-[var(--bg-tertiary)] transition-colors">
                                                                                     {allKeys.map((key, vidx) => {
                                                                                         const value = record?.[key];
                                                                                         const displayValue = value === null || value === undefined 
@@ -8344,9 +7915,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                                                 : String(value);
                                                                                         
                                                                                         return (
-                                                                                            <td key={`${idx}-${vidx}`} className="px-4 py-3 text-slate-600">
+                                                                                            <td key={`${idx}-${vidx}`} className="px-4 py-3 text-[var(--text-secondary)]">
                                                                                                 <div className="max-w-[400px] break-words" title={displayValue}>
-                                                                                                    <span className={value === null || value === undefined ? 'text-slate-300' : 'text-slate-700'}>
+                                                                                                    <span className={value === null || value === undefined ? 'text-[var(--text-tertiary)]' : 'text-[var(--text-primary)]'}>
                                                                                                         {displayValue}
                                                                                                     </span>
                                                                                                 </div>
@@ -8360,15 +7931,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 </div>
                                                             </div>
                                                             {totalRows > 0 && (
-                                                                <div className="mt-4 text-sm text-slate-500 text-center shrink-0">
+                                                                <div className="mt-4 text-sm text-[var(--text-secondary)] text-center shrink-0">
                                                                     <span className="font-medium">{totalRows.toLocaleString()}</span> {totalRows === 1 ? 'row' : 'rows'} total
                                                                 </div>
                                                             )}
                                                         </>
                                                     ) : (
                                                         <div className="text-center py-12">
-                                                            <Database size={32} className="mx-auto text-slate-300 mb-2" />
-                                                            <p className="text-sm text-slate-500">No data available</p>
+                                                            <Database size={32} className="mx-auto text-[var(--text-tertiary)] mb-2" />
+                                                            <p className="text-sm text-[var(--text-secondary)]">No data available</p>
                                                         </div>
                                                     );
                                                 })()}
@@ -8423,14 +7994,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <>
                                             <button
                                                 onClick={() => setConfiguringConditionNodeId(null)}
-                                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                             >
                                                 Cancel
                                             </button>
                                             <button
                                                 onClick={saveConditionConfig}
                                                 disabled={!conditionField}
-                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 Save
                                             </button>
@@ -8439,7 +8010,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 >
                                     <div className="space-y-5">
                                             <div>
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     Field Name
                                                 </label>
                                                 {hasAvailableFields ? (
@@ -8447,14 +8018,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         <select
                                                             value={conditionField}
                                                             onChange={(e) => setConditionField(e.target.value)}
-                                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
                                                         >
                                                             <option value="">Select a field...</option>
                                                             {availableFields.map(field => (
                                                                 <option key={field} value={field}>{field}</option>
                                                             ))}
                                                         </select>
-                                                        <p className="text-xs text-slate-500 mt-1">
+                                                        <p className="text-xs text-[var(--text-secondary)] mt-1">
                                                             Fields from {parentNode?.label || 'previous node'}
                                                         </p>
                                                     </>
@@ -8465,7 +8036,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             value={conditionField}
                                                             onChange={(e) => setConditionField(e.target.value)}
                                                             placeholder="e.g., status, price, name"
-                                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                         />
                                                         <p className="text-xs text-amber-600 mt-1">
                                                             ⚠️ Run the previous node first to see available fields
@@ -8474,13 +8045,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 )}
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     Operator
                                                 </label>
                                                 <select
                                                     value={conditionOperator}
                                                     onChange={(e) => setConditionOperator(e.target.value)}
-                                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                                    className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
                                                 >
                                                     <option value="equals">Equals</option>
                                                     <option value="notEquals">Not Equals</option>
@@ -8493,7 +8064,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </div>
                                             {['equals', 'notEquals', 'contains', 'greaterThan', 'lessThan'].includes(conditionOperator) && (
                                                 <div>
-                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                    <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                         Value
                                                     </label>
                                                     <input
@@ -8501,18 +8072,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         value={conditionValue}
                                                         onChange={(e) => setConditionValue(e.target.value)}
                                                         placeholder="Comparison value"
-                                                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                     />
                                                 </div>
                                             )}
 
                                             {/* Processing Mode */}
-                                            <div className="pt-2 border-t border-slate-200">
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                            <div className="pt-2 border-t border-[var(--border-light)]">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     Processing Mode
                                                 </label>
                                                 <div className="space-y-2">
-                                                    <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${conditionProcessingMode === 'batch' ? 'border-slate-400 bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                                    <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${conditionProcessingMode === 'batch' ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]' : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'}`}>
                                                         <input
                                                             type="radio"
                                                             name="processingMode"
@@ -8523,12 +8094,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         />
                                                         <div>
                                                             <span className="font-medium text-sm">Batch (all rows)</span>
-                                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                                                                 Evaluate first row → route ALL data to TRUE or FALSE
                                                             </p>
                                                         </div>
                                                     </label>
-                                                    <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${conditionProcessingMode === 'perRow' ? 'border-slate-400 bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                                    <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${conditionProcessingMode === 'perRow' ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]' : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'}`}>
                                                         <input
                                                             type="radio"
                                                             name="processingMode"
@@ -8539,7 +8110,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         />
                                                         <div>
                                                             <span className="font-medium text-sm">Per Row (filter)</span>
-                                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                                                                 Evaluate each row → matching to TRUE, non-matching to FALSE
                                                             </p>
                                                         </div>
@@ -8547,12 +8118,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 </div>
                                             </div>
                                         {/* Feedback Link */}
-                                        <div className="pt-3 border-t border-slate-200">
+                                        <div className="pt-3 border-t border-[var(--border-light)]">
                                             <button
                                                 onClick={() => openFeedbackPopup('condition', 'Condition')}
-                                                className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
+                                                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
                                             >
-                                                <MessageSquare size={12} />
+                                                <MessageSquare size={12} weight="light" />
                                                 What would you like this node to do?
                                             </button>
                                         </div>
@@ -8572,14 +8143,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <>
                                         <button
                                             onClick={() => setConfiguringAddFieldNodeId(null)}
-                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveAddFieldConfig}
                                             disabled={!addFieldName}
-                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
@@ -8588,7 +8159,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                 <div className="space-y-5">
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Field Name
                                         </label>
                                         <input
@@ -8596,11 +8167,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             value={addFieldName}
                                             onChange={(e) => setAddFieldName(e.target.value)}
                                             placeholder="e.g., Nombre, Category"
-                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Field Value
                                         </label>
                                         <input
@@ -8608,7 +8179,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             value={addFieldValue}
                                             onChange={(e) => setAddFieldValue(e.target.value)}
                                             placeholder="e.g., Albert, Active"
-                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                         />
                                     </div>
                                 </div>
@@ -8669,13 +8240,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <>
                                             <button
                                                 onClick={() => setConfiguringJoinNodeId(null)}
-                                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                             >
                                                 Cancel
                                             </button>
                                             <button
                                                 onClick={saveJoinConfig}
-                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                             >
                                                 Save
                                             </button>
@@ -8684,18 +8255,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 >
                                     <div className="space-y-5">
                                             <div>
-                                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                     Join Strategy
                                                 </label>
                                                 <select
                                                     value={joinStrategy}
                                                     onChange={(e) => setJoinStrategy(e.target.value as 'concat' | 'mergeByKey')}
-                                                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                                    className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
                                                 >
                                                     <option value="concat">Concatenate (combine all records)</option>
                                                     <option value="mergeByKey">Merge by common key</option>
                                                 </select>
-                                                <p className="text-xs text-slate-400 mt-1.5">
+                                                <p className="text-xs text-[var(--text-tertiary)] mt-1.5">
                                                     {joinStrategy === 'concat' 
                                                         ? 'All records from A and B will be combined into one list'
                                                         : 'Records with matching key values will be merged together'}
@@ -8705,11 +8276,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             {joinStrategy === 'mergeByKey' && (
                                                 <>
                                                 <div>
-                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                    <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                         Join Type
                                                     </label>
                                                     <div className="space-y-2">
-                                                        <label className={`flex items-start p-2.5 border rounded-lg cursor-pointer transition-all ${joinType === 'inner' ? 'border-slate-400 bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                                        <label className={`flex items-start p-2.5 border rounded-lg cursor-pointer transition-all ${joinType === 'inner' ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]' : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'}`}>
                                                             <input
                                                                 type="radio"
                                                                 name="joinType"
@@ -8719,13 +8290,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 className="mt-0.5 mr-3"
                                                             />
                                                             <div>
-                                                                <span className="font-medium text-xs text-slate-900">Inner Join</span>
-                                                                <p className="text-xs text-slate-400 mt-0.5">
+                                                                <span className="font-medium text-xs text-[var(--text-primary)]">Inner Join</span>
+                                                                <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
                                                                     Only records that match in both inputs
                                                                 </p>
                                                             </div>
                                                         </label>
-                                                        <label className={`flex items-start p-2.5 border rounded-lg cursor-pointer transition-all ${joinType === 'outer' ? 'border-slate-400 bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                                        <label className={`flex items-start p-2.5 border rounded-lg cursor-pointer transition-all ${joinType === 'outer' ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]' : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'}`}>
                                                             <input
                                                                 type="radio"
                                                                 name="joinType"
@@ -8735,8 +8306,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 className="mt-0.5 mr-3"
                                                             />
                                                             <div>
-                                                                <span className="font-medium text-xs text-slate-900">Outer Join</span>
-                                                                <p className="text-xs text-slate-400 mt-0.5">
+                                                                <span className="font-medium text-xs text-[var(--text-primary)]">Outer Join</span>
+                                                                <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
                                                                     All records from both inputs (empty where no match)
                                                                 </p>
                                                             </div>
@@ -8744,7 +8315,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-medium text-slate-700 mb-2">
+                                                    <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                                         Common Key Field
                                                     </label>
                                                     {allFields.length > 0 ? (
@@ -8752,7 +8323,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             <select
                                                                 value={joinKey}
                                                                 onChange={(e) => setJoinKey(e.target.value)}
-                                                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
                                                             >
                                                                 <option value="">Select a field...</option>
                                                                 {commonFields.length > 0 && (
@@ -8781,7 +8352,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 value={joinKey}
                                                                 onChange={(e) => setJoinKey(e.target.value)}
                                                                 placeholder="e.g., id, name"
-                                                                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                             />
                                                             <p className="text-xs text-amber-600 mt-1.5">
                                                                 ⚠️ Run the input nodes first to see available fields
@@ -8878,14 +8449,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <>
                                             <button
                                                 onClick={() => setConfiguringSplitColumnsNodeId(null)}
-                                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                             >
                                                 Cancel
                                             </button>
                                             <button
                                                 onClick={saveSplitColumnsConfig}
                                                 disabled={splitColumnsOutputA.length === 0 && splitColumnsOutputB.length === 0}
-                                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 Save Configuration
                                             </button>
@@ -8893,7 +8464,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     }
                                 >
                                         {allColumns.length === 0 ? (
-                                            <div className="text-center py-8 text-slate-500">
+                                            <div className="text-center py-8 text-[var(--text-secondary)]">
                                                 <Columns size={32} className="mx-auto mb-2 opacity-50" />
                                                 <p className="font-medium">No columns available</p>
                                                 <p className="text-sm">Run the previous node first to detect columns</p>
@@ -8910,19 +8481,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         <div className="flex items-center justify-between mb-2">
                                                             <div className="flex items-center gap-2">
                                                                 <div className="w-3 h-3 rounded-full bg-slate-700"></div>
-                                                                <span className="text-xs font-medium text-slate-700">Output A</span>
-                                                                <span className="text-xs text-slate-500">({splitColumnsOutputA.length} cols)</span>
+                                                                <span className="text-xs font-medium text-[var(--text-primary)]">Output A</span>
+                                                                <span className="text-xs text-[var(--text-secondary)]">({splitColumnsOutputA.length} cols)</span>
                                                             </div>
                                                             <button
                                                                 onClick={moveAllToA}
-                                                                className="text-xs text-slate-600 hover:text-slate-900 hover:underline"
+                                                                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline"
                                                             >
                                                                 Move all here
                                                             </button>
                                                         </div>
-                                                        <div className={`flex-1 border-2 rounded-lg p-2 min-h-[200px] max-h-[300px] overflow-y-auto transition-colors ${draggedColumn && !splitColumnsOutputA.includes(draggedColumn) ? 'border-slate-400 bg-slate-50' : 'border-slate-200 bg-white'}`}>
+                                                        <div className={`flex-1 border-2 rounded-lg p-2 min-h-[200px] max-h-[300px] overflow-y-auto transition-colors ${draggedColumn && !splitColumnsOutputA.includes(draggedColumn) ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]' : 'border-[var(--border-light)] bg-[var(--bg-card)]'}`}>
                                                             {splitColumnsOutputA.length === 0 ? (
-                                                                <div className="text-center py-8 text-slate-400 text-xs">
+                                                                <div className="text-center py-8 text-[var(--text-tertiary)] text-xs">
                                                                     Drop columns here
                                                                 </div>
                                                             ) : (
@@ -8933,15 +8504,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                             draggable
                                                                             onDragStart={() => handleDragStart(column)}
                                                                             onDragEnd={handleDragEnd}
-                                                                            className="flex items-center justify-between px-2.5 py-1.5 bg-white rounded border border-slate-200 cursor-grab group"
+                                                                            className="flex items-center justify-between px-2.5 py-1.5 bg-[var(--bg-card)] rounded border border-[var(--border-light)] cursor-grab group"
                                                                         >
                                                                             <div className="flex items-center gap-2">
-                                                                                <GripVertical size={12} className="text-slate-400" />
-                                                                                <span className="text-xs font-medium text-slate-700">{column}</span>
+                                                                                <GripVertical size={12} className="text-[var(--text-tertiary)]" />
+                                                                                <span className="text-xs font-medium text-[var(--text-primary)]">{column}</span>
                                                                             </div>
                                                                             <button
                                                                                 onClick={() => moveColumnToB(column)}
-                                                                                className="opacity-0 group-hover:opacity-100 text-xs text-slate-600 hover:text-slate-900 transition-opacity"
+                                                                                className="opacity-0 group-hover:opacity-100 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-opacity"
                                                                             >
                                                                                 → B
                                                                             </button>
@@ -8961,19 +8532,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         <div className="flex items-center justify-between mb-2">
                                                             <div className="flex items-center gap-2">
                                                                 <div className="w-3 h-3 rounded-full bg-slate-700"></div>
-                                                                <span className="text-xs font-medium text-slate-700">Output B</span>
-                                                                <span className="text-xs text-slate-500">({splitColumnsOutputB.length} cols)</span>
+                                                                <span className="text-xs font-medium text-[var(--text-primary)]">Output B</span>
+                                                                <span className="text-xs text-[var(--text-secondary)]">({splitColumnsOutputB.length} cols)</span>
                                                             </div>
                                                             <button
                                                                 onClick={moveAllToB}
-                                                                className="text-xs text-slate-600 hover:text-slate-900 hover:underline"
+                                                                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline"
                                                             >
                                                                 Move all here
                                                             </button>
                                                         </div>
-                                                        <div className={`flex-1 border-2 rounded-lg p-2 min-h-[200px] max-h-[300px] overflow-y-auto transition-colors ${draggedColumn && !splitColumnsOutputB.includes(draggedColumn) ? 'border-slate-400 bg-slate-50' : 'border-slate-200 bg-white'}`}>
+                                                        <div className={`flex-1 border-2 rounded-lg p-2 min-h-[200px] max-h-[300px] overflow-y-auto transition-colors ${draggedColumn && !splitColumnsOutputB.includes(draggedColumn) ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]' : 'border-[var(--border-light)] bg-[var(--bg-card)]'}`}>
                                                             {splitColumnsOutputB.length === 0 ? (
-                                                                <div className="text-center py-8 text-slate-400 text-xs">
+                                                                <div className="text-center py-8 text-[var(--text-tertiary)] text-xs">
                                                                     Drop columns here
                                                                 </div>
                                                             ) : (
@@ -8984,15 +8555,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                             draggable
                                                                             onDragStart={() => handleDragStart(column)}
                                                                             onDragEnd={handleDragEnd}
-                                                                            className="flex items-center justify-between px-2.5 py-1.5 bg-white rounded border border-slate-200 cursor-grab group"
+                                                                            className="flex items-center justify-between px-2.5 py-1.5 bg-[var(--bg-card)] rounded border border-[var(--border-light)] cursor-grab group"
                                                                         >
                                                                             <div className="flex items-center gap-2">
-                                                                                <GripVertical size={12} className="text-slate-400" />
-                                                                                <span className="text-xs font-medium text-slate-700">{column}</span>
+                                                                                <GripVertical size={12} className="text-[var(--text-tertiary)]" />
+                                                                                <span className="text-xs font-medium text-[var(--text-primary)]">{column}</span>
                                                                             </div>
                                                                             <button
                                                                                 onClick={() => moveColumnToA(column)}
-                                                                                className="opacity-0 group-hover:opacity-100 text-xs text-slate-600 hover:text-slate-900 transition-opacity"
+                                                                                className="opacity-0 group-hover:opacity-100 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-opacity"
                                                                             >
                                                                                 ← A
                                                                             </button>
@@ -9004,8 +8575,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     </div>
                                                 </div>
                                                 
-                                                <div className="mt-4 pt-3 border-t border-slate-200">
-                                                    <p className="text-xs text-slate-500">
+                                                <div className="mt-4 pt-3 border-t border-[var(--border-light)]">
+                                                    <p className="text-xs text-[var(--text-secondary)]">
                                                         <span className="font-medium">Tip:</span> Drag columns between outputs, or use the arrow buttons. Each row will be split into two datasets with the selected columns.
                                                     </p>
                                                 </div>
@@ -9027,7 +8598,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <div className="space-y-5">
                                     {/* File Upload Area */}
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Upload File
                                         </label>
                                         <div className="relative">
@@ -9043,21 +8614,21 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 htmlFor="excel-file-input"
                                                 className={`flex items-center justify-center gap-2 w-full px-4 py-6 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
                                                     isParsingExcel 
-                                                        ? 'bg-slate-50 border-slate-300 cursor-wait'
-                                                        : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                                                        ? 'bg-[var(--bg-tertiary)] border-[var(--border-medium)] cursor-wait'
+                                                        : 'border-[var(--border-medium)] hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)]'
                                                 }`}
                                             >
                                                 {isParsingExcel ? (
                                                     <>
-                                                        <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                                                        <span className="text-xs text-slate-600">Parsing file...</span>
+                                                        <div className="w-4 h-4 border-2 border-[var(--border-medium)] border-t-transparent rounded-full animate-spin" />
+                                                        <span className="text-xs text-[var(--text-secondary)]">Parsing file...</span>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <Upload className="text-slate-600" size={18} />
+                                                        <Upload className="text-[var(--text-secondary)]" size={18} />
                                                         <div className="text-center">
-                                                            <span className="text-xs text-slate-700 font-medium">Click to upload</span>
-                                                            <p className="text-[10px] text-slate-400 mt-1">CSV, XLS, XLSX supported</p>
+                                                            <span className="text-xs text-[var(--text-primary)] font-medium">Click to upload</span>
+                                                            <p className="text-[10px] text-[var(--text-tertiary)] mt-1">CSV, XLS, XLSX supported</p>
                                                         </div>
                                                     </>
                                                 )}
@@ -9069,20 +8640,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     {excelPreviewData && (
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
-                                                <label className="block text-xs font-medium text-slate-700">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)]">
                                                     Preview
                                                 </label>
-                                                <span className="text-[10px] text-slate-500">
+                                                <span className="text-[10px] text-[var(--text-secondary)]">
                                                     {excelPreviewData.rowCount} total rows • {excelPreviewData.headers.length} columns
                                                 </span>
                                             </div>
-                                            <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                            <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
                                                 <div className="overflow-x-auto max-h-48">
                                                     <table className="w-full text-xs">
-                                                        <thead className="bg-slate-50 sticky top-0">
+                                                        <thead className="bg-[var(--bg-tertiary)] sticky top-0">
                                                             <tr>
                                                                 {excelPreviewData.headers.map((header, i) => (
-                                                                    <th key={i} className="px-2 py-1.5 text-left font-medium text-slate-700 whitespace-nowrap text-xs">
+                                                                    <th key={i} className="px-2 py-1.5 text-left font-medium text-[var(--text-primary)] whitespace-nowrap text-xs">
                                                                         {header}
                                                                     </th>
                                                                 ))}
@@ -9090,9 +8661,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         </thead>
                                                         <tbody className="divide-y divide-slate-100">
                                                             {excelPreviewData.data.map((row, i) => (
-                                                                <tr key={i} className="hover:bg-slate-50">
+                                                                <tr key={i} className="hover:bg-[var(--bg-tertiary)]">
                                                                     {excelPreviewData.headers.map((header, j) => (
-                                                                        <td key={j} className="px-2 py-1.5 text-slate-600 whitespace-nowrap max-w-[120px] truncate text-xs">
+                                                                        <td key={j} className="px-2 py-1.5 text-[var(--text-secondary)] whitespace-nowrap max-w-[120px] truncate text-xs">
                                                                             {row[header] || '-'}
                                                                         </td>
                                                                     ))}
@@ -9102,7 +8673,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     </table>
                                                 </div>
                                                 {excelPreviewData.rowCount > 5 && (
-                                                    <div className="px-3 py-1.5 border-t border-slate-200 text-[10px] text-slate-500 text-center">
+                                                    <div className="px-3 py-1.5 border-t border-[var(--border-light)] text-[10px] text-[var(--text-secondary)] text-center">
                                                         Showing first 5 of {excelPreviewData.rowCount} rows
                                                     </div>
                                                 )}
@@ -9112,14 +8683,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                     {/* Current File Info */}
                                     {nodes.find(n => n.id === configuringExcelNodeId)?.config?.fileName && !excelFile && (
-                                        <div className="p-3 border border-slate-200 rounded-lg">
+                                        <div className="p-3 border border-[var(--border-light)] rounded-lg">
                                             <div className="flex items-center gap-2">
-                                                <FileSpreadsheet className="text-slate-600" size={14} />
-                                                <span className="text-xs font-medium text-slate-700">
+                                                <FileSpreadsheet className="text-[var(--text-secondary)]" size={14} />
+                                                <span className="text-xs font-medium text-[var(--text-primary)]">
                                                     {nodes.find(n => n.id === configuringExcelNodeId)?.config?.fileName}
                                                 </span>
                                             </div>
-                                            <p className="text-[10px] text-slate-500 mt-1">
+                                            <p className="text-[10px] text-[var(--text-secondary)] mt-1">
                                                 {nodes.find(n => n.id === configuringExcelNodeId)?.config?.rowCount} rows loaded
                                             </p>
                                         </div>
@@ -9139,7 +8710,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <button
                                         onClick={closePdfConfig}
                                         disabled={!pdfFile && !nodes.find(n => n.id === configuringPdfNodeId)?.config?.fileName}
-                                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Done
                                     </button>
@@ -9148,7 +8719,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <div className="space-y-5">
                                     {/* File Upload Area */}
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Upload PDF File
                                         </label>
                                         <div className="relative">
@@ -9164,21 +8735,21 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 htmlFor="pdf-file-input"
                                                 className={`flex items-center justify-center gap-2 w-full px-4 py-6 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
                                                     isParsingPdf 
-                                                        ? 'bg-slate-50 border-slate-300 cursor-wait'
-                                                        : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                                                        ? 'bg-[var(--bg-tertiary)] border-[var(--border-medium)] cursor-wait'
+                                                        : 'border-[var(--border-medium)] hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)]'
                                                 }`}
                                             >
                                                 {isParsingPdf ? (
                                                     <>
-                                                        <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                                                        <span className="text-xs text-slate-600">Parsing PDF...</span>
+                                                        <div className="w-4 h-4 border-2 border-[var(--border-medium)] border-t-transparent rounded-full animate-spin" />
+                                                        <span className="text-xs text-[var(--text-secondary)]">Parsing PDF...</span>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <Upload className="text-slate-600" size={18} />
+                                                        <Upload className="text-[var(--text-secondary)]" size={18} />
                                                         <div className="text-center">
-                                                            <span className="text-xs text-slate-700 font-medium">Click to upload</span>
-                                                            <p className="text-[10px] text-slate-400 mt-1">PDF files supported</p>
+                                                            <span className="text-xs text-[var(--text-primary)] font-medium">Click to upload</span>
+                                                            <p className="text-[10px] text-[var(--text-tertiary)] mt-1">PDF files supported</p>
                                                         </div>
                                                     </>
                                                 )}
@@ -9190,20 +8761,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     {pdfPreviewData && (
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
-                                                <label className="block text-xs font-medium text-slate-700">
+                                                <label className="block text-xs font-medium text-[var(--text-primary)]">
                                                     Extracted Text Preview
                                                 </label>
-                                                <span className="text-[10px] text-slate-500">
+                                                <span className="text-[10px] text-[var(--text-secondary)]">
                                                     {pdfPreviewData.pages} pages
                                                 </span>
                                             </div>
-                                            <div className="border border-slate-200 rounded-lg p-3 max-h-64 overflow-y-auto">
-                                                <pre className="text-xs text-slate-600 whitespace-pre-wrap font-mono">
+                                            <div className="border border-[var(--border-light)] rounded-lg p-3 max-h-64 overflow-y-auto">
+                                                <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap font-mono">
                                                     {pdfPreviewData.text.substring(0, 1000)}
                                                     {pdfPreviewData.text.length > 1000 && '\n\n... (text truncated for preview)'}
                                                 </pre>
                                             </div>
-                                            <p className="text-[10px] text-slate-500 mt-2">
+                                            <p className="text-[10px] text-[var(--text-secondary)] mt-2">
                                                 Full text ({pdfPreviewData.text.length} characters) will be available to the workflow
                                             </p>
                                         </div>
@@ -9211,14 +8782,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                     {/* Current File Info */}
                                     {nodes.find(n => n.id === configuringPdfNodeId)?.config?.fileName && !pdfFile && (
-                                        <div className="p-3 border border-slate-200 rounded-lg">
+                                        <div className="p-3 border border-[var(--border-light)] rounded-lg">
                                             <div className="flex items-center gap-2">
-                                                <FileText className="text-slate-600" size={14} />
-                                                <span className="text-xs font-medium text-slate-700">
+                                                <FileText className="text-[var(--text-secondary)]" size={14} />
+                                                <span className="text-xs font-medium text-[var(--text-primary)]">
                                                     {nodes.find(n => n.id === configuringPdfNodeId)?.config?.fileName}
                                                 </span>
                                             </div>
-                                            <p className="text-[10px] text-slate-500 mt-1">
+                                            <p className="text-[10px] text-[var(--text-secondary)] mt-1">
                                                 {nodes.find(n => n.id === configuringPdfNodeId)?.config?.pages} pages • {nodes.find(n => n.id === configuringPdfNodeId)?.config?.pdfText?.length || 0} characters
                                             </p>
                                         </div>
@@ -9238,14 +8809,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <>
                                         <button
                                             onClick={() => setConfiguringSaveNodeId(null)}
-                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveSaveRecordsConfig}
                                             disabled={!saveEntityId}
-                                            className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
@@ -9254,13 +8825,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                 <div className="space-y-6">
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Select Entity
                                         </label>
                                         <select
                                             value={saveEntityId}
                                             onChange={(e) => setSaveEntityId(e.target.value)}
-                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
                                         >
                                             <option value="">Choose entity...</option>
                                             {entities.map(entity => (
@@ -9285,14 +8856,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <>
                                     <button
                                         onClick={() => setConfiguringLLMNodeId(null)}
-                                        className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         onClick={saveLLMConfig}
                                         disabled={!llmPrompt.trim()}
-                                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Save
                                     </button>
@@ -9301,7 +8872,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         >
                                 <div className="space-y-6">
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Prompt
                                         </label>
                                         <div className="h-48">
@@ -9346,20 +8917,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             id="includeInput"
                                             checked={llmIncludeInput}
                                             onChange={(e) => setLlmIncludeInput(e.target.checked)}
-                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                            className="rounded border-[var(--border-medium)] text-indigo-600 focus:ring-indigo-500"
                                         />
-                                        <label htmlFor="includeInput" className="text-sm text-slate-700 cursor-pointer">
+                                        <label htmlFor="includeInput" className="text-sm text-[var(--text-primary)] cursor-pointer">
                                             Include Input Data (from previous node)
                                         </label>
                                     </div>
 
                                     {/* Processing Mode */}
-                                    <div className="pt-3 border-t border-slate-200">
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    <div className="pt-3 border-t border-[var(--border-light)]">
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                             Processing Mode
                                         </label>
                                         <div className="space-y-2">
-                                            <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${llmProcessingMode === 'batch' ? 'border-slate-400 bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                            <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${llmProcessingMode === 'batch' ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]' : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'}`}>
                                                 <input
                                                     type="radio"
                                                     name="llmProcessingMode"
@@ -9370,12 +8941,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 />
                                                 <div>
                                                     <span className="font-medium text-sm">Batch (all rows)</span>
-                                                    <p className="text-xs text-slate-500 mt-0.5">
+                                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                                                         Send all data in one AI call → single result
                                                     </p>
                                                 </div>
                                             </label>
-                                            <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${llmProcessingMode === 'perRow' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                                            <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${llmProcessingMode === 'perRow' ? 'border-violet-500 bg-violet-50' : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'}`}>
                                                 <input
                                                     type="radio"
                                                     name="llmProcessingMode"
@@ -9386,9 +8957,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 />
                                                 <div>
                                                     <span className="font-medium text-sm">Per Row</span>
-                                                    <p className="text-xs text-slate-500 mt-0.5">
-                                                        Call AI for each row → adds <code className="bg-slate-100 px-1 rounded">ai_result</code> field.
-                                                        Use <code className="bg-slate-100 px-1 rounded">{'{field}'}</code> in prompt for row values.
+                                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                                                        Call AI for each row → adds <code className="bg-[var(--bg-tertiary)] px-1 rounded">ai_result</code> field.
+                                                        Use <code className="bg-[var(--bg-tertiary)] px-1 rounded">{'{field}'}</code> in prompt for row values.
                                                     </p>
                                                 </div>
                                             </label>
@@ -9397,10 +8968,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 </div>
 
                                 {/* Feedback Link */}
-                                <div className="pt-3 border-t border-slate-200">
+                                <div className="pt-3 border-t border-[var(--border-light)]">
                                     <button
                                         onClick={() => openFeedbackPopup('llm', 'LLM / AI Generate')}
-                                        className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
+                                        className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
                                     >
                                         <MessageSquare size={12} />
                                         What would you like this node to do?
@@ -9421,13 +8992,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <>
                                     <button
                                         onClick={() => setConfiguringPythonNodeId(null)}
-                                        className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         onClick={savePythonConfig}
-                                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                        className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                     >
                                         Save
                                     </button>
@@ -9450,31 +9021,31 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                     {/* Code Editor */}
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Python Code
                                         </label>
                                         <div className="relative">
                                             <textarea
                                                 value={pythonCode}
                                                 onChange={(e) => setPythonCode(e.target.value)}
-                                                className="w-full px-4 py-3 bg-slate-900 text-slate-50 font-mono text-sm rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-64 resize-none"
+                                                className="w-full px-4 py-3 bg-[var(--bg-selected)] text-slate-50 font-mono text-sm rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-64 resize-none"
                                                 spellCheck={false}
                                             />
-                                            <div className="absolute top-2 right-2 text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded">
+                                            <div className="absolute top-2 right-2 text-xs text-[var(--text-secondary)] bg-slate-800 px-2 py-1 rounded">
                                                 Python 3
                                             </div>
                                         </div>
-                                        <p className="text-xs text-slate-500 mt-1">
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1">
                                             Function must be named <code>process(data)</code> and return a list.
                                         </p>
                                     </div>
                                 </div>
 
                                 {/* Feedback Link */}
-                                <div className="pt-3 border-t border-slate-200">
+                                <div className="pt-3 border-t border-[var(--border-light)]">
                                     <button
                                         onClick={() => openFeedbackPopup('python', 'Python Code')}
-                                        className="text-xs text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
+                                        className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
                                     >
                                         <MessageSquare size={12} />
                                         What would you like this node to do?
@@ -9494,14 +9065,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <>
                                     <button
                                         onClick={() => setConfiguringManualInputNodeId(null)}
-                                        className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                        className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         onClick={saveManualInputConfig}
                                         disabled={!manualInputVarName.trim()}
-                                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Save
                                     </button>
@@ -9510,7 +9081,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         >
                                 <div className="space-y-6">
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Variable Name
                                         </label>
                                         <input
@@ -9518,11 +9089,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             value={manualInputVarName}
                                             onChange={(e) => setManualInputVarName(e.target.value)}
                                             placeholder="e.g., temperature, count, status"
-                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Value
                                         </label>
                                         <input
@@ -9530,9 +9101,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             value={manualInputVarValue}
                                             onChange={(e) => setManualInputVarValue(e.target.value)}
                                             placeholder="e.g., 25, Active, Hello World"
-                                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                         />
-                                        <p className="text-xs text-slate-500 mt-1">
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1">
                                             Numbers will be parsed automatically.
                                         </p>
                                     </div>
@@ -9543,19 +9114,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     {/* Workflow Runner Modal */}
                     {showRunnerModal && (
                         <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none" onClick={() => setShowRunnerModal(false)}>
-                            <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                            <div className="bg-[var(--bg-card)] rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                                 {/* Header */}
-                                <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                                <div className="px-6 py-4 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
                                     <div className="flex items-center justify-between">
-                                        <h2 className="text-xl font-normal text-slate-800">Export Workflow</h2>
+                                        <h2 className="text-xl font-normal text-[var(--text-primary)]">Export Workflow</h2>
                                         <button
                                             onClick={() => setShowRunnerModal(false)}
-                                            className="text-slate-400 hover:text-slate-600 transition-colors"
+                                            className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
                                         >
-                                            <X size={24} />
+                                            <X size={24} weight="light" />
                                         </button>
                                     </div>
-                                    <p className="text-sm text-slate-500 mt-1">Export and share your workflow as a form</p>
+                                    <p className="text-sm text-[var(--text-secondary)] mt-1">Export and share your workflow as a form</p>
                                 </div>
 
                                 {/* Content */}
@@ -9565,7 +9136,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         {/* Shareable Link */}
                                         <div className="bg-gradient-to-r from-[#256A65]/5 to-[#256A65]/10 rounded-xl p-4 border border-[#256A65]/20">
                                             <label className="block text-sm font-normal text-teal-800 mb-2 flex items-center gap-2">
-                                                <Globe size={16} />
+                                                <Globe size={16} weight="light" />
                                                 Published Interface
                                             </label>
                                             <div className="flex gap-2">
@@ -9573,35 +9144,35 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     type="text"
                                                     readOnly
                                                     value={getShareableUrl()}
-                                                    className="flex-1 px-3 py-2 bg-white border border-[#256A65]/30 rounded-lg text-sm text-slate-600 focus:outline-none"
+                                                    className="flex-1 px-3 py-2 bg-[var(--bg-card)] border border-[#256A65]/30 rounded-lg text-sm text-[var(--text-secondary)] focus:outline-none"
                                                 />
                                                 <button
                                                     onClick={() => copyToClipboard(getShareableUrl(), 'Link copied to clipboard!')}
-                                                    className="px-4 py-2 bg-white border border-[#256A65]/30 rounded-lg hover:bg-[#256A65]/5 transition-colors text-[#1e554f] font-medium text-sm flex items-center gap-2"
+                                                    className="px-4 py-2 bg-[var(--bg-card)] border border-[#256A65]/30 rounded-lg hover:bg-[#256A65]/5 transition-colors text-[#1e554f] font-medium text-sm flex items-center gap-2"
                                                 >
-                                                    <Share2 size={16} />
+                                                    <Share2 size={16} weight="light" />
                                                     Copy
                                                 </button>
                                             </div>
                                         </div>
 
                                         {/* Embed Code Toggle */}
-                                        <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                        <div className="bg-[var(--bg-tertiary)] rounded-xl border border-[var(--border-light)] overflow-hidden">
                                             <button
                                                 onClick={() => setShowEmbedCode(!showEmbedCode)}
-                                                className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-100 transition-colors"
+                                                className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-[var(--bg-hover)] transition-colors"
                                             >
-                                                <span className="font-normal text-slate-700 flex items-center gap-2">
-                                                    <Code size={16} />
+                                                <span className="font-normal text-[var(--text-primary)] flex items-center gap-2">
+                                                    <Code size={16} weight="light" />
                                                     Embed Code
                                                 </span>
-                                                <span className={`text-slate-400 transition-transform ${showEmbedCode ? 'rotate-180' : ''}`}>
+                                                <span className={`text-[var(--text-tertiary)] transition-transform ${showEmbedCode ? 'rotate-180' : ''}`}>
                                                     ▼
                                                 </span>
                                             </button>
                                             {showEmbedCode && (
-                                                <div className="px-4 pb-4 border-t border-slate-200 pt-3">
-                                                    <p className="text-xs text-slate-500 mb-2">Copy this code to embed the form in your website or application:</p>
+                                                <div className="px-4 pb-4 border-t border-[var(--border-light)] pt-3">
+                                                    <p className="text-xs text-[var(--text-secondary)] mb-2">Copy this code to embed the form in your website or application:</p>
                                                     <div className="relative">
                                                         <pre className="bg-slate-800 text-slate-100 p-3 rounded-lg text-xs overflow-x-auto font-mono">
                                                             {getEmbedCode()}
@@ -9619,18 +9190,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </div>
 
                                     {/* Divider */}
-                                    <div className="border-t border-slate-200 my-6"></div>
+                                    <div className="border-t border-[var(--border-light)] my-6"></div>
 
                                     {/* File Input Form */}
                                     {nodes.filter(n => n.type === 'excelInput' || n.type === 'pdfInput').length > 0 && (
                                         <div className="space-y-4 mb-6">
-                                            <h3 className="font-normal text-slate-700 flex items-center gap-2">
+                                            <h3 className="font-normal text-[var(--text-primary)] flex items-center gap-2">
                                                 <Upload size={18} />
                                                 File Inputs
                                             </h3>
                                             {nodes.filter(n => n.type === 'excelInput' || n.type === 'pdfInput').map(node => (
-                                                <div key={node.id} className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                <div key={node.id} className="bg-[var(--bg-tertiary)] rounded-lg p-4 border border-[var(--border-light)]">
+                                                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                                         {node.label || (node.type === 'excelInput' ? 'Excel/CSV File' : 'PDF File')}
                                                     </label>
                                                     <div className="relative">
@@ -9651,17 +9222,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         />
                                                         <label
                                                             htmlFor={`runner-file-${node.id}`}
-                                                            className="flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-[#256A65] hover:bg-[#256A65]/5 transition-all"
+                                                            className="flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-dashed border-[var(--border-medium)] rounded-lg cursor-pointer hover:border-[#256A65] hover:bg-[#256A65]/5 transition-all"
                                                         >
                                                             {runnerFileInputs[node.id] ? (
                                                                 <>
-                                                                    <CheckCircle className="text-[#256A65]" size={20} />
-                                                                    <span className="text-slate-700 font-medium">{runnerFileInputs[node.id]?.name}</span>
+                                                                    <CheckCircle className="text-[#256A65]" size={20} weight="light" />
+                                                                    <span className="text-[var(--text-primary)] font-medium">{runnerFileInputs[node.id]?.name}</span>
                                                                 </>
                                                             ) : (
                                                                 <>
-                                                                    <Upload className="text-slate-400" size={20} />
-                                                                    <span className="text-slate-600">Click to upload {node.type === 'excelInput' ? 'Excel/CSV' : 'PDF'}</span>
+                                                                    <Upload className="text-[var(--text-tertiary)]" size={20} weight="light" />
+                                                                    <span className="text-[var(--text-secondary)]">Click to upload {node.type === 'excelInput' ? 'Excel/CSV' : 'PDF'}</span>
                                                                 </>
                                                             )}
                                                         </label>
@@ -9674,15 +9245,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     {/* Input Form */}
                                     {Object.keys(runnerInputs).length > 0 ? (
                                         <div className="space-y-4 mb-6">
-                                            <h3 className="font-normal text-slate-700 flex items-center gap-2">
-                                                <Edit size={18} />
+                                            <h3 className="font-normal text-[var(--text-primary)] flex items-center gap-2">
+                                                <Edit size={18} weight="light" />
                                                 Inputs
                                             </h3>
                                             {Object.entries(runnerInputs).map(([nodeId, value]) => {
                                                 const node = nodes.find(n => n.id === nodeId);
                                                 return (
-                                                    <div key={nodeId} className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                    <div key={nodeId} className="bg-[var(--bg-tertiary)] rounded-lg p-4 border border-[var(--border-light)]">
+                                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                                             {node?.config?.inputVarName || 'Input'}
                                                         </label>
                                                         <input
@@ -9693,14 +9264,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 [nodeId]: e.target.value
                                                             }))}
                                                             placeholder="Enter value..."
-                                                            className="w-full px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 placeholder:text-slate-400"
+                                                            className="w-full px-3 py-1.5 bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                                         />
                                                     </div>
                                                 );
                                             })}
                                         </div>
                                     ) : (
-                                        <div className="text-center py-8 text-slate-500">
+                                        <div className="text-center py-8 text-[var(--text-secondary)]">
                                             <p>No manual input nodes found in this workflow.</p>
                                             <p className="text-sm mt-1">Add "Manual Data Input" nodes to create form fields.</p>
                                         </div>
@@ -9712,7 +9283,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         disabled={isRunningWorkflow}
                                         className={`w-full py-3 rounded-lg font-normal text-white flex items-center justify-center gap-2 transition-all ${isRunningWorkflow
                                             ? 'bg-slate-400 cursor-not-allowed'
-                                            : 'bg-slate-800 hover:bg-slate-900'
+                                            : 'bg-slate-800 hover:bg-[var(--bg-selected)]'
                                             }`}
                                     >
                                         {isRunningWorkflow ? (
@@ -9722,7 +9293,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             </>
                                         ) : (
                                             <>
-                                                <PlayCircle size={20} />
+                                                <PlayCircle size={20} weight="light" />
                                                 Submit
                                             </>
                                         )}
@@ -9731,17 +9302,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     {/* Output Display */}
                                     {Object.keys(runnerOutputs).length > 0 && (
                                         <div className="mt-6 space-y-4">
-                                            <h3 className="font-normal text-slate-700 flex items-center gap-2 border-t pt-6">
-                                                <Database size={18} />
+                                            <h3 className="font-normal text-[var(--text-primary)] flex items-center gap-2 border-t pt-6">
+                                                <Database size={18} weight="light" />
                                                 Output
                                             </h3>
                                             {Object.entries(runnerOutputs).map(([nodeId, data]) => {
                                                 const node = nodes.find(n => n.id === nodeId);
                                                 return (
-                                                    <div key={nodeId} className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                                                        <h4 className="font-medium text-slate-700 mb-2">{node?.label || 'Output'}</h4>
-                                                        <div className="bg-white p-3 rounded border border-slate-300 max-h-64 overflow-auto">
-                                                            <pre className="text-xs text-slate-600 whitespace-pre-wrap">
+                                                    <div key={nodeId} className="bg-[var(--bg-tertiary)] rounded-lg p-4 border border-[var(--border-light)]">
+                                                        <h4 className="font-medium text-[var(--text-primary)] mb-2">{node?.label || 'Output'}</h4>
+                                                        <div className="bg-[var(--bg-card)] p-3 rounded border border-[var(--border-medium)] max-h-64 overflow-auto">
+                                                            <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap">
                                                                 {JSON.stringify(data, null, 2)}
                                                             </pre>
                                                         </div>
@@ -9798,49 +9369,49 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             {/* AI Confirm Dialog */}
             {showAiConfirmDialog && aiGeneratedWorkflow && (
                 <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
-                    <div className="bg-white rounded-xl shadow-2xl w-[400px] overflow-hidden pointer-events-auto" onClick={e => e.stopPropagation()}>
+                    <div className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-[400px] overflow-hidden pointer-events-auto" onClick={e => e.stopPropagation()}>
                         <div className="p-6">
                             <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-                                    <Sparkles size={20} className="text-slate-700" />
+                                <div className="w-10 h-10 bg-[var(--bg-tertiary)] rounded-lg flex items-center justify-center">
+                                    <Sparkles size={20} className="text-[var(--text-primary)]" />
                                 </div>
                                 <div>
-                                    <h3 className="font-normal text-lg text-slate-800">Workflow Generated!</h3>
-                                    <p className="text-sm text-slate-500">
+                                    <h3 className="font-normal text-lg text-[var(--text-primary)]">Workflow Generated!</h3>
+                                    <p className="text-sm text-[var(--text-secondary)]">
                                         {aiGeneratedWorkflow.nodes.length} nodes, {aiGeneratedWorkflow.connections.length} connections
                                     </p>
                                 </div>
                             </div>
 
-                            <p className="text-slate-600 mb-4">
+                            <p className="text-[var(--text-secondary)] mb-4">
                                 How would you like to add this workflow to the canvas?
                             </p>
 
                             <div className="space-y-2">
                                 <button
                                     onClick={() => applyAiWorkflow('replace')}
-                                    className="w-full p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-left"
+                                    className="w-full p-3 border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors text-left"
                                 >
-                                    <span className="font-medium text-slate-800">Replace canvas</span>
-                                    <p className="text-xs text-slate-500 mt-0.5">Clear existing nodes and start fresh</p>
+                                    <span className="font-medium text-[var(--text-primary)]">Replace canvas</span>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Clear existing nodes and start fresh</p>
                                 </button>
                                 <button
                                     onClick={() => applyAiWorkflow('add')}
-                                    className="w-full p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-left"
+                                    className="w-full p-3 border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors text-left"
                                 >
-                                    <span className="font-medium text-slate-800">Add to canvas</span>
-                                    <p className="text-xs text-slate-500 mt-0.5">Append nodes to existing workflow</p>
+                                    <span className="font-medium text-[var(--text-primary)]">Add to canvas</span>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Append nodes to existing workflow</p>
                                 </button>
                             </div>
                         </div>
 
-                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
+                        <div className="px-6 py-4 bg-[var(--bg-tertiary)] border-t border-[var(--border-light)]">
                             <button
                                 onClick={() => {
                                     setShowAiConfirmDialog(false);
                                     setAiGeneratedWorkflow(null);
                                 }}
-                                className="w-full px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                className="w-full px-4 py-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
                             >
                                 Cancel
                             </button>
@@ -9852,7 +9423,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             {/* Execution History Modal */}
             {showExecutionHistory && (
                 <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none" onClick={() => setShowExecutionHistory(false)}>
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
                         <div className="bg-gradient-to-r from-teal-600 to-teal-700 px-6 py-4 text-white rounded-t-xl shrink-0">
                             <div className="flex items-center justify-between">
@@ -9872,8 +9443,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         {/* Content */}
                         <div className="flex-1 overflow-hidden flex">
                             {/* Executions List */}
-                            <div className="w-1/3 border-r border-slate-200 overflow-y-auto">
-                                <div className="p-3 border-b border-slate-100 bg-slate-50">
+                            <div className="w-1/3 border-r border-[var(--border-light)] overflow-y-auto">
+                                <div className="p-3 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
                                     <button
                                         onClick={loadExecutionHistory}
                                         className="w-full px-3 py-2 bg-teal-100 text-[#1e554f] rounded-lg text-sm font-medium hover:bg-teal-200 transition-colors flex items-center justify-center gap-2"
@@ -9887,13 +9458,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </button>
                                 </div>
                                 {loadingExecutions ? (
-                                    <div className="p-8 text-center text-slate-500">
+                                    <div className="p-8 text-center text-[var(--text-secondary)]">
                                         <div className="w-8 h-8 border-2 border-[#256A65] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                                         Loading...
                                     </div>
                                 ) : executionHistory.length === 0 ? (
-                                    <div className="p-8 text-center text-slate-500">
-                                        <History size={32} className="mx-auto mb-2 text-slate-300" />
+                                    <div className="p-8 text-center text-[var(--text-secondary)]">
+                                        <History size={32} className="mx-auto mb-2 text-[var(--text-tertiary)]" />
                                         <p>No executions yet</p>
                                         <p className="text-xs mt-1">Run the workflow or send a webhook to see executions here</p>
                                     </div>
@@ -9903,23 +9474,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             <button
                                                 key={exec.id}
                                                 onClick={() => setSelectedExecution(exec)}
-                                                className={`w-full p-3 text-left hover:bg-slate-50 transition-colors ${selectedExecution?.id === exec.id ? 'bg-[#256A65]/5 border-l-2 border-[#256A65]' : ''}`}
+                                                className={`w-full p-3 text-left hover:bg-[var(--bg-tertiary)] transition-colors ${selectedExecution?.id === exec.id ? 'bg-[#256A65]/5 border-l-2 border-[#256A65]' : ''}`}
                                             >
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                                                         exec.status === 'completed' ? 'bg-[#256A65]/10 text-[#1e554f]' :
                                                         exec.status === 'failed' ? 'bg-red-100 text-red-700' :
                                                         exec.status === 'running' ? 'bg-yellow-100 text-yellow-700' :
-                                                        'bg-slate-100 text-slate-700'
+                                                        'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
                                                     }`}>
                                                         {exec.status}
                                                     </span>
                                                     {exec.triggerType && (
-                                                        <span className="text-xs text-slate-400">{exec.triggerType}</span>
+                                                        <span className="text-xs text-[var(--text-tertiary)]">{exec.triggerType}</span>
                                                     )}
                                                 </div>
-                                                <p className="text-xs text-slate-500">{formatDate(exec.createdAt)}</p>
-                                                <p className="text-xs text-slate-400 font-mono truncate">{exec.id}</p>
+                                                <p className="text-xs text-[var(--text-secondary)]">{formatDate(exec.createdAt)}</p>
+                                                <p className="text-xs text-[var(--text-tertiary)] font-mono truncate">{exec.id}</p>
                                             </button>
                                         ))}
                                     </div>
@@ -9930,28 +9501,28 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             <div className="flex-1 overflow-y-auto p-4">
                                 {selectedExecution ? (
                                     <div className="space-y-4">
-                                        <div className="bg-slate-50 rounded-lg p-4">
-                                            <h4 className="font-normal text-slate-800 mb-2">Execution Details</h4>
+                                        <div className="bg-[var(--bg-tertiary)] rounded-lg p-4">
+                                            <h4 className="font-normal text-[var(--text-primary)] mb-2">Execution Details</h4>
                                             <div className="grid grid-cols-2 gap-2 text-sm">
                                                 <div>
-                                                    <span className="text-slate-500">Status:</span>
+                                                    <span className="text-[var(--text-secondary)]">Status:</span>
                                                     <span className={`ml-2 font-medium ${
                                                         selectedExecution.status === 'completed' ? 'text-[#256A65]' :
                                                         selectedExecution.status === 'failed' ? 'text-red-600' :
-                                                        'text-slate-600'
+                                                        'text-[var(--text-secondary)]'
                                                     }`}>{selectedExecution.status}</span>
                                                 </div>
                                                 <div>
-                                                    <span className="text-slate-500">Trigger:</span>
-                                                    <span className="ml-2 font-medium text-slate-700">{selectedExecution.triggerType || 'manual'}</span>
+                                                    <span className="text-[var(--text-secondary)]">Trigger:</span>
+                                                    <span className="ml-2 font-medium text-[var(--text-primary)]">{selectedExecution.triggerType || 'manual'}</span>
                                                 </div>
                                                 <div>
-                                                    <span className="text-slate-500">Started:</span>
-                                                    <span className="ml-2 text-slate-700">{formatDate(selectedExecution.startedAt)}</span>
+                                                    <span className="text-[var(--text-secondary)]">Started:</span>
+                                                    <span className="ml-2 text-[var(--text-primary)]">{formatDate(selectedExecution.startedAt)}</span>
                                                 </div>
                                                 <div>
-                                                    <span className="text-slate-500">Completed:</span>
-                                                    <span className="ml-2 text-slate-700">{formatDate(selectedExecution.completedAt)}</span>
+                                                    <span className="text-[var(--text-secondary)]">Completed:</span>
+                                                    <span className="ml-2 text-[var(--text-primary)]">{formatDate(selectedExecution.completedAt)}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -9962,7 +9533,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     <ArrowRight size={16} />
                                                     Inputs
                                                 </h4>
-                                                <pre className="text-xs bg-white p-3 rounded border border-blue-100 overflow-x-auto max-h-40">
+                                                <pre className="text-xs bg-[var(--bg-card)] p-3 rounded border border-blue-100 overflow-x-auto max-h-40">
                                                     {JSON.stringify(selectedExecution.inputs, null, 2)}
                                                 </pre>
                                             </div>
@@ -9982,17 +9553,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         const nodeType = node?.type || result.nodeType || '';
                                                         
                                                         return (
-                                                            <div key={nodeId} className="bg-white p-3 rounded border border-[#256A65]/20">
+                                                            <div key={nodeId} className="bg-[var(--bg-card)] p-3 rounded border border-[#256A65]/20">
                                                                 <div className="flex items-center gap-2 mb-1">
-                                                                    <span className="font-medium text-slate-700">{nodeLabel}</span>
-                                                                    {nodeType && <span className="text-xs text-slate-400">({nodeType})</span>}
+                                                                    <span className="font-medium text-[var(--text-primary)]">{nodeLabel}</span>
+                                                                    {nodeType && <span className="text-xs text-[var(--text-tertiary)]">({nodeType})</span>}
                                                                     {result.success && <Check size={14} className="text-[#256A65]" />}
                                                                 </div>
                                                                 {result.message && (
-                                                                    <p className="text-xs text-slate-500 mb-1">{result.message}</p>
+                                                                    <p className="text-xs text-[var(--text-secondary)] mb-1">{result.message}</p>
                                                                 )}
                                                                 {result.outputData && (
-                                                                    <pre className="text-xs bg-slate-50 p-2 rounded overflow-x-auto max-h-32">
+                                                                    <pre className="text-xs bg-[var(--bg-tertiary)] p-2 rounded overflow-x-auto max-h-32">
                                                                         {JSON.stringify(result.outputData, null, 2)}
                                                                     </pre>
                                                                 )}
@@ -10009,16 +9580,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     <XCircle size={16} />
                                                     Error
                                                 </h4>
-                                                <pre className="text-xs bg-white p-3 rounded border border-red-100 text-red-600 overflow-x-auto">
+                                                <pre className="text-xs bg-[var(--bg-card)] p-3 rounded border border-red-100 text-red-600 overflow-x-auto">
                                                     {selectedExecution.error}
                                                 </pre>
                                             </div>
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="h-full flex items-center justify-center text-slate-400">
+                                    <div className="h-full flex items-center justify-center text-[var(--text-tertiary)]">
                                         <div className="text-center">
-                                            <Eye size={48} className="mx-auto mb-3 text-slate-300" />
+                                            <Eye size={48} className="mx-auto mb-3 text-[var(--text-tertiary)]" />
                                             <p>Select an execution to view details</p>
                                         </div>
                                     </div>
@@ -10032,18 +9603,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             {/* Node Feedback Popup */}
             {feedbackPopupNodeId && (
                 <div className="fixed inset-0 flex items-center justify-center z-[60] p-4 bg-black/40 backdrop-blur-sm pointer-events-none" onClick={closeFeedbackPopup}>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="px-6 py-4 border-b border-slate-200">
+                        <div className="px-6 py-4 border-b border-[var(--border-light)]">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                    <MessageSquare size={18} className="text-slate-600" />
+                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0">
+                                    <MessageSquare size={18} className="text-[var(--text-secondary)]" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                    <h3 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                         Share Your Feedback
                                     </h3>
-                                    <p className="text-xs text-slate-500 mt-0.5">Node: {feedbackPopupNodeLabel}</p>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Node: {feedbackPopupNodeLabel}</p>
                                 </div>
                             </div>
                         </div>
@@ -10051,7 +9622,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         {/* Content */}
                         <div className="px-6 py-4">
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                     What would you like this node to do?
                                 </label>
                                 <textarea
@@ -10059,27 +9630,27 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     onChange={(e) => setFeedbackText(e.target.value)}
                                     placeholder="Describe the functionality you'd like to see, any improvements, or share your ideas..."
                                     rows={4}
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 resize-none placeholder:text-slate-400 hover:border-slate-300 transition-colors"
+                                    className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] resize-none placeholder:text-[var(--text-tertiary)] hover:border-[var(--border-medium)] transition-colors"
                                     autoFocus
                                 />
-                                <p className="text-xs text-slate-500 mt-2">
+                                <p className="text-xs text-[var(--text-secondary)] mt-2">
                                     Your feedback helps us improve the platform. Thank you!
                                 </p>
                             </div>
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-slate-200 flex gap-2 justify-end">
+                        <div className="px-6 py-4 border-t border-[var(--border-light)] flex gap-2 justify-end">
                             <button
                                 onClick={closeFeedbackPopup}
-                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={submitFeedback}
                                 disabled={!feedbackText.trim() || isSubmittingFeedback}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isSubmittingFeedback ? (
                                     <>
@@ -10098,16 +9669,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             {/* Exit Confirmation Modal */}
             {showExitConfirmation && (
                 <div className="fixed inset-0 flex items-center justify-center z-[70] p-4 pointer-events-none" onClick={() => setShowExitConfirmation(false)}>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="px-6 py-5 border-b border-slate-200">
+                        <div className="px-6 py-5 border-b border-[var(--border-light)]">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                    <AlertCircle size={20} className="text-slate-600" />
+                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0">
+                                    <AlertCircle size={20} className="text-[var(--text-secondary)]" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="text-base font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Unsaved Changes</h3>
-                                    <p className="text-xs text-slate-500 mt-0.5">Do you want to save your workflow before leaving?</p>
+                                    <h3 className="text-base font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Unsaved Changes</h3>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Do you want to save your workflow before leaving?</p>
                                 </div>
                             </div>
                         </div>
@@ -10116,20 +9687,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         <div className="px-6 py-4 flex gap-2 justify-end">
                             <button
                                 onClick={() => setShowExitConfirmation(false)}
-                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={confirmExitWithoutSaving}
-                                className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                             >
                                 Don't Save
                             </button>
                             <button
                                 onClick={confirmExitWithSaving}
                                 disabled={isSaving}
-                                className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
+                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
                             >
                                 {isSaving ? (
                                     <>
@@ -10151,23 +9722,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             {/* Workflow Templates Modal */}
             {showTemplatesModal && !previewingTemplate && (
                 <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={() => !isCopyingTemplate && setShowTemplatesModal(false)}>
-                    <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="px-6 py-5 border-b border-slate-200 shrink-0">
+                        <div className="px-6 py-5 border-b border-[var(--border-light)] shrink-0">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
-                                        <BookOpen size={20} className="text-slate-600" />
+                                    <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center">
+                                        <BookOpen size={20} className="text-[var(--text-secondary)]" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Workflow Templates</h3>
-                                        <p className="text-sm text-slate-500 mt-0.5">Pre-built workflows to get you started quickly</p>
+                                        <h3 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Workflow Templates</h3>
+                                        <p className="text-sm text-[var(--text-secondary)] mt-0.5">Pre-built workflows to get you started quickly</p>
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => setShowTemplatesModal(false)}
                                     disabled={isCopyingTemplate}
-                                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                                    className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors disabled:opacity-50"
                                 >
                                     <X size={20} />
                                 </button>
@@ -10175,9 +9746,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         </div>
 
                         {/* Category Filter */}
-                        <div className="px-6 py-4 border-b border-slate-200 shrink-0">
+                        <div className="px-6 py-4 border-b border-[var(--border-light)] shrink-0">
                             <div className="flex items-center gap-3">
-                                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Category</span>
+                                <span className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Category</span>
                                 <div className="flex gap-2 flex-wrap">
                                     {templateCategories.map(category => (
                                         <button
@@ -10185,8 +9756,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             onClick={() => setSelectedTemplateCategory(category)}
                                             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                                                 selectedTemplateCategory === category
-                                                    ? 'bg-slate-900 text-white shadow-sm'
-                                                    : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                                    ? 'bg-[var(--bg-selected)] text-white shadow-sm'
+                                                    : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)]'
                                             }`}
                                         >
                                             {category}
@@ -10202,39 +9773,39 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 {filteredTemplates.map(template => (
                                     <div
                                         key={template.id}
-                                        className="bg-white border border-slate-200 rounded-lg p-5 group hover:shadow-md transition-shadow cursor-pointer"
+                                        className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 group hover:shadow-md transition-shadow cursor-pointer"
                                         onClick={() => setPreviewingTemplate(template)}
                                     >
                                         <div className="flex justify-between items-start mb-4">
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-2">
-                                                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center flex-shrink-0 group-hover:from-slate-100 group-hover:to-slate-200 transition-all">
-                                                        <Workflow size={16} className="text-slate-600" />
+                                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-light)] flex items-center justify-center flex-shrink-0 hover:bg-[var(--bg-selected)] transition-all">
+                                                        <Workflow size={16} className="text-[var(--text-secondary)]" />
                                                     </div>
-                                                    <h4 className="text-base font-normal text-slate-900 group-hover:text-slate-700 transition-colors truncate" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                    <h4 className="text-base font-normal text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors truncate" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                                         {template.name}
                                                     </h4>
                                                 </div>
-                                                <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded mt-1">
+                                                <span className="inline-block px-2 py-0.5 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs rounded mt-1">
                                                     {template.category}
                                                 </span>
                                             </div>
                                         </div>
                                         
-                                        <p className="text-sm text-slate-600 mb-4 min-h-[48px] line-clamp-2">
+                                        <p className="text-sm text-[var(--text-secondary)] mb-4 min-h-[48px] line-clamp-2">
                                             {template.description}
                                         </p>
 
                                         {/* Mini workflow preview */}
-                                        <div className="bg-slate-50 rounded-lg p-3 mb-4 border border-slate-100">
-                                            <div className="flex items-center gap-3 text-xs text-slate-500 mb-2">
+                                        <div className="bg-[var(--bg-tertiary)] rounded-lg p-3 mb-4 border border-[var(--border-light)]">
+                                            <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)] mb-2">
                                                 <span className="flex items-center gap-1.5">
                                                     <div className="w-1.5 h-1.5 bg-slate-400 rounded-full"></div>
                                                     {template.nodes.length} nodes
                                                 </span>
-                                                <span className="text-slate-300">•</span>
+                                                <span className="text-[var(--text-tertiary)]">•</span>
                                                 <span className="flex items-center gap-1.5">
-                                                    <ArrowRight size={12} className="text-slate-400" />
+                                                    <ArrowRight size={12} className="text-[var(--text-tertiary)]" weight="light" />
                                                     {template.connections.length} connections
                                                 </span>
                                             </div>
@@ -10242,13 +9813,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 {template.nodes.slice(0, 4).map((node, idx) => (
                                                     <span
                                                         key={idx}
-                                                        className="px-2 py-0.5 bg-white text-slate-600 text-xs rounded border border-slate-200"
+                                                        className="px-2 py-0.5 bg-[var(--bg-card)] text-[var(--text-secondary)] text-xs rounded border border-[var(--border-light)]"
                                                     >
                                                         {node.label}
                                                     </span>
                                                 ))}
                                                 {template.nodes.length > 4 && (
-                                                    <span className="px-2 py-0.5 text-slate-400 text-xs">
+                                                    <span className="px-2 py-0.5 text-[var(--text-tertiary)] text-xs">
                                                         +{template.nodes.length - 4}
                                                     </span>
                                                 )}
@@ -10262,7 +9833,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     e.stopPropagation();
                                                     setPreviewingTemplate(template);
                                                 }}
-                                                className="flex-1 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2"
+                                                className="flex-1 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)] rounded-lg text-xs font-medium hover:bg-[var(--bg-tertiary)] hover:border-[var(--border-medium)] transition-all flex items-center justify-center gap-2"
                                             >
                                                 <Eye size={14} />
                                                 Preview
@@ -10273,7 +9844,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     copyTemplateToWorkflows(template);
                                                 }}
                                                 disabled={isCopyingTemplate}
-                                                className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                                                className="flex-1 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
                                             >
                                                 {isCopyingTemplate ? (
                                                     <>
@@ -10282,7 +9853,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <Copy size={14} />
+                                                        <Copy size={14} weight="light" />
                                                         Use Template
                                                     </>
                                                 )}
@@ -10294,25 +9865,25 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                             {filteredTemplates.length === 0 && (
                                 <div className="text-center py-16">
-                                    <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
-                                        <BookOpen size={32} className="text-slate-400" />
+                                    <div className="w-16 h-16 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center mx-auto mb-4">
+                                        <BookOpen size={32} className="text-[var(--text-tertiary)]" />
                                     </div>
-                                    <h3 className="text-base font-normal text-slate-700 mb-2">No templates found</h3>
-                                    <p className="text-sm text-slate-500">Try selecting a different category</p>
+                                    <h3 className="text-base font-normal text-[var(--text-primary)] mb-2">No templates found</h3>
+                                    <p className="text-sm text-[var(--text-secondary)]">Try selecting a different category</p>
                                 </div>
                             )}
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-slate-200 shrink-0">
+                        <div className="px-6 py-4 border-t border-[var(--border-light)] shrink-0">
                             <div className="flex items-center justify-between">
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-[var(--text-secondary)]">
                                     {filteredTemplates.length} template{filteredTemplates.length !== 1 ? 's' : ''} available
                                 </p>
                                 <button
                                     onClick={() => setShowTemplatesModal(false)}
                                     disabled={isCopyingTemplate}
-                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                                    className="px-4 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
                                 >
                                     Close
                                 </button>
@@ -10325,22 +9896,22 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             {/* Template Preview Modal */}
             {previewingTemplate && (
                 <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[60] p-4" onClick={() => setPreviewingTemplate(null)}>
-                    <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="px-6 py-5 border-b border-slate-200 shrink-0">
+                        <div className="px-6 py-5 border-b border-[var(--border-light)] shrink-0">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
-                                        <Eye size={20} className="text-slate-600" />
+                                    <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center">
+                                        <Eye size={20} className="text-[var(--text-secondary)]" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Template Preview</h3>
-                                        <p className="text-sm text-slate-500 mt-0.5">{previewingTemplate.name}</p>
+                                        <h3 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Template Preview</h3>
+                                        <p className="text-sm text-[var(--text-secondary)] mt-0.5">{previewingTemplate.name}</p>
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => setPreviewingTemplate(null)}
-                                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                    className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
                                 >
                                     <X size={20} />
                                 </button>
@@ -10348,7 +9919,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         </div>
 
                         {/* Preview Canvas */}
-                        <div className="overflow-hidden bg-slate-50 relative border-b border-slate-200" style={{ height: '450px' }}>
+                        <div className="overflow-hidden bg-[var(--bg-tertiary)] relative border-b border-[var(--border-light)]" style={{ height: '450px' }}>
                             <div 
                                 className="absolute inset-0 overflow-auto p-8 custom-scrollbar"
                                 style={{
@@ -10406,14 +9977,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         return (
                                             <div
                                                 key={node.id}
-                                                className="absolute bg-white rounded-lg border border-slate-200 shadow-sm p-3 w-[140px] hover:shadow-md transition-shadow"
+                                                className="absolute bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-sm p-3 w-[140px] hover:shadow-md transition-shadow"
                                                 style={{ left: node.x, top: node.y }}
                                             >
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0">
                                                         <IconComponent size={14} className={iconBg} />
                                                     </div>
-                                                    <span className="text-xs font-normal text-slate-900 truncate flex-1" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                    <span className="text-xs font-normal text-[var(--text-primary)] truncate flex-1" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                                         {node.label}
                                                     </span>
                                                 </div>
@@ -10424,7 +9995,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     </div>
                                                 )}
                                                 {node.type === 'comment' && node.config?.commentText && (
-                                                    <p className="text-[10px] text-slate-500 mt-2 line-clamp-2">
+                                                    <p className="text-[10px] text-[var(--text-secondary)] mt-2 line-clamp-2">
                                                         {node.config.commentText}
                                                     </p>
                                                 )}
@@ -10436,35 +10007,35 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         </div>
 
                         {/* Template Info */}
-                        <div className="px-6 py-4 border-t border-slate-200 shrink-0">
+                        <div className="px-6 py-4 border-t border-[var(--border-light)] shrink-0">
                             <div className="flex items-start justify-between mb-3">
                                 <div className="flex-1">
-                                    <h4 className="text-base font-normal text-slate-900 mb-1" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{previewingTemplate.name}</h4>
-                                    <p className="text-sm text-slate-600">{previewingTemplate.description}</p>
+                                    <h4 className="text-base font-normal text-[var(--text-primary)] mb-1" style={{ fontFamily: "'Berkeley Mono', monospace" }}>{previewingTemplate.name}</h4>
+                                    <p className="text-sm text-[var(--text-secondary)]">{previewingTemplate.description}</p>
                                 </div>
-                                <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs rounded ml-4 flex-shrink-0">
+                                <span className="px-3 py-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs rounded ml-4 flex-shrink-0">
                                     {previewingTemplate.category}
                                 </span>
                             </div>
-                            <div className="flex items-center gap-4 text-xs text-slate-500">
+                            <div className="flex items-center gap-4 text-xs text-[var(--text-secondary)]">
                                 <span className="flex items-center gap-1.5">
                                     <div className="w-1.5 h-1.5 bg-slate-400 rounded-full"></div>
                                     {previewingTemplate.nodes.length} nodes
                                 </span>
-                                <span className="text-slate-300">•</span>
+                                <span className="text-[var(--text-tertiary)]">•</span>
                                 <span className="flex items-center gap-1.5">
-                                    <ArrowRight size={12} className="text-slate-400" />
+                                    <ArrowRight size={12} className="text-[var(--text-tertiary)]" weight="light" />
                                     {previewingTemplate.connections.length} connections
                                 </span>
                             </div>
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-slate-200 shrink-0">
+                        <div className="px-6 py-4 border-t border-[var(--border-light)] shrink-0">
                             <div className="flex items-center justify-end gap-2">
                                 <button
                                     onClick={() => setPreviewingTemplate(null)}
-                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors"
+                                    className="px-4 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-lg text-xs font-medium transition-colors"
                                 >
                                     Back
                                 </button>
@@ -10474,7 +10045,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         setPreviewingTemplate(null);
                                     }}
                                     disabled={isCopyingTemplate}
-                                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm hover:shadow-md"
+                                    className="px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm hover:shadow-md"
                                 >
                                     {isCopyingTemplate ? (
                                         <>
@@ -10483,7 +10054,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </>
                                     ) : (
                                         <>
-                                            <Copy size={14} />
+                                            <Copy size={14} weight="light" />
                                             Use This Template
                                         </>
                                     )}
@@ -10501,23 +10072,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     setConnectingFromNodeId(null);
                     setComponentSearchQuery('');
                 }}>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-[#256A65]/5 to-transparent">
-                            <h3 className="text-base font-normal text-slate-900">Connect Component</h3>
-                            <p className="text-xs text-slate-500 mt-0.5">Search and select a component to connect</p>
+                        <div className="px-6 py-5 border-b border-[var(--border-light)] bg-gradient-to-r from-[#256A65]/5 to-transparent">
+                            <h3 className="text-base font-normal text-[var(--text-primary)]">Connect Component</h3>
+                            <p className="text-xs text-[var(--text-secondary)] mt-0.5">Search and select a component to connect</p>
                         </div>
                         
                         {/* Search Input */}
-                        <div className="px-6 py-4 border-b border-slate-200">
+                        <div className="px-6 py-4 border-b border-[var(--border-light)]">
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} weight="light" />
                                 <input
                                     type="text"
                                     value={componentSearchQuery}
                                     onChange={(e) => setComponentSearchQuery(e.target.value)}
                                     placeholder="Search components..."
-                                    className="w-full pl-10 pr-4 py-2 bg-white text-slate-700 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-slate-400"
+                                    className="w-full pl-10 pr-4 py-2 bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-medium)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-[var(--text-tertiary)]"
                                     autoFocus
                                 />
                             </div>
@@ -10540,19 +10111,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <button
                                             key={item.type}
                                             onClick={() => handleQuickConnect(item.type)}
-                                            className="w-full flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:border-[#256A65] hover:bg-[#256A65]/5 transition-all text-left mb-2 group"
+                                            className="w-full flex items-start gap-3 p-3 rounded-lg border border-[var(--border-light)] hover:border-[#256A65] hover:bg-[#256A65]/5 transition-all text-left mb-2 group"
                                         >
                                             <div className="p-1.5 rounded-lg flex-shrink-0">
-                                                <Icon size={14} className={getNodeIconBg(item.type)} />
+                                                <Icon size={14} className={getNodeIconBg(item.type)} weight="light" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="font-normal text-sm text-slate-900 group-hover:text-[#256A65] transition-colors">
+                                                <div className="font-normal text-sm text-[var(--text-primary)] group-hover:text-[#256A65] transition-colors">
                                                     {item.label}
                                                 </div>
-                                                <div className="text-xs text-slate-500 mt-0.5">
+                                                <div className="text-xs text-[var(--text-secondary)] mt-0.5">
                                                     {item.description}
                                                 </div>
-                                                <div className="text-[10px] text-slate-400 mt-1">
+                                                <div className="text-[10px] text-[var(--text-tertiary)] mt-1">
                                                     {item.category}
                                                 </div>
                                             </div>
@@ -10567,21 +10138,21 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                  item.description.toLowerCase().includes(componentSearchQuery.toLowerCase()) ||
                                  item.category.toLowerCase().includes(componentSearchQuery.toLowerCase()))
                             ).length === 0 && (
-                                <div className="text-center py-8 text-slate-400 text-sm">
+                                <div className="text-center py-8 text-[var(--text-tertiary)] text-sm">
                                     No components found
                                 </div>
                             )}
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-slate-200 flex justify-end">
+                        <div className="px-6 py-4 border-t border-[var(--border-light)] flex justify-end">
                             <button
                                 onClick={() => {
                                     setShowComponentSearch(false);
                                     setConnectingFromNodeId(null);
                                     setComponentSearchQuery('');
                                 }}
-                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-700 transition-colors"
+                                className="px-4 py-2 border border-[var(--border-medium)] rounded-lg hover:bg-[var(--bg-tertiary)] text-sm font-medium text-[var(--text-primary)] transition-colors"
                             >
                                 Cancel
                             </button>
@@ -10593,23 +10164,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             {/* Tags Modal */}
             {showTagsModal && (
                 <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={() => setShowTagsModal(false)}>
-                    <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <div className="px-6 py-4 border-b border-slate-200">
-                            <h3 className="text-lg font-normal text-slate-900 flex items-center gap-2">
-                                <Tag size={20} className="text-slate-600" />
+                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+                        <div className="px-6 py-4 border-b border-[var(--border-light)]">
+                            <h3 className="text-lg font-normal text-[var(--text-primary)] flex items-center gap-2">
+                                <Tag size={20} className="text-[var(--text-secondary)]" weight="light" />
                                 Manage Tags
                             </h3>
                         </div>
                         <div className="px-6 py-4">
                             {/* Current Tags */}
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Current Tags</label>
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Current Tags</label>
                                 {workflowTags.length > 0 ? (
                                     <div className="flex flex-wrap gap-2">
                                         {workflowTags.map((tag, idx) => (
                                             <span
                                                 key={idx}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-light)]"
                                             >
                                                 {tag}
                                                 <button
@@ -10618,19 +10189,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     }}
                                                     className="ml-1 hover:text-red-600 transition-colors"
                                                 >
-                                                    <X size={14} />
+                                                    <X size={14} weight="light" />
                                                 </button>
                                             </span>
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-slate-500">No tags added yet</p>
+                                    <p className="text-sm text-[var(--text-secondary)]">No tags added yet</p>
                                 )}
                             </div>
 
                             {/* Add New Tag */}
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Add Tag</label>
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Add Tag</label>
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
@@ -10646,7 +10217,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             }
                                         }}
                                         placeholder="Enter tag name..."
-                                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300"
+                                        className="flex-1 px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
                                     />
                                     <button
                                         onClick={() => {
@@ -10655,20 +10226,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 setNewTagInput('');
                                             }
                                         }}
-                                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors"
+                                        className="px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-colors"
                                     >
                                         Add
                                     </button>
                                 </div>
                             </div>
                         </div>
-                        <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
+                        <div className="px-6 py-4 border-t border-[var(--border-light)] flex justify-end gap-2">
                             <button
                                 onClick={() => {
                                     setShowTagsModal(false);
                                     setNewTagInput('');
                                 }}
-                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium"
+                                className="px-4 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-tertiary)] rounded-lg text-sm font-medium"
                             >
                                 Cancel
                             </button>
@@ -10699,7 +10270,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     setShowTagsModal(false);
                                     setNewTagInput('');
                                 }}
-                                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium"
+                                className="px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium"
                             >
                                 Save
                             </button>

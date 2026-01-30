@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { CaretLeft, CaretRight } from '@phosphor-icons/react';
 
 interface PaginationProps {
     currentPage: number;
@@ -71,8 +71,8 @@ export const Pagination: React.FC<PaginationProps> = ({
     const pageNumbers = getPageNumbers();
 
     return (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-white">
-            <div className="flex items-center gap-2 text-sm text-slate-600">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-light)] bg-[var(--bg-card)]">
+            <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
                 {itemsPerPage && totalItems && (
                     <span>
                         Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} results
@@ -86,16 +86,16 @@ export const Pagination: React.FC<PaginationProps> = ({
                     className={`p-1.5 rounded-md transition-colors ${
                         currentPage === 1
                             ? 'text-slate-300 cursor-not-allowed'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'
                     }`}
                 >
-                    <ChevronLeft size={18} />
+                    <CaretLeft size={18} weight="light" />
                 </button>
 
                 {pageNumbers.map((page, index) => {
                     if (page === '...') {
                         return (
-                            <span key={`ellipsis-${index}`} className="px-2 text-slate-400">
+                            <span key={`ellipsis-${index}`} className="px-2 text-[var(--text-tertiary)]">
                                 ...
                             </span>
                         );
@@ -108,8 +108,8 @@ export const Pagination: React.FC<PaginationProps> = ({
                             onClick={() => onPageChange(pageNum)}
                             className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                                 currentPage === pageNum
-                                    ? 'bg-slate-900 text-white'
-                                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                    ? 'bg-[var(--bg-selected)] text-white'
+                                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'
                             }`}
                         >
                             {pageNum}
@@ -123,10 +123,10 @@ export const Pagination: React.FC<PaginationProps> = ({
                     className={`p-1.5 rounded-md transition-colors ${
                         currentPage === totalPages
                             ? 'text-slate-300 cursor-not-allowed'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'
                     }`}
                 >
-                    <ChevronRight size={18} />
+                    <CaretRight size={18} weight="light" />
                 </button>
             </div>
         </div>

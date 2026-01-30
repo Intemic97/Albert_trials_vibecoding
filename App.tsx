@@ -1,55 +1,74 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { TopNav } from './components/TopNav';
 import { EntityCard } from './components/EntityCard';
-import { Reporting } from './components/Reporting';
-import { ReportEditor } from './components/ReportEditor';
-import { Dashboard } from './components/Dashboard';
-import { Overview } from './components/Overview';
-import { Workflows } from './components/Workflows';
-import { PublicWorkflowForm } from './components/PublicWorkflowForm';
 import { LoginPage } from './components/LoginPage';
 import { VerifyEmail } from './components/VerifyEmail';
 import { AcceptInvite } from './components/AcceptInvite';
 import { ForgotPassword } from './components/ForgotPassword';
 import { ResetPassword } from './components/ResetPassword';
-import { InteractiveTutorial } from './components/InteractiveTutorial';
 import { ReportBugModal } from './components/ReportBugModal';
-import { Settings } from './components/Settings';
-import { SharedDashboard } from './components/SharedDashboard';
-import { AdminPanel } from './components/AdminPanel';
 import { OnboardingModal } from './components/OnboardingModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Entity, Property, PropertyType } from './types';
-import { Plus, Search, Filter, ArrowLeft, Trash2, Link as LinkIcon, Type, Hash, Pencil, X, Code, Paperclip, Download, Loader2, Sparkles } from 'lucide-react';
-import { Copilots } from './components/Copilots';
-import { LogsAndAlerts } from './components/LogsAndAlerts';
-import { Connections } from './components/Connections';
-import { Documentation } from './components/Documentation';
-import { KnowledgeBase } from './components/KnowledgeBase';
-import { Simulations } from './components/Simulations';
+import { Plus, MagnifyingGlass, Funnel, ArrowLeft, Trash, Link as LinkIcon, TextT, Hash, PencilSimple, X, Code, Paperclip, Download, SpinnerGap, Sparkle } from '@phosphor-icons/react';
 import { Tabs } from './components/Tabs';
 import { API_BASE } from './config';
 
+// Lazy-loaded components for better performance
+const Workflows = React.lazy(() => import('./components/Workflows').then(m => ({ default: m.Workflows })));
+const ReportEditor = React.lazy(() => import('./components/ReportEditor').then(m => ({ default: m.ReportEditor })));
+const Dashboard = React.lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
+const Overview = React.lazy(() => import('./components/Overview').then(m => ({ default: m.Overview })));
+const Reporting = React.lazy(() => import('./components/Reporting').then(m => ({ default: m.Reporting })));
+const Copilots = React.lazy(() => import('./components/Copilots').then(m => ({ default: m.Copilots })));
+const KnowledgeBase = React.lazy(() => import('./components/KnowledgeBase').then(m => ({ default: m.KnowledgeBase })));
+const Simulations = React.lazy(() => import('./components/Simulations').then(m => ({ default: m.Simulations })));
+const Settings = React.lazy(() => import('./components/Settings').then(m => ({ default: m.Settings })));
+const AdminPanel = React.lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
+const LogsAndAlerts = React.lazy(() => import('./components/LogsAndAlerts').then(m => ({ default: m.LogsAndAlerts })));
+const Connections = React.lazy(() => import('./components/Connections').then(m => ({ default: m.Connections })));
+const Documentation = React.lazy(() => import('./components/Documentation').then(m => ({ default: m.Documentation })));
+const SharedDashboard = React.lazy(() => import('./components/SharedDashboard').then(m => ({ default: m.SharedDashboard })));
+const PublicWorkflowForm = React.lazy(() => import('./components/PublicWorkflowForm').then(m => ({ default: m.PublicWorkflowForm })));
+const InteractiveTutorial = React.lazy(() => import('./components/InteractiveTutorial').then(m => ({ default: m.InteractiveTutorial })));
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="flex items-center justify-center h-full min-h-[400px]">
+    <div className="flex flex-col items-center gap-3">
+      <SpinnerGap className="w-8 h-8 animate-spin text-[var(--text-tertiary)]" weight="light" />
+      <span className="text-sm text-[var(--text-tertiary)]">Loading...</span>
+    </div>
+  </div>
+);
+
 export default function App() {
     return (
-        <BrowserRouter>
-            <Routes>
-                <Route path="/shared/:shareToken" element={<SharedDashboardWrapper />} />
-                <Route path="/*" element={
-                    <AuthProvider>
-                        <AuthenticatedApp />
-                    </AuthProvider>
-                } />
-            </Routes>
-        </BrowserRouter>
+        <ThemeProvider>
+            <BrowserRouter>
+                <Routes>
+                    <Route path="/shared/:shareToken" element={<SharedDashboardWrapper />} />
+                    <Route path="/*" element={
+                        <AuthProvider>
+                            <AuthenticatedApp />
+                        </AuthProvider>
+                    } />
+                </Routes>
+            </BrowserRouter>
+        </ThemeProvider>
     );
 }
 
 function SharedDashboardWrapper() {
     const { shareToken } = useParams();
-    return <SharedDashboard shareToken={shareToken || ''} />;
+    return (
+        <Suspense fallback={<PageLoader />}>
+            <SharedDashboard shareToken={shareToken || ''} />
+        </Suspense>
+    );
 }
 
 function AuthenticatedApp() {
@@ -753,9 +772,9 @@ function AuthenticatedApp() {
                             rel="noopener noreferrer"
                             className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800 hover:bg-purple-200 transition-colors gap-1"
                         >
-                            <Paperclip size={12} />
+                            <Paperclip size={12} weight="light" />
                             {fileData.originalName || fileData.filename}
-                            <Download size={12} />
+                            <Download size={12} weight="light" />
                         </a>
                     );
                 }
@@ -797,18 +816,18 @@ function AuthenticatedApp() {
 
     const renderIconForType = (type: PropertyType) => {
         switch (type) {
-            case 'text': return <Type size={16} className="text-slate-400" />;
-            case 'number': return <Hash size={16} className="text-slate-400" />;
-            case 'relation': return <LinkIcon size={16} className="text-teal-500" />;
-            case 'json': return <Code size={16} className="text-amber-500" />;
-            case 'file': return <Paperclip size={16} className="text-purple-500" />;
+            case 'text': return <TextT size={16} className="text-slate-400" weight="light" />;
+            case 'number': return <Hash size={16} className="text-slate-400" weight="light" />;
+            case 'relation': return <LinkIcon size={16} className="text-teal-500" weight="light" />;
+            case 'json': return <Code size={16} className="text-amber-500" weight="light" />;
+            case 'file': return <Paperclip size={16} className="text-purple-500" weight="light" />;
         }
     };
 
     const currentSchema = editingSchema || activeEntity;
 
     if (isLoading) {
-        return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Loading...</div>;
+        return <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center text-[var(--text-primary)] transition-colors duration-200">Loading...</div>;
     }
 
     // These routes should be accessible regardless of authentication status
@@ -818,13 +837,15 @@ function AuthenticatedApp() {
 
     if (isPublicPath) {
         return (
-            <Routes>
-                <Route path="/verify-email" element={<VerifyEmail />} />
-                <Route path="/invite" element={<AcceptInvite />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/form/:workflowId" element={<PublicWorkflowForm />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-            </Routes>
+            <Suspense fallback={<PageLoader />}>
+                <Routes>
+                    <Route path="/verify-email" element={<VerifyEmail />} />
+                    <Route path="/invite" element={<AcceptInvite />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/form/:workflowId" element={<PublicWorkflowForm />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                </Routes>
+            </Suspense>
         );
     }
 
@@ -840,7 +861,7 @@ function AuthenticatedApp() {
     const showOnboarding = user && !user.onboardingCompleted;
 
     return (
-        <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 text-[15px]">
+        <div className="flex min-h-screen bg-[var(--bg-primary)] font-sans text-[var(--text-primary)] text-[15px] transition-colors duration-200">
             {showOnboarding && (
                 <OnboardingModal onComplete={() => {
                     // Post-onboarding actions (fetchEntities + tutorial) are handled by 
@@ -849,20 +870,22 @@ function AuthenticatedApp() {
             )}
             
             {showTutorial && (
-                <InteractiveTutorial 
-                    onComplete={() => {
-                        localStorage.setItem('intemic_tutorial_completed', 'true');
-                        setShowTutorial(false);
-                        // Dispatch event so Settings can update its toggle
-                        window.dispatchEvent(new Event('tutorialCompleted'));
-                    }}
-                    onSkip={() => {
-                        localStorage.setItem('intemic_tutorial_completed', 'true');
-                        setShowTutorial(false);
-                        // Dispatch event so Settings can update its toggle
-                        window.dispatchEvent(new Event('tutorialCompleted'));
-                    }}
-                />
+                <Suspense fallback={<PageLoader />}>
+                    <InteractiveTutorial 
+                        onComplete={() => {
+                            localStorage.setItem('intemic_tutorial_completed', 'true');
+                            setShowTutorial(false);
+                            // Dispatch event so Settings can update its toggle
+                            window.dispatchEvent(new Event('tutorialCompleted'));
+                        }}
+                        onSkip={() => {
+                            localStorage.setItem('intemic_tutorial_completed', 'true');
+                            setShowTutorial(false);
+                            // Dispatch event so Settings can update its toggle
+                            window.dispatchEvent(new Event('tutorialCompleted'));
+                        }}
+                    />
+                </Suspense>
             )}
             
             <ReportBugModal 
@@ -883,7 +906,8 @@ function AuthenticatedApp() {
                 {!hideSidebarForRoutes && (
                     <TopNav activeView={currentView} />
                 )}
-                <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+                <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative bg-[var(--bg-primary)] transition-colors duration-200">
+                <Suspense fallback={<PageLoader />}>
                 <Routes>
                     <Route path="/" element={<Navigate to="/overview" replace />} />
                     <Route path="/overview" element={
@@ -968,10 +992,10 @@ function AuthenticatedApp() {
                                         onClick={() => setActiveEntityId(null)}
                                         className="mr-4 p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500"
                                     >
-                                        <ArrowLeft size={20} />
+                                        <ArrowLeft size={20} weight="light" />
                                     </button>
                                     <div>
-                                        <h1 className="text-lg font-normal text-slate-900">
+                                        <h1 className="text-lg font-normal text-slate-700">
                                             {activeEntity.name}
                                         </h1>
                                         <p className="text-[11px] text-slate-500">Managing structure properties</p>
@@ -979,7 +1003,7 @@ function AuthenticatedApp() {
                                 </div>
                             ) : (
                                 <div>
-                                    <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Your database</h1>
+                                    <h1 className="text-lg font-normal text-slate-700" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Your database</h1>
                                     <p className="text-[11px] text-slate-500">View and manage your different entities</p>
                                 </div>
                             )}
@@ -1003,7 +1027,7 @@ function AuthenticatedApp() {
                                                 </div>
                                                 <div className="flex items-center gap-3">
                                                     <div className="relative">
-                                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                                        <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} weight="light" />
                                                         <input
                                                             type="text"
                                                             placeholder="Search entities..."
@@ -1013,14 +1037,14 @@ function AuthenticatedApp() {
                                                         />
                                                     </div>
                                                     <button className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-                                                        <Filter size={14} className="mr-2" />
+                                                        <Funnel size={14} className="mr-2" weight="light" />
                                                         Filter
                                                     </button>
                                                     <button
                                                         onClick={() => setIsCreatingEntity(true)}
                                                         className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                                     >
-                                                        <Plus size={14} className="mr-2" />
+                                                        <Plus size={14} className="mr-2" weight="light" />
                                                         Create Entity
                                                     </button>
                                                 </div>
@@ -1051,7 +1075,7 @@ function AuthenticatedApp() {
                                                     className="border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center min-h-[200px] text-slate-400 hover:border-teal-500 hover:text-teal-600 hover:bg-teal-50 transition-all cursor-pointer group"
                                                 >
                                                     <div className="p-4 bg-slate-100 rounded-full mb-3 group-hover:bg-white">
-                                                        <Plus size={24} />
+                                                        <Plus size={24} weight="light" />
                                                     </div>
                                                     <span className="font-medium">Create new entity</span>
                                                 </div>
@@ -1106,7 +1130,7 @@ function AuthenticatedApp() {
                                                         onClick={() => setIsAddingProp(true)}
                                                         className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-sm transition-colors"
                                                     >
-                                                        <Plus size={16} className="mr-2" />
+                                                        <Plus size={16} className="mr-2" weight="light" />
                                                         Add Property
                                                     </button>
                                                 </div>
@@ -1146,7 +1170,7 @@ function AuthenticatedApp() {
                                                                         onClick={() => deleteProperty(prop.id)}
                                                                         className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
                                                                     >
-                                                                        <Trash2 size={16} />
+                                                                        <Trash size={16} weight="light" />
                                                                     </button>
                                                                 </div>
                                                             </div>
@@ -1243,7 +1267,7 @@ function AuthenticatedApp() {
                                                         disabled={activeEntity.properties.length === 0}
                                                         className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
                                                     >
-                                                        <Plus size={16} className="mr-2" />
+                                                        <Plus size={16} className="mr-2" weight="light" />
                                                         Add Record
                                                     </button>
                                                     {activeEntity.properties.length === 0 && (
@@ -1324,13 +1348,13 @@ function AuthenticatedApp() {
                                                                             onClick={() => handleEditRecord(record)}
                                                                             className="p-2 text-slate-300 hover:text-teal-500 hover:bg-teal-50 rounded transition-colors opacity-0 group-hover:opacity-100 mr-2"
                                                                         >
-                                                                            <Pencil size={16} />
+                                                                            <PencilSimple size={16} weight="light" />
                                                                         </button>
                                                                         <button
                                                                             onClick={() => deleteRecord(record.id)}
                                                                             className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
                                                                         >
-                                                                            <Trash2 size={16} />
+                                                                            <Trash size={16} weight="light" />
                                                                         </button>
                                                                     </td>
                                                                 </tr>
@@ -1371,7 +1395,7 @@ function AuthenticatedApp() {
                                             onClick={() => setSelectedRecord(null)}
                                             className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors"
                                         >
-                                            <X size={20} />
+                                            <X size={20} weight="light" />
                                         </button>
                                     </div>
                                 </div>
@@ -1405,7 +1429,7 @@ function AuthenticatedApp() {
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
                                 <div className="bg-white rounded-lg border border-slate-200 shadow-lg w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden">
                                     <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/50">
-                                        <h2 className="text-sm font-normal text-slate-900">Create New Entity</h2>
+                                        <h2 className="text-sm font-normal text-slate-700">Create New Entity</h2>
                                     </div>
 
                                     <div className="p-5 space-y-4">
@@ -1496,7 +1520,7 @@ function AuthenticatedApp() {
                                                         <div className="space-y-2">
                                                             {fileInfo && (
                                                                 <div className="flex items-center gap-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
-                                                                    <Paperclip size={16} className="text-purple-500" />
+                                                                    <Paperclip size={16} className="text-purple-500" weight="light" />
                                                                     <span className="text-sm text-purple-800 truncate flex-1">
                                                                         {fileInfo.originalName || fileInfo.filename}
                                                                     </span>
@@ -1505,7 +1529,7 @@ function AuthenticatedApp() {
                                                                         onClick={() => setNewRecordValues({ ...newRecordValues, [prop.id]: '' })}
                                                                         className="p-1 hover:bg-purple-200 rounded transition-colors"
                                                                     >
-                                                                        <X size={14} className="text-purple-600" />
+                                                                        <X size={14} className="text-purple-600" weight="light" />
                                                                     </button>
                                                                 </div>
                                                             )}
@@ -1527,12 +1551,12 @@ function AuthenticatedApp() {
                                                                 >
                                                                     {uploadingFiles[prop.id] ? (
                                                                         <>
-                                                                            <Loader2 size={16} className="animate-spin text-purple-500" />
+                                                                            <SpinnerGap size={16} className="animate-spin text-purple-500" weight="light" />
                                                                             <span className="text-sm text-slate-500">Uploading...</span>
                                                                         </>
                                                                     ) : (
                                                                         <>
-                                                                            <Paperclip size={16} className="text-slate-400" />
+                                                                            <Paperclip size={16} className="text-slate-400" weight="light" />
                                                                             <span className="text-sm text-slate-500">
                                                                                 {fileInfo ? 'Replace file' : 'Choose file'}
                                                                             </span>
@@ -1694,6 +1718,7 @@ function AuthenticatedApp() {
                     </div>
                     } />
                 </Routes>
+                </Suspense>
                 </main>
             </div>
         </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Mail, Loader2, CheckCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import { Envelope, SpinnerGap, CheckCircle, ArrowClockwise, Eye, EyeSlash } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 import { logger } from '../utils/logger';
 import { handleError, ApiError } from '../utils/errorHandler';
@@ -152,12 +152,12 @@ export function LoginPage() {
     // Show verification message screen
     if (showVerificationMessage) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-[#dde1e7] via-[#e8ecf1] to-[#dde1e7] flex items-center justify-center p-4">
+            <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
                 <div className="w-full max-w-md">
-                    <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
+                    <div className="bg-[var(--bg-card)] rounded-2xl p-8 shadow-lg border border-gray-100">
                         <div className="flex items-center justify-center mx-auto mb-6">
                             <div className="w-20 h-20 bg-gradient-to-br from-[#1e3a5f] to-[#2d4a6f] rounded-full flex items-center justify-center shadow-md">
-                                <Mail className="w-10 h-10 text-white" />
+                                <Envelope weight="light" className="w-10 h-10 text-white" />
                             </div>
                         </div>
                         
@@ -175,7 +175,7 @@ export function LoginPage() {
 
                         {resendSuccess && (
                             <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 mb-4 flex items-center gap-2 justify-center">
-                                <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                                <CheckCircle weight="light" className="w-5 h-5 flex-shrink-0" />
                                 <span>Verification email sent!</span>
                             </div>
                         )}
@@ -193,12 +193,12 @@ export function LoginPage() {
                         >
                             {isResending ? (
                                 <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                    <SpinnerGap weight="light" className="w-5 h-5 animate-spin" />
                                     <span>Sending...</span>
                                 </>
                             ) : (
                                 <>
-                                    <RefreshCw className="w-4 h-4" />
+                                    <ArrowClockwise weight="light" className="w-4 h-4" />
                                     <span>Resend verification email</span>
                                 </>
                             )}
@@ -222,9 +222,9 @@ export function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#dde1e7] via-[#e8ecf1] to-[#dde1e7] flex items-center justify-center p-4">
+        <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
             <div className="w-full max-w-md">
-                <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
+                <div className="bg-[var(--bg-card)] rounded-2xl p-8 shadow-lg border border-gray-100">
                     {/* Logo */}
                     <div className="mb-8 flex justify-center">
                         <img
@@ -272,7 +272,7 @@ export function LoginPage() {
                                     <input
                                         type="text"
                                         required
-                                        className="w-full bg-white border border-gray-200 rounded-xl py-3 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
+                                        className="w-full bg-[var(--bg-card)] border border-gray-200 rounded-xl py-3 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
                                         placeholder="John Doe"
                                         value={formData.name}
                                         onChange={e => setFormData({ ...formData, name: e.target.value })}
@@ -285,7 +285,7 @@ export function LoginPage() {
                                     <input
                                         type="text"
                                         required
-                                        className="w-full bg-white border border-gray-200 rounded-xl py-3 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
+                                        className="w-full bg-[var(--bg-card)] border border-gray-200 rounded-xl py-3 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
                                         placeholder="Acme Inc."
                                         value={formData.orgName}
                                         onChange={e => setFormData({ ...formData, orgName: e.target.value })}
@@ -301,7 +301,7 @@ export function LoginPage() {
                             <input
                                 type="email"
                                 required
-                                className="w-full bg-white border border-gray-200 rounded-xl py-3 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
+                                className="w-full bg-[var(--bg-card)] border border-gray-200 rounded-xl py-3 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
                                 placeholder="name@company.com"
                                 value={formData.email}
                                 onChange={e => setFormData({ ...formData, email: e.target.value })}
@@ -326,7 +326,7 @@ export function LoginPage() {
                                 <input
                                     type={showPassword ? 'text' : 'password'}
                                     required
-                                    className="w-full bg-white border border-gray-200 rounded-xl py-3 px-4 pr-12 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
+                                    className="w-full bg-[var(--bg-card)] border border-gray-200 rounded-xl py-3 px-4 pr-12 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] transition-all"
                                     placeholder="••••••••"
                                     value={formData.password}
                                     onChange={e => setFormData({ ...formData, password: e.target.value })}
@@ -337,7 +337,7 @@ export function LoginPage() {
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
                                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                                 >
-                                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                    {showPassword ? <EyeSlash weight="light" className="w-5 h-5" /> : <Eye weight="light" className="w-5 h-5" />}
                                 </button>
                             </div>
                         </div>
@@ -355,7 +355,7 @@ export function LoginPage() {
                         >
                             {isLoading ? (
                                 <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                    <SpinnerGap weight="light" className="w-5 h-5 animate-spin" />
                                     <span>Please wait...</span>
                                 </>
                             ) : (
