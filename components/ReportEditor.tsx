@@ -105,7 +105,7 @@ interface AIContextFile {
 const statusConfig = {
     draft: { label: 'Draft', color: 'text-amber-600', bg: 'bg-amber-50', icon: Clock },
     review: { label: 'Review', color: 'text-[#256A65]', bg: 'bg-[#84C4D1]/20', icon: Eye },
-    ready_to_send: { label: 'Ready to Send', color: 'text-teal-600', bg: 'bg-teal-50', icon: Send }
+    ready_to_send: { label: 'Ready to Send', color: 'text-teal-600', bg: 'bg-teal-50', icon: PaperPlaneTilt }
 };
 
 export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInfo, onViewChange }) => {
@@ -891,7 +891,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
 
     const getSectionStatus = (section: TemplateSection) => {
         if (section.sectionStatus === 'generated' || section.sectionStatus === 'edited') {
-            return { icon: CheckCircle2, color: 'text-teal-500' };
+            return { icon: CheckCircle, color: 'text-teal-500' };
         }
         return { icon: Circle, color: 'text-slate-300' };
     };
@@ -1011,9 +1011,9 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                     <div className="flex gap-1 border-b border-[var(--border-light)] -mb-px">
                         {[
                             { id: 'preview' as const, label: 'Preview', icon: Eye },
-                            { id: 'context' as const, label: 'Context', icon: Upload, badge: report.contexts.length },
-                            { id: 'generate' as const, label: 'Generate', icon: Sparkles },
-                            { id: 'review' as const, label: 'Review', icon: MessageSquare, badge: openCommentsCount, disabled: report.status !== 'review' }
+                            { id: 'context' as const, label: 'Context', icon: UploadSimple, badge: report.contexts.length },
+                            { id: 'generate' as const, label: 'Generate', icon: Sparkle },
+                            { id: 'review' as const, label: 'Review', icon: ChatCircle, badge: openCommentsCount, disabled: report.status !== 'review' }
                         ].map(tab => {
                             const TabIcon = tab.icon;
                             const isDisabled = 'disabled' in tab && tab.disabled;
