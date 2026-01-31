@@ -58,12 +58,12 @@ export const getNodeIconColor = (type: NodeType): string => {
     case 'mysql':
     case 'sapFetch':
     case 'limsFetch':
-      return 'text-indigo-600';
+      return 'text-[#256A65]';
     case 'llm':
     case 'agent':
-      return 'text-purple-600';
+      return 'text-[#256A65]';
     case 'python':
-      return 'text-blue-600';
+      return 'text-[#84C4D1]';
     case 'condition':
     case 'join':
     case 'splitColumns':
@@ -200,7 +200,7 @@ export const WorkflowNode: React.FC<WorkflowNodeProps> = ({
             e.stopPropagation();
             onDuplicate(node.id);
           }}
-          className="p-2 bg-[var(--bg-card)] hover:bg-blue-50 rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-blue-600 transition-all active:scale-90"
+          className="p-2 bg-[var(--bg-card)] hover:bg-[#256A65]/10 rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[#256A65] transition-all active:scale-90"
           title="Duplicate Node"
         >
           <Copy size={14} weight="light" />

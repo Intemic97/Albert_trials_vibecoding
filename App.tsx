@@ -6,6 +6,7 @@ import { EntityCard } from './components/EntityCard';
 import { LoginPage } from './components/LoginPage';
 import { VerifyEmail } from './components/VerifyEmail';
 import { AcceptInvite } from './components/AcceptInvite';
+import { CommandPalette, useCommandPalette } from './components/CommandPalette';
 import { ForgotPassword } from './components/ForgotPassword';
 import { ResetPassword } from './components/ResetPassword';
 import { ReportBugModal } from './components/ReportBugModal';
@@ -79,6 +80,9 @@ function AuthenticatedApp() {
     const [entitiesLoading, setEntitiesLoading] = useState(true);
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
     const previousUserIdRef = React.useRef<string | undefined>(undefined);
+    
+    // Command Palette (Cmd+K)
+    const commandPalette = useCommandPalette();
     
     // Tutorial state
     const [showTutorial, setShowTutorial] = useState(false);
@@ -893,6 +897,13 @@ function AuthenticatedApp() {
                 onClose={() => setShowReportBug(false)} 
             />
             
+            {/* Command Palette (Cmd+K) */}
+            <CommandPalette 
+                isOpen={commandPalette.isOpen} 
+                onClose={commandPalette.close} 
+                entities={entities}
+            />
+            
             {/* Hide sidebar when in report editor, workflow editor, workflows, or copilots for more space */}
             {!hideSidebarForRoutes && (
                 <Sidebar 
@@ -964,7 +975,25 @@ function AuthenticatedApp() {
                     <Route path="/admin" element={
                         <AdminPanel onNavigate={handleNavigate} />
                     } />
-                    <Route path="/simulations/:simulationId?/scenarios/:scenarioId?" element={
+                    <Route path="/simulations" element={
+                        <Simulations 
+                            entities={entities} 
+                            onNavigate={(entityId) => {
+                                setActiveEntityId(entityId);
+                                navigate(`/database/${entityId}`);
+                            }}
+                        />
+                    } />
+                    <Route path="/simulations/:simulationId" element={
+                        <Simulations 
+                            entities={entities} 
+                            onNavigate={(entityId) => {
+                                setActiveEntityId(entityId);
+                                navigate(`/database/${entityId}`);
+                            }}
+                        />
+                    } />
+                    <Route path="/simulations/:simulationId/scenarios/:scenarioId" element={
                         <Simulations 
                             entities={entities} 
                             onNavigate={(entityId) => {
@@ -985,26 +1014,26 @@ function AuthenticatedApp() {
                     <Route path="/database/:entityId" element={
                     <div data-tutorial="database-content" className="contents">
                         {/* Top Header */}
-                        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
+                        <header className="h-16 bg-[var(--bg-primary)] border-b border-[var(--border-light)] flex items-center justify-between px-8 z-10">
                             {activeEntity ? (
                                 <div className="flex items-center">
                                     <button
                                         onClick={() => setActiveEntityId(null)}
-                                        className="mr-4 p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500"
+                                        className="mr-4 p-2 hover:bg-[var(--bg-tertiary)] rounded-full transition-colors text-[var(--text-secondary)]"
                                     >
                                         <ArrowLeft size={20} weight="light" />
                                     </button>
                                     <div>
-                                        <h1 className="text-lg font-normal text-slate-700">
+                                        <h1 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                             {activeEntity.name}
                                         </h1>
-                                        <p className="text-[11px] text-slate-500">Managing structure properties</p>
+                                        <p className="text-[11px] text-[var(--text-secondary)]">Managing structure properties</p>
                                     </div>
                                 </div>
                             ) : (
                                 <div>
-                                    <h1 className="text-lg font-normal text-slate-700" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Your database</h1>
-                                    <p className="text-[11px] text-slate-500">View and manage your different entities</p>
+                                    <h1 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Your database</h1>
+                                    <p className="text-[11px] text-[var(--text-secondary)]">View and manage your different entities</p>
                                 </div>
                             )}
 
@@ -1019,7 +1048,7 @@ function AuthenticatedApp() {
                                 <div>
                                     {/* Toolbar */}
                                     <div className="flex justify-between items-center mb-6">
-                                                <div className="text-sm text-slate-500">
+                                                <div className="text-sm text-[var(--text-secondary)]">
                                                     {entitySearchQuery 
                                                         ? `Showing ${entities.filter(e => e.name.toLowerCase().includes(entitySearchQuery.toLowerCase()) || e.description?.toLowerCase().includes(entitySearchQuery.toLowerCase())).length} of ${entities.length} entities`
                                                         : `Total: ${entities.length} entities`
@@ -1027,22 +1056,22 @@ function AuthenticatedApp() {
                                                 </div>
                                                 <div className="flex items-center gap-3">
                                                     <div className="relative">
-                                                        <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} weight="light" />
+                                                        <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={14} weight="light" />
                                                         <input
                                                             type="text"
                                                             placeholder="Search entities..."
                                                             value={entitySearchQuery}
                                                             onChange={(e) => setEntitySearchQuery(e.target.value)}
-                                                            className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 w-60 placeholder:text-slate-400"
+                                                            className="pl-8 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] w-60 placeholder:text-[var(--text-tertiary)]"
                                                         />
                                                     </div>
-                                                    <button className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                                                    <button className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors">
                                                         <Funnel size={14} className="mr-2" weight="light" />
                                                         Filter
                                                     </button>
                                                     <button
                                                         onClick={() => setIsCreatingEntity(true)}
-                                                        className="flex items-center px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                                        className="flex items-center px-3 py-1.5 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                                     >
                                                         <Plus size={14} className="mr-2" weight="light" />
                                                         Create Entity
@@ -1072,9 +1101,9 @@ function AuthenticatedApp() {
                                                 {/* Empty State / Add New Placeholder */}
                                                 <div
                                                     onClick={() => setIsCreatingEntity(true)}
-                                                    className="border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center min-h-[200px] text-slate-400 hover:border-teal-500 hover:text-teal-600 hover:bg-teal-50 transition-all cursor-pointer group"
+                                                    className="border-2 border-dashed border-[var(--border-medium)] rounded-xl flex flex-col items-center justify-center min-h-[200px] text-[var(--text-tertiary)] hover:border-[#256A65] hover:text-[#256A65] hover:bg-[#256A65]/5 transition-all cursor-pointer group"
                                                 >
-                                                    <div className="p-4 bg-slate-100 rounded-full mb-3 group-hover:bg-white">
+                                                    <div className="p-4 bg-[var(--bg-tertiary)] rounded-full mb-3 group-hover:bg-[var(--bg-card)]">
                                                         <Plus size={24} weight="light" />
                                                     </div>
                                                     <span className="font-medium">Create new entity</span>
@@ -1102,57 +1131,57 @@ function AuthenticatedApp() {
                                     {activeTab === 'structure' && (
                                         <>
                                             {/* Overview Panel */}
-                                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                                <h2 className="text-lg font-normal text-slate-800 mb-4">Structure Overview</h2>
+                                            <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-light)] p-6">
+                                                <h2 className="text-lg font-normal text-[var(--text-primary)] mb-4" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Structure Overview</h2>
                                                 <div className="grid grid-cols-2 gap-6">
                                                     <div>
-                                                        <label className="block text-xs font-normal text-slate-500 uppercase tracking-wide mb-1">Description</label>
-                                                        <p className="text-slate-700">{activeEntity.description || 'No description provided.'}</p>
+                                                        <label className="block text-xs font-normal text-[var(--text-tertiary)] uppercase tracking-wide mb-1">Description</label>
+                                                        <p className="text-[var(--text-secondary)]">{activeEntity.description || 'No description provided.'}</p>
                                                     </div>
                                                     <div>
-                                                        <label className="block text-xs font-normal text-slate-500 uppercase tracking-wide mb-1">Metadata</label>
-                                                        <div className="text-sm text-slate-600 space-y-1">
-                                                            <p>Created by: <span className="font-medium text-slate-800">{activeEntity.author}</span></p>
-                                                            <p>Last modified: <span className="font-medium text-slate-800">{activeEntity.lastEdited}</span></p>
+                                                        <label className="block text-xs font-normal text-[var(--text-tertiary)] uppercase tracking-wide mb-1">Metadata</label>
+                                                        <div className="text-sm text-[var(--text-secondary)] space-y-1">
+                                                            <p>Created by: <span className="font-medium text-[var(--text-primary)]">{activeEntity.author}</span></p>
+                                                            <p>Last modified: <span className="font-medium text-[var(--text-primary)]">{activeEntity.lastEdited}</span></p>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {/* Properties Panel */}
-                                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                            <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-light)] overflow-hidden">
+                                                <div className="p-6 border-b border-[var(--border-light)] flex justify-between items-center bg-[var(--bg-tertiary)]">
                                                     <div>
-                                                        <h2 className="text-lg font-normal text-slate-800">Properties</h2>
-                                                        <p className="text-sm text-slate-500">Define the data structure for this entity.</p>
+                                                        <h2 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Properties</h2>
+                                                        <p className="text-sm text-[var(--text-secondary)]">Define the data structure for this entity.</p>
                                                     </div>
                                                     <button
                                                         onClick={() => setIsAddingProp(true)}
-                                                        className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-sm transition-colors"
+                                                        className="flex items-center px-4 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-sm font-medium shadow-sm transition-colors"
                                                     >
                                                         <Plus size={16} className="mr-2" weight="light" />
                                                         Add Property
                                                     </button>
                                                 </div>
                                                 {/* Property List */}
-                                                <div className="divide-y divide-slate-100">
+                                                <div className="divide-y divide-[var(--border-light)]">
                                                     {activeEntity.properties.length === 0 ? (
-                                                        <div className="p-12 text-center text-slate-500">
+                                                        <div className="p-12 text-center text-[var(--text-secondary)]">
                                                             No properties defined yet. Click "Add Property" to start modeling.
                                                         </div>
                                                     ) : (
                                                         activeEntity.properties.map(prop => (
-                                                            <div key={prop.id} className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between group">
+                                                            <div key={prop.id} className="p-4 hover:bg-[var(--bg-tertiary)] transition-colors flex items-center justify-between group">
                                                                 <div className="flex items-center space-x-4">
-                                                                    <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center border border-slate-200">
+                                                                    <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center border border-[var(--border-light)]">
                                                                         {renderIconForType(prop.type)}
                                                                     </div>
                                                                     <div>
-                                                                        <h3 className="text-sm font-normal text-slate-800">{prop.name}</h3>
-                                                                        <p className="text-xs text-slate-500 flex items-center mt-0.5">
+                                                                        <h3 className="text-sm font-normal text-[var(--text-primary)]">{prop.name}</h3>
+                                                                        <p className="text-xs text-[var(--text-tertiary)] flex items-center mt-0.5">
                                                                             <span className="uppercase tracking-wider font-normal mr-2">{prop.type}</span>
                                                                             {prop.type === 'relation' && (
-                                                                                <span className="bg-teal-100 text-teal-800 px-1.5 rounded text-[10px]">
+                                                                                <span className="bg-[#256A65]/10 text-[#256A65] px-1.5 rounded text-[10px]">
                                                                                     → {getRelatedEntityName(prop.relatedEntityId)}
                                                                                 </span>
                                                                             )}
@@ -1160,15 +1189,15 @@ function AuthenticatedApp() {
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex items-center space-x-4">
-                                                                    <div className="text-xs text-right text-slate-400 mr-4">
+                                                                    <div className="text-xs text-right text-[var(--text-tertiary)] mr-4">
                                                                         Example Value:<br />
-                                                                        <span className="text-slate-600 font-mono">
+                                                                        <span className="text-[var(--text-secondary)] font-mono">
                                                                             {prop.type === 'relation' ? 'ID-REF-123' : prop.type === 'file' ? 'document.pdf' : prop.defaultValue}
                                                                         </span>
                                                                     </div>
                                                                     <button
                                                                         onClick={() => deleteProperty(prop.id)}
-                                                                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                                                        className="p-2 text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded transition-colors opacity-0 group-hover:opacity-100"
                                                                     >
                                                                         <Trash size={16} weight="light" />
                                                                     </button>
@@ -1180,26 +1209,26 @@ function AuthenticatedApp() {
 
                                                 {/* Add Property Form Area */}
                                                 {isAddingProp && (
-                                                    <div className="p-6 bg-slate-50 border-t border-slate-200 animate-in fade-in slide-in-from-top-4 duration-200">
-                                                        <h3 className="text-sm font-normal text-slate-800 mb-4">New Property</h3>
+                                                    <div className="p-6 bg-[var(--bg-tertiary)] border-t border-[var(--border-light)] animate-in fade-in slide-in-from-top-4 duration-200">
+                                                        <h3 className="text-sm font-normal text-[var(--text-primary)] mb-4">New Property</h3>
                                                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                                                             <div className="md:col-span-4">
-                                                                <label className="block text-xs font-normal text-slate-500 mb-1">Name</label>
+                                                                <label className="block text-xs font-normal text-[var(--text-tertiary)] mb-1">Name</label>
                                                                 <input
                                                                     autoFocus
                                                                     type="text"
                                                                     value={newPropName}
                                                                     onChange={(e) => setNewPropName(e.target.value)}
                                                                     placeholder="e.g. Serial Number"
-                                                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                                    className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] focus:outline-none placeholder:text-[var(--text-tertiary)]"
                                                                 />
                                                             </div>
                                                             <div className="md:col-span-3">
-                                                                <label className="block text-xs font-normal text-slate-500 mb-1">Type</label>
+                                                                <label className="block text-xs font-normal text-[var(--text-tertiary)] mb-1">Type</label>
                                                                 <select
                                                                     value={newPropType}
                                                                     onChange={(e) => setNewPropType(e.target.value as PropertyType)}
-                                                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                                    className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] focus:outline-none"
                                                                 >
                                                                     <option value="text">Text</option>
                                                                     <option value="number">Number</option>
@@ -1211,11 +1240,11 @@ function AuthenticatedApp() {
 
                                                             {newPropType === 'relation' && (
                                                                 <div className="md:col-span-3">
-                                                                    <label className="block text-xs font-normal text-slate-500 mb-1">Related Structure</label>
+                                                                    <label className="block text-xs font-normal text-[var(--text-tertiary)] mb-1">Related Structure</label>
                                                                     <select
                                                                         value={newPropRelationId}
                                                                         onChange={(e) => setNewPropRelationId(e.target.value)}
-                                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                                        className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] focus:outline-none"
                                                                     >
                                                                         <option value="">Select entity...</option>
                                                                         {entities
@@ -1231,13 +1260,13 @@ function AuthenticatedApp() {
                                                                 <button
                                                                     onClick={handleAddProperty}
                                                                     disabled={!newPropName || (newPropType === 'relation' && !newPropRelationId)}
-                                                                    className="flex-1 py-2 bg-slate-800 text-white rounded-md text-sm font-medium hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                    className="flex-1 py-2 bg-[#256A65] text-white rounded-md text-sm font-medium hover:bg-[#1e5a55] disabled:opacity-50 disabled:cursor-not-allowed"
                                                                 >
                                                                     Save
                                                                 </button>
                                                                 <button
                                                                     onClick={() => setIsAddingProp(false)}
-                                                                    className="px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-md text-sm font-medium hover:bg-slate-50"
+                                                                    className="px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)] rounded-md text-sm font-medium hover:bg-[var(--bg-tertiary)]"
                                                                 >
                                                                     Cancel
                                                                 </button>
@@ -1251,11 +1280,11 @@ function AuthenticatedApp() {
 
                                     {/* DATA TAB */}
                                     {activeTab === 'data' && (
-                                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                        <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-light)] overflow-hidden">
+                                            <div className="p-6 border-b border-[var(--border-light)] flex justify-between items-center bg-[var(--bg-tertiary)]">
                                                 <div>
-                                                    <h2 className="text-lg font-normal text-slate-800">Data Records</h2>
-                                                    <p className="text-sm text-slate-500">Manage the actual data for this entity.</p>
+                                                    <h2 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Data Records</h2>
+                                                    <p className="text-sm text-[var(--text-secondary)]">Manage the actual data for this entity.</p>
                                                 </div>
                                                 <div className="relative group/addrecord">
                                                     <button
@@ -1265,15 +1294,15 @@ function AuthenticatedApp() {
                                                             setIsAddingRecord(true);
                                                         }}
                                                         disabled={activeEntity.properties.length === 0}
-                                                        className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
+                                                        className="flex items-center px-4 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-sm font-medium shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                         <Plus size={16} className="mr-2" weight="light" />
                                                         Add Record
                                                     </button>
                                                     {activeEntity.properties.length === 0 && (
-                                                        <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/addrecord:opacity-100 transition-opacity pointer-events-none z-50">
+                                                        <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-[var(--bg-selected)] text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/addrecord:opacity-100 transition-opacity pointer-events-none z-50">
                                                             Add properties to your entity to start adding records
-                                                            <div className="absolute bottom-full right-4 border-4 border-transparent border-b-slate-900"></div>
+                                                            <div className="absolute bottom-full right-4 border-4 border-transparent border-b-[var(--bg-selected)]"></div>
                                                         </div>
                                                     )}
                                                 </div>
@@ -1282,25 +1311,25 @@ function AuthenticatedApp() {
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-left border-collapse">
                                                     <thead>
-                                                        <tr className="bg-slate-50 border-b border-slate-200">
+                                                        <tr className="bg-[var(--bg-tertiary)] border-b border-[var(--border-light)]">
                                                             {activeEntity.properties.map(prop => (
-                                                                <th key={prop.id} className="px-6 py-3 text-xs font-normal text-slate-500 uppercase tracking-wider">
+                                                                <th key={prop.id} className="px-6 py-3 text-xs font-normal text-[var(--text-tertiary)] uppercase tracking-wider">
                                                                     {prop.name}
                                                                 </th>
                                                             ))}
                                                             {/* Incoming Relations Headers */}
                                                             {Object.values(incomingData).map(({ sourceEntity, sourceProperty }) => (
-                                                                <th key={sourceProperty.id} className="px-6 py-3 text-xs font-normal text-teal-600 uppercase tracking-wider bg-teal-50/50">
+                                                                <th key={sourceProperty.id} className="px-6 py-3 text-xs font-normal text-[#256A65] uppercase tracking-wider bg-[#256A65]/5">
                                                                     {sourceEntity.name} ({sourceProperty.name})
                                                                 </th>
                                                             ))}
-                                                            <th className="px-6 py-3 text-right">Actions</th>
+                                                            <th className="px-6 py-3 text-right text-[var(--text-tertiary)]">Actions</th>
                                                         </tr>
                                                     </thead>
-                                                    <tbody className="divide-y divide-slate-100">
+                                                    <tbody className="divide-y divide-[var(--border-light)]">
                                                         {records.length === 0 ? (
                                                             <tr>
-                                                                <td colSpan={Math.max(activeEntity.properties.length, 1) + 1 + Object.keys(incomingData).length} className="p-12 text-center text-slate-500">
+                                                                <td colSpan={Math.max(activeEntity.properties.length, 1) + 1 + Object.keys(incomingData).length} className="p-12 text-center text-[var(--text-secondary)]">
                                                                     {activeEntity.properties.length === 0 
                                                                         ? 'Add properties to your entity first, then you can start adding records.'
                                                                         : 'No records found. Click "Add Record" to create one.'}
@@ -1308,9 +1337,9 @@ function AuthenticatedApp() {
                                                             </tr>
                                                         ) : (
                                                             records.map(record => (
-                                                                <tr key={record.id} className="hover:bg-slate-50 transition-colors group">
+                                                                <tr key={record.id} className="hover:bg-[var(--bg-tertiary)] transition-colors group">
                                                                     {activeEntity.properties.map(prop => (
-                                                                        <td key={prop.id} className="px-6 py-4 text-sm text-slate-700">
+                                                                        <td key={prop.id} className="px-6 py-4 text-sm text-[var(--text-secondary)]">
                                                                             {renderCellValue(prop, record.values[prop.id])}
                                                                         </td>
                                                                     ))}
@@ -1328,17 +1357,17 @@ function AuthenticatedApp() {
                                                                         });
 
                                                                         return (
-                                                                            <td key={sourceProperty.id} className="px-6 py-4 text-sm text-slate-700 bg-teal-50/10">
+                                                                            <td key={sourceProperty.id} className="px-6 py-4 text-sm text-[var(--text-secondary)] bg-[#256A65]/5">
                                                                                 <div className="flex flex-wrap gap-1">
                                                                                     {linkedRecords.length > 0 ? linkedRecords.map(lr => (
                                                                                         <button
                                                                                             key={lr.id}
                                                                                             onClick={() => handleRecordClick(lr, sourceEntity)}
-                                                                                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200 hover:bg-indigo-200 transition-colors"
+                                                                                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#256A65]/10 text-[#256A65] border border-[#256A65]/20 hover:bg-[#256A65]/20 transition-colors"
                                                                                         >
                                                                                             {getRecordDisplayName(lr, sourceEntity)}
                                                                                         </button>
-                                                                                    )) : <span className="text-slate-400 text-xs italic">None</span>}
+                                                                                    )) : <span className="text-[var(--text-tertiary)] text-xs italic">None</span>}
                                                                                 </div>
                                                                             </td>
                                                                         );
@@ -1346,7 +1375,7 @@ function AuthenticatedApp() {
                                                                     <td className="px-6 py-4 text-right">
                                                                         <button
                                                                             onClick={() => handleEditRecord(record)}
-                                                                            className="p-2 text-slate-300 hover:text-teal-500 hover:bg-teal-50 rounded transition-colors opacity-0 group-hover:opacity-100 mr-2"
+                                                                            className="p-2 text-[var(--text-tertiary)] hover:text-[#256A65] hover:bg-[#256A65]/10 rounded transition-colors opacity-0 group-hover:opacity-100 mr-2"
                                                                         >
                                                                             <PencilSimple size={16} weight="light" />
                                                                         </button>

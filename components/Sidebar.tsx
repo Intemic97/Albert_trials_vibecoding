@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { ProfileMenu, UserAvatar } from './ProfileMenu';
+import { NotificationBell, NotificationCenter, useNotificationCenter } from './NotificationCenter';
 import {
   SquaresFour,
   Database,
@@ -52,6 +53,7 @@ const viewToRoute: Record<string, string> = {
 export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShowTutorial }) => {
   const { organizations, user } = useAuth();
   const navigate = useNavigate();
+  const notificationCenter = useNotificationCenter();
   const searchRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchScope, setSearchScope] = useState<'workflows' | 'chats' | 'knowledge'>('workflows');
@@ -192,13 +194,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
     <div data-tutorial="sidebar" className="w-60 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] h-screen flex flex-col sticky top-0 font-sans z-40 transition-colors duration-200">
       {/* Header */}
       <div className="px-6 pt-5 pb-5 border-b border-[var(--sidebar-border)]">
-        <div className="flex items-center mb-5 pl-1">
+        <div className="flex items-center justify-between mb-5 pl-1">
           <img
             src="/logo.svg"
             alt="Intemic"
             className="h-5 w-auto object-contain transition-all duration-200"
             style={{ filter: 'var(--logo-filter)' }}
           />
+          {/* Notification Bell */}
+          <div className="relative">
+            <NotificationBell 
+              onClick={notificationCenter.toggle} 
+              unreadCount={notificationCenter.unreadCount} 
+            />
+            <NotificationCenter 
+              isOpen={notificationCenter.isOpen} 
+              onClose={notificationCenter.close} 
+            />
+          </div>
         </div>
         <div className="relative">
           <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sidebar-icon)]" size={14} weight="light" />

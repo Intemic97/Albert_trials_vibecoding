@@ -94,7 +94,6 @@ export function AcceptInvite() {
 
             setStatus('success');
             
-            // Auto-login after short delay
             setTimeout(() => {
                 login(data.user);
                 navigate('/overview');
@@ -109,10 +108,19 @@ export function AcceptInvite() {
     // Loading state
     if (status === 'loading') {
         return (
-            <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
-                <div className="w-full max-w-md text-center">
-                    <SpinnerGap weight="light" className="w-12 h-12 text-blue-400 animate-spin mx-auto mb-4" />
-                    <p className="text-slate-400">Validating invitation...</p>
+            <div className="min-h-screen bg-[#191919] flex flex-col">
+                <div className="pt-8 pb-4 flex justify-center">
+                    <img
+                        src="/logo.svg"
+                        alt="Intemic"
+                        className="h-8 w-auto object-contain brightness-0 invert opacity-90"
+                    />
+                </div>
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                        <SpinnerGap weight="bold" className="w-10 h-10 text-[#256A65] animate-spin mx-auto mb-4" />
+                        <p className="text-[#9b9b9b] text-sm">Validating invitation...</p>
+                    </div>
                 </div>
             </div>
         );
@@ -121,21 +129,37 @@ export function AcceptInvite() {
     // Invalid invitation
     if (status === 'invalid') {
         return (
-            <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
-                <div className="w-full max-w-md">
-                    <div className="bg-[var(--bg-selected)]/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
+            <div className="min-h-screen bg-[#191919] flex flex-col">
+                <div className="pt-8 pb-4 flex justify-center">
+                    <img
+                        src="/logo.svg"
+                        alt="Intemic"
+                        className="h-8 w-auto object-contain brightness-0 invert opacity-90"
+                    />
+                </div>
+
+                <div className="flex-1 flex items-center justify-center px-4">
+                    <div className="w-full max-w-sm text-center">
                         <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <XCircle weight="light" className="w-8 h-8 text-red-400" />
+                            <XCircle weight="fill" className="w-8 h-8 text-red-400" />
                         </div>
-                        <h1 className="text-2xl font-normal text-white mb-2">Invalid Invitation</h1>
-                        <p className="text-slate-400 mb-6">{error}</p>
+                        <h1 className="text-xl font-medium text-[#e8e8e8] mb-3" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
+                            Invalid invitation
+                        </h1>
+                        <p className="text-[#9b9b9b] text-sm mb-8">{error}</p>
                         <button
                             onClick={() => navigate('/login')}
-                            className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 rounded-lg transition-colors"
+                            className="w-full bg-[#2f2f2f] hover:bg-[#3f3f3f] text-[#e8e8e8] font-medium py-3 rounded-lg transition-colors border border-[#404040] text-sm"
                         >
-                            Go to Login
+                            Go to sign in
                         </button>
                     </div>
+                </div>
+
+                <div className="py-6 text-center">
+                    <p className="text-xs text-[#505050]">
+                        © {new Date().getFullYear()} Intemic. All rights reserved.
+                    </p>
                 </div>
             </div>
         );
@@ -144,18 +168,34 @@ export function AcceptInvite() {
     // Success state
     if (status === 'success') {
         return (
-            <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
-                <div className="w-full max-w-md">
-                    <div className="bg-[var(--bg-selected)]/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
+            <div className="min-h-screen bg-[#191919] flex flex-col">
+                <div className="pt-8 pb-4 flex justify-center">
+                    <img
+                        src="/logo.svg"
+                        alt="Intemic"
+                        className="h-8 w-auto object-contain brightness-0 invert opacity-90"
+                    />
+                </div>
+
+                <div className="flex-1 flex items-center justify-center px-4">
+                    <div className="w-full max-w-sm text-center">
                         <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <CheckCircle weight="light" className="w-8 h-8 text-emerald-400" />
+                            <CheckCircle weight="fill" className="w-8 h-8 text-emerald-400" />
                         </div>
-                        <h1 className="text-2xl font-normal text-white mb-2">Welcome to the team!</h1>
-                        <p className="text-slate-400 mb-2">
-                            You've successfully joined <span className="text-white font-medium">{invitation?.organizationName}</span>
+                        <h1 className="text-xl font-medium text-[#e8e8e8] mb-3" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
+                            Welcome to the team!
+                        </h1>
+                        <p className="text-[#9b9b9b] text-sm mb-2">
+                            You've successfully joined <span className="text-[#e8e8e8] font-medium">{invitation?.organizationName}</span>
                         </p>
-                        <p className="text-[var(--text-secondary)] text-sm">Redirecting you to the dashboard...</p>
+                        <p className="text-[#6b6b6b] text-sm">Redirecting you to the dashboard...</p>
                     </div>
+                </div>
+
+                <div className="py-6 text-center">
+                    <p className="text-xs text-[#505050]">
+                        © {new Date().getFullYear()} Intemic. All rights reserved.
+                    </p>
                 </div>
             </div>
         );
@@ -163,78 +203,79 @@ export function AcceptInvite() {
 
     // Registration form
     return (
-        <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
-            <div className="w-full max-w-md">
-                <div className="bg-[var(--bg-selected)]/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl">
+        <div className="min-h-screen bg-[#191919] flex flex-col">
+            <div className="pt-8 pb-4 flex justify-center">
+                <img
+                    src="/logo.svg"
+                    alt="Intemic"
+                    className="h-8 w-auto object-contain brightness-0 invert opacity-90"
+                />
+            </div>
+
+            <div className="flex-1 flex items-center justify-center px-4">
+                <div className="w-full max-w-sm">
                     {/* Header */}
                     <div className="text-center mb-8">
-                        <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Users weight="light" className="w-8 h-8 text-blue-400" />
+                        <div className="w-14 h-14 bg-[#256A65]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Users weight="light" className="w-7 h-7 text-[#256A65]" />
                         </div>
-                        <h1 className="text-2xl font-normal text-white mb-2">Join {invitation?.organizationName}</h1>
-                        <p className="text-slate-400">
-                            <span className="text-white">{invitation?.invitedByName}</span> has invited you to join their team
+                        <h1 className="text-xl font-medium text-[#e8e8e8] mb-3" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
+                            Join {invitation?.organizationName}
+                        </h1>
+                        <p className="text-[#9b9b9b] text-sm">
+                            <span className="text-[#e8e8e8]">{invitation?.invitedByName}</span> has invited you to join their team
                         </p>
                     </div>
 
                     {/* Email display */}
-                    <div className="mb-6 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-                        <p className="text-xs text-[var(--text-secondary)] mb-1">You're signing up as</p>
-                        <p className="text-white font-medium flex items-center gap-2">
-                            <Envelope weight="light" className="w-4 h-4 text-slate-400" />
+                    <div className="mb-6 p-3 bg-[#2f2f2f] rounded-lg border border-[#404040]">
+                        <p className="text-xs text-[#6b6b6b] mb-1">You're signing up as</p>
+                        <p className="text-[#e8e8e8] font-medium flex items-center gap-2 text-sm">
+                            <Envelope weight="light" className="w-4 h-4 text-[#6b6b6b]" />
                             {invitation?.email}
                         </p>
                     </div>
 
                     {/* Form */}
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300">Your Name</label>
-                            <div className="relative">
-                                <User weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-secondary)]" />
-                                <input
-                                    type="text"
-                                    required
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                                    placeholder="John Doe"
-                                    value={formData.name}
-                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                />
-                            </div>
+                        <div className="relative">
+                            <User weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6b6b6b]" />
+                            <input
+                                type="text"
+                                required
+                                className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[#256A65] focus:ring-1 focus:ring-[#256A65] transition-all text-sm"
+                                placeholder="Your full name"
+                                value={formData.name}
+                                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                            />
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300">Password</label>
-                            <div className="relative">
-                                <Lock weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-secondary)]" />
-                                <input
-                                    type="password"
-                                    required
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                                    placeholder="••••••••"
-                                    value={formData.password}
-                                    onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                />
-                            </div>
+                        <div className="relative">
+                            <Lock weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6b6b6b]" />
+                            <input
+                                type="password"
+                                required
+                                className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[#256A65] focus:ring-1 focus:ring-[#256A65] transition-all text-sm"
+                                placeholder="Password"
+                                value={formData.password}
+                                onChange={e => setFormData({ ...formData, password: e.target.value })}
+                            />
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300">Confirm Password</label>
-                            <div className="relative">
-                                <Lock weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-secondary)]" />
-                                <input
-                                    type="password"
-                                    required
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                                    placeholder="••••••••"
-                                    value={formData.confirmPassword}
-                                    onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
-                                />
-                            </div>
+                        <div className="relative">
+                            <Lock weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6b6b6b]" />
+                            <input
+                                type="password"
+                                required
+                                className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[#256A65] focus:ring-1 focus:ring-[#256A65] transition-all text-sm"
+                                placeholder="Confirm password"
+                                value={formData.confirmPassword}
+                                onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                            />
                         </div>
 
                         {error && (
-                            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+                            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400 text-center">
                                 {error}
                             </div>
                         )}
@@ -242,14 +283,14 @@ export function AcceptInvite() {
                         <button
                             type="submit"
                             disabled={status === 'registering'}
-                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full bg-[#256A65] hover:bg-[#1e5a55] text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                         >
                             {status === 'registering' ? (
-                                <SpinnerGap weight="light" className="w-5 h-5 animate-spin" />
+                                <SpinnerGap weight="bold" className="w-4 h-4 animate-spin" />
                             ) : (
                                 <>
-                                    Join Team
-                                    <ArrowRight weight="light" className="w-5 h-5" />
+                                    Join team
+                                    <ArrowRight weight="bold" className="w-4 h-4" />
                                 </>
                             )}
                         </button>
@@ -258,14 +299,19 @@ export function AcceptInvite() {
                     <div className="mt-6 text-center">
                         <button
                             onClick={() => navigate('/login')}
-                            className="text-sm text-slate-400 hover:text-white transition-colors"
+                            className="text-sm text-[#6b6b6b] hover:text-[#9b9b9b] transition-colors"
                         >
                             Already have an account? Sign in
                         </button>
                     </div>
                 </div>
             </div>
+
+            <div className="py-6 text-center">
+                <p className="text-xs text-[#505050]">
+                    © {new Date().getFullYear()} Intemic. All rights reserved.
+                </p>
+            </div>
         </div>
     );
 }
-

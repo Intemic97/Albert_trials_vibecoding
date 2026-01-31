@@ -4666,9 +4666,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             title={item.label}
                                         >
                                             <div className={`p-1 rounded ${item.category === 'Triggers' ? 'bg-cyan-100 text-cyan-700' :
-                                                item.category === 'Data' ? 'bg-indigo-100 text-indigo-700' :
+                                                item.category === 'Data' ? 'bg-[#256A65]/10 text-[#256A65]' :
                                                     item.category === 'Logic' ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]' :
-                                                        'bg-blue-100 text-blue-700'
+                                                        'bg-[#84C4D1]/20 text-[#256A65]'
                                                 }`}>
                                                 {React.createElement(item.icon, { size: 16, weight: "light" })}
                                             </div>
@@ -5223,7 +5223,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     e.stopPropagation();
                                                     duplicateNode(node.id);
                                                 }}
-                                                className="p-2 bg-[var(--bg-card)] hover:bg-blue-50 rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-blue-600 transition-all"
+                                                className="p-2 bg-[var(--bg-card)] hover:bg-[#256A65]/10 rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[#256A65] transition-all"
                                                 title="Duplicate Node (Ctrl+D)"
                                             >
                                                 <Copy size={14} weight="light" />
@@ -5512,10 +5512,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 {(node.config?.columnsOutputA?.length || 0) > 0 || (node.config?.columnsOutputB?.length || 0) > 0 ? (
                                                     <div className="flex flex-col gap-1.5">
                                                         <p className="text-xs text-[var(--text-secondary)] break-words">
-                                                            <span className="font-medium text-blue-600">A:</span> {node.config?.columnsOutputA?.length || 0} cols
+                                                            <span className="font-medium text-[#256A65]">A:</span> {node.config?.columnsOutputA?.length || 0} cols
                                                         </p>
                                                         <p className="text-xs text-[var(--text-secondary)] break-words">
-                                                            <span className="font-medium text-purple-600">B:</span> {node.config?.columnsOutputB?.length || 0} cols
+                                                            <span className="font-medium text-[#84C4D1]">B:</span> {node.config?.columnsOutputB?.length || 0} cols
                                                         </p>
                                                     </div>
                                                 ) : (
@@ -5643,7 +5643,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 }}
                                                             />
                                                             {/* Visible connector point */}
-                                                            <div className={`w-5 h-5 bg-blue-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'A' ? 'border-blue-500 scale-125 bg-blue-100 shadow-md' : 'border-blue-400 group-hover/connector:border-blue-500 group-hover/connector:bg-blue-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} 
+                                                            <div className={`w-5 h-5 bg-[#256A65]/10 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'A' ? 'border-[#256A65] scale-125 bg-[#256A65]/20 shadow-md' : 'border-[#256A65]/60 group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/20 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} 
                                                                 title="Output A" />
                                                         </div>
                                                         <span className="absolute -right-6 text-[9px] font-normal text-blue-600" style={{ top: '28px', transform: 'translateY(-50%)' }}>A</span>

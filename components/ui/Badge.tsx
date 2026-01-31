@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info' | 'purple';
+export type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info' | 'primary' | 'secondary';
 export type BadgeSize = 'sm' | 'md';
 
 interface BadgeProps {
@@ -13,11 +13,12 @@ interface BadgeProps {
 
 const variantStyles: Record<BadgeVariant, string> = {
   default: 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--border-light)]',
-  success: 'bg-green-50 text-green-700 border-green-200',
-  warning: 'bg-amber-50 text-amber-700 border-amber-200',
-  error: 'bg-red-50 text-red-700 border-red-200',
-  info: 'bg-blue-50 text-blue-700 border-blue-200',
-  purple: 'bg-purple-50 text-purple-700 border-purple-200',
+  success: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800',
+  warning: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800',
+  error: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800',
+  info: 'bg-[#84C4D1]/20 text-[#256A65] border-[#84C4D1]/40 dark:bg-[#84C4D1]/10 dark:text-[#84C4D1] dark:border-[#84C4D1]/30',
+  primary: 'bg-[#256A65]/10 text-[#256A65] border-[#256A65]/30 dark:bg-[#256A65]/20 dark:text-[#84C4D1] dark:border-[#256A65]/40',
+  secondary: 'bg-[#84C4D1]/15 text-[#1e5a55] border-[#84C4D1]/30 dark:bg-[#84C4D1]/10 dark:text-[#84C4D1] dark:border-[#84C4D1]/20',
 };
 
 const sizeStyles: Record<BadgeSize, string> = {

@@ -11,22 +11,22 @@ import {
 
 interface TutorialMedia {
     type: 'video' | 'gif' | 'image';
-    src: string; // Path to the media file (e.g., '/tutorial/drag-drop.mp4')
-    alt?: string; // Alt text for accessibility
+    src: string;
+    alt?: string;
 }
 
 interface TutorialStep {
     id: string;
     title: string;
     description: string;
-    targetSelector?: string; // CSS selector for the element to highlight
-    route?: string; // Route to navigate to
+    targetSelector?: string;
+    route?: string;
     position?: 'top' | 'bottom' | 'left' | 'right' | 'center';
-    action?: 'click' | 'hover' | 'observe'; // What the user should do
-    waitForElement?: boolean; // Wait for the element to appear
-    media?: TutorialMedia; // Optional video/gif/image to show
-    allowInteraction?: boolean; // Allow user to interact with highlighted area (no overlay blocking)
-    fullPage?: boolean; // Highlight the entire page content area (no spotlight)
+    action?: 'click' | 'hover' | 'observe';
+    waitForElement?: boolean;
+    media?: TutorialMedia;
+    allowInteraction?: boolean;
+    fullPage?: boolean;
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
@@ -100,7 +100,6 @@ const TUTORIAL_STEPS: TutorialStep[] = [
         waitForElement: true,
         allowInteraction: true,
         fullPage: true,
-        // To add a video: media: { type: 'video', src: '/tutorial/drag-drop-demo.mp4' }
     },
     {
         id: 'database-nav',
@@ -201,7 +200,6 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
         if (step.route && location.pathname !== step.route) {
             setIsTransitioning(true);
             navigate(step.route);
-            // Wait for navigation and DOM update
             setTimeout(() => {
                 setIsTransitioning(false);
                 updateTargetPosition();
@@ -217,7 +215,6 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
         window.addEventListener('resize', handleUpdate);
         window.addEventListener('scroll', handleUpdate, true);
         
-        // Also update periodically in case elements move
         const interval = setInterval(handleUpdate, 500);
 
         return () => {
@@ -246,13 +243,11 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
     const handleHighlightClick = useCallback(() => {
         if (step.action !== 'click' || !step.targetSelector) return;
         
-        // Trigger the actual element's click handler
         const element = document.querySelector(step.targetSelector) as HTMLElement;
         if (element) {
             element.click();
         }
         
-        // Advance to next step after a small delay
         setTimeout(() => {
             setCurrentStep(prev => prev + 1);
         }, 150);
@@ -262,7 +257,6 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
         if (isLastStep) {
             onComplete();
         } else {
-            // If this step has action: 'click', trigger the click and advance
             if (step.action === 'click' && step.targetSelector) {
                 const element = document.querySelector(step.targetSelector) as HTMLElement;
                 if (element) {
@@ -283,7 +277,7 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
         onSkip();
     };
 
-    // Calculate tooltip position - ensure it's always fully visible
+    // Calculate tooltip position
     const getTooltipStyle = (): React.CSSProperties => {
         if (!targetRect || step.position === 'center') {
             return {
@@ -296,8 +290,7 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
 
         const padding = 20;
         const tooltipWidth = step.media ? 420 : 360;
-        // More accurate height estimate based on content
-        const baseHeight = 280; // Base height for title, description, buttons
+        const baseHeight = 280;
         const mediaHeight = step.media ? 200 : 0;
         const hintHeight = targetRect ? 50 : 0;
         const tooltipHeight = baseHeight + mediaHeight + hintHeight;
@@ -307,7 +300,6 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
         const safeBottom = viewportHeight - tooltipHeight - padding;
         const safeRight = viewportWidth - tooltipWidth - padding;
 
-        // Calculate ideal position based on step.position
         let top: number;
         let left: number;
 
@@ -333,10 +325,7 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                 left = viewportWidth / 2 - tooltipWidth / 2;
         }
 
-        // Clamp to ensure tooltip stays within viewport
-        // Ensure it doesn't go below the viewport (most important!)
         top = Math.max(padding, Math.min(top, safeBottom));
-        // Ensure it doesn't go off the right edge
         left = Math.max(padding, Math.min(left, safeRight));
 
         return {
@@ -357,7 +346,6 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
         const height = targetRect.height + padding * 2;
         const radius = 12;
 
-        // Create a rounded rectangle cutout
         return `
             polygon(
                 0% 0%, 
@@ -380,30 +368,28 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
 
     return (
         <div className="fixed inset-0 z-[9999] pointer-events-none">
-            {/* Overlay with spotlight cutout - always allows interaction with highlighted area */}
+            {/* Overlay with spotlight cutout */}
             {step.fullPage ? (
-                // Full page mode: light overlay, no spotlight
                 <div 
-                    className="absolute inset-0 bg-slate-950/40 transition-all duration-300 pointer-events-none"
+                    className="absolute inset-0 bg-black/50 transition-all duration-300 pointer-events-none"
                 />
             ) : (
-                // Normal mode: spotlight cutout - the cutout area is naturally interactive
                 <div 
-                    className="absolute inset-0 bg-slate-950/70 transition-all duration-300 pointer-events-none"
+                    className="absolute inset-0 bg-black/60 transition-all duration-300 pointer-events-none"
                     style={targetRect ? { clipPath: getSpotlightClipPath() } : {}}
                 />
             )}
 
-            {/* Highlight border around target - only when not full page */}
+            {/* Highlight border around target */}
             {targetRect && !step.fullPage && (
                 <div
-                    className="absolute border-2 border-teal-400 rounded-xl pointer-events-none transition-all duration-300 animate-pulse"
+                    className="absolute border-2 border-[#256A65] rounded-xl pointer-events-none transition-all duration-300 animate-pulse"
                     style={{
                         left: targetRect.left - 8,
                         top: targetRect.top - 8,
                         width: targetRect.width + 16,
                         height: targetRect.height + 16,
-                        boxShadow: '0 0 0 4px rgba(20, 184, 166, 0.2), 0 0 20px rgba(20, 184, 166, 0.3)',
+                        boxShadow: '0 0 0 4px rgba(37, 106, 101, 0.2), 0 0 20px rgba(37, 106, 101, 0.3)',
                     }}
                 />
             )}
@@ -424,41 +410,42 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
 
             {/* Tooltip */}
             <div
-                className={`${step.media ? 'w-[420px]' : 'w-[360px]'} bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 pointer-events-auto`}
+                className={`${step.media ? 'w-[420px]' : 'w-[360px]'} bg-[var(--bg-card)] border border-[var(--border-light)] rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 pointer-events-auto`}
                 style={{
                     ...getTooltipStyle(),
-                    maxHeight: 'calc(100vh - 40px)', // Never exceed viewport height
+                    maxHeight: 'calc(100vh - 40px)',
                 }}
             >
                 {/* Progress bar */}
                 <div className="h-1 bg-[var(--bg-tertiary)] shrink-0">
                     <div 
-                        className="h-full bg-gradient-to-r from-teal-500 to-blue-500 transition-all duration-500"
+                        className="h-full bg-[#256A65] transition-all duration-500"
                         style={{ width: `${progress}%` }}
                     />
                 </div>
 
-                {/* Content - scrollable if too tall */}
+                {/* Content */}
                 <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 100px)' }}>
                     {/* Step indicator */}
                     <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2 text-teal-600">
-                            <Sparkle size={16} weight="light" />
+                        <div className="flex items-center gap-2 text-[#256A65]">
+                            <Sparkle size={16} weight="fill" />
                             <span className="text-xs font-medium">
                                 Step {currentStep + 1} of {TUTORIAL_STEPS.length}
                             </span>
                         </div>
                         <button
                             onClick={handleSkip}
-                            className="text-slate-400 hover:text-[var(--text-secondary)] p-1 hover:bg-[var(--bg-tertiary)] rounded transition-colors"
+                            className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] p-1 hover:bg-[var(--bg-tertiary)] rounded transition-colors"
                             title="Skip tutorial"
+                            aria-label="Skip tutorial"
                         >
                             <X size={18} weight="light" />
                         </button>
                     </div>
 
                     {/* Title */}
-                    <h3 className="text-lg font-normal text-slate-800 mb-2">
+                    <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                         {step.title}
                     </h3>
 
@@ -467,9 +454,9 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                         {step.description}
                     </p>
 
-                    {/* Media (video/gif/image) */}
+                    {/* Media */}
                     {step.media && (
-                        <div className="mb-4 rounded-lg overflow-hidden border border-slate-200 bg-[var(--bg-tertiary)]">
+                        <div className="mb-4 rounded-lg overflow-hidden border border-[var(--border-light)] bg-[var(--bg-tertiary)]">
                             {step.media.type === 'video' ? (
                                 <video
                                     src={step.media.src}
@@ -493,15 +480,15 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
 
                     {/* Action hint */}
                     {(step.fullPage || step.action === 'click') && (
-                        <div className="flex items-center gap-2 text-xs text-teal-600 bg-teal-50 px-3 py-2 rounded-lg mb-4">
+                        <div className="flex items-center gap-2 text-xs text-[#256A65] bg-[#256A65]/10 px-3 py-2 rounded-lg mb-4 border border-[#256A65]/20">
                             {step.fullPage ? (
                                 <>
-                                    <DotsSixVertical size={14} weight="light" />
+                                    <DotsSixVertical size={14} weight="bold" />
                                     <span>Try it! Drag components onto the canvas, then click Next</span>
                                 </>
                             ) : (
                                 <>
-                                    <CursorClick size={14} weight="light" />
+                                    <CursorClick size={14} weight="fill" />
                                     <span>Click the highlighted element to continue</span>
                                 </>
                             )}
@@ -515,11 +502,11 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                             disabled={isFirstStep}
                             className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                                 isFirstStep
-                                    ? 'text-slate-300 cursor-not-allowed'
+                                    ? 'text-[var(--text-tertiary)] cursor-not-allowed'
                                     : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                             }`}
                         >
-                            <CaretLeft size={16} weight="light" />
+                            <CaretLeft size={16} weight="bold" />
                             Back
                         </button>
 
@@ -529,10 +516,10 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                                     key={index}
                                     className={`w-1.5 h-1.5 rounded-full transition-all ${
                                         index === currentStep
-                                            ? 'w-4 bg-teal-500'
+                                            ? 'w-4 bg-[#256A65]'
                                             : index < currentStep
-                                                ? 'bg-teal-300'
-                                                : 'bg-[var(--bg-selected)]'
+                                                ? 'bg-[#256A65]/50'
+                                                : 'bg-[var(--border-medium)]'
                                     }`}
                                 />
                             ))}
@@ -542,12 +529,12 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                             onClick={handleNext}
                             className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                                 isLastStep
-                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600'
-                                    : 'bg-slate-800 text-white hover:bg-slate-700'
+                                    ? 'bg-[#256A65] text-white hover:bg-[#1e5a55]'
+                                    : 'bg-[var(--bg-selected)] text-white hover:bg-[#555555]'
                             }`}
                         >
                             {isLastStep ? 'Finish' : 'Next'}
-                            <CaretRight size={16} weight="light" />
+                            <CaretRight size={16} weight="bold" />
                         </button>
                     </div>
                 </div>
@@ -556,10 +543,9 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
             {/* Loading state during transitions */}
             {isTransitioning && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                    <div className="w-8 h-8 border-2 border-[#256A65] border-t-transparent rounded-full animate-spin" />
                 </div>
             )}
         </div>
     );
 }
-

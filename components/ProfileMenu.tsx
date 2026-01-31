@@ -171,54 +171,34 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
     useEffect(() => {
         if (isOpen && triggerRef.current) {
             const rect = triggerRef.current.getBoundingClientRect();
-            const windowWidth = window.innerWidth;
             const windowHeight = window.innerHeight;
-            const menuWidth = 288; // w-72 = 18rem = 288px
-            const menuHeight = 400; // approximate height
-            
-            // Calculate space available
-            const spaceOnRight = windowWidth - rect.right;
-            const spaceOnLeft = rect.left;
+            const menuHeight = 300; // approximate height
             
             let position: { top: number; left?: number; right?: number };
             let top: number;
             
-            // Check if trigger is on the left side (likely sidebar)
-            // If trigger is in left 300px, position menu to the right of trigger using left
-            if (rect.left < 300 && spaceOnRight >= menuWidth) {
-                // Position to the right of trigger, aligned with left edge
-                const left = rect.right + 8; // 8px gap from trigger
-                position = { left };
-                // For sidebar menu, position so menu bottom aligns with trigger bottom
-                // This places the menu at the same level as the profile button
-                top = rect.bottom - menuHeight;
-                // Ensure menu doesn't go above screen
-                if (top < 8) top = 8;
-            } else if (spaceOnRight >= menuWidth) {
-                // Enough space on right, position to the right using right positioning
-                position = { right: windowWidth - rect.right };
-                // Calculate vertical position based on placement
-                if (menuPlacement === 'top-right' || menuPlacement === 'top-left') {
-                    top = rect.top - menuHeight - 8;
-                    if (top < 8) top = rect.bottom + 8;
-                } else {
-                    top = rect.bottom + 8;
-                    if (top + menuHeight > windowHeight - 8) {
-                        top = rect.top - menuHeight - 8;
-                        if (top < 8) top = windowHeight - menuHeight - 8;
-                    }
-                }
-            } else if (spaceOnLeft >= menuWidth) {
-                // Not enough space on right, but enough on left, position to the left
-                position = { right: windowWidth - rect.left + 8 };
-                top = rect.bottom + 8;
-            } else {
-                // Not enough space on either side, default to right edge
-                position = { right: 16 };
+            // Position menu to the right of the trigger
+            const left = rect.right + 8;
+            
+            // Position menu so its BOTTOM aligns with the trigger's BOTTOM
+            // This makes it appear "attached" to the profile button from below
+            top = rect.bottom - menuHeight;
+            
+            // If menu would go above screen, position it below the trigger instead
+            if (top < 8) {
                 top = rect.bottom + 8;
             }
             
-            position.top = Math.max(8, Math.min(top, windowHeight - menuHeight - 8));
+            // If menu would go below screen, cap it
+            if (top + menuHeight > windowHeight - 8) {
+                top = windowHeight - menuHeight - 8;
+            }
+            
+            position = { 
+                left,
+                top: Math.max(8, top)
+            };
+            
             setMenuPosition(position);
         } else {
             setMenuPosition(null);
@@ -235,7 +215,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                 onClick={() => setIsOpen(!isOpen)}
                 className={triggerContent
                     ? triggerClassName
-                    : "rounded-full shadow-md hover:ring-2 hover:ring-teal-500 transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"}
+                    : "rounded-full shadow-md hover:ring-2 hover:ring-[#256A65] transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#256A65]"}
             >
                 {triggerContent ? triggerContent : (
                     <UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="md" />
@@ -394,11 +374,11 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
             <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowProfileModal(false)}>
                 <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl w-[420px] max-w-full mx-4" onClick={e => e.stopPropagation()}>
                     {/* Header */}
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-light)] bg-slate-50/50">
-                        <h2 className="text-sm font-normal text-[var(--text-primary)]">My Profile</h2>
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
+                        <h2 className="text-sm font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>My Profile</h2>
                         <button 
                             onClick={() => setShowProfileModal(false)}
-                            className="p-1 hover:bg-[var(--bg-tertiary)] rounded-md transition-colors"
+                            className="p-1 hover:bg-[var(--bg-hover)] rounded-md transition-colors"
                         >
                             <X size={20} weight="light" className="text-[var(--text-tertiary)]" />
                         </button>
@@ -447,7 +427,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     type="text"
                                     value={editName}
                                     onChange={(e) => setEditName(e.target.value)}
-                                    className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                    className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] placeholder:text-[var(--text-tertiary)]"
                                     placeholder="Your name"
                                 />
                             </div>
@@ -460,7 +440,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     type="text"
                                     value={editRole}
                                     onChange={(e) => setEditRole(e.target.value)}
-                                    className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                    className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] placeholder:text-[var(--text-tertiary)]"
                                     placeholder="e.g. Product Manager, Developer, Designer"
                                 />
                             </div>
@@ -473,7 +453,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     type="email"
                                     value={user?.email || ''}
                                     disabled
-                                    className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-slate-50 text-sm text-[var(--text-secondary)] cursor-not-allowed"
+                                    className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] cursor-not-allowed"
                                 />
                                 <p className="text-[11px] text-[var(--text-tertiary)] mt-1">Email cannot be changed</p>
                             </div>
@@ -481,19 +461,19 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                     </div>
 
                     {/* Footer */}
-                    <div className="flex justify-end gap-2 px-5 py-4 border-t border-[var(--border-light)] bg-slate-50/50 rounded-b-lg">
+                    <div className="flex justify-end gap-2 px-5 py-4 border-t border-[var(--border-light)] bg-[var(--bg-tertiary)] rounded-b-lg">
                         <button
                             onClick={() => setShowProfileModal(false)}
-                            className="px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                            className="px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
                         >
                             Cancel
                         </button>
                         <button
                             onClick={handleSaveProfile}
                             disabled={isSaving}
-                            className="btn-3d btn-primary-3d text-sm text-white rounded-lg text-sm hover:bg-[#1e554f] transition-colors disabled:opacity-50 flex items-center gap-2"
+                            className="px-3 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-sm text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
-                            {isSaving && <SpinnerGap size={16} weight="light" className="animate-spin" />}
+                            {isSaving && <SpinnerGap size={16} weight="bold" className="animate-spin" />}
                             Save Changes
                         </button>
                     </div>
@@ -506,11 +486,11 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
             <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowCreateOrgModal(false)}>
                 <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-lg w-[400px] max-w-full mx-4" onClick={e => e.stopPropagation()}>
                     {/* Header */}
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-light)] bg-slate-50/50">
-                        <h2 className="text-sm font-normal text-[var(--text-primary)]">Create Organization</h2>
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
+                        <h2 className="text-sm font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Create Organization</h2>
                         <button 
                             onClick={() => setShowCreateOrgModal(false)}
-                            className="p-1 hover:bg-[var(--bg-tertiary)] rounded-md transition-colors"
+                            className="p-1 hover:bg-[var(--bg-hover)] rounded-md transition-colors"
                         >
                             <X size={20} weight="light" className="text-[var(--text-tertiary)]" />
                         </button>
@@ -530,7 +510,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                 type="text"
                                 value={newOrgName}
                                 onChange={(e) => setNewOrgName(e.target.value)}
-                                className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
+                                className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] placeholder:text-[var(--text-tertiary)]"
                                 placeholder="e.g. Acme Inc."
                                 autoFocus
                                 onKeyDown={(e) => {
@@ -543,19 +523,19 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                     </div>
 
                     {/* Footer */}
-                    <div className="flex justify-end gap-2 px-5 py-4 border-t border-[var(--border-light)] bg-slate-50/50 rounded-b-lg">
+                    <div className="flex justify-end gap-2 px-5 py-4 border-t border-[var(--border-light)] bg-[var(--bg-tertiary)] rounded-b-lg">
                         <button
                             onClick={() => setShowCreateOrgModal(false)}
-                            className="px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                            className="px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
                         >
                             Cancel
                         </button>
                         <button
                             onClick={handleCreateOrganization}
                             disabled={isCreatingOrg || !newOrgName.trim()}
-                            className="btn-3d btn-primary-3d text-sm text-white rounded-lg text-sm hover:bg-[#1e554f] transition-colors disabled:opacity-50 flex items-center gap-2"
+                            className="px-3 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-sm text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
-                            {isCreatingOrg && <SpinnerGap size={16} weight="light" className="animate-spin" />}
+                            {isCreatingOrg && <SpinnerGap size={16} weight="bold" className="animate-spin" />}
                             Create Organization
                         </button>
                     </div>

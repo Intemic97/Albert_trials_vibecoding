@@ -138,3 +138,6 @@ export { CanvasControls } from './CanvasControls';
 
 // Workflow Toolbar - Barra de herramientas superior
 export { WorkflowToolbar } from './WorkflowToolbar';
+
+// Data Preview Panel - Preview de datos en tiempo real
+export { DataPreviewPanel, InlineDataPreview } from './DataPreviewPanel';

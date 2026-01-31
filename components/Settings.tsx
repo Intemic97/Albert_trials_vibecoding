@@ -537,7 +537,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${user.role === 'admin'
-                                                        ? 'bg-purple-50 text-purple-700 border border-purple-100'
+                                                        ? 'bg-[#256A65]/10 text-[#256A65] border border-[#256A65]/30'
                                                         : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]'
                                                         }`}>
                                                         {user.role}

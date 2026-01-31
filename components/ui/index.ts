@@ -91,3 +91,16 @@ export {
 
 // Toast - Notificaciones
 export { Toast, ToastContainer, showToast } from './Toast';
+
+// ============================================================================
+// LAYOUT COMPONENTS
+// ============================================================================
+
+// SidePanel - Panel lateral deslizante
+export { 
+  SidePanel, 
+  SidePanelContent, 
+  SidePanelSection, 
+  SidePanelDivider 
+} from './SidePanel';
+export type { SidePanelSize, SidePanelPosition } from './SidePanel';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkle, Icon } from '@phosphor-icons/react';
+import { Sparkle, Icon, SpinnerGap } from '@phosphor-icons/react';
 
 interface AIPromptSectionProps {
     label: string;
@@ -21,13 +21,13 @@ export const AIPromptSection: React.FC<AIPromptSectionProps> = ({
     onGenerate,
     isGenerating,
     generatingText = 'Generating...',
-    icon: Icon = Sparkle,
+    icon: IconComponent = Sparkle,
     buttonText = 'Generate'
 }) => {
     return (
         <div className="space-y-2">
-            <label className="block text-xs font-medium text-slate-700 mb-2 flex items-center gap-2">
-                <Icon size={14} weight="light" className="text-[var(--text-secondary)]" />
+            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
+                <IconComponent size={14} weight="fill" className="text-[var(--text-secondary)]" />
                 {label}
             </label>
             <div className="flex gap-2">
@@ -37,22 +37,22 @@ export const AIPromptSection: React.FC<AIPromptSectionProps> = ({
                     onChange={(e) => onChange(e.target.value)}
                     placeholder={placeholder}
                     onKeyDown={(e) => e.key === 'Enter' && !isGenerating && onGenerate()}
-                    className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-slate-400 bg-[var(--bg-card)]"
+                    className="flex-1 px-3 py-2 bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] placeholder:text-[var(--text-tertiary)]"
                     disabled={isGenerating}
                 />
                 <button
                     onClick={onGenerate}
                     disabled={isGenerating || !value.trim()}
-                    className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2 whitespace-nowrap"
+                    className="flex items-center px-3 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2 whitespace-nowrap"
                 >
                     {isGenerating ? (
                         <>
-                            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <SpinnerGap size={14} weight="bold" className="animate-spin" />
                             {generatingText}
                         </>
                     ) : (
                         <>
-                            <Icon size={14} weight="light" />
+                            <IconComponent size={14} weight="fill" />
                             {buttonText}
                         </>
                     )}

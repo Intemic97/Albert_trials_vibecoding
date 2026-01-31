@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Entity } from '../types';
-import { Database, Sparkle, X, Info, Plus, Share, CaretDown, Copy, Check, Trash, Link, ArrowSquareOut, Layout, MagnifyingGlass, ArrowLeft, Calendar, Clock, CaretRight, DotsSixVertical } from '@phosphor-icons/react';
+import { Database, Sparkle, X, Info, Plus, Share, CaretDown, Copy, Check, Trash, Link, ArrowSquareOut, Layout, MagnifyingGlass, ArrowLeft, Calendar, Clock, CaretRight, DotsSixVertical, GearSix, ArrowsClockwise } from '@phosphor-icons/react';
 import { PromptInput } from './PromptInput';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { Pagination } from './Pagination';
@@ -12,6 +12,18 @@ import { useNotifications } from '../hooks/useNotifications';
 import { ToastContainer } from './ui/Toast';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
+
+// New Grafana-style components
+import { 
+    WidgetGallery, 
+    WidgetConfigurator, 
+    DashboardToolbar,
+    ChartWidget,
+    WidgetTemplate,
+    WidgetFullConfig,
+    WIDGET_TEMPLATES
+} from './dashboard/index';
+import type { TimeRange } from './dashboard/index';
 
 // Custom styles to ensure resize handles are visible
 // Documentation: https://github.com/react-grid-layout/react-grid-layout
@@ -407,6 +419,97 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     // Modal state for adding widgets
     const [showAddWidgetModal, setShowAddWidgetModal] = useState(false);
     const [selectedVisualizationType, setSelectedVisualizationType] = useState<string>('');
+    
+    // New Grafana-style states
+    const [showWidgetGallery, setShowWidgetGallery] = useState(false);
+    const [selectedWidgetTemplate, setSelectedWidgetTemplate] = useState<WidgetTemplate | null>(null);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [timeRange, setTimeRange] = useState<TimeRange>('last_30d');
+    const [refreshInterval, setRefreshInterval] = useState(0); // 0 = disabled
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    
+    // Auto refresh effect
+    useEffect(() => {
+        if (refreshInterval > 0 && selectedDashboardId) {
+            const intervalId = setInterval(() => {
+                handleRefreshDashboard();
+            }, refreshInterval * 1000);
+            return () => clearInterval(intervalId);
+        }
+    }, [refreshInterval, selectedDashboardId]);
+    
+    const handleRefreshDashboard = async () => {
+        if (!selectedDashboardId || isRefreshing) return;
+        setIsRefreshing(true);
+        await fetchWidgets(selectedDashboardId);
+        setTimeout(() => setIsRefreshing(false), 500);
+    };
+    
+    const handleWidgetTemplateSelect = (template: WidgetTemplate) => {
+        setShowWidgetGallery(false);
+        if (template.id === 'ai_generated') {
+            // For AI generated, show the old modal
+            setShowAddWidgetModal(true);
+        } else {
+            // For data-driven widgets, show configurator
+            setSelectedWidgetTemplate(template);
+        }
+    };
+    
+    const handleSaveConfiguredWidget = async (config: WidgetFullConfig) => {
+        if (!selectedDashboardId) return;
+        
+        try {
+            const id = generateUUID();
+            const template = selectedWidgetTemplate || WIDGET_TEMPLATES.find(t => t.id === config.type);
+            
+            // Find position for new widget
+            const maxY = layout.length > 0 ? Math.max(...layout.map(l => l.y + l.h)) : 0;
+            const gridX = 0;
+            const gridY = maxY;
+            const gridW = template?.defaultWidth || 6;
+            const gridH = template?.defaultHeight || 4;
+            
+            const widgetConfig: WidgetConfig = {
+                type: config.type === 'bar_chart' ? 'bar' : 
+                      config.type === 'line_chart' ? 'line' : 
+                      config.type === 'area_chart' ? 'area' : 
+                      config.type === 'pie_chart' ? 'pie' : 'bar',
+                title: config.title,
+                description: config.description || '',
+                data: config.data || [],
+                xAxisKey: 'name',
+                dataKey: 'value',
+                colors: config.colors
+            };
+            
+            const res = await fetch(`${API_BASE}/dashboards/${selectedDashboardId}/widgets`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id,
+                    title: config.title,
+                    description: config.description,
+                    config: widgetConfig,
+                    gridX,
+                    gridY,
+                    gridWidth: gridW,
+                    gridHeight: gridH
+                }),
+                credentials: 'include'
+            });
+            
+            if (res.ok) {
+                await fetchWidgets(selectedDashboardId);
+                success('Widget added successfully');
+            }
+        } catch (error) {
+            console.error('Error saving widget:', error);
+            showError('Failed to add widget');
+        }
+        
+        setSelectedWidgetTemplate(null);
+    };
     
     // Update grid width on window resize
     useEffect(() => {
@@ -1104,46 +1207,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 </>
             ) : selectedDashboardId ? (
                 <>
-                    {/* Header */}
-                    <header className="h-16 bg-[var(--bg-primary)] border-b border-[var(--border-light)] flex items-center justify-between px-8 z-20 shrink-0">
-                        <div className="flex items-center gap-4">
-                            <button
-                                onClick={() => {
-                                    setSelectedDashboardId(null);
-                                    navigate('/dashboard', { replace: true });
-                                }}
-                                className="flex items-center gap-2 px-2 py-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors text-sm"
-                            >
-                                <ArrowLeft size={14} weight="light" />
-                                <span className="font-medium">Back to Dashboards</span>
-                            </button>
-                            
-                            {/* Dashboard Actions */}
-                            {selectedDashboard && (
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        onClick={openShareModalIfShared}
-                                        className={`p-1.5 rounded-md transition-colors ${
-                                            selectedDashboard.isPublic 
-                                                ? 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]' 
-                                                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
-                                        }`}
-                                        title={selectedDashboard.isPublic ? "Manage Share Link" : "Share Dashboard"}
-                                    >
-                                        <Share size={16} weight="light" />
-                                    </button>
-                                    <button
-                                        onClick={handleDeleteDashboard}
-                                        className="p-1.5 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
-                                        title="Delete Dashboard"
-                                    >
-                                        <Trash size={16} weight="light" />
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                        <div />
-                    </header>
+                    {/* Grafana-style Toolbar */}
+                    <DashboardToolbar
+                        dashboardName={selectedDashboard?.name || 'Dashboard'}
+                        onBack={() => {
+                            setSelectedDashboardId(null);
+                            navigate('/dashboard', { replace: true });
+                        }}
+                        onShare={openShareModalIfShared}
+                        onDelete={handleDeleteDashboard}
+                        onAddWidget={() => setShowWidgetGallery(true)}
+                        timeRange={timeRange}
+                        onTimeRangeChange={setTimeRange}
+                        refreshInterval={refreshInterval}
+                        onRefreshIntervalChange={setRefreshInterval}
+                        onRefresh={handleRefreshDashboard}
+                        isRefreshing={isRefreshing}
+                        isEditMode={isEditMode}
+                        onToggleEditMode={() => setIsEditMode(!isEditMode)}
+                    />
 
                     {/* Main Content */}
                     <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
@@ -1249,8 +1331,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                                 }, 100);
                                             }
                                         }}
-                                        isDraggable={true}
-                                        isResizable={true}
+                                        isDraggable={isEditMode}
+                                        isResizable={isEditMode}
                                         draggableHandle=".drag-handle"
                                         margin={[16, 16]}
                                         containerPadding={[16, 16]}
@@ -1311,13 +1393,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                             {/* Floating Add Widget Button */}
                             {selectedDashboard && (
                                 <button
-                                    onClick={() => setShowAddWidgetModal(true)}
-                                    className="fixed bottom-8 right-8 bg-[var(--bg-selected)] text-white rounded-full p-4 shadow-lg hover:bg-[#555555] transition-colors z-50 flex items-center gap-2 group"
+                                    onClick={() => setShowWidgetGallery(true)}
+                                    className="fixed bottom-8 right-8 bg-[#256A65] text-white rounded-2xl px-5 py-3.5 shadow-xl hover:shadow-2xl hover:bg-[#1e5a55] transition-all duration-300 z-50 flex items-center gap-3 group hover:scale-105 active:scale-95"
                                     title="Add Widget"
                                 >
-                                    <Plus size={20} weight="light" className="group-hover:rotate-90 transition-transform duration-200" />
-                                    <span className="text-sm font-medium pr-2 hidden sm:inline">Add Widget</span>
+                                    <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                                        <Plus size={16} weight="bold" className="group-hover:rotate-90 transition-transform duration-300" />
+                                    </div>
+                                    <span className="text-sm font-medium hidden sm:inline">Add widget</span>
                                 </button>
+                            )}
+                            
+                            {/* Widget Gallery Modal */}
+                            {showWidgetGallery && (
+                                <WidgetGallery
+                                    onSelect={handleWidgetTemplateSelect}
+                                    onClose={() => setShowWidgetGallery(false)}
+                                />
+                            )}
+                            
+                            {/* Widget Configurator Modal */}
+                            {selectedWidgetTemplate && (
+                                <WidgetConfigurator
+                                    template={selectedWidgetTemplate}
+                                    entities={entities}
+                                    onSave={handleSaveConfiguredWidget}
+                                    onCancel={() => setSelectedWidgetTemplate(null)}
+                                />
                             )}
 
                             {/* Add Widget Modal */}

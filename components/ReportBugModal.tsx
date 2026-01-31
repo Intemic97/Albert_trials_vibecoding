@@ -129,12 +129,12 @@ export const ReportBugModal: React.FC<ReportBugModalProps> = ({ isOpen, onClose 
                         >
                             {isSubmitting ? (
                                 <>
-                                    <Loader2 size={16} className="animate-spin" />
+                                    <SpinnerGap size={16} className="animate-spin" weight="light" />
                                     Submitting...
                                 </>
                             ) : (
                                 <>
-                                    <Send size={16} />
+                                    <PaperPlaneTilt size={16} weight="light" />
                                     Submit Report
                                 </>
                             )}

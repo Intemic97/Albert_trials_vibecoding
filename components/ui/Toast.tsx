@@ -34,10 +34,10 @@ const styleMap: Record<NotificationType, { bg: string; border: string; icon: str
     title: 'text-yellow-800 dark:text-yellow-200',
   },
   info: {
-    bg: 'bg-blue-50 dark:bg-blue-900/20',
-    border: 'border-blue-200 dark:border-blue-800',
-    icon: 'text-blue-500',
-    title: 'text-blue-800 dark:text-blue-200',
+    bg: 'bg-[#84C4D1]/20 dark:bg-[#84C4D1]/10',
+    border: 'border-[#84C4D1]/40 dark:border-[#84C4D1]/30',
+    icon: 'text-[#256A65]',
+    title: 'text-[#256A65] dark:text-[#84C4D1]',
   },
 };
 

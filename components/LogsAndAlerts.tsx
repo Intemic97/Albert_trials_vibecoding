@@ -209,7 +209,7 @@ export const LogsAndAlerts: React.FC = () => {
             case 'completed':
                 return <CheckCircle size={16} weight="light" className="text-emerald-600" />;
             case 'running':
-                return <Loader2 size={16} weight="light" className="text-blue-600 animate-spin" />;
+                return <Loader2 size={16} weight="light" className="text-[#256A65] animate-spin" />;
             case 'failed':
                 return <XCircle size={16} weight="light" className="text-red-600" />;
             case 'pending':
@@ -222,7 +222,7 @@ export const LogsAndAlerts: React.FC = () => {
     const getStatusBadge = (status: string) => {
         const styles = {
             completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-            running: 'bg-blue-50 text-blue-700 border-blue-200',
+            running: 'bg-[#84C4D1]/20 text-[#256A65] border-[#84C4D1]/40',
             failed: 'bg-red-50 text-red-700 border-red-200',
             pending: 'bg-amber-50 text-amber-700 border-amber-200'
         };
@@ -570,13 +570,13 @@ export const LogsAndAlerts: React.FC = () => {
                                         const alertIcons = {
                                             error: <XCircle size={16} weight="light" className="text-red-600" />,
                                             warning: <AlertTriangle size={16} weight="light" className="text-amber-600" />,
-                                            info: <Info size={16} weight="light" className="text-blue-600" />,
+                                            info: <Info size={16} weight="light" className="text-[#256A65]" />,
                                             success: <CheckCircle size={16} weight="light" className="text-emerald-600" />
                                         };
                                         const alertStyles = {
                                             error: 'bg-red-50 border-red-200',
                                             warning: 'bg-amber-50 border-amber-200',
-                                            info: 'bg-blue-50 border-blue-200',
+                                            info: 'bg-[#84C4D1]/20 border-[#84C4D1]/40',
                                             success: 'bg-emerald-50 border-emerald-200'
                                         };
                                         return (

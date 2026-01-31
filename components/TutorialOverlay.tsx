@@ -194,7 +194,7 @@ export function TutorialOverlay({ onComplete, onSkip }: TutorialOverlayProps) {
                         isLastStep 
                             ? 'bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-600'
                             : isFirstStep
-                                ? 'bg-gradient-to-br from-blue-100 to-purple-100 text-blue-600'
+                                ? 'bg-gradient-to-br from-[#84C4D1]/30 to-[#256A65]/20 text-[#256A65]'
                                 : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
                     }`}>
                         {step.icon}

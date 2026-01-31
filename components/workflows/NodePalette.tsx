@@ -215,9 +215,9 @@ const PaletteItem: React.FC<PaletteItemProps> = ({ item, onDragStart, onDragEnd 
     >
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
         item.category === 'Triggers' ? 'bg-amber-100 text-amber-700' :
-        item.category === 'Data' ? 'bg-indigo-100 text-indigo-700' :
+        item.category === 'Data' ? 'bg-[#256A65]/10 text-[#256A65]' :
         item.category === 'Logic' ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]' :
-        'bg-blue-100 text-blue-700'
+        'bg-[#84C4D1]/20 text-[#256A65]'
       }`}>
         <Icon size={16} weight="light" />
       </div>

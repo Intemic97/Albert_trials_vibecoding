@@ -1107,11 +1107,11 @@ export const Copilots: React.FC = () => {
                                 <div className="max-w-3xl w-full space-y-8">
                                     {/* Greeting */}
                                     <div className="text-center">
-                                        <h2 className="text-2xl font-normal text-[var(--text-primary)] leading-tight" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
-                                            Ask me anything about your data.
+                                        <h2 className="text-lg font-medium text-[var(--text-secondary)] tracking-wider uppercase" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
+                                            Ask me anything about your data
                                         </h2>
                                     </div>
-
+                                    
                                     {/* Centered Input */}
                                     <div className="relative">
                                         <form onSubmit={handleSubmit} className="relative">
