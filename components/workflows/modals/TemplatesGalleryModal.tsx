@@ -12,7 +12,7 @@ import {
     ArrowRight,
     FlowArrow,
     Shield,
-    Zap,
+    Lightning,
     Calendar,
     ChartBar,
     CheckCircle
@@ -38,7 +38,7 @@ interface TemplatesGalleryModalProps {
 const CATEGORIES = [
     { name: 'All', icon: <FlowArrow size={14} weight="light" />, color: 'from-slate-500 to-slate-600' },
     { name: 'Compliance', icon: <Shield size={14} weight="light" />, color: 'from-blue-500 to-blue-600' },
-    { name: 'Process Optimization', icon: <Zap size={14} weight="light" />, color: 'from-amber-500 to-orange-500' },
+    { name: 'Process Optimization', icon: <Lightning size={14} weight="light" />, color: 'from-amber-500 to-orange-500' },
     { name: 'Planning', icon: <Calendar size={14} weight="light" />, color: 'from-purple-500 to-purple-600' },
     { name: 'Reporting', icon: <ChartBar size={14} weight="light" />, color: 'from-emerald-500 to-teal-500' },
     { name: 'Quality Assurance', icon: <CheckCircle size={14} weight="light" />, color: 'from-rose-500 to-pink-500' }
