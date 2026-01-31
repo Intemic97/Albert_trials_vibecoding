@@ -181,3 +181,15 @@ export {
   ConfirmDialog,
   useConfirmDialog
 } from './ConfirmDialog';
+
+// ============================================================================
+// FILE EXPLORER COMPONENTS
+// ============================================================================
+
+// Breadcrumbs - Navegación por ruta
+export { Breadcrumbs } from './Breadcrumbs';
+export type { BreadcrumbItem } from './Breadcrumbs';
+
+// FolderTree - Árbol de carpetas
+export { FolderTree } from './FolderTree';
+export type { FolderNode } from './FolderTree';
