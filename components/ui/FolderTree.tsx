@@ -105,10 +105,10 @@ const FolderTreeItem: React.FC<FolderTreeItemProps> = ({
                             e.stopPropagation();
                             onCreateFolder(folder.id);
                         }}
-                        className={`p-0.5 rounded transition-colors ${isSelected ? 'hover:bg-white/20' : 'hover:bg-[var(--bg-tertiary)]'}`}
-                        title="Create subfolder"
+                        className={`p-1 rounded transition-colors ${isSelected ? 'bg-white/10 hover:bg-white/20' : 'bg-[var(--bg-tertiary)] hover:bg-[var(--border-light)]'}`}
+                        title="Create subfolder inside this folder"
                     >
-                        <Plus size={12} weight="bold" />
+                        <Plus size={14} weight="bold" />
                     </button>
                 )}
             </div>

@@ -701,14 +701,23 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                 >
                                                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                                                         <button
+                                                            onClick={(e) => { e.stopPropagation(); openCreateFolderModal(folder.id); }}
+                                                            className="p-1 hover:bg-[var(--bg-tertiary)] rounded text-[var(--text-secondary)]"
+                                                            title="Create subfolder"
+                                                        >
+                                                            <FolderPlus size={12} weight="light" />
+                                                        </button>
+                                                        <button
                                                             onClick={(e) => { e.stopPropagation(); setEditingFolder(folder); }}
                                                             className="p-1 hover:bg-[var(--bg-tertiary)] rounded text-[var(--text-secondary)]"
+                                                            title="Edit folder"
                                                         >
                                                             <PencilSimple size={12} weight="light" />
                                                         </button>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder); }}
                                                             className="p-1 hover:bg-red-50 rounded text-red-500"
+                                                            title="Delete folder"
                                                         >
                                                             <Trash size={12} weight="light" />
                                                         </button>
@@ -812,10 +821,13 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                         <span className="flex-1 text-sm text-[var(--text-primary)]">{folder.name}</span>
                                         <span className="text-xs text-[var(--text-tertiary)]">{folder.entityIds.length + folder.documentIds.length} items</span>
                                         <div className="opacity-0 group-hover:opacity-100 flex gap-1">
-                                            <button onClick={(e) => { e.stopPropagation(); setEditingFolder(folder); }} className="p-1 hover:bg-[var(--bg-tertiary)] rounded">
+                                            <button onClick={(e) => { e.stopPropagation(); openCreateFolderModal(folder.id); }} className="p-1 hover:bg-[var(--bg-tertiary)] rounded" title="Create subfolder">
+                                                <FolderPlus size={14} weight="light" className="text-[var(--text-secondary)]" />
+                                            </button>
+                                            <button onClick={(e) => { e.stopPropagation(); setEditingFolder(folder); }} className="p-1 hover:bg-[var(--bg-tertiary)] rounded" title="Edit folder">
                                                 <PencilSimple size={14} weight="light" className="text-[var(--text-secondary)]" />
                                             </button>
-                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder); }} className="p-1 hover:bg-red-50 rounded">
+                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder); }} className="p-1 hover:bg-red-50 rounded" title="Delete folder">
                                                 <Trash size={14} weight="light" className="text-red-500" />
                                             </button>
                                         </div>
