@@ -231,7 +231,7 @@ interface WidgetCardProps {
 }
 
 // Grid Widget Card Component (for use in GridLayout)
-const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = ({ widget, onRemove }) => {
+const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = React.memo(({ widget, onRemove }) => {
     const [showExplanation, setShowExplanation] = useState(false);
     
     return (
@@ -289,9 +289,14 @@ const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = 
             </div>
         </div>
     );
-};
+}, (prevProps, nextProps) => {
+    // Custom comparison for memo - only re-render if widget data or onRemove changes
+    return prevProps.widget.id === nextProps.widget.id &&
+           prevProps.widget.title === nextProps.widget.title &&
+           JSON.stringify(prevProps.widget.config) === JSON.stringify(nextProps.widget.config);
+});
 
-const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSaved, onNavigate, entities }) => {
+const WidgetCard: React.FC<WidgetCardProps> = React.memo(({ widget, onSave, onRemove, isSaved, onNavigate, entities }) => {
     const [showExplanation, setShowExplanation] = useState(false);
 
     const renderExplanation = (text: string) => {
@@ -368,7 +373,7 @@ const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSav
             )}
         </div>
     );
-};
+});
 
 export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onViewChange }) => {
     const { dashboardId: urlDashboardId } = useParams();
