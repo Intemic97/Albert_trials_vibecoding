@@ -3544,6 +3544,23 @@ app.post('/api/knowledge/documents', authenticateToken, knowledgeUpload.single('
             ]
         );
         
+        // If folderId is provided, add document to folder
+        const { folderId } = req.body;
+        if (folderId) {
+            const folder = await db.get(
+                'SELECT documentIds FROM knowledge_folders WHERE id = ? AND organizationId = ?',
+                [folderId, req.user.orgId]
+            );
+            if (folder) {
+                const docIds = folder.documentIds ? JSON.parse(folder.documentIds) : [];
+                docIds.push(id);
+                await db.run(
+                    'UPDATE knowledge_folders SET documentIds = ?, updatedAt = ? WHERE id = ?',
+                    [JSON.stringify(docIds), now, folderId]
+                );
+            }
+        }
+        
         res.json({
             id,
             name: name || req.file.originalname,
@@ -3551,6 +3568,7 @@ app.post('/api/knowledge/documents', authenticateToken, knowledgeUpload.single('
             source: 'upload',
             fileSize: req.file.size,
             summary,
+            folderId: folderId || null,
             createdAt: now
         });
     } catch (error) {

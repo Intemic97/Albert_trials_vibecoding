@@ -546,6 +546,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                         <button
                             onClick={() => setIsCreatingEntity(true)}
                             className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] rounded-lg text-xs font-medium text-[var(--text-primary)] transition-colors"
+                            title={currentFolder ? `Create entity in "${currentFolder.name}"` : 'Create new entity'}
                         >
                             <Database size={14} weight="light" />
                             New Entity
@@ -553,6 +554,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                         <button
                             onClick={() => documentFileInputRef.current?.click()}
                             className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] rounded-lg text-xs font-medium text-[var(--text-primary)] transition-colors"
+                            title={currentFolder ? `Upload document to "${currentFolder.name}"` : 'Upload document'}
                         >
                             <UploadSimple size={14} weight="light" />
                             Upload
@@ -560,6 +562,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                         <button
                             onClick={() => openCreateFolderModal(currentFolderId)}
                             className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-colors"
+                            title={currentFolder ? `Create subfolder in "${currentFolder.name}"` : 'Create new folder'}
                         >
                             <FolderPlus size={14} weight="light" />
                             New Folder
@@ -977,6 +980,13 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                 <X size={18} weight="light" className="text-[var(--text-secondary)]" />
                             </button>
                         </div>
+                        
+                        {currentFolderId && (
+                            <div className="mb-4 px-3 py-2 bg-[var(--bg-tertiary)] rounded-lg text-xs text-[var(--text-secondary)] flex items-center gap-2">
+                                <Folder size={14} weight="light" style={{ color: currentFolder?.color }} />
+                                Creating in: <span className="font-medium text-[var(--text-primary)]">{currentFolder?.name}</span>
+                            </div>
+                        )}
                         
                         <div className="flex gap-2 mb-4">
                             <button
