@@ -3642,6 +3642,218 @@ app.post('/api/knowledge/documents/:id/relate', authenticateToken, async (req, r
     }
 });
 
+// ==================== KNOWLEDGE FOLDERS ENDPOINTS ====================
+
+// Get all folders
+app.get('/api/knowledge/folders', authenticateToken, async (req, res) => {
+    try {
+        const folders = await db.all(
+            'SELECT * FROM knowledge_folders WHERE organizationId = ? ORDER BY name ASC',
+            [req.user.orgId]
+        );
+        
+        const parsed = folders.map(f => ({
+            ...f,
+            documentIds: f.documentIds ? JSON.parse(f.documentIds) : [],
+            entityIds: f.entityIds ? JSON.parse(f.entityIds) : []
+        }));
+        
+        res.json(parsed);
+    } catch (error) {
+        console.error('Error fetching folders:', error);
+        res.status(500).json({ error: 'Failed to fetch folders' });
+    }
+});
+
+// Get single folder
+app.get('/api/knowledge/folders/:id', authenticateToken, async (req, res) => {
+    try {
+        const folder = await db.get(
+            'SELECT * FROM knowledge_folders WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!folder) {
+            return res.status(404).json({ error: 'Folder not found' });
+        }
+        
+        res.json({
+            ...folder,
+            documentIds: folder.documentIds ? JSON.parse(folder.documentIds) : [],
+            entityIds: folder.entityIds ? JSON.parse(folder.entityIds) : []
+        });
+    } catch (error) {
+        console.error('Error fetching folder:', error);
+        res.status(500).json({ error: 'Failed to fetch folder' });
+    }
+});
+
+// Create folder
+app.post('/api/knowledge/folders', authenticateToken, async (req, res) => {
+    try {
+        const { name, description, color, parentId, documentIds, entityIds, createdBy } = req.body;
+        const id = Math.random().toString(36).substr(2, 9);
+        const now = new Date().toISOString();
+        
+        await db.run(
+            `INSERT INTO knowledge_folders (id, organizationId, name, description, color, parentId, documentIds, entityIds, createdBy, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id,
+                req.user.orgId,
+                name,
+                description || null,
+                color || '#3b82f6',
+                parentId || null,
+                JSON.stringify(documentIds || []),
+                JSON.stringify(entityIds || []),
+                createdBy || req.user.id,
+                now,
+                now
+            ]
+        );
+        
+        res.json({ 
+            id, 
+            name, 
+            description, 
+            color: color || '#3b82f6', 
+            parentId: parentId || null,
+            documentIds: documentIds || [], 
+            entityIds: entityIds || [],
+            createdBy: createdBy || req.user.id,
+            createdAt: now,
+            updatedAt: now
+        });
+    } catch (error) {
+        console.error('Error creating folder:', error);
+        res.status(500).json({ error: 'Failed to create folder' });
+    }
+});
+
+// Update folder
+app.put('/api/knowledge/folders/:id', authenticateToken, async (req, res) => {
+    try {
+        const { name, description, color, parentId } = req.body;
+        const now = new Date().toISOString();
+        
+        const folder = await db.get(
+            'SELECT * FROM knowledge_folders WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!folder) {
+            return res.status(404).json({ error: 'Folder not found' });
+        }
+        
+        await db.run(
+            `UPDATE knowledge_folders SET name = ?, description = ?, color = ?, parentId = ?, updatedAt = ? WHERE id = ?`,
+            [
+                name || folder.name,
+                description !== undefined ? description : folder.description,
+                color || folder.color,
+                parentId !== undefined ? parentId : folder.parentId,
+                now,
+                req.params.id
+            ]
+        );
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating folder:', error);
+        res.status(500).json({ error: 'Failed to update folder' });
+    }
+});
+
+// Delete folder
+app.delete('/api/knowledge/folders/:id', authenticateToken, async (req, res) => {
+    try {
+        const folder = await db.get(
+            'SELECT * FROM knowledge_folders WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!folder) {
+            return res.status(404).json({ error: 'Folder not found' });
+        }
+        
+        // Move children to parent folder
+        await db.run(
+            'UPDATE knowledge_folders SET parentId = ? WHERE parentId = ?',
+            [folder.parentId, req.params.id]
+        );
+        
+        await db.run('DELETE FROM knowledge_folders WHERE id = ?', [req.params.id]);
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting folder:', error);
+        res.status(500).json({ error: 'Failed to delete folder' });
+    }
+});
+
+// Add item to folder
+app.post('/api/knowledge/folders/:id/add', authenticateToken, async (req, res) => {
+    try {
+        const { type, itemId } = req.body;
+        
+        const folder = await db.get(
+            'SELECT * FROM knowledge_folders WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!folder) {
+            return res.status(404).json({ error: 'Folder not found' });
+        }
+        
+        const field = type === 'entity' ? 'entityIds' : 'documentIds';
+        const currentIds = folder[field] ? JSON.parse(folder[field]) : [];
+        
+        if (!currentIds.includes(itemId)) {
+            currentIds.push(itemId);
+            await db.run(
+                `UPDATE knowledge_folders SET ${field} = ?, updatedAt = ? WHERE id = ?`,
+                [JSON.stringify(currentIds), new Date().toISOString(), req.params.id]
+            );
+        }
+        
+        res.json({ success: true, [field]: currentIds });
+    } catch (error) {
+        console.error('Error adding to folder:', error);
+        res.status(500).json({ error: 'Failed to add item to folder' });
+    }
+});
+
+// Remove item from folder
+app.post('/api/knowledge/folders/:id/remove', authenticateToken, async (req, res) => {
+    try {
+        const { type, itemId } = req.body;
+        
+        const folder = await db.get(
+            'SELECT * FROM knowledge_folders WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!folder) {
+            return res.status(404).json({ error: 'Folder not found' });
+        }
+        
+        const field = type === 'entity' ? 'entityIds' : 'documentIds';
+        const currentIds = folder[field] ? JSON.parse(folder[field]) : [];
+        const updatedIds = currentIds.filter(id => id !== itemId);
+        
+        await db.run(
+            `UPDATE knowledge_folders SET ${field} = ?, updatedAt = ? WHERE id = ?`,
+            [JSON.stringify(updatedIds), new Date().toISOString(), req.params.id]
+        );
+        
+        res.json({ success: true, [field]: updatedIds });
+    } catch (error) {
+        console.error('Error removing from folder:', error);
+        res.status(500).json({ error: 'Failed to remove item from folder' });
+    }
+});
+
 // ==================== DASHBOARD-WORKFLOW CONNECTION ENDPOINTS ====================
 
 // Connect widget to workflow output

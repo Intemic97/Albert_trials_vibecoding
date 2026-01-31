@@ -378,6 +378,24 @@ async function initDb() {
     );
   `);
 
+  // Create knowledge folders table
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS knowledge_folders (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT,
+      name TEXT NOT NULL,
+      description TEXT,
+      color TEXT DEFAULT '#3b82f6',
+      parentId TEXT,
+      documentIds TEXT DEFAULT '[]',
+      entityIds TEXT DEFAULT '[]',
+      createdBy TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(parentId) REFERENCES knowledge_folders(id) ON DELETE SET NULL
+    );
+  `);
+
   // Create dashboard-workflow connections table
   await db.exec(`
     CREATE TABLE IF NOT EXISTS dashboard_workflow_connections (
