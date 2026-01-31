@@ -5,16 +5,16 @@
 
 import React from 'react';
 import { 
-    Search, 
+    MagnifyingGlass, 
     Tag, 
     X,
     BookOpen,
-    Workflow,
+    FlowArrow,
     Trash,
     User,
     Calendar,
     Clock,
-    ChevronRight
+    CaretRight
 } from '@phosphor-icons/react';
 import { PageHeader } from '../../PageHeader';
 import { Pagination } from '../../Pagination';
@@ -93,7 +93,7 @@ export const WorkflowsListView: React.FC<WorkflowsListViewProps> = ({
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-4">
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={14} weight="light" />
+                            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={14} weight="light" />
                             <input
                                 type="text"
                                 placeholder="Search workflows..."
@@ -142,7 +142,7 @@ export const WorkflowsListView: React.FC<WorkflowsListViewProps> = ({
                             onClick={onCreateNew}
                             className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                         >
-                            <Workflow size={14} className="mr-2" weight="light" />
+                            <FlowArrow size={14} className="mr-2" weight="light" />
                             Create Workflow
                         </button>
                     </div>
@@ -160,7 +160,7 @@ export const WorkflowsListView: React.FC<WorkflowsListViewProps> = ({
                                 <div className="flex items-start justify-between mb-3">
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
                                         <div className="p-2.5 bg-[var(--bg-tertiary)] rounded-lg flex-shrink-0 group-hover:bg-[var(--bg-hover)] transition-colors">
-                                            <Workflow size={18} className="text-[var(--text-secondary)]" weight="light" />
+                                            <FlowArrow size={18} className="text-[var(--text-secondary)]" weight="light" />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <h3 className="text-base font-normal text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors truncate">
@@ -221,7 +221,7 @@ export const WorkflowsListView: React.FC<WorkflowsListViewProps> = ({
 
                             <div className="flex items-center justify-between mt-5">
                                 <div className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary)]">
-                                    <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" weight="light" />
+                                    <CaretRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" weight="light" />
                                     <span className="opacity-0 group-hover:opacity-100 transition-opacity font-medium text-[var(--text-secondary)]">Open workflow</span>
                                 </div>
                             </div>
@@ -235,7 +235,7 @@ export const WorkflowsListView: React.FC<WorkflowsListViewProps> = ({
                         className="border border-dashed border-[var(--border-medium)] rounded-lg flex flex-col items-center justify-center min-h-[200px] text-[var(--text-tertiary)] cursor-pointer group hover:border-[#256A65] hover:text-[#256A65] transition-colors"
                     >
                         <div className="p-4 bg-[var(--bg-tertiary)] rounded-full mb-3 group-hover:bg-[#256A65]/10 transition-colors">
-                            <Workflow size={24} weight="light" />
+                            <FlowArrow size={24} weight="light" />
                         </div>
                         <span className="font-medium">Create new workflow</span>
                     </div>
