@@ -211,7 +211,8 @@ function authenticateToken(req, res, next) {
         if (err) {
             return res.status(403).json({ error: 'Forbidden' });
         }
-        req.user = user;
+        // Add 'id' as alias for 'sub' for backwards compatibility
+        req.user = { ...user, id: user.sub };
         next();
     });
 }
