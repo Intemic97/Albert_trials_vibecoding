@@ -48,6 +48,8 @@ import {
   TemplatesGalleryModal,
   ExecutionHistoryModal,
   WorkflowRunnerModal,
+  // Hooks
+  useWorkflowHistory,
 } from './workflows/index';
 
 // Use imported DRAGGABLE_ITEMS from workflows module
@@ -82,6 +84,30 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const { user } = useAuth();
     const [nodes, setNodes] = useState<WorkflowNode[]>([]);
     const [connections, setConnections] = useState<Connection[]>([]);
+    
+    // Undo/Redo history
+    const { canUndo, canRedo, undo, redo, pushState } = useWorkflowHistory({
+        maxHistoryLength: 50,
+    });
+    const isUndoRedoRef = useRef(false);
+    const lastHistoryStateRef = useRef<string>('');
+    
+    // Save state to history when nodes/connections change (debounced)
+    useEffect(() => {
+        if (isUndoRedoRef.current) return;
+        if (nodes.length === 0 && connections.length === 0) return;
+        
+        const stateKey = JSON.stringify({ n: nodes.length, c: connections.length, ids: nodes.map(n => n.id).join(',') });
+        if (stateKey === lastHistoryStateRef.current) return;
+        
+        const timeoutId = setTimeout(() => {
+            lastHistoryStateRef.current = stateKey;
+            pushState({ nodes, connections });
+        }, 500);
+        
+        return () => clearTimeout(timeoutId);
+    }, [nodes, connections, pushState]);
+    
     const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
     const [draggingItem, setDraggingItem] = useState<DraggableItem | null>(null);
     const [workflowName, setWorkflowName] = useState<string>('Untitled Workflow');
@@ -3931,6 +3957,38 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Skip if typing in input/textarea
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+                return;
+            }
+            
+            // Ctrl/Cmd + Z to undo
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                if (canUndo) {
+                    isUndoRedoRef.current = true;
+                    const state = undo();
+                    if (state) {
+                        setNodes(state.nodes);
+                        setConnections(state.connections);
+                    }
+                    setTimeout(() => { isUndoRedoRef.current = false; }, 100);
+                }
+            }
+            // Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y to redo
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                e.preventDefault();
+                if (canRedo) {
+                    isUndoRedoRef.current = true;
+                    const state = redo();
+                    if (state) {
+                        setNodes(state.nodes);
+                        setConnections(state.connections);
+                    }
+                    setTimeout(() => { isUndoRedoRef.current = false; }, 100);
+                }
+            }
             // Ctrl/Cmd + D to duplicate selected node
             if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedNodeId) {
                 e.preventDefault();
@@ -3947,7 +4005,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedNodeId, nodes, currentWorkflowId, workflowName]);
+    }, [selectedNodeId, nodes, currentWorkflowId, workflowName, canUndo, canRedo, undo, redo]);
 
     // Quick connect component function
     const handleQuickConnect = (componentType: string) => {
