@@ -10,11 +10,11 @@ import {
     Copy,
     Eye,
     ArrowRight,
-    Workflow,
+    FlowArrow,
     Shield,
     Zap,
     Calendar,
-    BarChart as BarChart3,
+    ChartBar,
     CheckCircle
 } from '@phosphor-icons/react';
 import { WORKFLOW_TEMPLATES, WorkflowTemplate } from '../templates';
@@ -36,11 +36,11 @@ interface TemplatesGalleryModalProps {
 // ============================================================================
 
 const CATEGORIES = [
-    { name: 'All', icon: <Workflow size={14} weight="light" />, color: 'from-slate-500 to-slate-600' },
+    { name: 'All', icon: <FlowArrow size={14} weight="light" />, color: 'from-slate-500 to-slate-600' },
     { name: 'Compliance', icon: <Shield size={14} weight="light" />, color: 'from-blue-500 to-blue-600' },
     { name: 'Process Optimization', icon: <Zap size={14} weight="light" />, color: 'from-amber-500 to-orange-500' },
     { name: 'Planning', icon: <Calendar size={14} weight="light" />, color: 'from-purple-500 to-purple-600' },
-    { name: 'Reporting', icon: <BarChart3 size={14} weight="light" />, color: 'from-emerald-500 to-teal-500' },
+    { name: 'Reporting', icon: <ChartBar size={14} weight="light" />, color: 'from-emerald-500 to-teal-500' },
     { name: 'Quality Assurance', icon: <CheckCircle size={14} weight="light" />, color: 'from-rose-500 to-pink-500' }
 ];
 
@@ -91,7 +91,7 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onPreview, onCopy
                     {template.nodes.slice(0, 5).map((node, idx) => (
                         <React.Fragment key={idx}>
                             <div className="flex-shrink-0 w-6 h-6 rounded bg-[var(--bg-tertiary)] border border-[var(--border-light)] flex items-center justify-center" title={node.label}>
-                                <Workflow size={10} className="text-[var(--text-tertiary)]" weight="light" />
+                                <FlowArrow size={10} className="text-[var(--text-tertiary)]" weight="light" />
                             </div>
                             {idx < Math.min(template.nodes.length - 1, 4) && (
                                 <ArrowRight size={10} className="text-[var(--text-tertiary)] flex-shrink-0" weight="light" />
