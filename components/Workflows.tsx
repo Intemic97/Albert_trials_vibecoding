@@ -4997,7 +4997,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 setHoveredConnection(conn.id);
                                                             }
                                                         }}
-                                                        onMouseLeave={() => setHoveredConnection(null)}
+                                                        onMouseLeave={(e) => {
+                                                            // Don't hide if moving to delete button
+                                                            const relatedTarget = e.relatedTarget as Element;
+                                                            if (relatedTarget?.closest('[data-delete-button]')) {
+                                                                return;
+                                                            }
+                                                            setHoveredConnection(null);
+                                                        }}
                                                         onClick={(e) => {
                                                             // Don't delete if clicking on a connector
                                                             const target = e.target as HTMLElement;
@@ -5057,7 +5064,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 />
                                                 {/* Delete button on hover */}
                                                 {!isRunning && hoveredConnection === conn.id && (
-                                                    <g style={{ pointerEvents: 'auto' }}>
+                                                    <g 
+                                                        data-delete-button="true"
+                                                        style={{ pointerEvents: 'auto' }}
+                                                        onMouseLeave={(e) => {
+                                                            // Hide when leaving the delete button area
+                                                            const relatedTarget = e.relatedTarget as Element;
+                                                            if (!relatedTarget?.closest('[data-delete-button]')) {
+                                                                setHoveredConnection(null);
+                                                            }
+                                                        }}
+                                                    >
                                                         {/* Delete button circle */}
                                                         <circle
                                                             cx={(x1 + x2) / 2}
