@@ -88,10 +88,17 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     const [draggedItem, setDraggedItem] = useState<{ type: 'entity' | 'document' | 'folder'; id: string } | null>(null);
     const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
-    // Load data on mount
+    // Load data on mount and restore folder navigation
     useEffect(() => {
         fetchFolders();
         fetchDocuments();
+        
+        // Restore folder navigation after reload
+        const savedFolder = sessionStorage.getItem('kb_currentFolder');
+        if (savedFolder) {
+            setCurrentFolderId(savedFolder);
+            sessionStorage.removeItem('kb_currentFolder');
+        }
     }, []);
 
     // API calls
@@ -369,6 +376,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                 setNewEntityName('');
                 setNewEntityDescription('');
                 setIsCreatingEntity(false);
+                
+                // Save current folder and reload
+                if (currentFolderId) {
+                    sessionStorage.setItem('kb_currentFolder', currentFolderId);
+                }
                 window.location.reload();
             }
         } catch (error) {
@@ -385,6 +397,10 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                 method: 'DELETE',
                 credentials: 'include'
             });
+            // Save current folder and reload
+            if (currentFolderId) {
+                sessionStorage.setItem('kb_currentFolder', currentFolderId);
+            }
             window.location.reload();
         } catch (error) {
             console.error('Error deleting entity:', error);
@@ -476,6 +492,10 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             if (res.ok) {
                 setNewEntityName('');
                 setIsCreatingEntity(false);
+                // Save current folder and reload
+                if (currentFolderId) {
+                    sessionStorage.setItem('kb_currentFolder', currentFolderId);
+                }
                 window.location.reload();
             } else {
                 const errorData = await res.json();
