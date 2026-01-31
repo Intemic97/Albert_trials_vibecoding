@@ -13,7 +13,7 @@ import { ReportBugModal } from './components/ReportBugModal';
 import { OnboardingModal } from './components/OnboardingModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
-import { ErrorBoundary, KeyboardShortcutsProvider, useShortcut } from './components/ui';
+import { ErrorBoundary, KeyboardShortcutsProvider, useShortcut, AnnouncerProvider, SkipLink } from './components/ui';
 import { Entity, Property, PropertyType } from './types';
 import { Plus, MagnifyingGlass, Funnel, ArrowLeft, Trash, Link as LinkIcon, TextT, Hash, PencilSimple, X, Code, Paperclip, Download, SpinnerGap, Sparkle } from '@phosphor-icons/react';
 import { Tabs } from './components/Tabs';
@@ -51,18 +51,21 @@ export default function App() {
     return (
         <ErrorBoundary>
             <ThemeProvider>
-                <KeyboardShortcutsProvider>
-                    <BrowserRouter>
-                        <Routes>
-                            <Route path="/shared/:shareToken" element={<SharedDashboardWrapper />} />
-                            <Route path="/*" element={
-                                <AuthProvider>
-                                    <AuthenticatedApp />
-                                </AuthProvider>
-                            } />
-                        </Routes>
-                    </BrowserRouter>
-                </KeyboardShortcutsProvider>
+                <AnnouncerProvider>
+                    <KeyboardShortcutsProvider>
+                        <BrowserRouter>
+                            <SkipLink href="#main-content" />
+                            <Routes>
+                                <Route path="/shared/:shareToken" element={<SharedDashboardWrapper />} />
+                                <Route path="/*" element={
+                                    <AuthProvider>
+                                        <AuthenticatedApp />
+                                    </AuthProvider>
+                                } />
+                            </Routes>
+                        </BrowserRouter>
+                    </KeyboardShortcutsProvider>
+                </AnnouncerProvider>
             </ThemeProvider>
         </ErrorBoundary>
     );
@@ -959,7 +962,7 @@ function AuthenticatedApp() {
                 {!hideSidebarForRoutes && (
                     <TopNav activeView={currentView} />
                 )}
-                <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative bg-[var(--bg-primary)] transition-colors duration-200">
+                <main id="main-content" className="flex-1 flex flex-col min-h-0 overflow-hidden relative bg-[var(--bg-primary)] transition-colors duration-200" tabIndex={-1}>
                 <Suspense fallback={<PageLoader />}>
                 <Routes>
                     <Route path="/" element={<Navigate to="/overview" replace />} />

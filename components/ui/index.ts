@@ -33,7 +33,7 @@ export { Input, Textarea, Select } from './Input';
 export type { InputSize } from './Input';
 
 // Modal - Diálogos y ventanas modales
-export { Modal, ConfirmDialog } from './Modal';
+export { Modal } from './Modal';
 export type { ModalSize } from './Modal';
 
 // ============================================================================
@@ -150,3 +150,34 @@ export {
   ShortcutBadge,
   type Shortcut
 } from './KeyboardShortcuts';
+
+// ============================================================================
+// ACCESSIBILITY
+// ============================================================================
+
+// Accessibility components and hooks
+export {
+  VisuallyHidden,
+  SkipLink,
+  FocusTrap,
+  LiveRegion,
+  AnnouncerProvider,
+  useAnnouncer,
+  RovingTabIndex,
+  getFocusableElements,
+  isFocusable,
+  useFocusManager,
+  useKeyboardNavigation,
+  useEscapeKey,
+  useReturnFocus
+} from './Accessibility';
+
+// ============================================================================
+// CONFIRM DIALOG
+// ============================================================================
+
+// ConfirmDialog - Diálogo de confirmación accesible
+export {
+  ConfirmDialog,
+  useConfirmDialog
+} from './ConfirmDialog';
