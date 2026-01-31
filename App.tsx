@@ -13,6 +13,7 @@ import { ReportBugModal } from './components/ReportBugModal';
 import { OnboardingModal } from './components/OnboardingModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { ErrorBoundary, KeyboardShortcutsProvider, useShortcut } from './components/ui';
 import { Entity, Property, PropertyType } from './types';
 import { Plus, MagnifyingGlass, Funnel, ArrowLeft, Trash, Link as LinkIcon, TextT, Hash, PencilSimple, X, Code, Paperclip, Download, SpinnerGap, Sparkle } from '@phosphor-icons/react';
 import { Tabs } from './components/Tabs';
@@ -48,18 +49,22 @@ const PageLoader = () => (
 
 export default function App() {
     return (
-        <ThemeProvider>
-            <BrowserRouter>
-                <Routes>
-                    <Route path="/shared/:shareToken" element={<SharedDashboardWrapper />} />
-                    <Route path="/*" element={
-                        <AuthProvider>
-                            <AuthenticatedApp />
-                        </AuthProvider>
-                    } />
-                </Routes>
-            </BrowserRouter>
-        </ThemeProvider>
+        <ErrorBoundary>
+            <ThemeProvider>
+                <KeyboardShortcutsProvider>
+                    <BrowserRouter>
+                        <Routes>
+                            <Route path="/shared/:shareToken" element={<SharedDashboardWrapper />} />
+                            <Route path="/*" element={
+                                <AuthProvider>
+                                    <AuthenticatedApp />
+                                </AuthProvider>
+                            } />
+                        </Routes>
+                    </BrowserRouter>
+                </KeyboardShortcutsProvider>
+            </ThemeProvider>
+        </ErrorBoundary>
     );
 }
 
@@ -87,6 +92,43 @@ function AuthenticatedApp() {
     // Tutorial state
     const [showTutorial, setShowTutorial] = useState(false);
     const [showReportBug, setShowReportBug] = useState(false);
+    
+    // Global keyboard shortcuts
+    useShortcut('go-home', {
+        key: 'h',
+        modifiers: ['cmd', 'shift'],
+        description: 'Go to Overview',
+        category: 'Navigation',
+        action: () => navigate('/'),
+        global: true
+    }, [navigate]);
+    
+    useShortcut('go-workflows', {
+        key: 'w',
+        modifiers: ['cmd', 'shift'],
+        description: 'Go to Workflows',
+        category: 'Navigation',
+        action: () => navigate('/workflows'),
+        global: true
+    }, [navigate]);
+    
+    useShortcut('go-dashboard', {
+        key: 'd',
+        modifiers: ['cmd', 'shift'],
+        description: 'Go to Dashboard',
+        category: 'Navigation',
+        action: () => navigate('/dashboard'),
+        global: true
+    }, [navigate]);
+    
+    useShortcut('go-settings', {
+        key: ',',
+        modifiers: ['cmd'],
+        description: 'Go to Settings',
+        category: 'Navigation',
+        action: () => navigate('/settings'),
+        global: true
+    }, [navigate]);
     
     // Listen for report bug event from Sidebar
     React.useEffect(() => {

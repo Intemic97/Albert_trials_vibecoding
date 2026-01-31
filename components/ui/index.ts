@@ -124,3 +124,29 @@ export {
   type VirtualListProps,
   type VirtualGridProps 
 } from './VirtualList';
+
+// ============================================================================
+// ERROR HANDLING
+// ============================================================================
+
+// ErrorBoundary - Captura errores en componentes
+export { 
+  ErrorBoundary, 
+  ErrorFallback, 
+  SectionErrorBoundary,
+  withErrorBoundary,
+  useErrorHandler
+} from './ErrorBoundary';
+
+// ============================================================================
+// KEYBOARD SHORTCUTS
+// ============================================================================
+
+// KeyboardShortcuts - Sistema de atajos de teclado
+export { 
+  KeyboardShortcutsProvider,
+  useKeyboardShortcuts,
+  useShortcut,
+  ShortcutBadge,
+  type Shortcut
+} from './KeyboardShortcuts';
