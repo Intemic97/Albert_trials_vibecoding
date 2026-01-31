@@ -1063,7 +1063,10 @@ function AuthenticatedApp() {
                             {activeEntity ? (
                                 <div className="flex items-center">
                                     <button
-                                        onClick={() => setActiveEntityId(null)}
+                                        onClick={() => {
+                                            setActiveEntityId(null);
+                                            navigate('/database');
+                                        }}
                                         className="mr-4 p-2 hover:bg-[var(--bg-tertiary)] rounded-full transition-colors text-[var(--text-secondary)]"
                                     >
                                         <ArrowLeft size={20} weight="light" />
