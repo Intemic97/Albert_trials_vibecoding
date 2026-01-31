@@ -4,7 +4,7 @@
  */
 
 import { 
-    Workflow,
+    FlowArrow,
     Lightning,
     Database,
     GitBranch,
@@ -108,7 +108,7 @@ export const getNodeIconBg = (type: string): string => {
  */
 export const getNodeIcon = (type: string): React.ElementType => {
     const item = DRAGGABLE_ITEMS.find(i => i.type === type);
-    return item?.icon || Workflow;
+    return item?.icon || FlowArrow;
 };
 
 // ============================================================================
