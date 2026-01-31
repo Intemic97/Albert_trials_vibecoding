@@ -643,6 +643,168 @@ app.put('/api/company', authenticateToken, async (req, res) => {
     }
 });
 
+// ==================== NOTIFICATIONS ENDPOINTS ====================
+
+// Get notifications for user
+app.get('/api/notifications', authenticateToken, async (req, res) => {
+    try {
+        const { limit = 20, offset = 0, unread } = req.query;
+        
+        let query = `
+            SELECT n.*, 
+                   CASE WHEN nr.id IS NOT NULL THEN 1 ELSE 0 END as isRead
+            FROM notifications n
+            LEFT JOIN notification_reads nr ON n.id = nr.notificationId AND nr.userId = ?
+            WHERE n.orgId = ? OR n.userId = ?
+        `;
+        const params = [req.user.id, req.user.orgId, req.user.id];
+        
+        if (unread === 'true') {
+            query += ' AND nr.id IS NULL';
+        }
+        
+        query += ' ORDER BY n.createdAt DESC LIMIT ? OFFSET ?';
+        params.push(parseInt(limit), parseInt(offset));
+        
+        const notifications = await db.all(query, params);
+        
+        res.json(notifications.map(n => ({
+            ...n,
+            isRead: Boolean(n.isRead)
+        })));
+    } catch (error) {
+        console.error('Get notifications error:', error);
+        res.status(500).json({ error: 'Failed to get notifications' });
+    }
+});
+
+// Get unread count
+app.get('/api/notifications/unread-count', authenticateToken, async (req, res) => {
+    try {
+        const result = await db.get(`
+            SELECT COUNT(*) as count
+            FROM notifications n
+            LEFT JOIN notification_reads nr ON n.id = nr.notificationId AND nr.userId = ?
+            WHERE (n.orgId = ? OR n.userId = ?) AND nr.id IS NULL
+        `, [req.user.id, req.user.orgId, req.user.id]);
+        
+        res.json({ count: result?.count || 0 });
+    } catch (error) {
+        console.error('Get unread count error:', error);
+        res.status(500).json({ error: 'Failed to get unread count' });
+    }
+});
+
+// Mark all as read
+app.post('/api/notifications/read-all', authenticateToken, async (req, res) => {
+    try {
+        // Get all unread notification IDs for this user
+        const unreadNotifications = await db.all(`
+            SELECT n.id
+            FROM notifications n
+            LEFT JOIN notification_reads nr ON n.id = nr.notificationId AND nr.userId = ?
+            WHERE (n.orgId = ? OR n.userId = ?) AND nr.id IS NULL
+        `, [req.user.id, req.user.orgId, req.user.id]);
+        
+        // Insert read records for each
+        for (const notification of unreadNotifications) {
+            await db.run(
+                'INSERT OR IGNORE INTO notification_reads (id, notificationId, userId, readAt) VALUES (?, ?, ?, ?)',
+                [generateId(), notification.id, req.user.id, new Date().toISOString()]
+            );
+        }
+        
+        res.json({ message: 'All notifications marked as read', count: unreadNotifications.length });
+    } catch (error) {
+        console.error('Mark all read error:', error);
+        res.status(500).json({ error: 'Failed to mark notifications as read' });
+    }
+});
+
+// Mark single notification as read
+app.post('/api/notifications/:id/read', authenticateToken, async (req, res) => {
+    try {
+        await db.run(
+            'INSERT OR IGNORE INTO notification_reads (id, notificationId, userId, readAt) VALUES (?, ?, ?, ?)',
+            [generateId(), req.params.id, req.user.id, new Date().toISOString()]
+        );
+        
+        res.json({ message: 'Notification marked as read' });
+    } catch (error) {
+        console.error('Mark read error:', error);
+        res.status(500).json({ error: 'Failed to mark notification as read' });
+    }
+});
+
+// Get alert configurations
+app.get('/api/alert-configs', authenticateToken, async (req, res) => {
+    try {
+        const configs = await db.all(
+            'SELECT * FROM alert_configs WHERE orgId = ? AND (userId = ? OR userId IS NULL) ORDER BY createdAt DESC',
+            [req.user.orgId, req.user.id]
+        );
+        
+        res.json(configs || []);
+    } catch (error) {
+        console.error('Get alert configs error:', error);
+        res.status(500).json({ error: 'Failed to get alert configurations' });
+    }
+});
+
+// Create alert configuration
+app.post('/api/alert-configs', authenticateToken, async (req, res) => {
+    try {
+        const { name, type, condition, threshold, entityId, enabled = true } = req.body;
+        
+        const id = generateId();
+        await db.run(
+            `INSERT INTO alert_configs (id, orgId, userId, name, type, condition, threshold, entityId, enabled, createdAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, req.user.orgId, req.user.id, name, type, condition, threshold, entityId, enabled ? 1 : 0, new Date().toISOString()]
+        );
+        
+        res.json({ id, message: 'Alert configuration created' });
+    } catch (error) {
+        console.error('Create alert config error:', error);
+        res.status(500).json({ error: 'Failed to create alert configuration' });
+    }
+});
+
+// Update alert configuration
+app.put('/api/alert-configs/:id', authenticateToken, async (req, res) => {
+    try {
+        const { name, type, condition, threshold, entityId, enabled } = req.body;
+        
+        await db.run(
+            `UPDATE alert_configs SET 
+                name = COALESCE(?, name),
+                type = COALESCE(?, type),
+                condition = COALESCE(?, condition),
+                threshold = COALESCE(?, threshold),
+                entityId = COALESCE(?, entityId),
+                enabled = COALESCE(?, enabled)
+             WHERE id = ? AND orgId = ?`,
+            [name, type, condition, threshold, entityId, enabled !== undefined ? (enabled ? 1 : 0) : null, req.params.id, req.user.orgId]
+        );
+        
+        res.json({ message: 'Alert configuration updated' });
+    } catch (error) {
+        console.error('Update alert config error:', error);
+        res.status(500).json({ error: 'Failed to update alert configuration' });
+    }
+});
+
+// Delete alert configuration
+app.delete('/api/alert-configs/:id', authenticateToken, async (req, res) => {
+    try {
+        await db.run('DELETE FROM alert_configs WHERE id = ? AND orgId = ?', [req.params.id, req.user.orgId]);
+        res.json({ message: 'Alert configuration deleted' });
+    } catch (error) {
+        console.error('Delete alert config error:', error);
+        res.status(500).json({ error: 'Failed to delete alert configuration' });
+    }
+});
+
 // Admin Routes - Platform-wide admin panel
 app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
     try {

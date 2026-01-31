@@ -398,6 +398,54 @@ async function initDb() {
     );
   `);
 
+  // Create notifications table
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      orgId TEXT,
+      userId TEXT,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT,
+      link TEXT,
+      metadata TEXT,
+      createdAt TEXT,
+      FOREIGN KEY(orgId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Create notification reads table (tracks which users have read which notifications)
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS notification_reads (
+      id TEXT PRIMARY KEY,
+      notificationId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      readAt TEXT,
+      UNIQUE(notificationId, userId),
+      FOREIGN KEY(notificationId) REFERENCES notifications(id) ON DELETE CASCADE,
+      FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Create alert configurations table
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS alert_configs (
+      id TEXT PRIMARY KEY,
+      orgId TEXT NOT NULL,
+      userId TEXT,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      condition TEXT,
+      threshold TEXT,
+      entityId TEXT,
+      enabled INTEGER DEFAULT 1,
+      createdAt TEXT,
+      FOREIGN KEY(orgId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+
   // Migration: Add profilePhoto and companyRole columns to users table if they don't exist
   try {
     await db.exec(`ALTER TABLE users ADD COLUMN profilePhoto TEXT`);
