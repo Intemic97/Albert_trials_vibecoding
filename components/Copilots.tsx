@@ -1,10 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft } from '@phosphor-icons/react';
+import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft, Folder } from '@phosphor-icons/react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { API_BASE } from '../config';
 import { Entity, Property } from '../types';
 import { useNotifications } from '../hooks/useNotifications';
 import { ToastContainer } from './ui/Toast';
+
+// Folder type for mentions
+interface KnowledgeFolder {
+    id: string;
+    name: string;
+    color?: string;
+    entityIds: string[];
+    documentIds: string[];
+}
 
 // Intemic Logo Icon Component
 const IntemicIcon: React.FC<{ size?: number; className?: string }> = ({ size = 14, className = '' }) => {
@@ -81,6 +90,7 @@ export const Copilots: React.FC = () => {
     const [copilotInstructions, setCopilotInstructions] = useState('');
     const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
     const [availableEntities, setAvailableEntities] = useState<Entity[]>([]);
+    const [availableFolders, setAvailableFolders] = useState<KnowledgeFolder[]>([]);
     const [isLoadingEntities, setIsLoadingEntities] = useState(false);
     const [chatSearchQuery, setChatSearchQuery] = useState('');
     const [editingChatId, setEditingChatId] = useState<string | null>(null);
@@ -94,7 +104,7 @@ export const Copilots: React.FC = () => {
     const previousActiveChatRef = useRef<string | null>(null);
     
     // Mention state
-    type MentionType = 'entity' | 'attribute';
+    type MentionType = 'entity' | 'attribute' | 'folder';
     interface MentionState {
         isActive: boolean;
         type: MentionType;
@@ -135,15 +145,26 @@ export const Copilots: React.FC = () => {
     const loadEntities = async () => {
         try {
             setIsLoadingEntities(true);
-            const response = await fetch(`${API_BASE}/entities`, {
+            
+            // Load entities
+            const entitiesResponse = await fetch(`${API_BASE}/entities`, {
                 credentials: 'include'
             });
-            if (response.ok) {
-                const entities = await response.json();
+            if (entitiesResponse.ok) {
+                const entities = await entitiesResponse.json();
                 setAvailableEntities(entities);
             }
+            
+            // Load folders
+            const foldersResponse = await fetch(`${API_BASE}/knowledge/folders`, {
+                credentials: 'include'
+            });
+            if (foldersResponse.ok) {
+                const folders = await foldersResponse.json();
+                setAvailableFolders(folders);
+            }
         } catch (error) {
-            console.error('Error loading entities:', error);
+            console.error('Error loading entities/folders:', error);
         } finally {
             setIsLoadingEntities(false);
         }
@@ -686,20 +707,28 @@ export const Copilots: React.FC = () => {
         }
     };
 
+    // Unified mention item type
+    type MentionItem = (Entity & { _type: 'entity' }) | (KnowledgeFolder & { _type: 'folder' }) | (Property & { _type: 'property' });
+    
     // Get mention suggestions
-    const getMentionSuggestions = (): (Entity | Property)[] => {
+    const getMentionSuggestions = (): MentionItem[] => {
         if (!mention.isActive) return [];
 
         const query = mention.query.toLowerCase();
 
         if (mention.type === 'entity') {
-            return availableEntities.filter(e =>
-                e.name.toLowerCase().includes(query)
-            );
+            // Return both folders and entities
+            const folderResults = availableFolders
+                .filter(f => f.name.toLowerCase().includes(query))
+                .map(f => ({ ...f, _type: 'folder' as const }));
+            const entityResults = availableEntities
+                .filter(e => e.name.toLowerCase().includes(query))
+                .map(e => ({ ...e, _type: 'entity' as const }));
+            return [...folderResults, ...entityResults];
         } else if (mention.type === 'attribute' && mention.entityContext) {
-            return mention.entityContext.properties.filter(p =>
-                p.name.toLowerCase().includes(query)
-            );
+            return mention.entityContext.properties
+                .filter(p => p.name.toLowerCase().includes(query))
+                .map(p => ({ ...p, _type: 'property' as const }));
         }
         return [];
     };
@@ -794,7 +823,7 @@ export const Copilots: React.FC = () => {
     };
 
     // Select mention suggestion
-    const selectMentionSuggestion = (item: Entity | Property) => {
+    const selectMentionSuggestion = (item: MentionItem) => {
         if (!inputRef.current) return;
 
         const text = input;
@@ -802,8 +831,8 @@ export const Copilots: React.FC = () => {
         let newCursorPos = 0;
 
         if (mention.type === 'entity') {
-            const entity = item as Entity;
-            insertText = entity.name;
+            // Handle both folders and entities
+            insertText = item.name;
 
             const start = text.lastIndexOf('@', inputRef.current.selectionStart);
             const end = inputRef.current.selectionStart;
@@ -811,9 +840,8 @@ export const Copilots: React.FC = () => {
             const newText = text.slice(0, start) + '@' + insertText + text.slice(end);
             setInput(newText);
             newCursorPos = start + 1 + insertText.length;
-        } else {
-            const prop = item as Property;
-            insertText = prop.name;
+        } else if (item._type === 'property') {
+            insertText = item.name;
 
             const start = text.lastIndexOf('.', inputRef.current.selectionStart);
             const end = inputRef.current.selectionStart;
@@ -1142,7 +1170,7 @@ export const Copilots: React.FC = () => {
                                                         }}
                                                     >
                                                         <div className="bg-[var(--bg-tertiary)] px-3 py-2 border-b border-[var(--border-light)] text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">
-                                                            {mention.type === 'entity' ? 'Entities' : `Properties of ${mention.entityContext?.name}`}
+                                                            {mention.type === 'entity' ? 'Folders & Entities' : `Properties of ${mention.entityContext?.name}`}
                                                         </div>
                                                         <div className="max-h-48 overflow-y-auto">
                                                             {mentionSuggestions.map((item, index) => (
@@ -1155,12 +1183,17 @@ export const Copilots: React.FC = () => {
                                                                             : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
                                                                     }`}
                                                                 >
-                                                                    {mention.type === 'entity' ? (
+                                                                    {item._type === 'folder' ? (
+                                                                        <Folder size={14} style={{ color: (item as KnowledgeFolder).color || 'var(--text-tertiary)' }} weight="light" />
+                                                                    ) : item._type === 'entity' ? (
                                                                         <Database size={14} className="text-[var(--text-tertiary)]" weight="light" />
                                                                     ) : (
                                                                         <Hash size={14} className="text-[var(--text-tertiary)]" weight="light" />
                                                                     )}
                                                                     <span>{item.name}</span>
+                                                                    {item._type === 'folder' && (
+                                                                        <span className="text-[10px] text-[var(--text-tertiary)] ml-auto">folder</span>
+                                                                    )}
                                                                 </button>
                                                             ))}
                                                         </div>
@@ -1364,7 +1397,7 @@ export const Copilots: React.FC = () => {
                                             }}
                                         >
                                             <div className="bg-[var(--bg-tertiary)] px-3 py-2 border-b border-[var(--border-light)] text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">
-                                                {mention.type === 'entity' ? 'Entities' : `Properties of ${mention.entityContext?.name}`}
+                                                {mention.type === 'entity' ? 'Folders & Entities' : `Properties of ${mention.entityContext?.name}`}
                                             </div>
                                             <div className="max-h-48 overflow-y-auto">
                                                 {mentionSuggestions.map((item, index) => (
@@ -1377,12 +1410,17 @@ export const Copilots: React.FC = () => {
                                                                 : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
                                                         }`}
                                                     >
-                                                        {mention.type === 'entity' ? (
+                                                        {item._type === 'folder' ? (
+                                                            <Folder size={14} style={{ color: (item as KnowledgeFolder).color || 'var(--text-tertiary)' }} weight="light" />
+                                                        ) : item._type === 'entity' ? (
                                                             <Database size={14} className="text-[var(--text-tertiary)]" weight="light" />
                                                         ) : (
                                                             <Hash size={14} className="text-[var(--text-tertiary)]" weight="light" />
                                                         )}
                                                         <span>{item.name}</span>
+                                                        {item._type === 'folder' && (
+                                                            <span className="text-[10px] text-[var(--text-tertiary)] ml-auto">folder</span>
+                                                        )}
                                                     </button>
                                                 ))}
                                             </div>
