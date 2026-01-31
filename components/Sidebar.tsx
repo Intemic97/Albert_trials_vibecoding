@@ -318,7 +318,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
           <div className="space-y-0.5">
             <NavItem icon={House} label="Overview" view="overview" active={activeView === 'overview'} />
             <NavItem icon={SquaresFour} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
-            <NavItem icon={Sliders} label="Simulations" view="simulations" active={activeView === 'simulations'} />
           </div>
 
           <SectionLabel label="Data Modeling" />
@@ -326,6 +325,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
             <NavItem icon={FlowArrow} label="Workflows" view="workflows" active={activeView === 'workflows'} />
             <NavItem icon={Database} label="Knowledge Base" view="database" active={activeView === 'database'} />
             <NavItem icon={Sparkle} label="Copilots" view="copilots" active={activeView === 'copilots'} />
+            <NavItem icon={Sliders} label="Simulations" view="simulations" active={activeView === 'simulations'} />
           </div>
 
           <SectionLabel label="Reports" />

@@ -21,3 +21,9 @@ export { useWorkflowHistory } from './useWorkflowHistory';
 
 // Node Configuration - Estado de configuración de nodos
 export { useNodeConfig, type NodeConfigState, type UseNodeConfigReturn } from './useNodeConfig';
+
+// Workflow State - Estado centralizado del workflow
+export { useWorkflowState, type WorkflowData, type WorkflowStateHook } from './useWorkflowState';
+
+// Canvas Interaction - Pan, zoom, drag & drop
+export { useCanvasInteraction, type CanvasOffset, type DragConnectionState, type CanvasInteractionHook } from './useCanvasInteraction';

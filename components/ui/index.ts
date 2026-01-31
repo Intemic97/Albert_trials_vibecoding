@@ -104,3 +104,23 @@ export {
   SidePanelDivider 
 } from './SidePanel';
 export type { SidePanelSize, SidePanelPosition } from './SidePanel';
+
+// ============================================================================
+// PERFORMANCE COMPONENTS
+// ============================================================================
+
+// OptimizedChart - Charts memoizados para mejor rendimiento
+export { 
+  OptimizedChart,
+  type ChartType,
+  type ChartDataPoint,
+  type OptimizedChartProps
+} from './OptimizedChart';
+
+// VirtualList - Listas virtualizadas para grandes datasets
+export { 
+  VirtualList, 
+  VirtualGrid,
+  type VirtualListProps,
+  type VirtualGridProps 
+} from './VirtualList';

@@ -72,6 +72,15 @@ export {
   useNodeConfig,
   type NodeConfigState,
   type UseNodeConfigReturn,
+  // Workflow state management
+  useWorkflowState,
+  type WorkflowData as WorkflowStateData,
+  type WorkflowStateHook,
+  // Canvas interaction
+  useCanvasInteraction,
+  type CanvasOffset,
+  type DragConnectionState,
+  type CanvasInteractionHook,
 } from './hooks';
 
 // ============================================================================
@@ -87,7 +96,20 @@ export {
   // AI/Code
   LLMConfigModal,
   PythonConfigModal,
+  // Workflow runner
+  ExecutionHistoryModal,
+  WorkflowRunnerModal,
+  TemplatesGalleryModal,
 } from './modals';
+
+// ============================================================================
+// VIEWS
+// ============================================================================
+
+export {
+  WorkflowsListView,
+  type WorkflowListItem,
+} from './views';
 
 // ============================================================================
 // NODE UTILITIES
@@ -114,6 +136,22 @@ export {
   getExecutionOrder,
   cloneNode,
 } from './nodes';
+
+// ============================================================================
+// HELPER UTILITIES
+// ============================================================================
+
+export {
+  getNodeColor,
+  getNodeIconColor as getNodeIconColorUtil,
+  getNodeIconBg,
+  getNodeIcon as getNodeIconUtil,
+  isNodeConfigured,
+  getNodeTopTag,
+  getCategoryColors,
+  TEMPLATE_CATEGORY_COLORS,
+  TEMPLATE_TEXT_COLORS,
+} from './utils';
 
 // ============================================================================
 // UI COMPONENTS

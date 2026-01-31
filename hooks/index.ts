@@ -41,6 +41,19 @@ export {
   useAsync,
 } from './useDebounce';
 
+// Advanced Optimization Hooks
+export {
+  useDebouncedState,
+  useThrottledCallback as useThrottledCallbackOptimized,
+  useMemoizedComputation,
+  useLazyInit,
+  useStableCallback,
+  useIntersectionObserver,
+  useWindowSize,
+  useRenderCount,
+  useBatchedState,
+} from './useOptimizedState';
+
 // ============================================================================
 // UTILITIES
 // ============================================================================

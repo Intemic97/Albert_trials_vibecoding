@@ -4,22 +4,44 @@
     "description": "Backend for Entity Management System",
     "main": "index.js",
     "scripts": {
-        "start": "node index.js"
+        "start": "node index.js",
+        "dev": "NODE_ENV=development node index.js",
+        "test": "jest --coverage",
+        "test:watch": "jest --watch",
+        "test:smoke": "node __tests__/middleware.test.js",
+        "lint": "eslint ."
     },
     "dependencies": {
         "@google-cloud/storage": "^7.18.0",
+        "cookie-parser": "^1.4.6",
         "cors": "^2.8.5",
+        "dotenv": "^16.3.1",
         "express": "^4.18.2",
+        "jsonwebtoken": "^9.0.2",
         "multer": "^2.0.2",
         "mysql2": "^3.16.0",
         "nodemailer": "^7.0.11",
+        "openai": "^4.0.0",
         "pdf-parse": "^1.1.1",
         "resend": "^6.6.0",
         "sqlite": "^5.1.1",
         "sqlite3": "^5.1.7",
         "stripe": "^20.1.0",
         "twilio": "^5.11.1",
+        "uuid": "^9.0.0",
         "ws": "^8.18.3",
         "xlsx": "^0.18.5"
+    },
+    "devDependencies": {
+        "jest": "^29.7.0"
+    },
+    "jest": {
+        "testEnvironment": "node",
+        "coverageDirectory": "coverage",
+        "collectCoverageFrom": [
+            "middleware/**/*.js",
+            "services/**/*.js",
+            "!**/__tests__/**"
+        ]
     }
 }

@@ -14,3 +14,8 @@ export { HttpConfigModal } from './HttpConfigModal';
 // AI/Code modals
 export { LLMConfigModal } from './LLMConfigModal';
 export { PythonConfigModal } from './PythonConfigModal';
+
+// Workflow runner modals
+export { ExecutionHistoryModal } from './ExecutionHistoryModal';
+export { WorkflowRunnerModal } from './WorkflowRunnerModal';
+export { TemplatesGalleryModal } from './TemplatesGalleryModal';
