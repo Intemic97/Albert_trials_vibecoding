@@ -734,6 +734,18 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  try {
+    await db.exec(`ALTER TABLE copilot_chats ADD COLUMN isFavorite INTEGER DEFAULT 0`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  try {
+    await db.exec(`ALTER TABLE copilot_chats ADD COLUMN tags TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   // Migration: Add grid layout columns to widgets table
   try {
     await db.exec(`ALTER TABLE widgets ADD COLUMN gridX INTEGER DEFAULT 0`);
@@ -781,6 +793,37 @@ async function initDb() {
     await db.exec(`ALTER TABLE simulations ADD COLUMN scenariosData TEXT DEFAULT '[]'`);
   } catch (e) {
     // Column already exists, ignore
+  }
+
+  // Create audit_logs table for activity tracking
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT NOT NULL,
+      userId TEXT,
+      userName TEXT,
+      userEmail TEXT,
+      action TEXT NOT NULL,
+      resourceType TEXT NOT NULL,
+      resourceId TEXT,
+      resourceName TEXT,
+      details TEXT,
+      ipAddress TEXT,
+      userAgent TEXT,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(userId) REFERENCES users(id) ON DELETE SET NULL
+    );
+  `);
+
+  // Create index for faster queries
+  try {
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_logs_org ON audit_logs(organizationId)`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(userId)`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(createdAt)`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)`);
+  } catch (e) {
+    // Indexes might already exist
   }
 
   return db;

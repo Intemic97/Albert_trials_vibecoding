@@ -22,31 +22,30 @@ const calculatePath = (
   inputPort?: 'A' | 'B'
 ): { x1: number; y1: number; x2: number; y2: number; path: string } => {
   const { NODE_HALF_WIDTH, CONNECTOR_RADIUS } = CANVAS_CONSTANTS;
-  const ESTIMATED_HALF_HEIGHT = 65;
 
   // Calculate X positions
   const x1 = fromNode.x + NODE_HALF_WIDTH + CONNECTOR_RADIUS;
   const x2 = toNode.x - NODE_HALF_WIDTH - CONNECTOR_RADIUS;
 
-  // Calculate Y positions
+  // Calculate Y positions using fixed offsets from node center
   let y1 = fromNode.y;
   let y2 = toNode.y;
 
-  // Adjust Y1 for special output types
+  // Adjust Y1 for special output types (fixed offset: 37px from center)
   if (fromNode.type === 'condition' || fromNode.type === 'splitColumns') {
     if (outputType === 'true' || outputType === 'A') {
-      y1 = fromNode.y - ESTIMATED_HALF_HEIGHT + 28;
+      y1 = fromNode.y - 37;
     } else if (outputType === 'false' || outputType === 'B') {
-      y1 = fromNode.y + ESTIMATED_HALF_HEIGHT - 28;
+      y1 = fromNode.y + 37;
     }
   }
 
-  // Adjust Y2 for join node inputs
+  // Adjust Y2 for join node inputs (fixed offsets from center)
   if (toNode.type === 'join') {
     if (inputPort === 'A') {
-      y2 = toNode.y - ESTIMATED_HALF_HEIGHT + 60;
+      y2 = toNode.y - 5;
     } else if (inputPort === 'B') {
-      y2 = toNode.y - ESTIMATED_HALF_HEIGHT + 90;
+      y2 = toNode.y + 25;
     }
   }
 

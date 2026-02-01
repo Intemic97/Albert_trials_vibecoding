@@ -14,7 +14,9 @@ import {
     SpinnerGap, ChartLine, Table, Sliders, Robot, PaperPlaneTilt,
     Gear, Eye, Copy, Check, X, ArrowsClockwise, BookmarkSimple,
     CaretUp, ChartBar, ChartPie, Gauge, NumberSquareOne, FlowArrow,
-    FolderOpen, Clock, DotsThree, Export, Share, Info
+    FolderOpen, Clock, DotsThree, Export, Share, Info,
+    ArrowCounterClockwise, FileCsv, FileImage, Keyboard, DotsSixVertical,
+    Lightning, Tag
 } from '@phosphor-icons/react';
 import { PageHeader } from './PageHeader';
 import { API_BASE } from '../config';
@@ -281,7 +283,12 @@ const KPICard: React.FC<{
     format?: 'number' | 'currency' | 'percent';
     change?: number;
     color?: string;
-}> = ({ title, value, format = 'number', change, color }) => {
+    isLoading?: boolean;
+}> = ({ title, value, format = 'number', change, color, isLoading }) => {
+    const [displayValue, setDisplayValue] = useState<number | null>(null);
+    const [isAnimating, setIsAnimating] = useState(false);
+    const prevValueRef = useRef<number | null>(null);
+
     const formatValue = (val: any) => {
         if (val === null || val === undefined) return '—';
         const num = typeof val === 'number' ? val : parseFloat(val);
@@ -297,16 +304,70 @@ const KPICard: React.FC<{
         }
     };
 
+    // Animate value changes
+    useEffect(() => {
+        const numValue = typeof value === 'number' ? value : parseFloat(value);
+        if (isNaN(numValue) || value === null || value === undefined) {
+            setDisplayValue(null);
+            return;
+        }
+
+        const prevValue = prevValueRef.current;
+        prevValueRef.current = numValue;
+
+        if (prevValue === null || prevValue === numValue) {
+            setDisplayValue(numValue);
+            return;
+        }
+
+        // Animate from prev to new value
+        setIsAnimating(true);
+        const duration = 600;
+        const steps = 30;
+        const stepDuration = duration / steps;
+        const increment = (numValue - prevValue) / steps;
+        let currentStep = 0;
+
+        const interval = setInterval(() => {
+            currentStep++;
+            if (currentStep >= steps) {
+                setDisplayValue(numValue);
+                setIsAnimating(false);
+                clearInterval(interval);
+            } else {
+                setDisplayValue(prevValue + increment * currentStep);
+            }
+        }, stepDuration);
+
+        return () => clearInterval(interval);
+    }, [value]);
+
+    // Skeleton loading
+    if (isLoading) {
+        return (
+            <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 animate-pulse">
+                <div className="h-3 w-24 bg-[var(--bg-tertiary)] rounded mb-3" />
+                <div className="h-7 w-20 bg-[var(--bg-tertiary)] rounded" />
+            </div>
+        );
+    }
+
     return (
-        <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
-            <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-1">{title}</p>
-            <p className="text-2xl font-semibold text-[var(--text-primary)]" style={{ color }}>
-                {formatValue(value)}
+        <div className={`bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 transition-all duration-200 hover:border-[var(--border-medium)] ${isAnimating ? 'border-[var(--accent-primary)]/30' : ''}`}>
+            <p className="text-xs text-[var(--text-secondary)] mb-2">{title}</p>
+            <p 
+                className={`text-2xl font-normal transition-colors duration-300 tabular-nums`}
+                style={{ 
+                    fontFamily: "'Berkeley Mono', monospace",
+                    color: isAnimating ? 'var(--accent-primary)' : (color || 'var(--text-primary)')
+                }}
+            >
+                {displayValue !== null ? formatValue(displayValue) : formatValue(value)}
             </p>
             {change !== undefined && (
-                <div className={`flex items-center gap-1 mt-1 text-xs ${change >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                    {change >= 0 ? <CaretUp size={12} weight="fill" /> : <CaretDown size={12} weight="fill" />}
-                    <span>{Math.abs(change).toFixed(1)}%</span>
+                <div className={`flex items-center gap-1 mt-2 text-xs font-medium ${change >= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    {change >= 0 ? <CaretUp size={12} weight="bold" /> : <CaretDown size={12} weight="bold" />}
+                    <span>{change >= 0 ? '+' : ''}{Math.abs(change).toFixed(1)}%</span>
                 </div>
             )}
         </div>
@@ -558,6 +619,24 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
     const [activeTab, setActiveTab] = useState<'parameters' | 'scenarios' | 'history'>('parameters');
     const [isChatExpanded, setIsChatExpanded] = useState(false);
     const [showAddVisualization, setShowAddVisualization] = useState(false);
+    const [vizMenuOpen, setVizMenuOpen] = useState<string | null>(null); // Track which viz menu is open
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+    
+    // Drag & Drop state
+    const [draggedVizId, setDraggedVizId] = useState<string | null>(null);
+    const [dragOverVizId, setDragOverVizId] = useState<string | null>(null);
+    
+    // Undo state
+    const [undoStack, setUndoStack] = useState<{ type: string; data: any }[]>([]);
+    const [showUndoToast, setShowUndoToast] = useState(false);
+    const [lastUndoAction, setLastUndoAction] = useState<string>('');
+    
+    // Quick bookmark
+    const [quickBookmarkName, setQuickBookmarkName] = useState('');
+    const [showQuickBookmark, setShowQuickBookmark] = useState(false);
+    const [bookmarkSaved, setBookmarkSaved] = useState(false);
+    
     const [newVisualization, setNewVisualization] = useState({
         type: 'kpi' as VisualizationConfig['type'],
         title: '',
@@ -1251,6 +1330,15 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
     const removeVisualization = async (vizId: string) => {
         if (!selectedSimulation) return;
 
+        // Save to undo stack
+        const removedViz = selectedSimulation.visualizations.find(v => v.id === vizId);
+        if (removedViz) {
+            setUndoStack(prev => [...prev.slice(-9), { type: 'remove_viz', data: removedViz }]);
+            setLastUndoAction('Widget deleted');
+            setShowUndoToast(true);
+            setTimeout(() => setShowUndoToast(false), 4000);
+        }
+
         const updatedSim = {
             ...selectedSimulation,
             visualizations: selectedSimulation.visualizations.filter(v => v.id !== vizId),
@@ -1272,6 +1360,349 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                 console.error('Error removing visualization:', error);
             }
         }
+    };
+
+    const duplicateVisualization = async (vizId: string) => {
+        if (!selectedSimulation) return;
+
+        const vizToDuplicate = selectedSimulation.visualizations.find(v => v.id === vizId);
+        if (!vizToDuplicate) return;
+
+        const newViz: VisualizationConfig = {
+            ...vizToDuplicate,
+            id: generateUUID(),
+            title: `${vizToDuplicate.title} (copy)`
+        };
+
+        const updatedSim = {
+            ...selectedSimulation,
+            visualizations: [...selectedSimulation.visualizations, newViz],
+            updatedAt: new Date().toISOString()
+        };
+
+        setSelectedSimulation(updatedSim);
+        setSimulations(prev => prev.map(s => s.id === updatedSim.id ? updatedSim : s));
+
+        if (selectedSimulation.id !== 'demo-experiment') {
+            try {
+                await fetch(`${API_BASE}/simulations/${selectedSimulation.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(updatedSim)
+                });
+            } catch (error) {
+                console.error('Error duplicating visualization:', error);
+            }
+        }
+    };
+
+    const [editingViz, setEditingViz] = useState<VisualizationConfig | null>(null);
+
+    const updateVisualization = async (updatedViz: VisualizationConfig) => {
+        if (!selectedSimulation) return;
+
+        const updatedSim = {
+            ...selectedSimulation,
+            visualizations: selectedSimulation.visualizations.map(v => 
+                v.id === updatedViz.id ? updatedViz : v
+            ),
+            updatedAt: new Date().toISOString()
+        };
+
+        setSelectedSimulation(updatedSim);
+        setSimulations(prev => prev.map(s => s.id === updatedSim.id ? updatedSim : s));
+        setEditingViz(null);
+
+        if (selectedSimulation.id !== 'demo-experiment') {
+            try {
+                await fetch(`${API_BASE}/simulations/${selectedSimulation.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(updatedSim)
+                });
+            } catch (error) {
+                console.error('Error updating visualization:', error);
+            }
+        }
+    };
+
+    // ========================================================================
+    // UNDO FUNCTIONALITY
+    // ========================================================================
+    
+    const handleUndo = useCallback(async () => {
+        if (undoStack.length === 0 || !selectedSimulation) return;
+        
+        const lastAction = undoStack[undoStack.length - 1];
+        setUndoStack(prev => prev.slice(0, -1));
+        
+        if (lastAction.type === 'remove_viz') {
+            const restoredViz = lastAction.data;
+            const updatedSim = {
+                ...selectedSimulation,
+                visualizations: [...selectedSimulation.visualizations, restoredViz],
+                updatedAt: new Date().toISOString()
+            };
+            
+            setSelectedSimulation(updatedSim);
+            setSimulations(prev => prev.map(s => s.id === updatedSim.id ? updatedSim : s));
+            
+            if (selectedSimulation.id !== 'demo-experiment') {
+                try {
+                    await fetch(`${API_BASE}/simulations/${selectedSimulation.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(updatedSim)
+                    });
+                } catch (error) {
+                    console.error('Error restoring visualization:', error);
+                }
+            }
+        }
+        
+        setShowUndoToast(false);
+    }, [undoStack, selectedSimulation]);
+
+    // ========================================================================
+    // KEYBOARD SHORTCUTS
+    // ========================================================================
+    
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Don't trigger shortcuts when typing in inputs
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+            
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            const modKey = isMac ? e.metaKey : e.ctrlKey;
+            
+            // Cmd/Ctrl + R - Run experiment
+            if (modKey && e.key === 'r' && selectedSimulation) {
+                e.preventDefault();
+                if (!isRunning) {
+                    runSimulation();
+                }
+            }
+            
+            // Cmd/Ctrl + Z - Undo
+            if (modKey && e.key === 'z' && undoStack.length > 0) {
+                e.preventDefault();
+                handleUndo();
+            }
+            
+            // Cmd/Ctrl + S - Quick bookmark
+            if (modKey && e.key === 's' && selectedSimulation) {
+                e.preventDefault();
+                setShowQuickBookmark(true);
+            }
+            
+            // Cmd/Ctrl + E - Export
+            if (modKey && e.key === 'e' && selectedSimulation && lastResult) {
+                e.preventDefault();
+                setShowExportModal(true);
+            }
+            
+            // ? - Show keyboard shortcuts
+            if (e.key === '?' && !modKey) {
+                setShowKeyboardShortcuts(prev => !prev);
+            }
+            
+            // Escape - Close modals
+            if (e.key === 'Escape') {
+                setShowExportModal(false);
+                setShowQuickBookmark(false);
+                setShowKeyboardShortcuts(false);
+                setVizMenuOpen(null);
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedSimulation, isRunning, undoStack, lastResult, handleUndo]);
+
+    // ========================================================================
+    // DRAG & DROP
+    // ========================================================================
+    
+    const handleDragStart = (vizId: string) => {
+        setDraggedVizId(vizId);
+    };
+    
+    const handleDragOver = (e: React.DragEvent, vizId: string) => {
+        e.preventDefault();
+        if (vizId !== draggedVizId) {
+            setDragOverVizId(vizId);
+        }
+    };
+    
+    const handleDragEnd = async () => {
+        if (!draggedVizId || !dragOverVizId || !selectedSimulation) {
+            setDraggedVizId(null);
+            setDragOverVizId(null);
+            return;
+        }
+        
+        const vizs = [...selectedSimulation.visualizations];
+        const draggedIndex = vizs.findIndex(v => v.id === draggedVizId);
+        const targetIndex = vizs.findIndex(v => v.id === dragOverVizId);
+        
+        if (draggedIndex !== -1 && targetIndex !== -1) {
+            const [removed] = vizs.splice(draggedIndex, 1);
+            vizs.splice(targetIndex, 0, removed);
+            
+            const updatedSim = {
+                ...selectedSimulation,
+                visualizations: vizs,
+                updatedAt: new Date().toISOString()
+            };
+            
+            setSelectedSimulation(updatedSim);
+            setSimulations(prev => prev.map(s => s.id === updatedSim.id ? updatedSim : s));
+            
+            if (selectedSimulation.id !== 'demo-experiment') {
+                try {
+                    await fetch(`${API_BASE}/simulations/${selectedSimulation.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(updatedSim)
+                    });
+                } catch (error) {
+                    console.error('Error reordering visualizations:', error);
+                }
+            }
+        }
+        
+        setDraggedVizId(null);
+        setDragOverVizId(null);
+    };
+
+    // ========================================================================
+    // EXPORT FUNCTIONALITY
+    // ========================================================================
+    
+    const exportAsCSV = () => {
+        if (!lastResult) return;
+        
+        const flattenObject = (obj: any, prefix = ''): Record<string, any> => {
+            return Object.keys(obj).reduce((acc, key) => {
+                const value = obj[key];
+                const newKey = prefix ? `${prefix}.${key}` : key;
+                
+                if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                    Object.assign(acc, flattenObject(value, newKey));
+                } else if (Array.isArray(value)) {
+                    acc[newKey] = JSON.stringify(value);
+                } else {
+                    acc[newKey] = value;
+                }
+                return acc;
+            }, {} as Record<string, any>);
+        };
+        
+        const flatData = flattenObject(lastResult);
+        const headers = Object.keys(flatData);
+        const values = Object.values(flatData);
+        
+        const csv = [headers.join(','), values.map(v => `"${v}"`).join(',')].join('\n');
+        
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${selectedSimulation?.name || 'experiment'}_results_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setShowExportModal(false);
+    };
+    
+    const exportAsPNG = async () => {
+        // Export the visualization area as PNG
+        const vizArea = document.getElementById('visualization-area');
+        if (!vizArea) return;
+        
+        try {
+            const html2canvas = (await import('html2canvas')).default;
+            const canvas = await html2canvas(vizArea, {
+                backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-primary'),
+                scale: 2
+            });
+            
+            const link = document.createElement('a');
+            link.download = `${selectedSimulation?.name || 'experiment'}_${new Date().toISOString().split('T')[0]}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        } catch (error) {
+            console.error('Error exporting as PNG:', error);
+            // Fallback message
+            alert('PNG export requires html2canvas. Install with: npm install html2canvas');
+        }
+        setShowExportModal(false);
+    };
+    
+    const exportAsJSON = () => {
+        if (!lastResult) return;
+        
+        const data = {
+            experiment: selectedSimulation?.name,
+            parameters: parameterValues,
+            results: lastResult,
+            exportedAt: new Date().toISOString()
+        };
+        
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${selectedSimulation?.name || 'experiment'}_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setShowExportModal(false);
+    };
+
+    // ========================================================================
+    // QUICK BOOKMARK
+    // ========================================================================
+    
+    const saveQuickBookmark = async () => {
+        if (!selectedSimulation || !quickBookmarkName.trim()) return;
+        
+        const newScenario: SavedScenario = {
+            id: generateUUID(),
+            name: quickBookmarkName.trim(),
+            description: `Saved on ${new Date().toLocaleDateString()}`,
+            parameterValues: { ...parameterValues },
+            createdAt: new Date().toISOString()
+        };
+        
+        const updatedSim = {
+            ...selectedSimulation,
+            savedScenarios: [...selectedSimulation.savedScenarios, newScenario],
+            updatedAt: new Date().toISOString()
+        };
+        
+        setSelectedSimulation(updatedSim);
+        setSimulations(prev => prev.map(s => s.id === updatedSim.id ? updatedSim : s));
+        
+        if (selectedSimulation.id !== 'demo-experiment') {
+            try {
+                await fetch(`${API_BASE}/simulations/${selectedSimulation.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(updatedSim)
+                });
+            } catch (error) {
+                console.error('Error saving bookmark:', error);
+            }
+        }
+        
+        setQuickBookmarkName('');
+        setShowQuickBookmark(false);
+        setBookmarkSaved(true);
+        setTimeout(() => setBookmarkSaved(false), 2000);
     };
 
     // Config panel functions
@@ -1733,26 +2164,83 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                 </div>
                 
                 <div className="flex items-center gap-2">
+                    {/* Quick Bookmark */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowQuickBookmark(!showQuickBookmark)}
+                            className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
+                                bookmarkSaved 
+                                    ? 'text-emerald-500 bg-emerald-500/10' 
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
+                            }`}
+                            title="Quick save (⌘S)"
+                        >
+                            {bookmarkSaved ? <Check size={16} /> : <Tag size={16} />}
+                            <span className="hidden sm:inline">{bookmarkSaved ? 'Saved!' : 'Bookmark'}</span>
+                        </button>
+                        
+                        {showQuickBookmark && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setShowQuickBookmark(false)} />
+                                <div className="absolute right-0 top-full mt-2 w-64 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-xl z-50 p-3">
+                                    <p className="text-xs text-[var(--text-tertiary)] mb-2">Quick save current parameters</p>
+                                    <input
+                                        type="text"
+                                        value={quickBookmarkName}
+                                        onChange={(e) => setQuickBookmarkName(e.target.value)}
+                                        placeholder="Bookmark name..."
+                                        className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm mb-2"
+                                        autoFocus
+                                        onKeyDown={(e) => e.key === 'Enter' && saveQuickBookmark()}
+                                    />
+                                    <button
+                                        onClick={saveQuickBookmark}
+                                        disabled={!quickBookmarkName.trim()}
+                                        className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[var(--accent-primary)] text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                                    >
+                                        <BookmarkSimple size={14} />
+                                        Save
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    
+                    {/* Export Button */}
                     <button
-                        onClick={saveScenario}
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                        onClick={() => setShowExportModal(true)}
+                        disabled={!lastResult}
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors disabled:opacity-50"
+                        title="Export results (⌘E)"
                     >
-                        <BookmarkSimple size={16} />
-                        Save Scenario
+                        <Export size={16} />
+                        <span className="hidden sm:inline">Export</span>
                     </button>
+                    
+                    <div className="w-px h-6 bg-[var(--border-light)]" />
                     
                     <button
                         onClick={() => setShowConfigPanel(!showConfigPanel)}
                         className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
                     >
                         <Gear size={16} />
-                        Configure
+                        <span className="hidden sm:inline">Configure</span>
+                    </button>
+                    
+                    {/* Keyboard shortcut hint */}
+                    <button
+                        onClick={() => setShowKeyboardShortcuts(true)}
+                        className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                        title="Keyboard shortcuts (?)"
+                    >
+                        <Keyboard size={16} />
                     </button>
                     
                     <button
                         onClick={runSimulation}
                         disabled={isRunning}
                         className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                        title="Run experiment (⌘R)"
                     >
                         {isRunning ? (
                             <SpinnerGap size={16} className="animate-spin" />
@@ -2023,7 +2511,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                 </div>
 
                 {/* Right Panel - Visualizations */}
-                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                <div id="visualization-area" className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                     {/* Header with Add Button */}
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-sm font-medium text-[var(--text-tertiary)] uppercase tracking-wider">
@@ -2044,14 +2532,50 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                             {selectedSimulation.visualizations
                                 .filter(v => v.type === 'kpi')
                                 .map(viz => (
-                                    <div key={viz.id} className="relative group">
+                                    <div 
+                                        key={viz.id} 
+                                        className={`relative group transition-all duration-200 cursor-grab active:cursor-grabbing ${
+                                            draggedVizId === viz.id ? 'opacity-50 scale-95' : ''
+                                        } ${dragOverVizId === viz.id ? 'ring-2 ring-[var(--accent-primary)] ring-offset-2' : ''}`}
+                                        draggable
+                                        onDragStart={() => handleDragStart(viz.id)}
+                                        onDragOver={(e) => handleDragOver(e, viz.id)}
+                                        onDragEnd={handleDragEnd}
+                                        onDragLeave={() => setDragOverVizId(null)}
+                                    >
                                         <VisualizationCard config={viz} data={lastResult} />
-                                        <button
-                                            onClick={() => removeVisualization(viz.id)}
-                                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                                        >
-                                            <X size={12} weight="bold" />
-                                        </button>
+                                        {/* Context Menu Button */}
+                                        <div className="absolute top-2 right-2">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setVizMenuOpen(vizMenuOpen === viz.id ? null : viz.id);
+                                                }}
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-[var(--bg-primary)]/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-tertiary)] transition-all"
+                                            >
+                                                <DotsThree size={16} weight="bold" className="text-[var(--text-secondary)]" />
+                                            </button>
+                                            {vizMenuOpen === viz.id && (
+                                                <>
+                                                    <div 
+                                                        className="fixed inset-0 z-40" 
+                                                        onClick={() => setVizMenuOpen(null)}
+                                                    />
+                                                    <div className="absolute right-0 top-9 w-36 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl z-50 py-1">
+                                                        <button
+                                                            onClick={() => {
+                                                                removeVisualization(viz.id);
+                                                                setVizMenuOpen(null);
+                                                            }}
+                                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
+                                                        >
+                                                            <Trash size={14} />
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                         </div>
@@ -2063,14 +2587,71 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                             {selectedSimulation.visualizations
                                 .filter(v => v.type !== 'kpi')
                                 .map(viz => (
-                                    <div key={viz.id} className="relative group">
+                                    <div 
+                                        key={viz.id} 
+                                        className={`relative group transition-all duration-200 cursor-grab active:cursor-grabbing ${
+                                            draggedVizId === viz.id ? 'opacity-50 scale-95' : ''
+                                        } ${dragOverVizId === viz.id ? 'ring-2 ring-[var(--accent-primary)] ring-offset-2' : ''}`}
+                                        draggable
+                                        onDragStart={() => handleDragStart(viz.id)}
+                                        onDragOver={(e) => handleDragOver(e, viz.id)}
+                                        onDragEnd={handleDragEnd}
+                                        onDragLeave={() => setDragOverVizId(null)}
+                                    >
                                         <VisualizationCard config={viz} data={lastResult} />
-                                        <button
-                                            onClick={() => removeVisualization(viz.id)}
-                                            className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                                        >
-                                            <X size={12} weight="bold" />
-                                        </button>
+                                        {/* Context Menu Button */}
+                                        <div className="absolute top-3 right-3">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setVizMenuOpen(vizMenuOpen === viz.id ? null : viz.id);
+                                                }}
+                                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-[var(--bg-primary)]/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-tertiary)] transition-all"
+                                            >
+                                                <DotsThree size={18} weight="bold" className="text-[var(--text-secondary)]" />
+                                            </button>
+                                            {vizMenuOpen === viz.id && (
+                                                <>
+                                                    <div 
+                                                        className="fixed inset-0 z-40" 
+                                                        onClick={() => setVizMenuOpen(null)}
+                                                    />
+                                                    <div className="absolute right-0 top-10 w-40 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl z-50 py-1">
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingViz(viz);
+                                                                setVizMenuOpen(null);
+                                                            }}
+                                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                                        >
+                                                            <PencilSimple size={14} />
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                duplicateVisualization(viz.id);
+                                                                setVizMenuOpen(null);
+                                                            }}
+                                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                                        >
+                                                            <Copy size={14} />
+                                                            Duplicate
+                                                        </button>
+                                                        <div className="border-t border-[var(--border-light)] my-1" />
+                                                        <button
+                                                            onClick={() => {
+                                                                removeVisualization(viz.id);
+                                                                setVizMenuOpen(null);
+                                                            }}
+                                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
+                                                        >
+                                                            <Trash size={14} />
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                         </div>
@@ -2627,6 +3208,271 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                 Done
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Visualization Modal */}
+            {editingViz && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-[var(--bg-card)] rounded-2xl w-full max-w-md overflow-hidden">
+                        <div className="px-6 py-4 border-b border-[var(--border-light)] flex items-center justify-between">
+                            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                                Edit Widget
+                            </h2>
+                            <button
+                                onClick={() => setEditingViz(null)}
+                                className="p-1.5 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                            >
+                                <X size={18} className="text-[var(--text-tertiary)]" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
+                                    Title
+                                </label>
+                                <input
+                                    type="text"
+                                    value={editingViz.title}
+                                    onChange={(e) => setEditingViz({ ...editingViz, title: e.target.value })}
+                                    className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
+                                    Type
+                                </label>
+                                <select
+                                    value={editingViz.type}
+                                    onChange={(e) => setEditingViz({ ...editingViz, type: e.target.value as VisualizationConfig['type'] })}
+                                    className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm"
+                                >
+                                    <option value="kpi">KPI</option>
+                                    <option value="line">Line Chart</option>
+                                    <option value="bar">Bar Chart</option>
+                                    <option value="area">Area Chart</option>
+                                    <option value="pie">Pie Chart</option>
+                                    <option value="table">Table</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
+                                    Data Source
+                                </label>
+                                <input
+                                    type="text"
+                                    value={editingViz.dataMapping.source}
+                                    onChange={(e) => setEditingViz({ 
+                                        ...editingViz, 
+                                        dataMapping: { ...editingViz.dataMapping, source: e.target.value }
+                                    })}
+                                    placeholder="e.g., results.revenue"
+                                    className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm"
+                                />
+                            </div>
+                            
+                            {editingViz.type === 'kpi' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
+                                        Format
+                                    </label>
+                                    <select
+                                        value={editingViz.dataMapping.format || 'number'}
+                                        onChange={(e) => setEditingViz({ 
+                                            ...editingViz, 
+                                            dataMapping: { ...editingViz.dataMapping, format: e.target.value as 'number' | 'currency' | 'percent' }
+                                        })}
+                                        className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm"
+                                    >
+                                        <option value="number">Number</option>
+                                        <option value="currency">Currency ($)</option>
+                                        <option value="percent">Percentage (%)</option>
+                                    </select>
+                                </div>
+                            )}
+                            
+                            {editingViz.type !== 'kpi' && (
+                                <>
+                                    <div>
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
+                                            X Axis Key
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={editingViz.dataMapping.xAxis || ''}
+                                            onChange={(e) => setEditingViz({ 
+                                                ...editingViz, 
+                                                dataMapping: { ...editingViz.dataMapping, xAxis: e.target.value }
+                                            })}
+                                            placeholder="e.g., month"
+                                            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
+                                            Y Axis Keys (comma separated)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={editingViz.dataMapping.yAxis?.join(', ') || ''}
+                                            onChange={(e) => setEditingViz({ 
+                                                ...editingViz, 
+                                                dataMapping: { ...editingViz.dataMapping, yAxis: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }
+                                            })}
+                                            placeholder="e.g., revenue, cost"
+                                            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm"
+                                        />
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                        <div className="px-6 py-4 border-t border-[var(--border-light)] flex gap-3">
+                            <button
+                                onClick={() => setEditingViz(null)}
+                                className="flex-1 px-4 py-2 border border-[var(--border-light)] rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => updateVisualization(editingViz)}
+                                className="flex-1 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors"
+                            >
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Export Modal */}
+            {showExportModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-[var(--bg-card)] rounded-2xl w-full max-w-sm overflow-hidden">
+                        <div className="px-6 py-4 border-b border-[var(--border-light)] flex items-center justify-between">
+                            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                                Export Results
+                            </h2>
+                            <button
+                                onClick={() => setShowExportModal(false)}
+                                className="p-1.5 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                            >
+                                <X size={18} className="text-[var(--text-tertiary)]" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-3">
+                            <button
+                                onClick={exportAsCSV}
+                                className="w-full flex items-center gap-3 p-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-selected)] rounded-xl transition-colors text-left"
+                            >
+                                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                                    <FileCsv size={20} className="text-emerald-500" />
+                                </div>
+                                <div>
+                                    <p className="font-medium text-[var(--text-primary)]">CSV</p>
+                                    <p className="text-xs text-[var(--text-tertiary)]">Spreadsheet format</p>
+                                </div>
+                            </button>
+                            <button
+                                onClick={exportAsPNG}
+                                className="w-full flex items-center gap-3 p-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-selected)] rounded-xl transition-colors text-left"
+                            >
+                                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                                    <FileImage size={20} className="text-blue-500" />
+                                </div>
+                                <div>
+                                    <p className="font-medium text-[var(--text-primary)]">PNG</p>
+                                    <p className="text-xs text-[var(--text-tertiary)]">Screenshot of dashboard</p>
+                                </div>
+                            </button>
+                            <button
+                                onClick={exportAsJSON}
+                                className="w-full flex items-center gap-3 p-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-selected)] rounded-xl transition-colors text-left"
+                            >
+                                <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                                    <FloppyDisk size={20} className="text-purple-500" />
+                                </div>
+                                <div>
+                                    <p className="font-medium text-[var(--text-primary)]">JSON</p>
+                                    <p className="text-xs text-[var(--text-tertiary)]">Raw data with parameters</p>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Keyboard Shortcuts Modal */}
+            {showKeyboardShortcuts && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowKeyboardShortcuts(false)}>
+                    <div className="bg-[var(--bg-card)] rounded-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="px-6 py-4 border-b border-[var(--border-light)] flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Keyboard size={20} className="text-[var(--accent-primary)]" />
+                                <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                                    Keyboard Shortcuts
+                                </h2>
+                            </div>
+                            <button
+                                onClick={() => setShowKeyboardShortcuts(false)}
+                                className="p-1.5 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                            >
+                                <X size={18} className="text-[var(--text-tertiary)]" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-3">
+                            {[
+                                { keys: ['⌘', 'R'], description: 'Run experiment' },
+                                { keys: ['⌘', 'S'], description: 'Quick bookmark' },
+                                { keys: ['⌘', 'E'], description: 'Export results' },
+                                { keys: ['⌘', 'Z'], description: 'Undo last action' },
+                                { keys: ['?'], description: 'Show shortcuts' },
+                                { keys: ['Esc'], description: 'Close modals' },
+                            ].map((shortcut, i) => (
+                                <div key={i} className="flex items-center justify-between py-2">
+                                    <span className="text-sm text-[var(--text-secondary)]">{shortcut.description}</span>
+                                    <div className="flex items-center gap-1">
+                                        {shortcut.keys.map((key, j) => (
+                                            <kbd 
+                                                key={j}
+                                                className="px-2 py-1 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded text-xs font-mono text-[var(--text-primary)]"
+                                            >
+                                                {key}
+                                            </kbd>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="px-6 py-3 border-t border-[var(--border-light)] bg-[var(--bg-tertiary)]">
+                            <p className="text-xs text-[var(--text-tertiary)] text-center">
+                                Use Ctrl instead of ⌘ on Windows/Linux
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Undo Toast */}
+            {showUndoToast && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-slide-up">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-xl">
+                        <ArrowCounterClockwise size={18} className="text-[var(--text-tertiary)]" />
+                        <span className="text-sm text-[var(--text-primary)]">{lastUndoAction}</span>
+                        <button
+                            onClick={handleUndo}
+                            className="px-3 py-1 text-sm font-medium text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 rounded-lg transition-colors"
+                        >
+                            Undo
+                        </button>
+                        <button
+                            onClick={() => setShowUndoToast(false)}
+                            className="p-1 hover:bg-[var(--bg-tertiary)] rounded transition-colors"
+                        >
+                            <X size={14} className="text-[var(--text-tertiary)]" />
+                        </button>
                     </div>
                 </div>
             )}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft, Folder } from '@phosphor-icons/react';
+import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft, Folder, Star, Export, Tag, FileText } from '@phosphor-icons/react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { API_BASE } from '../config';
 import { Entity, Property } from '../types';
@@ -14,6 +14,46 @@ interface KnowledgeFolder {
     entityIds: string[];
     documentIds: string[];
 }
+
+// Generate clean, concise chat title from user input
+const generateChatTitle = (input: string): string => {
+    let title = input.trim();
+    
+    // Remove folder contents: "#Folder (contains: @entity1, @entity2)" -> "#Folder"
+    title = title.replace(/\s*\(contains:[^)]*\)/gi, '');
+    
+    // Remove "(empty folder)" text
+    title = title.replace(/\s*\(empty folder\)/gi, '');
+    
+    // Extract first meaningful phrase (before punctuation or newline)
+    const firstLine = title.split(/[.!?\n]/)[0].trim();
+    
+    // If starts with @ or #, keep the first mention and add context if short
+    if (firstLine.startsWith('@') || firstLine.startsWith('#')) {
+        const mentions = firstLine.match(/[@#][^\s@#,]+/g) || [];
+        if (mentions.length > 0) {
+            // Take first 2-3 mentions max
+            const limitedMentions = mentions.slice(0, 3).join(' ');
+            return limitedMentions.length > 40 ? limitedMentions.slice(0, 40) + '...' : limitedMentions;
+        }
+    }
+    
+    // For normal text, take first ~40 chars of meaningful content
+    const cleanTitle = firstLine
+        .replace(/\s+/g, ' ')  // Normalize whitespace
+        .slice(0, 45);
+    
+    // Don't cut words in half
+    if (cleanTitle.length === 45 && firstLine.length > 45) {
+        const lastSpace = cleanTitle.lastIndexOf(' ');
+        if (lastSpace > 20) {
+            return cleanTitle.slice(0, lastSpace) + '...';
+        }
+        return cleanTitle + '...';
+    }
+    
+    return cleanTitle || 'New Chat';
+};
 
 // Intemic Logo Icon Component
 const IntemicIcon: React.FC<{ size?: number; className?: string }> = ({ size = 14, className = '' }) => {
@@ -71,7 +111,21 @@ interface Chat {
     updatedAt: Date;
     instructions?: string;
     allowedEntities?: string[];
+    isFavorite?: boolean;
+    tags?: string[];
 }
+
+// Predefined tag colors
+const TAG_COLORS: Record<string, string> = {
+    'work': '#3B82F6',
+    'personal': '#8B5CF6',
+    'research': '#10B981',
+    'important': '#EF4444',
+    'archive': '#6B7280',
+    'project': '#F59E0B',
+    'ideas': '#EC4899',
+    'default': '#256A65'
+};
 
 export const Copilots: React.FC = () => {
     const navigate = useNavigate();
@@ -96,6 +150,14 @@ export const Copilots: React.FC = () => {
     const [editingChatId, setEditingChatId] = useState<string | null>(null);
     const [editingInstructions, setEditingInstructions] = useState('');
     const [editingEntities, setEditingEntities] = useState<string[]>([]);
+    
+    // Favorites, Tags & Export state
+    const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+    const [filterTag, setFilterTag] = useState<string | null>(null);
+    const [showTagMenu, setShowTagMenu] = useState<string | null>(null);
+    const [newTagInput, setNewTagInput] = useState('');
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [allTags, setAllTags] = useState<string[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const titleInputRef = useRef<HTMLInputElement>(null);
@@ -228,7 +290,9 @@ export const Copilots: React.FC = () => {
                         createdAt: chat.createdAt ? (chat.createdAt instanceof Date ? chat.createdAt.toISOString() : chat.createdAt) : new Date().toISOString(),
                         updatedAt: chat.updatedAt ? (chat.updatedAt instanceof Date ? chat.updatedAt.toISOString() : chat.updatedAt) : new Date().toISOString(),
                         instructions: chat.instructions || null,
-                        allowedEntities: Array.isArray(chat.allowedEntities) && chat.allowedEntities.length > 0 ? chat.allowedEntities : null
+                        allowedEntities: Array.isArray(chat.allowedEntities) && chat.allowedEntities.length > 0 ? chat.allowedEntities : null,
+                        isFavorite: chat.isFavorite || false,
+                        tags: Array.isArray(chat.tags) && chat.tags.length > 0 ? chat.tags : null
                     };
                     
                     // Try PUT first, if it fails (404), try POST
@@ -277,6 +341,8 @@ export const Copilots: React.FC = () => {
                             updatedAt: chat.updatedAt ? new Date(chat.updatedAt) : new Date(),
                             instructions: chat.instructions || undefined,
                             allowedEntities: Array.isArray(chat.allowedEntities) ? chat.allowedEntities : [],
+                            isFavorite: chat.isFavorite || false,
+                            tags: Array.isArray(chat.tags) ? chat.tags : [],
                             messages: Array.isArray(chat.messages) ? chat.messages.map((msg: any) => ({
                                 id: msg.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                                 role: msg.role,
@@ -320,7 +386,9 @@ export const Copilots: React.FC = () => {
                 createdAt: chat.createdAt ? (chat.createdAt instanceof Date ? chat.createdAt.toISOString() : chat.createdAt) : new Date().toISOString(),
                 updatedAt: chat.updatedAt ? (chat.updatedAt instanceof Date ? chat.updatedAt.toISOString() : chat.updatedAt) : new Date().toISOString(),
                 instructions: chat.instructions || null,
-                allowedEntities: Array.isArray(chat.allowedEntities) && chat.allowedEntities.length > 0 ? chat.allowedEntities : null
+                allowedEntities: Array.isArray(chat.allowedEntities) && chat.allowedEntities.length > 0 ? chat.allowedEntities : null,
+                isFavorite: chat.isFavorite || false,
+                tags: Array.isArray(chat.tags) && chat.tags.length > 0 ? chat.tags : null
             };
             
             const response = await fetch(`${API_BASE}/copilot/chats/${chat.id}`, {
@@ -483,6 +551,108 @@ export const Copilots: React.FC = () => {
         }
     };
 
+    // Toggle favorite status
+    const toggleFavorite = async (chatId: string) => {
+        const chat = chats.find(c => c.id === chatId);
+        if (!chat) return;
+        
+        const updatedChat = { ...chat, isFavorite: !chat.isFavorite };
+        setChats(prev => prev.map(c => c.id === chatId ? updatedChat : c));
+        saveChat(updatedChat);
+    };
+
+    // Add tag to chat
+    const addTagToChat = async (chatId: string, tag: string) => {
+        const chat = chats.find(c => c.id === chatId);
+        if (!chat) return;
+        
+        const normalizedTag = tag.toLowerCase().trim();
+        if (!normalizedTag) return;
+        
+        const currentTags = chat.tags || [];
+        if (currentTags.includes(normalizedTag)) return;
+        
+        const updatedChat = { ...chat, tags: [...currentTags, normalizedTag] };
+        setChats(prev => prev.map(c => c.id === chatId ? updatedChat : c));
+        
+        // Update allTags
+        if (!allTags.includes(normalizedTag)) {
+            setAllTags(prev => [...prev, normalizedTag]);
+        }
+        
+        saveChat(updatedChat);
+        setNewTagInput('');
+    };
+
+    // Remove tag from chat
+    const removeTagFromChat = async (chatId: string, tag: string) => {
+        const chat = chats.find(c => c.id === chatId);
+        if (!chat || !chat.tags) return;
+        
+        const updatedChat = { ...chat, tags: chat.tags.filter(t => t !== tag) };
+        setChats(prev => prev.map(c => c.id === chatId ? updatedChat : c));
+        saveChat(updatedChat);
+    };
+
+    // Export conversation
+    const exportConversation = (format: 'markdown' | 'txt' | 'json') => {
+        const chat = currentChat;
+        if (!chat) return;
+        
+        let content = '';
+        let filename = `${chat.title.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}`;
+        let mimeType = 'text/plain';
+        
+        if (format === 'markdown') {
+            content = `# ${chat.title}\n\n`;
+            content += `*Exported: ${new Date().toLocaleString()}*\n\n---\n\n`;
+            chat.messages.forEach(msg => {
+                const role = msg.role === 'user' ? '**You**' : '**Copilot**';
+                content += `### ${role}\n\n${msg.content}\n\n---\n\n`;
+            });
+            filename += '.md';
+            mimeType = 'text/markdown';
+        } else if (format === 'txt') {
+            content = `${chat.title}\n${'='.repeat(chat.title.length)}\n\n`;
+            content += `Exported: ${new Date().toLocaleString()}\n\n`;
+            chat.messages.forEach(msg => {
+                const role = msg.role === 'user' ? 'You' : 'Copilot';
+                content += `[${role}]\n${msg.content}\n\n`;
+            });
+            filename += '.txt';
+        } else if (format === 'json') {
+            content = JSON.stringify({
+                title: chat.title,
+                exportedAt: new Date().toISOString(),
+                messages: chat.messages.map(m => ({
+                    role: m.role,
+                    content: m.content,
+                    timestamp: m.timestamp
+                }))
+            }, null, 2);
+            filename += '.json';
+            mimeType = 'application/json';
+        }
+        
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        setShowExportModal(false);
+    };
+
+    // Update allTags when chats change
+    useEffect(() => {
+        const tags = new Set<string>();
+        chats.forEach(chat => {
+            chat.tags?.forEach(tag => tags.add(tag));
+        });
+        setAllTags(Array.from(tags));
+    }, [chats]);
+
     const toggleExplanation = (messageId: string) => {
         setExpandedExplanations(prev => {
             const newSet = new Set(prev);
@@ -518,8 +688,8 @@ export const Copilots: React.FC = () => {
             ...currentChat,
             messages: [...currentChat.messages, userMessage],
             updatedAt: new Date(),
-            // Auto-generate title from first user message
-            title: currentChat.messages.length === 1 ? input.trim().slice(0, 50) : currentChat.title
+            // Auto-generate title from first user message (clean & concise)
+            title: currentChat.messages.length === 1 ? generateChatTitle(input) : currentChat.title
         };
 
         // Use currentChat.id instead of activeChat to ensure we update the correct chat
@@ -878,9 +1048,26 @@ export const Copilots: React.FC = () => {
 
     const chatQuery = new URLSearchParams(location.search).get('q')?.toLowerCase() || '';
     const chatIdParam = new URLSearchParams(location.search).get('chatId');
-    const filteredChats = (chatQuery || chatSearchQuery)
-        ? chats.filter(chat => chat.title.toLowerCase().includes((chatQuery || chatSearchQuery).toLowerCase()))
-        : chats;
+    
+    // Filter and sort chats
+    const filteredChats = chats
+        .filter(chat => {
+            // Search filter
+            const searchMatch = !chatQuery && !chatSearchQuery || 
+                chat.title.toLowerCase().includes((chatQuery || chatSearchQuery).toLowerCase());
+            // Favorites filter
+            const favMatch = !showFavoritesOnly || chat.isFavorite;
+            // Tag filter
+            const tagMatch = !filterTag || chat.tags?.includes(filterTag);
+            return searchMatch && favMatch && tagMatch;
+        })
+        .sort((a, b) => {
+            // Favorites first
+            if (a.isFavorite && !b.isFavorite) return -1;
+            if (!a.isFavorite && b.isFavorite) return 1;
+            // Then by date
+            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        });
 
     useEffect(() => {
         if (chatIdParam && chats.some(chat => chat.id === chatIdParam)) {
@@ -987,16 +1174,37 @@ export const Copilots: React.FC = () => {
                         )}
                     </div>
                 </div>
-                {/* Edit Configuration Button */}
+                {/* Action Buttons */}
                 {currentChat && (
-                    <button
-                        onClick={() => openEditModal(currentChat.id)}
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]/30 rounded-lg transition-colors duration-200 ease-in-out"
-                        title="Edit copilot configuration"
-                    >
-                        <GearSix size={14} className="text-[var(--text-secondary)]" weight="light" />
-                        <span>Edit Configuration</span>
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setShowExportModal(true)}
+                            className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]/30 rounded-lg transition-colors"
+                            title="Export conversation"
+                        >
+                            <Export size={14} />
+                            <span className="hidden sm:inline">Export</span>
+                        </button>
+                        <button
+                            onClick={() => toggleFavorite(currentChat.id)}
+                            className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
+                                currentChat.isFavorite 
+                                    ? 'text-amber-500' 
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]/30'
+                            }`}
+                            title={currentChat.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                        >
+                            <Star size={14} weight={currentChat.isFavorite ? "fill" : "regular"} />
+                        </button>
+                        <button
+                            onClick={() => openEditModal(currentChat.id)}
+                            className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]/30 rounded-lg transition-colors"
+                            title="Edit copilot configuration"
+                        >
+                            <GearSix size={14} />
+                            <span className="hidden sm:inline">Configure</span>
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -1037,6 +1245,52 @@ export const Copilots: React.FC = () => {
                             <Sparkle size={14} className="mr-2" weight="light" />
                             New Copilot
                         </button>
+                        
+                        {/* Filter Pills */}
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            <button
+                                onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                                className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
+                                    showFavoritesOnly 
+                                        ? 'bg-amber-500/20 text-amber-500' 
+                                        : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]'
+                                }`}
+                            >
+                                <Star size={12} weight={showFavoritesOnly ? "fill" : "regular"} />
+                                Favorites
+                            </button>
+                            {allTags.length > 0 && (
+                                <div className="flex items-center gap-1 flex-wrap">
+                                    {allTags.slice(0, 3).map(tag => (
+                                        <button
+                                            key={tag}
+                                            onClick={() => setFilterTag(filterTag === tag ? null : tag)}
+                                            className={`px-2 py-1 rounded-md text-xs transition-colors ${
+                                                filterTag === tag 
+                                                    ? 'text-white' 
+                                                    : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]'
+                                            }`}
+                                            style={{ 
+                                                backgroundColor: filterTag === tag ? (TAG_COLORS[tag] || TAG_COLORS.default) : undefined 
+                                            }}
+                                        >
+                                            #{tag}
+                                        </button>
+                                    ))}
+                                    {allTags.length > 3 && (
+                                        <span className="text-xs text-[var(--text-tertiary)]">+{allTags.length - 3}</span>
+                                    )}
+                                </div>
+                            )}
+                            {(showFavoritesOnly || filterTag) && (
+                                <button
+                                    onClick={() => { setShowFavoritesOnly(false); setFilterTag(null); }}
+                                    className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                                >
+                                    Clear
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {/* Chat List */}
@@ -1051,6 +1305,10 @@ export const Copilots: React.FC = () => {
                                 }`}
                                 onClick={() => setActiveChat(chat.id)}
                             >
+                                {/* Favorite Star */}
+                                {chat.isFavorite && (
+                                    <Star size={12} weight="fill" className="absolute top-1.5 left-1.5 text-amber-500" />
+                                )}
                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                                     activeChat === chat.id
                                         ? 'bg-[var(--bg-selected)] text-white'
@@ -1060,11 +1318,105 @@ export const Copilots: React.FC = () => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-normal truncate text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>{chat.title}</p>
-                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                                        {chat.messages.length} {chat.messages.length === 1 ? 'message' : 'messages'}
-                                    </p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-xs text-[var(--text-secondary)]">
+                                            {chat.messages.length} {chat.messages.length === 1 ? 'msg' : 'msgs'}
+                                        </span>
+                                        {chat.tags && chat.tags.length > 0 && (
+                                            <div className="flex items-center gap-1">
+                                                {chat.tags.slice(0, 2).map(tag => (
+                                                    <span 
+                                                        key={tag} 
+                                                        className="px-1.5 py-0.5 rounded text-[10px] text-white"
+                                                        style={{ backgroundColor: TAG_COLORS[tag] || TAG_COLORS.default }}
+                                                    >
+                                                        {tag}
+                                                    </span>
+                                                ))}
+                                                {chat.tags.length > 2 && (
+                                                    <span className="text-[10px] text-[var(--text-tertiary)]">+{chat.tags.length - 2}</span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleFavorite(chat.id);
+                                        }}
+                                        className={`p-1.5 rounded transition-all ${chat.isFavorite ? 'text-amber-500' : 'hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)]'}`}
+                                        title={chat.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                                    >
+                                        <Star size={14} weight={chat.isFavorite ? "fill" : "regular"} />
+                                    </button>
+                                    <div className="relative">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowTagMenu(showTagMenu === chat.id ? null : chat.id);
+                                            }}
+                                            className="p-1.5 hover:bg-[var(--bg-hover)] rounded transition-all"
+                                            title="Add tag"
+                                        >
+                                            <Tag size={14} className="text-[var(--text-tertiary)]" />
+                                        </button>
+                                        {showTagMenu === chat.id && (
+                                            <>
+                                                <div className="fixed inset-0 z-40" onClick={() => setShowTagMenu(null)} />
+                                                <div className="absolute right-0 top-8 w-40 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl z-50 p-2">
+                                                    <input
+                                                        type="text"
+                                                        value={newTagInput}
+                                                        onChange={(e) => setNewTagInput(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                addTagToChat(chat.id, newTagInput);
+                                                            }
+                                                        }}
+                                                        placeholder="New tag..."
+                                                        className="w-full px-2 py-1 text-xs bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mb-2"
+                                                        autoFocus
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                    {allTags.filter(t => !chat.tags?.includes(t)).slice(0, 5).map(tag => (
+                                                        <button
+                                                            key={tag}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                addTagToChat(chat.id, tag);
+                                                                setShowTagMenu(null);
+                                                            }}
+                                                            className="w-full text-left px-2 py-1 text-xs hover:bg-[var(--bg-tertiary)] rounded flex items-center gap-2"
+                                                        >
+                                                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: TAG_COLORS[tag] || TAG_COLORS.default }} />
+                                                            {tag}
+                                                        </button>
+                                                    ))}
+                                                    {chat.tags && chat.tags.length > 0 && (
+                                                        <>
+                                                            <div className="border-t border-[var(--border-light)] my-1" />
+                                                            <p className="text-[10px] text-[var(--text-tertiary)] px-2 mb-1">Remove:</p>
+                                                            {chat.tags.map(tag => (
+                                                                <button
+                                                                    key={tag}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        removeTagFromChat(chat.id, tag);
+                                                                    }}
+                                                                    className="w-full text-left px-2 py-1 text-xs hover:bg-red-50 text-red-500 rounded flex items-center gap-2"
+                                                                >
+                                                                    <X size={10} />
+                                                                    {tag}
+                                                                </button>
+                                                            ))}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -1073,7 +1425,7 @@ export const Copilots: React.FC = () => {
                                         className="p-1.5 hover:bg-[var(--bg-hover)] rounded transition-all"
                                         title="Edit configuration"
                                     >
-                                        <GearSix size={14} className="text-[var(--text-secondary)]" weight="light" />
+                                        <GearSix size={14} className="text-[var(--text-tertiary)]" />
                                     </button>
                                     <button
                                         onClick={(e) => {
@@ -1082,7 +1434,7 @@ export const Copilots: React.FC = () => {
                                         }}
                                         className="p-1.5 hover:bg-red-50 rounded transition-all"
                                     >
-                                        <Trash size={14} className="text-red-500" weight="light" />
+                                        <Trash size={14} className="text-red-500" />
                                     </button>
                                 </div>
                             </div>
@@ -1167,7 +1519,7 @@ export const Copilots: React.FC = () => {
                                                                     )}
                                                                     <span className={item._type === 'folder' ? 'font-medium' : ''}>{item.name}</span>
                                                                     {item._type === 'folder' && (
-                                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 ml-auto">
+                                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 ml-auto">
                                                                             {(item as KnowledgeFolder).entityIds.length} entities
                                                                         </span>
                                                                     )}
@@ -1400,7 +1752,7 @@ export const Copilots: React.FC = () => {
                                                         )}
                                                         <span className={item._type === 'folder' ? 'font-medium' : ''}>{item.name}</span>
                                                         {item._type === 'folder' && (
-                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 ml-auto">
+                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 ml-auto">
                                                                 {(item as KnowledgeFolder).entityIds.length} entities
                                                             </span>
                                                         )}
@@ -1762,6 +2114,69 @@ export const Copilots: React.FC = () => {
                             >
                                 <Check size={14} weight="light" />
                                 Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Export Modal */}
+            {showExportModal && currentChat && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowExportModal(false)}>
+                    <div className="bg-[var(--bg-card)] rounded-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="px-6 py-4 border-b border-[var(--border-light)] flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-[var(--accent-primary)]/10 flex items-center justify-center">
+                                    <Export size={20} className="text-[var(--accent-primary)]" />
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-medium text-[var(--text-primary)]">Export Conversation</h2>
+                                    <p className="text-xs text-[var(--text-tertiary)]">{currentChat.messages.length} messages</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowExportModal(false)}
+                                className="p-1.5 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                            >
+                                <X size={18} className="text-[var(--text-tertiary)]" />
+                            </button>
+                        </div>
+                        <div className="p-4 space-y-2">
+                            <button
+                                onClick={() => exportConversation('markdown')}
+                                className="w-full flex items-center gap-3 p-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-selected)] hover:text-white rounded-xl transition-colors text-left group"
+                            >
+                                <div className="w-10 h-10 rounded-lg bg-purple-500/10 group-hover:bg-purple-500/20 flex items-center justify-center">
+                                    <FileText size={18} className="text-purple-500" />
+                                </div>
+                                <div>
+                                    <p className="font-medium text-sm">Markdown</p>
+                                    <p className="text-xs text-[var(--text-tertiary)] group-hover:text-white/70">Formatted for docs & notes</p>
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => exportConversation('txt')}
+                                className="w-full flex items-center gap-3 p-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-selected)] hover:text-white rounded-xl transition-colors text-left group"
+                            >
+                                <div className="w-10 h-10 rounded-lg bg-blue-500/10 group-hover:bg-blue-500/20 flex items-center justify-center">
+                                    <FileText size={18} className="text-blue-500" />
+                                </div>
+                                <div>
+                                    <p className="font-medium text-sm">Plain Text</p>
+                                    <p className="text-xs text-[var(--text-tertiary)] group-hover:text-white/70">Simple readable format</p>
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => exportConversation('json')}
+                                className="w-full flex items-center gap-3 p-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-selected)] hover:text-white rounded-xl transition-colors text-left group"
+                            >
+                                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 group-hover:bg-emerald-500/20 flex items-center justify-center">
+                                    <Database size={18} className="text-emerald-500" />
+                                </div>
+                                <div>
+                                    <p className="font-medium text-sm">JSON</p>
+                                    <p className="text-xs text-[var(--text-tertiary)] group-hover:text-white/70">Structured data export</p>
+                                </div>
                             </button>
                         </div>
                     </div>

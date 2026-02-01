@@ -183,6 +183,19 @@ async function login(req, res) {
 
         res.cookie('auth_token', token, COOKIE_OPTIONS);
 
+        // Log login activity
+        try {
+            const logId = Math.random().toString(36).substr(2, 9);
+            await db.run(
+                `INSERT INTO audit_logs (id, organizationId, userId, userName, userEmail, action, resourceType, resourceId, resourceName, ipAddress, userAgent, createdAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [logId, userOrg.organizationId, user.id, user.name, user.email, 'login', 'user', user.id, user.name, 
+                 req.ip || req.headers['x-forwarded-for'], req.headers['user-agent'], new Date().toISOString()]
+            );
+        } catch (logErr) {
+            console.error('Error logging login:', logErr);
+        }
+
         res.json({ message: 'Logged in', user: { id: user.id, name: user.name, email: user.email, orgId: userOrg.organizationId, profilePhoto: user.profilePhoto, companyRole: user.companyRole, isAdmin: !!user.isAdmin, onboardingCompleted: !!user.onboardingCompleted } });
 
     } catch (error) {
@@ -416,6 +429,19 @@ async function inviteUser(req, res) {
         } catch (emailError) {
             console.error('[Auth] Failed to send invitation email:', emailError);
             // Don't fail the invitation if email fails
+        }
+
+        // Log invite activity
+        try {
+            const logId = Math.random().toString(36).substr(2, 9);
+            await db.run(
+                `INSERT INTO audit_logs (id, organizationId, userId, userName, userEmail, action, resourceType, resourceId, resourceName, details, ipAddress, userAgent, createdAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [logId, orgId, inviterId, inviter?.name, req.user.email, 'invite', 'user', inviteId, email, 
+                 JSON.stringify({ organizationName: org?.name }), req.ip || req.headers['x-forwarded-for'], req.headers['user-agent'], new Date().toISOString()]
+            );
+        } catch (logErr) {
+            console.error('Error logging invite:', logErr);
         }
 
         res.json({ message: 'Invitation email sent', added: false });

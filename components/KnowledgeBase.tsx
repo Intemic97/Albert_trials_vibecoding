@@ -4,7 +4,7 @@ import {
     Database, Plus, MagnifyingGlass, Funnel, X, FileText, Folder, FolderPlus, 
     UploadSimple, Table, SpinnerGap, File, DownloadSimple, Trash, Eye, 
     Link as LinkIcon, Copy, Check, PencilSimple, Calendar, Tag, CaretRight,
-    FolderOpen, House, GridFour, List, SortAscending, DotsThree
+    FolderOpen, House, GridFour, List, SortAscending, DotsThree, TreeStructure
 } from '@phosphor-icons/react';
 import { Entity } from '../types';
 import { EntityCard } from './EntityCard';
@@ -14,6 +14,7 @@ import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../hooks/useNotifications';
 import { ToastContainer } from './ui/Toast';
+import { KnowledgeGraph } from './KnowledgeGraph';
 
 interface KnowledgeBaseProps {
     entities: Entity[];
@@ -58,6 +59,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
     const [sortBy, setSortBy] = useState<SortBy>('name');
+    const [showKnowledgeGraph, setShowKnowledgeGraph] = useState(false);
     
     // Data state
     const [folders, setFolders] = useState<Folder[]>([]);
@@ -551,6 +553,16 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         <div className="flex flex-col h-full bg-[var(--bg-primary)]" data-tutorial="database-content">
             <ToastContainer notifications={notifications} onDismiss={removeNotification} />
             
+            {/* Knowledge Graph Modal */}
+            {showKnowledgeGraph && (
+                <KnowledgeGraph
+                    entities={entities}
+                    folders={folders}
+                    onNavigate={onNavigate}
+                    onClose={() => setShowKnowledgeGraph(false)}
+                />
+            )}
+            
             {/* Header */}
             <div className="px-8 pt-6 pb-4 bg-[var(--bg-primary)] border-b border-[var(--border-light)]">
                 <div className="flex items-center justify-between mb-4">
@@ -563,6 +575,15 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setShowKnowledgeGraph(true)}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-violet-500/10 hover:bg-violet-500/20 text-violet-500 rounded-lg text-xs font-medium transition-colors"
+                            title="View knowledge graph"
+                        >
+                            <TreeStructure size={14} weight="light" />
+                            Knowledge Graph
+                        </button>
+                        <div className="w-px h-5 bg-[var(--border-light)]" />
                         <button
                             onClick={() => setIsCreatingEntity(true)}
                             className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] rounded-lg text-xs font-medium text-[var(--text-primary)] transition-colors"
@@ -739,7 +760,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                         </button>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder); }}
-                                                            className="p-1 hover:bg-red-50 rounded text-red-500"
+                                                            className="p-1 hover:bg-red-500/10 rounded text-red-500"
                                                             title="Delete folder"
                                                         >
                                                             <Trash size={12} weight="light" />
@@ -804,12 +825,12 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc.id); }}
-                                                            className="p-1 hover:bg-red-50 rounded text-red-500"
+                                                            className="p-1 hover:bg-red-500/10 rounded text-red-500"
                                                         >
                                                             <Trash size={12} weight="light" />
                                                         </button>
                                                     </div>
-                                                    <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center mb-3">
+                                                    <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center mb-3">
                                                         <FileText size={20} weight="light" className="text-blue-500" />
                                                     </div>
                                                     <h4 className="text-sm font-medium text-[var(--text-primary)] truncate mb-1">{doc.name}</h4>
@@ -850,7 +871,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                             <button onClick={(e) => { e.stopPropagation(); setEditingFolder(folder); }} className="p-1 hover:bg-[var(--bg-tertiary)] rounded" title="Edit folder">
                                                 <PencilSimple size={14} weight="light" className="text-[var(--text-secondary)]" />
                                             </button>
-                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder); }} className="p-1 hover:bg-red-50 rounded" title="Delete folder">
+                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder); }} className="p-1 hover:bg-red-500/10 rounded" title="Delete folder">
                                                 <Trash size={14} weight="light" className="text-red-500" />
                                             </button>
                                         </div>
@@ -870,7 +891,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                         <span className="flex-1 text-sm text-[var(--text-primary)]">{entity.name}</span>
                                         <span className="text-xs text-[var(--text-tertiary)]">{entity.properties?.length || 0} properties</span>
                                         <div className="opacity-0 group-hover:opacity-100 flex gap-1">
-                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteEntity(entity); }} className="p-1 hover:bg-red-50 rounded">
+                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteEntity(entity); }} className="p-1 hover:bg-red-500/10 rounded">
                                                 <Trash size={14} weight="light" className="text-red-500" />
                                             </button>
                                         </div>
@@ -889,7 +910,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                         <span className="flex-1 text-sm text-[var(--text-primary)]">{doc.name}</span>
                                         <span className="text-xs text-[var(--text-tertiary)]">{doc.type}</span>
                                         <div className="opacity-0 group-hover:opacity-100 flex gap-1">
-                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc.id); }} className="p-1 hover:bg-red-50 rounded">
+                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc.id); }} className="p-1 hover:bg-red-500/10 rounded">
                                                 <Trash size={14} weight="light" className="text-red-500" />
                                             </button>
                                         </div>
