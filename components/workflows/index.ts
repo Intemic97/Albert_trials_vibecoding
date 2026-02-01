@@ -179,3 +179,10 @@ export { WorkflowToolbar } from './WorkflowToolbar';
 
 // Data Preview Panel - Preview de datos en tiempo real
 export { DataPreviewPanel, InlineDataPreview } from './DataPreviewPanel';
+
+// ============================================================================
+// MODULAR COMPONENTS (Zustand-based)
+// ============================================================================
+
+// Workflow Canvas - Canvas principal con stores de Zustand
+export { WorkflowCanvas } from './WorkflowCanvas';
