@@ -36,8 +36,9 @@ import {
   WorkflowRunnerModal,
 } from './modals';
 
-// Types
+// Types & Constants
 import type { WorkflowNode, Connection } from './types';
+import { DRAGGABLE_ITEMS } from './constants';
 
 interface WorkflowEditorProps {
   entities?: any[];
@@ -71,6 +72,8 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
   const setWorkflowMeta = useWorkflowStore(state => state.setWorkflowMeta);
   const setNodes = useWorkflowStore(state => state.setNodes);
   const setConnections = useWorkflowStore(state => state.setConnections);
+  const addNode = useWorkflowStore(state => state.addNode);
+  const selectNode = useWorkflowStore(state => state.selectNode);
   const updateNode = useWorkflowStore(state => state.updateNode);
   const markAsSaved = useWorkflowStore(state => state.markAsSaved);
   const toggleSidebar = useWorkflowStore(state => state.toggleSidebar);
@@ -339,7 +342,36 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
         </div>
         
         {/* Canvas */}
-        <div className="flex-1 relative">
+        <div 
+          className="flex-1 relative"
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const itemType = e.dataTransfer.getData('application/workflow-node');
+            if (itemType) {
+              const item = DRAGGABLE_ITEMS.find((i) => i.type === itemType);
+              if (item) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const newNode: WorkflowNode = {
+                  id: generateUUID(),
+                  type: item.type as any,
+                  label: item.label,
+                  x: x,
+                  y: y,
+                  status: 'idle',
+                };
+                addNode(newNode);
+                selectNode(newNode.id);
+              }
+            }
+          }}
+        >
           <WorkflowCanvas
             entities={entities}
             isRunning={isRunning}

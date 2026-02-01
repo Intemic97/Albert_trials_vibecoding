@@ -197,21 +197,40 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   // =========================================================================
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = 'copy';
   }, []);
   
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    if (!canvasRef.current) return;
+    e.stopPropagation();
+    
+    console.log('Drop event triggered');
+    
+    if (!canvasRef.current) {
+      console.log('No canvas ref');
+      return;
+    }
     
     const itemType = e.dataTransfer.getData('application/workflow-node');
-    if (!itemType) return;
+    console.log('Item type from dataTransfer:', itemType);
+    
+    if (!itemType) {
+      console.log('No item type found');
+      return;
+    }
     
     const item = DRAGGABLE_ITEMS.find(i => i.type === itemType);
-    if (!item) return;
+    console.log('Found item:', item);
+    
+    if (!item) {
+      console.log('Item not found in DRAGGABLE_ITEMS');
+      return;
+    }
     
     const rect = canvasRef.current.getBoundingClientRect();
     const canvasPos = screenToCanvas(e.clientX, e.clientY, rect);
+    console.log('Canvas position:', canvasPos);
     
     const newNode: WorkflowNode = {
       id: generateUUID(),
@@ -222,6 +241,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
       status: 'idle',
     };
     
+    console.log('Adding node:', newNode);
     addNode(newNode);
     selectNode(newNode.id);
   }, [screenToCanvas, addNode, selectNode]);

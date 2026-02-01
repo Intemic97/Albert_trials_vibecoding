@@ -207,6 +207,7 @@ const PaletteItem: React.FC<PaletteItemProps> = ({ item, onDragStart, onDragEnd 
   const Icon = item.icon;
   
   const handleDragStart = (e: React.DragEvent) => {
+    console.log('Drag start:', item.type);
     e.dataTransfer.setData('application/workflow-node', item.type);
     e.dataTransfer.effectAllowed = 'copy';
     onDragStart(item);
