@@ -186,3 +186,9 @@ export { DataPreviewPanel, InlineDataPreview } from './DataPreviewPanel';
 
 // Workflow Canvas - Canvas principal con stores de Zustand
 export { WorkflowCanvas } from './WorkflowCanvas';
+
+// Workflow Editor - Editor completo modular
+export { WorkflowEditor } from './WorkflowEditor';
+
+// AI Assistant Panel - Panel de asistente IA
+export { AIAssistantPanel } from './AIAssistantPanel';

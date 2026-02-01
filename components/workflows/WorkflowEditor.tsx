@@ -29,6 +29,7 @@ import { generateUUID } from '../../utils/uuid';
 import { WorkflowCanvas } from './WorkflowCanvas';
 import { NodePalette } from './NodePalette';
 import { WorkflowToolbar } from './WorkflowToolbar';
+import { AIAssistantPanel } from './AIAssistantPanel';
 import { 
   ExecutionHistoryModal, 
   TemplatesGalleryModal,
@@ -334,13 +335,22 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
         )}
         
         {/* Canvas */}
-        <WorkflowCanvas
-          entities={entities}
-          isRunning={isRunning}
-          onNodeConfigure={handleNodeConfigure}
-          onNodeRun={handleNodeRun}
-          onOpenAIAssistant={toggleAIAssistant}
-        />
+        <div className="flex-1 relative">
+          <WorkflowCanvas
+            entities={entities}
+            isRunning={isRunning}
+            onNodeConfigure={handleNodeConfigure}
+            onNodeRun={handleNodeRun}
+            onOpenAIAssistant={toggleAIAssistant}
+          />
+          
+          {/* AI Assistant Panel */}
+          <AIAssistantPanel
+            isOpen={ui.showAIAssistant}
+            onClose={toggleAIAssistant}
+            entities={entities}
+          />
+        </div>
       </div>
       
       {/* Modals */}
