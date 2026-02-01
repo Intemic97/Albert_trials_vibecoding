@@ -27,7 +27,7 @@ const Overview = React.lazy(() => import('./components/Overview').then(m => ({ d
 const Reporting = React.lazy(() => import('./components/Reporting').then(m => ({ default: m.Reporting })));
 const Copilots = React.lazy(() => import('./components/Copilots').then(m => ({ default: m.Copilots })));
 const KnowledgeBase = React.lazy(() => import('./components/KnowledgeBase').then(m => ({ default: m.KnowledgeBase })));
-const Simulations = React.lazy(() => import('./components/Simulations').then(m => ({ default: m.Simulations })));
+const Lab = React.lazy(() => import('./components/Lab').then(m => ({ default: m.Lab })));
 const Settings = React.lazy(() => import('./components/Settings').then(m => ({ default: m.Settings })));
 const AdminPanel = React.lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
 const LogsAndAlerts = React.lazy(() => import('./components/LogsAndAlerts').then(m => ({ default: m.LogsAndAlerts })));
@@ -149,7 +149,7 @@ function AuthenticatedApp() {
     const getCurrentView = () => {
         const path = location.pathname;
         if (path.startsWith('/dashboard')) return 'dashboard';
-        if (path.startsWith('/simulations')) return 'simulations';
+        if (path.startsWith('/lab')) return 'lab';
         if (path.startsWith('/workflow')) return 'workflows';
         if (path.startsWith('/database')) return 'database';
         if (path.startsWith('/templates')) return 'templates';
@@ -175,7 +175,7 @@ function AuthenticatedApp() {
         const routes: Record<string, string> = {
             'overview': '/overview',
             'dashboard': '/dashboard',
-            'simulations': '/simulations',
+            'lab': '/lab',
             'workflows': '/workflows',
             'database': '/database',
             'reports': '/reports',
@@ -1020,8 +1020,8 @@ function AuthenticatedApp() {
                     <Route path="/admin" element={
                         <AdminPanel onNavigate={handleNavigate} />
                     } />
-                    <Route path="/simulations" element={
-                        <Simulations 
+                    <Route path="/lab" element={
+                        <Lab 
                             entities={entities} 
                             onNavigate={(entityId) => {
                                 setActiveEntityId(entityId);
@@ -1029,8 +1029,8 @@ function AuthenticatedApp() {
                             }}
                         />
                     } />
-                    <Route path="/simulations/:simulationId" element={
-                        <Simulations 
+                    <Route path="/lab/:simulationId" element={
+                        <Lab 
                             entities={entities} 
                             onNavigate={(entityId) => {
                                 setActiveEntityId(entityId);
@@ -1038,8 +1038,8 @@ function AuthenticatedApp() {
                             }}
                         />
                     } />
-                    <Route path="/simulations/:simulationId/scenarios/:scenarioId" element={
-                        <Simulations 
+                    <Route path="/lab/:simulationId/scenarios/:scenarioId" element={
+                        <Lab 
                             entities={entities} 
                             onNavigate={(entityId) => {
                                 setActiveEntityId(entityId);

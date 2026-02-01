@@ -104,13 +104,13 @@ const DOC_SECTIONS: DocSection[] = [
         ]
     },
     {
-        id: 'simulations',
-        title: 'Simulations',
+        id: 'lab',
+        title: 'Lab',
         icon: ChartLine,
         subsections: [
-            { id: 'create-simulation', title: 'Creating Simulations' },
-            { id: 'variables', title: 'Variables & Modifiers' },
-            { id: 'sensitivity', title: 'Sensitivity Analysis' },
+            { id: 'create-experiment', title: 'Creating Experiments' },
+            { id: 'variables', title: 'Variables & Parameters' },
+            { id: 'analysis', title: 'Analysis & Results' },
             { id: 'compare', title: 'Comparing Scenarios' }
         ]
     },
@@ -381,7 +381,7 @@ export const Documentation: React.FC = () => {
                                             ['Copilots', 'Create AI assistants with custom instructions and data access'],
                                             ['Dashboards', 'Visualize KPIs and metrics with configurable widgets'],
                                             ['Connections', 'Integrate with external databases and services'],
-                                            ['Simulations', 'Run scenario analysis and sensitivity testing']
+                                            ['Lab', 'Run experiments and scenario analysis']
                                         ]}
                                     />
                                 </div>
@@ -1089,37 +1089,37 @@ Guidelines:
                             </section>
 
                             {/* ================================================================== */}
-                            {/* SIMULATIONS */}
+                            {/* LAB */}
                             {/* ================================================================== */}
-                            <section id="simulations" className="mb-20">
+                            <section id="lab" className="mb-20">
                                 <div className="mb-8">
-                                    <h1 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-3">Simulations</h1>
+                                    <h1 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-3">Lab</h1>
                                     <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
-                                        Run scenario analysis and sensitivity testing on your data.
+                                        Run experiments and scenario analysis powered by workflows.
                                     </p>
                                 </div>
 
-                                {/* Creating Simulations */}
-                                <div id="simulations-create-simulation" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Creating Simulations</h2>
+                                {/* Creating Experiments */}
+                                <div id="lab-create-experiment" className="mb-12">
+                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Creating Experiments</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
-                                        Simulations let you model "what-if" scenarios by modifying entity data and observing the impact.
+                                        Lab experiments let you model "what-if" scenarios using workflows as the calculation engine.
                                     </p>
 
                                     <ol className="list-decimal pl-6 space-y-2 text-[var(--text-primary)] mb-4">
-                                        <li>Navigate to <strong>Simulations</strong> in the sidebar</li>
-                                        <li>Click <strong>New Simulation</strong></li>
-                                        <li>Select source entities for the simulation</li>
+                                        <li>Navigate to <strong>Lab</strong> in the sidebar</li>
+                                        <li>Click <strong>New Experiment</strong></li>
+                                        <li>Select a workflow to power the experiment</li>
                                         <li>Define variables (what you want to change)</li>
                                         <li>Create scenarios with different variable values</li>
                                         <li>Run the simulation and compare results</li>
                                     </ol>
                                 </div>
 
-                                {/* Variables & Modifiers */}
-                                <div id="simulations-variables" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Variables & Modifiers</h2>
-                                    <p className="text-[var(--text-primary)] mb-4">Variables are numeric properties you want to modify in your scenarios.</p>
+                                {/* Variables & Parameters */}
+                                <div id="lab-variables" className="mb-12">
+                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Variables & Parameters</h2>
+                                    <p className="text-[var(--text-primary)] mb-4">Parameters are extracted from workflow inputs and can be adjusted interactively.</p>
 
                                     <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Modifier Types</h3>
                                     <Table 
@@ -1132,9 +1132,9 @@ Guidelines:
                                     />
                                 </div>
 
-                                {/* Sensitivity Analysis */}
-                                <div id="simulations-sensitivity" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Sensitivity Analysis</h2>
+                                {/* Analysis & Results */}
+                                <div id="lab-analysis" className="mb-12">
+                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Analysis & Results</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
                                         Understand how changes in one variable affect outcomes by running sensitivity analysis.
                                     </p>
@@ -1146,7 +1146,7 @@ Guidelines:
                                 </div>
 
                                 {/* Comparing Scenarios */}
-                                <div id="simulations-compare" className="mb-12">
+                                <div id="lab-compare" className="mb-12">
                                     <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Comparing Scenarios</h2>
                                     <p className="text-[var(--text-primary)] mb-4">
                                         Create multiple scenarios within a simulation and compare them side-by-side:

@@ -3401,13 +3401,36 @@ app.get('/api/simulations', authenticateToken, async (req, res) => {
             [req.user.orgId]
         );
         
-        // Parse JSON fields
-        const parsed = simulations.map(s => ({
-            ...s,
-            sourceEntities: JSON.parse(s.sourceEntities || '[]'),
-            variables: JSON.parse(s.variables || '[]'),
-            scenarios: JSON.parse(s.scenariosData || '[]')
-        }));
+        // Parse JSON fields - support both old and new schema
+        const parsed = simulations.map(sim => {
+            // Try to parse new schema
+            try {
+                const data = JSON.parse(sim.sourceEntities || '{}');
+                if (data.workflowId) {
+                    return {
+                        id: sim.id,
+                        name: sim.name,
+                        description: sim.description,
+                        workflowId: data.workflowId,
+                        workflowName: data.workflowName,
+                        parameters: data.parameters || [],
+                        visualizations: data.visualizations || [],
+                        savedScenarios: data.savedScenarios || [],
+                        runs: data.runs || [],
+                        createdAt: sim.createdAt,
+                        updatedAt: sim.updatedAt
+                    };
+                }
+            } catch (e) {}
+            
+            // Old schema fallback
+            return {
+                ...sim,
+                sourceEntities: JSON.parse(sim.sourceEntities || '[]'),
+                variables: JSON.parse(sim.variables || '[]'),
+                scenarios: JSON.parse(sim.scenariosData || '[]')
+            };
+        });
         
         res.json(parsed);
     } catch (error) {
@@ -3419,20 +3442,41 @@ app.get('/api/simulations', authenticateToken, async (req, res) => {
 // Get single simulation
 app.get('/api/simulations/:id', authenticateToken, async (req, res) => {
     try {
-        const simulation = await db.get(
+        const sim = await db.get(
             'SELECT * FROM simulations WHERE id = ? AND organizationId = ?',
             [req.params.id, req.user.orgId]
         );
         
-        if (!simulation) {
+        if (!sim) {
             return res.status(404).json({ error: 'Simulation not found' });
         }
         
+        // Try to parse new schema
+        try {
+            const data = JSON.parse(sim.sourceEntities || '{}');
+            if (data.workflowId) {
+                return res.json({
+                    id: sim.id,
+                    name: sim.name,
+                    description: sim.description,
+                    workflowId: data.workflowId,
+                    workflowName: data.workflowName,
+                    parameters: data.parameters || [],
+                    visualizations: data.visualizations || [],
+                    savedScenarios: data.savedScenarios || [],
+                    runs: data.runs || [],
+                    createdAt: sim.createdAt,
+                    updatedAt: sim.updatedAt
+                });
+            }
+        } catch (e) {}
+        
+        // Old schema fallback
         res.json({
-            ...simulation,
-            sourceEntities: JSON.parse(simulation.sourceEntities || '[]'),
-            variables: JSON.parse(simulation.variables || '[]'),
-            scenarios: JSON.parse(simulation.scenariosData || '[]')
+            ...sim,
+            sourceEntities: JSON.parse(sim.sourceEntities || '[]'),
+            variables: JSON.parse(sim.variables || '[]'),
+            scenarios: JSON.parse(sim.scenariosData || '[]')
         });
     } catch (error) {
         console.error('Error fetching simulation:', error);
@@ -3443,9 +3487,25 @@ app.get('/api/simulations/:id', authenticateToken, async (req, res) => {
 // Create simulation
 app.post('/api/simulations', authenticateToken, async (req, res) => {
     try {
-        const { id, name, description, sourceEntities, variables, scenarios } = req.body;
+        const { 
+            id, name, description, 
+            // New schema fields
+            workflowId, workflowName, parameters, visualizations, savedScenarios, runs,
+            // Old schema fields (for backwards compatibility)
+            sourceEntities, variables, scenarios 
+        } = req.body;
         const now = new Date().toISOString();
         const simId = id || generateId();
+        
+        // Store new schema data in sourceEntities field as JSON
+        const dataToStore = workflowId ? {
+            workflowId,
+            workflowName,
+            parameters: parameters || [],
+            visualizations: visualizations || [],
+            savedScenarios: savedScenarios || [],
+            runs: runs || []
+        } : sourceEntities || [];
         
         await db.run(
             `INSERT INTO simulations (id, organizationId, name, description, sourceEntities, variables, scenariosData, createdAt, updatedAt) 
@@ -3455,7 +3515,7 @@ app.post('/api/simulations', authenticateToken, async (req, res) => {
                 req.user.orgId,
                 name,
                 description || '',
-                JSON.stringify(sourceEntities || []),
+                JSON.stringify(dataToStore),
                 JSON.stringify(variables || []),
                 JSON.stringify(scenarios || []),
                 now,
@@ -3463,16 +3523,33 @@ app.post('/api/simulations', authenticateToken, async (req, res) => {
             ]
         );
         
-        res.json({
-            id: simId,
-            name,
-            description,
-            sourceEntities: sourceEntities || [],
-            variables: variables || [],
-            scenarios: scenarios || [],
-            createdAt: now,
-            updatedAt: now
-        });
+        // Return appropriate response based on schema
+        if (workflowId) {
+            res.json({
+                id: simId,
+                name,
+                description,
+                workflowId,
+                workflowName,
+                parameters: parameters || [],
+                visualizations: visualizations || [],
+                savedScenarios: savedScenarios || [],
+                runs: runs || [],
+                createdAt: now,
+                updatedAt: now
+            });
+        } else {
+            res.json({
+                id: simId,
+                name,
+                description,
+                sourceEntities: sourceEntities || [],
+                variables: variables || [],
+                scenarios: scenarios || [],
+                createdAt: now,
+                updatedAt: now
+            });
+        }
     } catch (error) {
         console.error('Error creating simulation:', error);
         res.status(500).json({ error: 'Failed to create simulation' });
@@ -3482,7 +3559,13 @@ app.post('/api/simulations', authenticateToken, async (req, res) => {
 // Update simulation
 app.put('/api/simulations/:id', authenticateToken, async (req, res) => {
     try {
-        const { name, description, sourceEntities, variables, scenarios } = req.body;
+        const { 
+            name, description,
+            // New schema fields
+            workflowId, workflowName, parameters, visualizations, savedScenarios, runs,
+            // Old schema fields
+            sourceEntities, variables, scenarios 
+        } = req.body;
         const now = new Date().toISOString();
         
         // Verify ownership
@@ -3495,13 +3578,23 @@ app.put('/api/simulations/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Simulation not found' });
         }
         
+        // Store new schema data in sourceEntities field as JSON
+        const dataToStore = workflowId ? {
+            workflowId,
+            workflowName,
+            parameters: parameters || [],
+            visualizations: visualizations || [],
+            savedScenarios: savedScenarios || [],
+            runs: runs || []
+        } : sourceEntities || [];
+        
         await db.run(
             `UPDATE simulations SET name = ?, description = ?, sourceEntities = ?, variables = ?, scenariosData = ?, updatedAt = ? 
              WHERE id = ?`,
             [
                 name,
                 description || '',
-                JSON.stringify(sourceEntities || []),
+                JSON.stringify(dataToStore),
                 JSON.stringify(variables || []),
                 JSON.stringify(scenarios || []),
                 now,
@@ -3509,15 +3602,31 @@ app.put('/api/simulations/:id', authenticateToken, async (req, res) => {
             ]
         );
         
-        res.json({
-            id: req.params.id,
-            name,
-            description,
-            sourceEntities: sourceEntities || [],
-            variables: variables || [],
-            scenarios: scenarios || [],
-            updatedAt: now
-        });
+        // Return appropriate response based on schema
+        if (workflowId) {
+            res.json({
+                id: req.params.id,
+                name,
+                description,
+                workflowId,
+                workflowName,
+                parameters: parameters || [],
+                visualizations: visualizations || [],
+                savedScenarios: savedScenarios || [],
+                runs: runs || [],
+                updatedAt: now
+            });
+        } else {
+            res.json({
+                id: req.params.id,
+                name,
+                description,
+                sourceEntities: sourceEntities || [],
+                variables: variables || [],
+                scenarios: scenarios || [],
+                updatedAt: now
+            });
+        }
     } catch (error) {
         console.error('Error updating simulation:', error);
         res.status(500).json({ error: 'Failed to update simulation' });
@@ -3542,6 +3651,113 @@ app.delete('/api/simulations/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Error deleting simulation:', error);
         res.status(500).json({ error: 'Failed to delete simulation' });
+    }
+});
+
+// Simulation Chat Assistant
+app.post('/api/simulations/chat', authenticateToken, async (req, res) => {
+    try {
+        const { simulationName, parameters, lastResult, userQuery } = req.body;
+        
+        // Build context for the AI
+        const parameterContext = parameters.map(p => 
+            `- ${p.name}: ${p.currentValue}${p.unit || ''} (rango: ${p.min ?? 'sin min'} - ${p.max ?? 'sin max'})`
+        ).join('\n');
+        
+        const resultContext = lastResult 
+            ? `Último resultado de la simulación:\n${JSON.stringify(lastResult, null, 2)}`
+            : 'No hay resultados previos de simulación.';
+        
+        const systemPrompt = `Eres un asistente de simulaciones interactivas. 
+Tu rol es ayudar al usuario a entender y ajustar los parámetros de la simulación "${simulationName}".
+
+Parámetros disponibles:
+${parameterContext}
+
+${resultContext}
+
+Puedes realizar las siguientes acciones:
+1. Ajustar parámetros: Responde con { "action": { "type": "set_parameter", "data": { "variable": "nombre_variable", "value": nuevo_valor } } }
+2. Ejecutar simulación: Responde con { "action": { "type": "run_simulation", "data": {} } }
+3. Simplemente responder preguntas sobre los resultados o sugerir cambios.
+
+Responde siempre en español y de forma concisa. Si el usuario pide cambiar un parámetro, incluye la acción correspondiente.`;
+
+        // Call OpenAI or return a simulated response
+        const openaiKey = process.env.OPENAI_API_KEY;
+        
+        if (openaiKey) {
+            const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${openaiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userQuery }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 500
+                })
+            });
+            
+            if (openaiRes.ok) {
+                const data = await openaiRes.json();
+                const content = data.choices[0]?.message?.content || '';
+                
+                // Try to extract action from response
+                let action = null;
+                try {
+                    const actionMatch = content.match(/\{[\s\S]*"action"[\s\S]*\}/);
+                    if (actionMatch) {
+                        const parsed = JSON.parse(actionMatch[0]);
+                        action = parsed.action;
+                    }
+                } catch (e) {}
+                
+                // Clean message (remove JSON if present)
+                const cleanMessage = content.replace(/\{[\s\S]*"action"[\s\S]*\}/g, '').trim();
+                
+                return res.json({
+                    message: cleanMessage || content,
+                    action
+                });
+            }
+        }
+        
+        // Fallback: Simple pattern matching for common queries
+        const query = userQuery.toLowerCase();
+        let message = '';
+        let action = null;
+        
+        if (query.includes('ejecuta') || query.includes('corre') || query.includes('run')) {
+            message = 'Ejecutando la simulación con los parámetros actuales...';
+            action = { type: 'run_simulation', data: {} };
+        } else if (query.includes('sube') || query.includes('aumenta')) {
+            const param = parameters[0];
+            if (param) {
+                const newValue = Math.min(param.currentValue * 1.2, param.max || param.currentValue * 2);
+                message = `Aumentando ${param.name} a ${newValue.toLocaleString()}${param.unit || ''}.`;
+                action = { type: 'set_parameter', data: { variable: param.variable, value: newValue } };
+            }
+        } else if (query.includes('baja') || query.includes('reduce')) {
+            const param = parameters[0];
+            if (param) {
+                const newValue = Math.max(param.currentValue * 0.8, param.min || 0);
+                message = `Reduciendo ${param.name} a ${newValue.toLocaleString()}${param.unit || ''}.`;
+                action = { type: 'set_parameter', data: { variable: param.variable, value: newValue } };
+            }
+        } else {
+            message = `Actualmente tienes ${parameters.length} parámetros configurados. Puedes pedirme que ajuste cualquier valor o que ejecute la simulación para ver los resultados.`;
+        }
+        
+        res.json({ message, action });
+    } catch (error) {
+        console.error('Error in simulation chat:', error);
+        res.status(500).json({ error: 'Failed to process chat message' });
     }
 });
 

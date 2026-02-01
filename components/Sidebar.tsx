@@ -19,9 +19,11 @@ import {
   Bug,
   CaretDown,
   CaretUp,
+  CaretLeft,
+  CaretRight,
   Checks,
   ClipboardText,
-  Sliders,
+  Flask,
   MagnifyingGlass,
   ChatCircle
 } from '@phosphor-icons/react';
@@ -36,7 +38,7 @@ interface SidebarProps {
 const viewToRoute: Record<string, string> = {
   'overview': '/overview',
   'dashboard': '/dashboard',
-  'simulations': '/simulations',
+  'lab': '/lab',
   'workflows': '/workflows',
   'database': '/database',
   'templates': '/templates',
@@ -65,7 +67,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
   }>({ workflows: [], chats: [], entities: [] });
   const [showResults, setShowResults] = useState(false);
   const [showHelpDropdown, setShowHelpDropdown] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebar-collapsed');
+    return saved === 'true';
+  });
   const currentOrg = organizations.find(org => org.id === user?.orgId);
+
+  // Persist collapsed state
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', String(isCollapsed));
+  }, [isCollapsed]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -134,40 +145,50 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
     };
   }, [searchQuery]);
 
-  const NavItem = ({ icon: Icon, label, view, active = false, onClick, onNavigate }: { icon: any, label: string, view?: string, active?: boolean, onClick?: () => void, onNavigate?: () => void }) => {
+  const NavItem = ({ icon: Icon, label, view, active = false, onClick, onNavigate: onNavCb }: { icon: any, label: string, view?: string, active?: boolean, onClick?: () => void, onNavigate?: () => void }) => {
     const route = view ? viewToRoute[view] || `/${view}` : '#';
     
-    const baseClasses = "flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out w-full text-left group";
+    const baseClasses = `flex items-center ${isCollapsed ? 'justify-center px-2' : 'px-3'} py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out w-full text-left group relative`;
     const activeClasses = active 
       ? 'bg-[var(--sidebar-bg-active)] text-[var(--sidebar-text-active)] font-medium' 
       : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]';
     
-    const iconClasses = `mr-3 transition-colors duration-200 ease-in-out ${active ? 'text-[var(--sidebar-icon-active)]' : 'text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]'}`;
+    const iconClasses = `${isCollapsed ? '' : 'mr-3'} transition-colors duration-200 ease-in-out flex-shrink-0 ${active ? 'text-[var(--sidebar-icon-active)]' : 'text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]'}`;
+    
+    // Tooltip for collapsed state
+    const tooltip = isCollapsed ? (
+      <span className="absolute left-full ml-2 px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md text-xs text-[var(--text-primary)] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
+        {label}
+      </span>
+    ) : null;
     
     if (onClick) {
       return (
         <button
           onClick={onClick}
           className={`${baseClasses} ${activeClasses}`}
+          title={isCollapsed ? label : undefined}
         >
-          <Icon size={16} weight="light" className={iconClasses} />
-          <span className="transition-colors duration-200 ease-in-out">{label}</span>
+          <Icon size={isCollapsed ? 18 : 16} weight="light" className={iconClasses} />
+          {!isCollapsed && <span className="transition-colors duration-200 ease-in-out">{label}</span>}
+          {tooltip}
         </button>
       );
     }
     
     if (!view) {
       return (
-        <div className={`${baseClasses} ${activeClasses}`}>
-          <Icon size={16} weight="light" className={iconClasses} />
-          <span className="transition-colors duration-200 ease-in-out">{label}</span>
+        <div className={`${baseClasses} ${activeClasses}`} title={isCollapsed ? label : undefined}>
+          <Icon size={isCollapsed ? 18 : 16} weight="light" className={iconClasses} />
+          {!isCollapsed && <span className="transition-colors duration-200 ease-in-out">{label}</span>}
+          {tooltip}
         </div>
       );
     }
 
     const handleClick = () => {
-      if (onNavigate) {
-        onNavigate();
+      if (onNavCb) {
+        onNavCb();
       }
     };
 
@@ -177,68 +198,96 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         data-tutorial={`nav-${view}`}
         className={`${baseClasses} ${activeClasses}`}
         onClick={handleClick}
+        title={isCollapsed ? label : undefined}
       >
-        <Icon size={16} weight="light" className={iconClasses} />
-        <span className="transition-colors duration-200 ease-in-out">{label}</span>
+        <Icon size={isCollapsed ? 18 : 16} weight="light" className={iconClasses} />
+        {!isCollapsed && <span className="transition-colors duration-200 ease-in-out">{label}</span>}
+        {tooltip}
       </Link>
     );
   };
 
   const SectionLabel = ({ label }: { label: string }) => (
-    <div className="px-3 mt-6 mb-2 first:mt-0 text-[10px] font-light text-[var(--sidebar-section-label)] uppercase tracking-wider">
-      {label}
-    </div>
+    isCollapsed ? (
+      <div className="px-2 mt-4 mb-2 first:mt-0">
+        <div className="h-px bg-[var(--sidebar-border)]" />
+      </div>
+    ) : (
+      <div className="px-3 mt-6 mb-2 first:mt-0 text-[10px] font-light text-[var(--sidebar-section-label)] uppercase tracking-wider">
+        {label}
+      </div>
+    )
   );
 
   return (
-    <div data-tutorial="sidebar" className="w-60 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] h-screen flex flex-col sticky top-0 font-sans z-40 transition-colors duration-200">
+    <div data-tutorial="sidebar" className={`${isCollapsed ? 'w-16' : 'w-60'} bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] h-screen flex flex-col sticky top-0 font-sans z-40 transition-all duration-300`}>
+      {/* Collapse Toggle Button */}
+      <button
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="absolute -right-3 top-20 w-6 h-6 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:border-[var(--accent-primary)] transition-colors z-50 shadow-sm"
+      >
+        {isCollapsed ? <CaretRight size={12} weight="bold" /> : <CaretLeft size={12} weight="bold" />}
+      </button>
+
       {/* Header */}
-      <div className="px-6 pt-5 pb-5 border-b border-[var(--sidebar-border)]">
-        <div className="flex items-center justify-between mb-5 pl-1">
-          <img
-            src="/logo.svg"
-            alt="Intemic"
-            className="h-5 w-auto object-contain transition-all duration-200"
-            style={{ filter: 'var(--logo-filter)' }}
-          />
-          {/* Notification Bell */}
-          <div className="relative">
-            <NotificationBell 
-              onClick={notificationCenter.toggle} 
-              unreadCount={notificationCenter.unreadCount} 
+      <div className={`${isCollapsed ? 'px-3' : 'px-6'} pt-5 pb-5 border-b border-[var(--sidebar-border)]`}>
+        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} mb-5 ${isCollapsed ? '' : 'pl-1'}`}>
+          {isCollapsed ? (
+            <img
+              src="/favicon.svg"
+              alt="Intemic"
+              className="h-6 w-6 object-contain transition-all duration-200"
+              style={{ filter: 'var(--logo-filter)' }}
             />
-            <NotificationCenter 
-              isOpen={notificationCenter.isOpen} 
-              onClose={notificationCenter.close} 
-            />
-          </div>
+          ) : (
+            <>
+              <img
+                src="/logo.svg"
+                alt="Intemic"
+                className="h-5 w-auto object-contain transition-all duration-200"
+                style={{ filter: 'var(--logo-filter)' }}
+              />
+              {/* Notification Bell */}
+              <div className="relative">
+                <NotificationBell 
+                  onClick={notificationCenter.toggle} 
+                  unreadCount={notificationCenter.unreadCount} 
+                />
+                <NotificationCenter 
+                  isOpen={notificationCenter.isOpen} 
+                  onClose={notificationCenter.close} 
+                />
+              </div>
+            </>
+          )}
         </div>
-        <div className="relative">
-          <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sidebar-icon)]" size={14} weight="light" />
-          <input
-            type="text"
-            ref={searchRef}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && searchQuery.trim()) {
-                const query = encodeURIComponent(searchQuery.trim());
-                if (searchScope === 'workflows') {
-                  navigate(`/workflows?q=${query}`);
-                } else if (searchScope === 'chats') {
-                  navigate(`/copilots?q=${query}`);
-                } else {
-                  navigate(`/database?q=${query}`);
+        {!isCollapsed ? (
+          <div className="relative">
+            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sidebar-icon)]" size={14} weight="light" />
+            <input
+              type="text"
+              ref={searchRef}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && searchQuery.trim()) {
+                  const query = encodeURIComponent(searchQuery.trim());
+                  if (searchScope === 'workflows') {
+                    navigate(`/workflows?q=${query}`);
+                  } else if (searchScope === 'chats') {
+                    navigate(`/copilots?q=${query}`);
+                  } else {
+                    navigate(`/database?q=${query}`);
+                  }
+                  setShowResults(false);
                 }
-                setShowResults(false);
-              }
-              if (e.key === 'Escape') {
-                setShowResults(false);
-              }
-            }}
-            placeholder="Search"
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-[var(--bg-input)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] focus:border-[var(--border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] transition-all duration-200"
-          />
+                if (e.key === 'Escape') {
+                  setShowResults(false);
+                }
+              }}
+              placeholder="Search"
+              className="w-full pl-9 pr-3 py-1.5 text-xs bg-[var(--bg-input)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] focus:border-[var(--border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] transition-all duration-200"
+            />
           {showResults && (
             <div className="absolute left-0 right-0 mt-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-lg text-sm z-20 overflow-hidden">
               <div className="px-3 py-2 text-xs font-medium text-[var(--text-secondary)] border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
@@ -309,6 +358,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
             </div>
           )}
         </div>
+        ) : (
+          <button
+            onClick={() => setIsCollapsed(false)}
+            className="w-full flex items-center justify-center p-2 rounded-lg text-[var(--sidebar-icon)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)] transition-colors"
+            title="Search (⌘K)"
+          >
+            <MagnifyingGlass size={18} weight="light" />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -325,7 +383,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
             <NavItem icon={FlowArrow} label="Workflows" view="workflows" active={activeView === 'workflows'} />
             <NavItem icon={Database} label="Knowledge Base" view="database" active={activeView === 'database'} />
             <NavItem icon={Sparkle} label="Copilots" view="copilots" active={activeView === 'copilots'} />
-            <NavItem icon={Sliders} label="Simulations" view="simulations" active={activeView === 'simulations'} />
+            <NavItem icon={Flask} label="Lab" view="lab" active={activeView === 'lab'} />
           </div>
 
           <SectionLabel label="Reports" />
@@ -343,78 +401,95 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-3 border-t border-[var(--sidebar-border)]">
+      <div className={`${isCollapsed ? 'px-2' : 'px-3'} py-3 border-t border-[var(--sidebar-border)]`}>
         {/* Help Dropdown */}
-        <div className="mb-2">
-          <button
-            onClick={() => setShowHelpDropdown(!showHelpDropdown)}
-            className="flex items-center justify-between w-full px-3 py-2 text-sm rounded-lg cursor-pointer transition-colors duration-200 ease-in-out text-[var(--sidebar-text)] hover:bg-[var(--sidebar-bg-hover)] hover:text-[var(--sidebar-text-hover)] group"
-          >
-            <div className="flex items-center">
-              <Question size={16} weight="light" className="mr-3 text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)] transition-colors duration-200 ease-in-out" />
-              <span className="transition-colors duration-200 ease-in-out">Help</span>
-            </div>
-            {showHelpDropdown ? (
-              <CaretUp size={16} weight="light" className="text-[var(--sidebar-icon)]" />
-            ) : (
-              <CaretDown size={16} weight="light" className="text-[var(--sidebar-icon)]" />
-            )}
-          </button>
-          {showHelpDropdown && (
-            <div className="ml-4 mt-1 space-y-0.5 border-l border-[var(--sidebar-border)] pl-3">
-              <NavItem 
-                icon={Question} 
-                label="Quickstart" 
-                onClick={() => {
-                  setShowHelpDropdown(false);
-                  if (onShowTutorial) {
-                    onShowTutorial();
-                  } else {
-                    window.dispatchEvent(new CustomEvent('showTutorial'));
-                  }
-                }} 
-              />
-              <div onClick={() => setShowHelpDropdown(false)}>
+        {!isCollapsed ? (
+          <div className="mb-2">
+            <button
+              onClick={() => setShowHelpDropdown(!showHelpDropdown)}
+              className="flex items-center justify-between w-full px-3 py-2 text-sm rounded-lg cursor-pointer transition-colors duration-200 ease-in-out text-[var(--sidebar-text)] hover:bg-[var(--sidebar-bg-hover)] hover:text-[var(--sidebar-text-hover)] group"
+            >
+              <div className="flex items-center">
+                <Question size={16} weight="light" className="mr-3 text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)] transition-colors duration-200 ease-in-out" />
+                <span className="transition-colors duration-200 ease-in-out">Help</span>
+              </div>
+              {showHelpDropdown ? (
+                <CaretUp size={16} weight="light" className="text-[var(--sidebar-icon)]" />
+              ) : (
+                <CaretDown size={16} weight="light" className="text-[var(--sidebar-icon)]" />
+              )}
+            </button>
+            {showHelpDropdown && (
+              <div className="ml-4 mt-1 space-y-0.5 border-l border-[var(--sidebar-border)] pl-3">
                 <NavItem 
-                  icon={BookOpen} 
-                  label="Documentation" 
-                  view="documentation"
-                  active={activeView === 'documentation'}
+                  icon={Question} 
+                  label="Quickstart" 
+                  onClick={() => {
+                    setShowHelpDropdown(false);
+                    if (onShowTutorial) {
+                      onShowTutorial();
+                    } else {
+                      window.dispatchEvent(new CustomEvent('showTutorial'));
+                    }
+                  }} 
+                />
+                <div onClick={() => setShowHelpDropdown(false)}>
+                  <NavItem 
+                    icon={BookOpen} 
+                    label="Documentation" 
+                    view="documentation"
+                    active={activeView === 'documentation'}
+                  />
+                </div>
+                <NavItem 
+                  icon={Bug} 
+                  label="Report a Bug" 
+                  onClick={() => {
+                    setShowHelpDropdown(false);
+                    window.dispatchEvent(new CustomEvent('showReportBug'));
+                  }} 
                 />
               </div>
-              <NavItem 
-                icon={Bug} 
-                label="Report a Bug" 
-                onClick={() => {
-                  setShowHelpDropdown(false);
-                  window.dispatchEvent(new CustomEvent('showReportBug'));
-                }} 
-              />
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        ) : (
+          <div className="mb-2">
+            <NavItem icon={Question} label="Help" view="documentation" active={activeView === 'documentation'} />
+          </div>
+        )}
         
         <div className="mb-2">
           <NavItem icon={GearSix} label="Settings" view="settings" active={activeView === 'settings'} />
         </div>
-        <ProfileMenu
-          onNavigate={onNavigate}
-          menuPlacement="top-right"
-          triggerClassName="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--sidebar-bg-hover)] transition-colors duration-200 ease-in-out text-left border border-transparent hover:border-[var(--sidebar-border)]"
-          triggerContent={(
-            <>
-              <UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="md" />
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-normal text-[var(--sidebar-text)] truncate">{user?.name || 'User'}</div>
-                {currentOrg && (
-                  <div className="text-xs text-[var(--text-tertiary)] truncate">
-                    {currentOrg.name}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        />
+        
+        {/* Profile */}
+        {isCollapsed ? (
+          <ProfileMenu
+            onNavigate={onNavigate}
+            menuPlacement="top-right"
+            triggerClassName="w-full flex items-center justify-center p-2 rounded-lg hover:bg-[var(--sidebar-bg-hover)] transition-colors duration-200 ease-in-out"
+            triggerContent={<UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="sm" />}
+          />
+        ) : (
+          <ProfileMenu
+            onNavigate={onNavigate}
+            menuPlacement="top-right"
+            triggerClassName="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--sidebar-bg-hover)] transition-colors duration-200 ease-in-out text-left border border-transparent hover:border-[var(--sidebar-border)]"
+            triggerContent={(
+              <>
+                <UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="md" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-normal text-[var(--sidebar-text)] truncate">{user?.name || 'User'}</div>
+                  {currentOrg && (
+                    <div className="text-xs text-[var(--text-tertiary)] truncate">
+                      {currentOrg.name}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          />
+        )}
       </div>
     </div>
   );

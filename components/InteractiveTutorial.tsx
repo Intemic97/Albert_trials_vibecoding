@@ -6,14 +6,15 @@ import {
     CaretLeft,
     Sparkle,
     CursorClick,
-    DotsSixVertical
+    Hand,
+    RocketLaunch,
+    ChartLineUp,
+    TreeStructure,
+    Database,
+    FileText,
+    Gear,
+    Lightning
 } from '@phosphor-icons/react';
-
-interface TutorialMedia {
-    type: 'video' | 'gif' | 'image';
-    src: string;
-    alt?: string;
-}
 
 interface TutorialStep {
     id: string;
@@ -24,141 +25,163 @@ interface TutorialStep {
     position?: 'top' | 'bottom' | 'left' | 'right' | 'center';
     action?: 'click' | 'hover' | 'observe';
     waitForElement?: boolean;
-    media?: TutorialMedia;
     allowInteraction?: boolean;
     fullPage?: boolean;
+    icon?: React.ElementType;
+    emoji?: string;
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
     {
         id: 'welcome',
-        title: 'Welcome to Intemic! 👋',
-        description: 'Intemic helps manufacturing companies to automate their operations and regulatory compliance, reducing time and costs. Let\'s take a quick tour of the platform. We\'ll guide you through each section step by step.',
+        title: 'Welcome to Intemic!',
+        description: 'Your all-in-one platform for automating manufacturing operations and regulatory compliance. Let\'s take a 2-minute tour.',
         position: 'center',
+        icon: RocketLaunch,
+        emoji: '👋'
     },
     {
         id: 'sidebar',
-        title: 'Navigation Sidebar',
-        description: 'This is your main navigation. Click on any section to explore different parts of the platform.',
+        title: 'Navigation',
+        description: 'This sidebar is your command center. All major sections are just one click away.',
         targetSelector: '[data-tutorial="sidebar"]',
         route: '/dashboard',
         position: 'right',
+        icon: Lightning,
     },
     {
         id: 'dashboards-nav',
-        title: 'Dashboards Section',
-        description: 'Click on "Dashboards" to create custom analytics views with charts, tables, and KPIs.',
+        title: 'Dashboards',
+        description: 'Click here to create custom analytics dashboards with charts, tables, and KPIs.',
         targetSelector: '[data-tutorial="nav-dashboard"]',
         route: '/dashboard',
         position: 'right',
         action: 'click',
+        icon: ChartLineUp,
+        emoji: '📊'
     },
     {
         id: 'dashboards-content',
-        title: 'Custom Dashboards 📊',
-        description: 'Build interactive dashboards that you can share with your team. Just by writting a prompt, add charts, tables, and insights powered by your database entities, with zero hallucination.',
+        title: 'Build Visual Insights',
+        description: 'Create interactive dashboards powered by your data. Just describe what you want to see — AI handles the rest with zero hallucination.',
         targetSelector: '[data-tutorial="dashboard-content"]',
         route: '/dashboard',
         position: 'bottom',
         waitForElement: true,
+        icon: ChartLineUp,
     },
     {
         id: 'workflows-nav',
-        title: 'Workflows Section',
-        description: 'Click on "Workflows" to see where the magic happens - build automated, agentic data pipelines with our visual editor.',
+        title: 'Workflows',
+        description: 'Click here to discover where the magic happens — build automated data pipelines with our visual editor.',
         targetSelector: '[data-tutorial="nav-workflows"]',
         route: '/dashboard',
         position: 'right',
         action: 'click',
+        icon: TreeStructure,
+        emoji: '⚡'
     },
     {
         id: 'workflows-list',
-        title: 'Your Workflows',
-        description: 'Here you can see all your workflows. You can start with pre-built templates or create your own from scratch.',
+        title: 'Your Automation Hub',
+        description: 'All your workflows in one place. Start from templates or create custom pipelines from scratch.',
         targetSelector: '[data-tutorial="workflows-content"]',
         route: '/workflows',
         position: 'bottom',
         waitForElement: true,
+        icon: TreeStructure,
     },
     {
         id: 'create-workflow',
-        title: 'Create Your First Workflow',
-        description: 'Click here to create a new workflow. This opens the visual editor where you can build your data pipeline.',
+        title: 'Create a Workflow',
+        description: 'Click to open the visual editor and start building your first automated pipeline.',
         targetSelector: '[data-tutorial="create-workflow"]',
         route: '/workflows',
         position: 'center',
         action: 'click',
         waitForElement: true,
+        icon: TreeStructure,
     },
     {
         id: 'workflow-editor',
-        title: 'Build Your Workflows! 🎯',
-        description: 'This is the workflow editor. On the left you have the Components panel with all the building blocks. On the right is the Canvas where you build your workflows, in real-time collaboration if you are with your colleagues.\n\nTry it now! Drag a component from the left and drop it on the canvas.',
+        title: 'Visual Workflow Builder',
+        description: 'Drag components from the left panel onto the canvas. Connect them to build powerful automation flows. Try it now!',
         targetSelector: '[data-tutorial="workflow-editor"]',
         route: '/workflow/new',
         position: 'center',
         waitForElement: true,
         allowInteraction: true,
         fullPage: true,
+        icon: Hand,
+        emoji: '🎯'
     },
     {
         id: 'database-nav',
-        title: 'Database Section',
-        description: 'Now let\'s check the Database. Click here to define your data structure with custom entities and properties.',
+        title: 'Database',
+        description: 'Click here to manage your data structure — entities, properties, and relationships.',
         targetSelector: '[data-tutorial="nav-database"]',
         position: 'right',
         action: 'click',
+        icon: Database,
     },
     {
         id: 'database-content',
-        title: 'Data Structures',
-        description: 'Your company has many different entities: Customers, Products, Orders, Factories, Assets, etc... All of them with their custom properties and relationships. Create and manage your own entities and its properties, which can be used in dashboards, workflows and reports.',
+        title: 'Your Data Foundation',
+        description: 'Define entities like Customers, Products, Assets — each with custom properties. These power your dashboards, workflows, and reports.',
         targetSelector: '[data-tutorial="database-main"]',
         route: '/database',
         position: 'left',
         waitForElement: true,
+        icon: Database,
     },
     {
         id: 'reports-nav',
-        title: 'Reports Section',
-        description: 'Click on "Reports" to generate AI-powered insights and analysis from your data.',
+        title: 'Reports',
+        description: 'Click to explore AI-powered report generation.',
         targetSelector: '[data-tutorial="nav-reports"]',
         route: '/database',
         position: 'right',
         action: 'click',
+        icon: FileText,
+        emoji: '📄'
     },
     {
         id: 'reports-content',
-        title: 'AI Reports 📄',
-        description: 'Generate professional reports with AI assistance. Choose from templates or create custom reports that can be used for stakeholder presentations, regulatory compliance or internal data-driven process improvement. Again, reading from your database to ensure zero hallucinations.',
+        title: 'Professional Reports',
+        description: 'Generate polished reports for stakeholders, compliance, or process improvement. AI writes, your database provides the facts.',
         targetSelector: '[data-tutorial="reports-content"]',
         route: '/reports',
         position: 'left',
         waitForElement: true,
+        icon: FileText,
     },
     {
         id: 'settings-nav',
         title: 'Settings',
-        description: 'Click on "Settings" to manage your team, profile, and organization preferences.',
+        description: 'Click to configure your team and preferences.',
         targetSelector: '[data-tutorial="nav-settings"]',
         route: '/reports',
         position: 'right',
         action: 'click',
+        icon: Gear,
     },
     {
         id: 'settings-content',
-        title: 'Team Management',
-        description: 'Invite team members, manage roles, and configure your organization settings here.',
+        title: 'Team & Preferences',
+        description: 'Invite colleagues, manage roles, and customize your workspace here.',
         targetSelector: '[data-tutorial="settings-content"]',
         route: '/settings',
         position: 'center',
         waitForElement: true,
+        icon: Gear,
     },
     {
         id: 'complete',
-        title: 'You\'re Ready! 🎉',
-        description: 'That\'s the tour! Start exploring and building amazing workflows. You can restart this tutorial anytime from Settings > General.',
+        title: 'You\'re All Set!',
+        description: 'Start exploring and building. You can restart this tour anytime from Settings → General.',
         position: 'center',
+        icon: RocketLaunch,
+        emoji: '🎉'
     },
 ];
 
@@ -273,10 +296,6 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
         }
     };
 
-    const handleSkip = () => {
-        onSkip();
-    };
-
     // Calculate tooltip position
     const getTooltipStyle = (): React.CSSProperties => {
         if (!targetRect || step.position === 'center') {
@@ -288,12 +307,9 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
             };
         }
 
-        const padding = 20;
-        const tooltipWidth = step.media ? 420 : 360;
-        const baseHeight = 280;
-        const mediaHeight = step.media ? 200 : 0;
-        const hintHeight = targetRect ? 50 : 0;
-        const tooltipHeight = baseHeight + mediaHeight + hintHeight;
+        const padding = 24;
+        const tooltipWidth = 380;
+        const tooltipHeight = 320;
         
         const viewportHeight = window.innerHeight;
         const viewportWidth = window.innerWidth;
@@ -366,30 +382,29 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
         `;
     };
 
+    const Icon = step.icon || Sparkle;
+
     return (
         <div className="fixed inset-0 z-[9999] pointer-events-none">
             {/* Overlay with spotlight cutout */}
-            {step.fullPage ? (
-                <div 
-                    className="absolute inset-0 bg-black/50 transition-all duration-300 pointer-events-none"
-                />
-            ) : (
-                <div 
-                    className="absolute inset-0 bg-black/60 transition-all duration-300 pointer-events-none"
-                    style={targetRect ? { clipPath: getSpotlightClipPath() } : {}}
-                />
-            )}
+            <div 
+                className={`absolute inset-0 transition-all duration-300 pointer-events-none ${
+                    step.fullPage ? 'bg-black/40' : 'bg-black/60'
+                }`}
+                style={targetRect && !step.fullPage ? { clipPath: getSpotlightClipPath() } : {}}
+            />
 
             {/* Highlight border around target */}
             {targetRect && !step.fullPage && (
                 <div
-                    className="absolute border-2 border-[#256A65] rounded-xl pointer-events-none transition-all duration-300 animate-pulse"
+                    className="absolute rounded-xl pointer-events-none transition-all duration-300"
                     style={{
                         left: targetRect.left - 8,
                         top: targetRect.top - 8,
                         width: targetRect.width + 16,
                         height: targetRect.height + 16,
-                        boxShadow: '0 0 0 4px rgba(37, 106, 101, 0.2), 0 0 20px rgba(37, 106, 101, 0.3)',
+                        border: '2px solid var(--accent-primary)',
+                        boxShadow: '0 0 0 4px rgba(37, 106, 101, 0.15), 0 0 30px rgba(37, 106, 101, 0.2)',
                     }}
                 />
             )}
@@ -408,88 +423,67 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                 />
             )}
 
-            {/* Tooltip */}
+            {/* Tooltip Card */}
             <div
-                className={`${step.media ? 'w-[420px]' : 'w-[360px]'} bg-[var(--bg-card)] border border-[var(--border-light)] rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 pointer-events-auto`}
-                style={{
-                    ...getTooltipStyle(),
-                    maxHeight: 'calc(100vh - 40px)',
-                }}
+                className="w-[380px] bg-[var(--bg-card)] border border-[var(--border-light)] rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 pointer-events-auto"
+                style={getTooltipStyle()}
             >
                 {/* Progress bar */}
-                <div className="h-1 bg-[var(--bg-tertiary)] shrink-0">
+                <div className="h-1 bg-[var(--bg-tertiary)]">
                     <div 
-                        className="h-full bg-[#256A65] transition-all duration-500"
+                        className="h-full bg-gradient-to-r from-[var(--accent-primary)] to-emerald-400 transition-all duration-500"
                         style={{ width: `${progress}%` }}
                     />
                 </div>
 
                 {/* Content */}
-                <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 100px)' }}>
-                    {/* Step indicator */}
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2 text-[#256A65]">
-                            <Sparkle size={16} weight="fill" />
-                            <span className="text-xs font-medium">
-                                Step {currentStep + 1} of {TUTORIAL_STEPS.length}
-                            </span>
+                <div className="p-6">
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-[var(--accent-primary)]/10 flex items-center justify-center">
+                                {step.emoji ? (
+                                    <span className="text-xl">{step.emoji}</span>
+                                ) : (
+                                    <Icon size={20} className="text-[var(--accent-primary)]" weight="duotone" />
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-tertiary)]">
+                                <Sparkle size={12} className="text-[var(--accent-primary)]" weight="fill" />
+                                {currentStep + 1} / {TUTORIAL_STEPS.length}
+                            </div>
                         </div>
                         <button
-                            onClick={handleSkip}
-                            className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] p-1 hover:bg-[var(--bg-tertiary)] rounded transition-colors"
-                            title="Skip tutorial"
-                            aria-label="Skip tutorial"
+                            onClick={onSkip}
+                            className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                            title="Skip tour"
                         >
-                            <X size={18} weight="light" />
+                            <X size={18} />
                         </button>
                     </div>
 
                     {/* Title */}
-                    <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
+                    <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
                         {step.title}
                     </h3>
 
                     {/* Description */}
-                    <p className="text-[var(--text-secondary)] text-sm leading-relaxed mb-4">
+                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-5">
                         {step.description}
                     </p>
 
-                    {/* Media */}
-                    {step.media && (
-                        <div className="mb-4 rounded-lg overflow-hidden border border-[var(--border-light)] bg-[var(--bg-tertiary)]">
-                            {step.media.type === 'video' ? (
-                                <video
-                                    src={step.media.src}
-                                    autoPlay
-                                    loop
-                                    muted
-                                    playsInline
-                                    className="w-full h-auto max-h-[180px] object-contain"
-                                >
-                                    Your browser does not support the video tag.
-                                </video>
-                            ) : (
-                                <img
-                                    src={step.media.src}
-                                    alt={step.media.alt || step.title}
-                                    className="w-full h-auto max-h-[180px] object-contain"
-                                />
-                            )}
-                        </div>
-                    )}
-
                     {/* Action hint */}
                     {(step.fullPage || step.action === 'click') && (
-                        <div className="flex items-center gap-2 text-xs text-[#256A65] bg-[#256A65]/10 px-3 py-2 rounded-lg mb-4 border border-[#256A65]/20">
+                        <div className="flex items-center gap-2 text-xs text-[var(--accent-primary)] bg-[var(--accent-primary)]/10 px-4 py-3 rounded-xl mb-5 border border-[var(--accent-primary)]/20">
                             {step.fullPage ? (
                                 <>
-                                    <DotsSixVertical size={14} weight="bold" />
-                                    <span>Try it! Drag components onto the canvas, then click Next</span>
+                                    <Hand size={16} weight="fill" />
+                                    <span>Try dragging components onto the canvas!</span>
                                 </>
                             ) : (
                                 <>
-                                    <CursorClick size={14} weight="fill" />
-                                    <span>Click the highlighted element to continue</span>
+                                    <CursorClick size={16} weight="fill" />
+                                    <span>Click the highlighted element</span>
                                 </>
                             )}
                         </div>
@@ -500,26 +494,27 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                         <button
                             onClick={handlePrev}
                             disabled={isFirstStep}
-                            className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                                 isFirstStep
                                     ? 'text-[var(--text-tertiary)] cursor-not-allowed'
-                                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
                             }`}
                         >
                             <CaretLeft size={16} weight="bold" />
                             Back
                         </button>
 
+                        {/* Step dots */}
                         <div className="flex gap-1">
                             {TUTORIAL_STEPS.map((_, index) => (
                                 <div
                                     key={index}
-                                    className={`w-1.5 h-1.5 rounded-full transition-all ${
+                                    className={`h-1.5 rounded-full transition-all duration-300 ${
                                         index === currentStep
-                                            ? 'w-4 bg-[#256A65]'
+                                            ? 'w-4 bg-[var(--accent-primary)]'
                                             : index < currentStep
-                                                ? 'bg-[#256A65]/50'
-                                                : 'bg-[var(--border-medium)]'
+                                                ? 'w-1.5 bg-[var(--accent-primary)]/50'
+                                                : 'w-1.5 bg-[var(--border-medium)]'
                                     }`}
                                 />
                             ))}
@@ -527,13 +522,13 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
 
                         <button
                             onClick={handleNext}
-                            className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                                 isLastStep
-                                    ? 'bg-[#256A65] text-white hover:bg-[#1e5a55]'
-                                    : 'bg-[var(--bg-selected)] text-white hover:bg-[#555555]'
+                                    ? 'bg-gradient-to-r from-[var(--accent-primary)] to-emerald-500 text-white shadow-lg shadow-[var(--accent-primary)]/20'
+                                    : 'bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary-hover)]'
                             }`}
                         >
-                            {isLastStep ? 'Finish' : 'Next'}
+                            {isLastStep ? 'Let\'s Go!' : 'Next'}
                             <CaretRight size={16} weight="bold" />
                         </button>
                     </div>
@@ -542,8 +537,10 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
 
             {/* Loading state during transitions */}
             {isTransitioning && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-8 h-8 border-2 border-[#256A65] border-t-transparent rounded-full animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-10 h-10 rounded-xl bg-[var(--bg-card)] border border-[var(--border-light)] flex items-center justify-center shadow-xl">
+                        <div className="w-5 h-5 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
+                    </div>
                 </div>
             )}
         </div>
