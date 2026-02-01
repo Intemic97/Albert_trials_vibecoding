@@ -27,3 +27,16 @@ export { useWorkflowState, type WorkflowData, type WorkflowStateHook } from './u
 
 // Canvas Interaction - Pan, zoom, drag & drop
 export { useCanvasInteraction, type CanvasOffset, type DragConnectionState, type CanvasInteractionHook } from './useCanvasInteraction';
+
+// ============================================================================
+// NEW MODULAR HOOKS (for Zustand migration)
+// ============================================================================
+
+// Canvas Pan & Zoom - Optimized pan/zoom with wheel support
+export { useCanvasPanZoom } from './useCanvasPanZoom';
+
+// Node Drag - Drag nodes with grid snapping
+export { useNodeDrag } from './useNodeDrag';
+
+// Connection Drag - Create connections by dragging
+export { useConnectionDrag } from './useConnectionDrag';
