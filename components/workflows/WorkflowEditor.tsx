@@ -30,6 +30,8 @@ import { WorkflowCanvas } from './WorkflowCanvas';
 import { NodePalette } from './NodePalette';
 import { WorkflowToolbar } from './WorkflowToolbar';
 import { AIAssistantPanel } from './AIAssistantPanel';
+import { NodeConfigPanels } from './NodeConfigPanels';
+import { DataPreviewSidePanel } from './DataPreviewSidePanel';
 import { 
   ExecutionHistoryModal, 
   TemplatesGalleryModal,
@@ -94,6 +96,7 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [recentNodes, setRecentNodes] = useState<string[]>([]);
+  const [viewingDataNodeId, setViewingDataNodeId] = useState<string | null>(null);
   
   // =========================================================================
   // EFFECTS
@@ -248,8 +251,36 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
     
     // Simulate node execution
     setTimeout(() => {
-      updateNode(nodeId, { status: 'completed', executionResult: 'Success' });
+      updateNode(nodeId, { 
+        status: 'completed', 
+        executionResult: 'Success',
+        data: [{ id: 1, name: 'Sample', value: 100 }, { id: 2, name: 'Data', value: 200 }]
+      });
     }, 1000);
+  };
+  
+  const handleViewNodeData = (nodeId: string) => {
+    setViewingDataNodeId(nodeId);
+  };
+  
+  const handleDeleteNode = (nodeId: string) => {
+    const deleteNode = useWorkflowStore.getState().deleteNode;
+    deleteNode(nodeId);
+  };
+  
+  const handleDuplicateNode = (nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      const newNode: WorkflowNode = {
+        ...node,
+        id: generateUUID(),
+        x: node.x + 50,
+        y: node.y + 50,
+        label: `${node.label} (copy)`,
+      };
+      addNode(newNode);
+      selectNode(newNode.id);
+    }
   };
   
   const handlePaletteDragStart = (item: any) => {
@@ -377,6 +408,9 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
             isRunning={isRunning}
             onNodeConfigure={handleNodeConfigure}
             onNodeRun={handleNodeRun}
+            onNodeDelete={handleDeleteNode}
+            onNodeDuplicate={handleDuplicateNode}
+            onViewNodeData={handleViewNodeData}
             onOpenAIAssistant={toggleAIAssistant}
           />
           
@@ -385,6 +419,16 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
             isOpen={ui.showAIAssistant}
             onClose={toggleAIAssistant}
             entities={entities}
+          />
+          
+          {/* Node Configuration Panels */}
+          <NodeConfigPanels entities={entities} />
+          
+          {/* Data Preview Panel */}
+          <DataPreviewSidePanel
+            isOpen={viewingDataNodeId !== null}
+            nodeId={viewingDataNodeId}
+            onClose={() => setViewingDataNodeId(null)}
           />
         </div>
       </div>

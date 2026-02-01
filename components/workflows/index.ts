@@ -192,3 +192,9 @@ export { WorkflowEditor } from './WorkflowEditor';
 
 // AI Assistant Panel - Panel de asistente IA
 export { AIAssistantPanel } from './AIAssistantPanel';
+
+// Node Configuration Panels - Paneles de configuración por tipo de nodo
+export { NodeConfigPanels } from './NodeConfigPanels';
+
+// Data Preview Panel - Panel de previsualización de datos
+export { DataPreviewSidePanel } from './DataPreviewSidePanel';
