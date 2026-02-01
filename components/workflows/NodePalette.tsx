@@ -206,10 +206,16 @@ interface PaletteItemProps {
 const PaletteItem: React.FC<PaletteItemProps> = ({ item, onDragStart, onDragEnd }) => {
   const Icon = item.icon;
   
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData('application/workflow-node', item.type);
+    e.dataTransfer.effectAllowed = 'copy';
+    onDragStart(item);
+  };
+  
   return (
     <div
       draggable
-      onDragStart={() => onDragStart(item)}
+      onDragStart={handleDragStart}
       onDragEnd={onDragEnd}
       className="flex items-center gap-3 p-2 rounded-lg cursor-grab hover:bg-[var(--bg-hover)] transition-colors group active:cursor-grabbing"
     >

@@ -90,6 +90,7 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
   
   const [isSaving, setIsSaving] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [recentNodes, setRecentNodes] = useState<string[]>([]);
   
   // =========================================================================
   // EFFECTS
@@ -248,9 +249,12 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
     }, 1000);
   };
   
-  const handlePaletteDragStart = (e: React.DragEvent, item: any) => {
-    e.dataTransfer.setData('application/workflow-node', item.type);
-    e.dataTransfer.effectAllowed = 'copy';
+  const handlePaletteDragStart = (item: any) => {
+    // Track recent nodes
+    setRecentNodes(prev => {
+      const filtered = prev.filter(t => t !== item.type);
+      return [item.type, ...filtered].slice(0, 5);
+    });
   };
   
   // =========================================================================
@@ -324,15 +328,15 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar - Node Palette */}
-        {!ui.isSidebarCollapsed && (
-          <div className="w-64 border-r border-[var(--border-light)] bg-[var(--bg-card)] overflow-y-auto">
-            <NodePalette
-              onDragStart={handlePaletteDragStart}
-              searchQuery={ui.searchQuery}
-              selectedCategory={ui.selectedCategory}
-            />
-          </div>
-        )}
+        <div className={`${ui.isSidebarCollapsed ? 'w-12' : 'w-64'} border-r border-[var(--border-light)] bg-[var(--bg-card)] overflow-y-auto transition-all duration-200`}>
+          <NodePalette
+            isCollapsed={ui.isSidebarCollapsed}
+            onToggleCollapse={toggleSidebar}
+            recentNodes={recentNodes as any}
+            onDragStart={handlePaletteDragStart}
+            onDragEnd={() => {}}
+          />
+        </div>
         
         {/* Canvas */}
         <div className="flex-1 relative">
