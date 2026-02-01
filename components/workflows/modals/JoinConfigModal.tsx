@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { GitMerge } from '@phosphor-icons/react';
+import { Warning, CheckCircle } from '@phosphor-icons/react';
 import { NodeConfigSidePanel } from '../../NodeConfigSidePanel';
 import { WorkflowNode, Connection } from '../types';
 
@@ -86,38 +86,37 @@ export const JoinConfigModal: React.FC<JoinConfigModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Configure Join"
-      icon={GitMerge}
       footer={
-        <>
+        <div className="flex items-center gap-3 w-full">
           <button
             onClick={onClose}
-            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+            className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onSave}
-            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+            className="px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors"
           >
             Save
           </button>
-        </>
+        </div>
       }
     >
       <div className="space-y-5">
         <div>
-          <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">
             Join Strategy
           </label>
           <select
             value={joinStrategy}
             onChange={(e) => onJoinStrategyChange(e.target.value as 'concat' | 'mergeByKey')}
-            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] bg-[var(--bg-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
+            className="w-full px-3 py-2.5 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
           >
             <option value="concat">Concatenate (combine all records)</option>
             <option value="mergeByKey">Merge by common key</option>
           </select>
-          <p className="text-xs text-[var(--text-tertiary)] mt-1.5">
+          <p className="text-xs text-[var(--text-tertiary)] mt-2">
             {joinStrategy === 'concat' 
               ? 'All records from A and B will be combined into one list'
               : 'Records with matching key values will be merged together'}
@@ -127,37 +126,45 @@ export const JoinConfigModal: React.FC<JoinConfigModalProps> = ({
         {joinStrategy === 'mergeByKey' && (
           <>
             <div>
-              <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+              <label className="block text-sm font-semibold text-[var(--text-primary)] mb-3">
                 Join Type
               </label>
               <div className="space-y-2">
-                <label className={`flex items-start p-2.5 border rounded-lg cursor-pointer transition-all ${joinType === 'inner' ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]' : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'}`}>
+                <label className={`flex items-start p-3 rounded-lg cursor-pointer transition-all ${
+                  joinType === 'inner' 
+                    ? 'bg-[var(--accent-primary)]/5 border border-[var(--accent-primary)]' 
+                    : 'bg-[var(--bg-tertiary)] border border-transparent hover:border-[var(--border-light)]'
+                }`}>
                   <input
                     type="radio"
                     name="joinType"
                     value="inner"
                     checked={joinType === 'inner'}
                     onChange={() => onJoinTypeChange('inner')}
-                    className="mt-0.5 mr-3"
+                    className="mt-0.5 mr-3 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
                   />
                   <div>
-                    <span className="font-medium text-xs text-[var(--text-primary)]">Inner Join</span>
+                    <span className="font-medium text-sm text-[var(--text-primary)]">Inner Join</span>
                     <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
                       Only records that match in both inputs
                     </p>
                   </div>
                 </label>
-                <label className={`flex items-start p-2.5 border rounded-lg cursor-pointer transition-all ${joinType === 'outer' ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]' : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'}`}>
+                <label className={`flex items-start p-3 rounded-lg cursor-pointer transition-all ${
+                  joinType === 'outer' 
+                    ? 'bg-[var(--accent-primary)]/5 border border-[var(--accent-primary)]' 
+                    : 'bg-[var(--bg-tertiary)] border border-transparent hover:border-[var(--border-light)]'
+                }`}>
                   <input
                     type="radio"
                     name="joinType"
                     value="outer"
                     checked={joinType === 'outer'}
                     onChange={() => onJoinTypeChange('outer')}
-                    className="mt-0.5 mr-3"
+                    className="mt-0.5 mr-3 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
                   />
                   <div>
-                    <span className="font-medium text-xs text-[var(--text-primary)]">Outer Join</span>
+                    <span className="font-medium text-sm text-[var(--text-primary)]">Outer Join</span>
                     <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
                       All records from both inputs (empty where no match)
                     </p>
@@ -167,7 +174,7 @@ export const JoinConfigModal: React.FC<JoinConfigModalProps> = ({
             </div>
             
             <div>
-              <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+              <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">
                 Common Key Field
               </label>
               {allFields.length > 0 ? (
@@ -175,7 +182,7 @@ export const JoinConfigModal: React.FC<JoinConfigModalProps> = ({
                   <select
                     value={joinKey}
                     onChange={(e) => onJoinKeyChange(e.target.value)}
-                    className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] bg-[var(--bg-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
+                    className="w-full px-3 py-2.5 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
                   >
                     <option value="">Select a field...</option>
                     {commonFields.length > 0 && (
@@ -192,9 +199,12 @@ export const JoinConfigModal: React.FC<JoinConfigModalProps> = ({
                     </optgroup>
                   </select>
                   {commonFields.length > 0 && (
-                    <p className="text-xs text-[#256A65] mt-1.5">
-                      ✓ {commonFields.length} common field(s) found
-                    </p>
+                    <div className="flex items-center gap-2 mt-2 p-2 bg-emerald-500/10 rounded-lg">
+                      <CheckCircle size={14} className="text-emerald-400 shrink-0" weight="fill" />
+                      <p className="text-xs text-emerald-400">
+                        {commonFields.length} common field(s) found
+                      </p>
+                    </div>
                   )}
                 </>
               ) : (
@@ -204,11 +214,14 @@ export const JoinConfigModal: React.FC<JoinConfigModalProps> = ({
                     value={joinKey}
                     onChange={(e) => onJoinKeyChange(e.target.value)}
                     placeholder="e.g., id, name"
-                    className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] bg-[var(--bg-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                    className="w-full px-3 py-2.5 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)]"
                   />
-                  <p className="text-xs text-amber-600 mt-1.5">
-                    ⚠️ Run the input nodes first to see available fields
-                  </p>
+                  <div className="flex items-center gap-2 mt-2 p-2 bg-amber-500/10 rounded-lg">
+                    <Warning size={14} className="text-amber-400 shrink-0" weight="fill" />
+                    <p className="text-xs text-amber-400">
+                      Run the input nodes first to see available fields
+                    </p>
+                  </div>
                 </>
               )}
             </div>

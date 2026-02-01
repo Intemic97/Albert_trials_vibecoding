@@ -184,31 +184,17 @@ export const Copilots: React.FC = () => {
     
     // Auto-save chats when they change (with debounce)
     useEffect(() => {
-        // Don't save on initial load (when chats is empty)
-        if (chats.length === 0) {
-            console.log('[Copilots] Skipping auto-save: no chats to save');
-            return;
-        }
+        if (chats.length === 0) return;
 
         const saveTimeout = setTimeout(() => {
-            console.log('[Copilots] Auto-saving', chats.length, 'chats...');
             chats.forEach(chat => {
-                // Save all chats that have been modified (have messages or configuration)
-                // Also save chats that have been created (even if only welcome message)
                 if (chat.messages.length > 0 || chat.instructions || (chat.allowedEntities && chat.allowedEntities.length > 0)) {
-                    console.log('[Copilots] Auto-saving chat:', chat.id, chat.title, 'messages:', chat.messages.length);
-                    saveChat(chat).catch(err => {
-                        console.error('[Copilots] Error auto-saving chat:', chat.id, err);
-                    });
-                } else {
-                    console.log('[Copilots] Skipping auto-save for chat:', chat.id, '- no content');
+                    saveChat(chat).catch(() => {});
                 }
             });
-        }, 1000); // Debounce: save 1 second after last change
+        }, 1000);
 
-        return () => {
-            clearTimeout(saveTimeout);
-        };
+        return () => clearTimeout(saveTimeout);
     }, [chats]);
 
     // Save previous chat when switching to a different chat
@@ -216,8 +202,7 @@ export const Copilots: React.FC = () => {
         if (previousActiveChatRef.current && previousActiveChatRef.current !== activeChat) {
             const previousChat = chats.find(c => c.id === previousActiveChatRef.current);
             if (previousChat && (previousChat.messages.length > 0 || previousChat.instructions || (previousChat.allowedEntities && previousChat.allowedEntities.length > 0))) {
-                console.log('[Copilots] Saving previous chat before switch:', previousActiveChatRef.current);
-                saveChat(previousChat).catch(err => console.error('[Copilots] Error saving previous chat:', err));
+                saveChat(previousChat).catch(() => {});
             }
         }
         previousActiveChatRef.current = activeChat;
@@ -226,7 +211,6 @@ export const Copilots: React.FC = () => {
     // Save all chats on unmount
     useEffect(() => {
         return () => {
-            console.log('[Copilots] Component unmounting, saving all chats...');
             chats.forEach(chat => {
                 if (chat.messages.length > 0 || chat.instructions || (chat.allowedEntities && chat.allowedEntities.length > 0)) {
                     const payload = {
@@ -256,14 +240,13 @@ export const Copilots: React.FC = () => {
                         keepalive: true // Keep request alive even after page unload
                     }).catch(() => {
                         // If PUT fails, try POST (chat might not exist)
-                        console.log('[Copilots] PUT failed on unmount, trying POST for chat:', chat.id);
                         fetch(`${API_BASE}/copilot/chats`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             credentials: 'include',
                             body: JSON.stringify(payload),
                             keepalive: true
-                        }).catch(err => console.error('[Copilots] Error saving on unmount:', chat.id, err));
+                        }).catch(() => {});
                     });
                 }
             });
@@ -278,15 +261,11 @@ export const Copilots: React.FC = () => {
 
     const loadChats = async () => {
         try {
-            console.log('[Copilots] Loading chats from server...');
             const response = await fetch(`${API_BASE}/copilot/chats`, {
                 credentials: 'include'
             });
-            console.log('[Copilots] Response status:', response.status, response.statusText);
             if (response.ok) {
                 const data = await response.json();
-                console.log('[Copilots] Raw response data:', data);
-                console.log('[Copilots] Chats array:', data.chats);
                 
                 const loadedChats = (data.chats || []).map((chat: any) => {
                     try {
@@ -314,48 +293,17 @@ export const Copilots: React.FC = () => {
                     }
                 }).filter((chat: any) => chat !== null);
                 
-                console.log('[Copilots] Loaded chats from server:', loadedChats.length, loadedChats.map(c => ({ 
-                    id: c.id, 
-                    title: c.title, 
-                    messages: c.messages.length,
-                    hasInstructions: !!c.instructions,
-                    updatedAt: c.updatedAt 
-                })));
-                
-                // Always set loaded chats - show them in sidebar (even if empty)
-                console.log('[Copilots] Setting chats state with', loadedChats.length, 'chats');
                 setChats(loadedChats);
-                if (loadedChats.length > 0) {
-                    // Don't auto-select a chat - start with empty state
-                    // User can click on a chat from sidebar to open it
-                    console.log('[Copilots] Loaded', loadedChats.length, 'chats, starting with empty state');
-                    console.log('[Copilots] Chat IDs:', loadedChats.map(c => c.id));
-                    console.log('[Copilots] Chat titles:', loadedChats.map(c => c.title));
-                } else {
-                    // Only create new chat if truly no chats exist
-                    console.log('[Copilots] No chats found, will create one when user sends first message');
-                    // Don't create chat automatically - wait for user to send a message
-                }
             } else {
-                const errorData = await response.json().catch(() => ({}));
-                console.error('[Copilots] Failed to load chats:', response.status, response.statusText, errorData);
-                // Set empty array to ensure state is initialized
                 setChats([]);
-                // Don't create a new chat on error, let user see the error
             }
         } catch (error) {
-            console.error('[Copilots] Error loading chats:', error);
-            // Set empty array to ensure state is initialized even on error
             setChats([]);
-            // Don't create a new chat on error
         }
     };
 
     const saveChat = async (chat: Chat) => {
-        if (!chat || !chat.id) {
-            console.error('[Copilots] Cannot save chat: invalid chat object', chat);
-            return;
-        }
+        if (!chat || !chat.id) return;
         
         try {
             const payload = {
@@ -375,13 +323,6 @@ export const Copilots: React.FC = () => {
                 allowedEntities: Array.isArray(chat.allowedEntities) && chat.allowedEntities.length > 0 ? chat.allowedEntities : null
             };
             
-            console.log('[Copilots] Saving chat:', chat.id, { 
-                title: payload.title, 
-                messageCount: payload.messages.length,
-                hasInstructions: !!payload.instructions,
-                allowedEntitiesCount: payload.allowedEntities ? payload.allowedEntities.length : 0
-            });
-            
             const response = await fetch(`${API_BASE}/copilot/chats/${chat.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -390,22 +331,9 @@ export const Copilots: React.FC = () => {
             });
             
             if (!response.ok) {
-                const errorText = await response.text();
-                let errorData;
-                try {
-                    errorData = JSON.parse(errorText);
-                } catch {
-                    errorData = { message: errorText };
-                }
-                console.error('[Copilots] Failed to save chat:', response.status, response.statusText, errorData);
-                throw new Error(`Failed to save chat: ${response.status} ${response.statusText}`);
-            } else {
-                const result = await response.json().catch(() => ({ success: true }));
-                console.log('[Copilots] Chat saved successfully:', chat.id, result);
+                throw new Error(`Failed to save chat: ${response.status}`);
             }
         } catch (error) {
-            console.error('[Copilots] Error saving chat:', error);
-            // Re-throw to allow caller to handle if needed
             throw error;
         }
     };
@@ -438,13 +366,7 @@ export const Copilots: React.FC = () => {
             allowedEntities: entities || []
         };
 
-        // Always update local state immediately so the input becomes enabled
-        console.log('[Copilots] Creating new chat:', newChat.id, newChat.title);
-        setChats(prev => {
-            const updated = [newChat, ...prev];
-            console.log('[Copilots] Updated chats state, total chats:', updated.length);
-            return updated;
-        });
+        setChats(prev => [newChat, ...prev]);
         setActiveChat(newChat.id);
 
         // Try to save to backend immediately
@@ -463,35 +385,16 @@ export const Copilots: React.FC = () => {
                 instructions: newChat.instructions || null,
                 allowedEntities: newChat.allowedEntities && newChat.allowedEntities.length > 0 ? newChat.allowedEntities : null
             };
-            console.log('[Copilots] Saving new chat to backend:', newChat.id, payload);
-            const response = await fetch(`${API_BASE}/copilot/chats`, {
+            await fetch(`${API_BASE}/copilot/chats`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify(payload)
             });
-            if (response.ok) {
-                const savedChat = await response.json();
-                console.log('[Copilots] Chat created successfully on backend:', newChat.id, savedChat);
-                // Server returns { success: true, chatId: id }, but we use our own ID
-                // No need to update ID since we're using client-generated IDs
-            } else {
-                const errorText = await response.text();
-                let errorData;
-                try {
-                    errorData = JSON.parse(errorText);
-                } catch {
-                    errorData = { message: errorText };
-                }
-                console.error('[Copilots] Failed to create chat on backend:', response.status, response.statusText, errorData);
-                // Chat is still in local state, so user can continue, but it won't persist
-            }
         } catch (error) {
-            console.error('[Copilots] Error saving chat to backend:', error);
             // Chat is already in local state, so user can continue
         }
         
-        // Return the created chat so caller can use it immediately
         return newChat;
     };
 
@@ -505,14 +408,11 @@ export const Copilots: React.FC = () => {
             // Create the new chat and wait for it to complete
             const newChat = await createNewChat(copilotName.trim(), copilotInstructions.trim() || undefined, selectedEntities);
             
-            // Ensure the chat is saved by calling saveChat explicitly
-            // This handles the case where POST might have failed but we still have the chat in state
+            // Ensure the chat is saved
             try {
                 await saveChat(newChat);
-                console.log('[Copilots] Copilot saved successfully:', newChat.id);
             } catch (saveError) {
-                console.error('[Copilots] Error saving copilot after creation:', saveError);
-                // If save fails, try to create it again (in case POST failed)
+                // If save fails, try to create it again
                 try {
                     const payload = {
                         id: newChat.id,
@@ -534,9 +434,8 @@ export const Copilots: React.FC = () => {
                         credentials: 'include',
                         body: JSON.stringify(payload)
                     });
-                    console.log('[Copilots] Retried POST and succeeded');
                 } catch (retryError) {
-                    console.error('[Copilots] Retry POST also failed:', retryError);
+                    // Silent fail - chat is in local state
                 }
             }
             
@@ -549,7 +448,6 @@ export const Copilots: React.FC = () => {
             setCopilotInstructions('');
             setSelectedEntities([]);
         } catch (error) {
-            console.error('[Copilots] Error creating copilot:', error);
             showError('Failed to create copilot', 'Please try again');
         }
     };
@@ -564,15 +462,12 @@ export const Copilots: React.FC = () => {
 
     const deleteChat = async (chatId: string) => {
         try {
-            const response = await fetch(`${API_BASE}/copilot/chats/${chatId}`, {
+            await fetch(`${API_BASE}/copilot/chats/${chatId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
-            if (!response.ok) {
-                console.error('Failed to delete chat:', response.status, response.statusText);
-            }
         } catch (error) {
-            console.error('Error deleting chat:', error);
+            // Silent fail
         }
 
         setChats(prev => prev.filter(c => c.id !== chatId));
@@ -607,16 +502,9 @@ export const Copilots: React.FC = () => {
         // If no active chat, create one first
         let currentChat = chats.find(c => c.id === activeChat);
         if (!currentChat) {
-            console.log('[Copilots] No active chat, creating new one...');
-            // createNewChat returns the created chat, so we can use it directly
             currentChat = await createNewChat();
-            console.log('[Copilots] Created new chat:', currentChat.id, currentChat.title);
         }
-        if (!currentChat) {
-            console.error('[Copilots] No chat available to send message, chats:', chats.length);
-            return;
-        }
-        console.log('[Copilots] Sending message to chat:', currentChat.id, currentChat.title);
+        if (!currentChat) return;
 
         const userMessage: Message = {
             id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -647,6 +535,41 @@ export const Copilots: React.FC = () => {
         saveChat(updatedChat).catch(err => console.error('[Copilots] Error saving user message:', err));
 
         try {
+            // Extract all entity mentions from the message (including those inside folder citations)
+            // Match @EntityName patterns - simplified regex to capture word characters
+            const entityMentionRegex = /@(\w+)/g;
+            const mentionedEntityNames: string[] = [];
+            let match;
+            while ((match = entityMentionRegex.exec(userMessage.content)) !== null) {
+                const name = match[1].trim();
+                // Only add unique entity names (case-insensitive comparison)
+                if (name && !mentionedEntityNames.some(n => n.toLowerCase() === name.toLowerCase())) {
+                    mentionedEntityNames.push(name);
+                }
+            }
+            
+            // Map mentioned entity names to their IDs
+            const mentionedEntityIds = mentionedEntityNames
+                .map(name => availableEntities.find(e => e.name.toLowerCase() === name.toLowerCase())?.id)
+                .filter((id): id is string => !!id);
+            
+            // Also check if any folder was mentioned (via #) and include its entities
+            const folderMentionRegex = /#(\w+)/g;
+            while ((match = folderMentionRegex.exec(userMessage.content)) !== null) {
+                const folderName = match[1].trim();
+                const folder = availableFolders.find(f => f.name.toLowerCase() === folderName.toLowerCase());
+                if (folder && folder.entityIds) {
+                    // Add all entity IDs from the folder that aren't already included
+                    folder.entityIds.forEach(id => {
+                        if (!mentionedEntityIds.includes(id)) {
+                            mentionedEntityIds.push(id);
+                        }
+                    });
+                }
+            }
+            
+            console.log('[Copilots] Extracted entity mentions:', mentionedEntityNames, '-> IDs:', mentionedEntityIds);
+
             const response = await fetch(`${API_BASE}/database/ask`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -659,7 +582,8 @@ export const Copilots: React.FC = () => {
                     })),
                     chatId: currentChat.id,
                     instructions: currentChat.instructions,
-                    allowedEntities: currentChat.allowedEntities
+                    allowedEntities: currentChat.allowedEntities,
+                    mentionedEntities: mentionedEntityIds.length > 0 ? mentionedEntityIds : undefined
                 })
             });
 
@@ -717,14 +641,15 @@ export const Copilots: React.FC = () => {
         const query = mention.query.toLowerCase();
 
         if (mention.type === 'entity') {
-            // Return both folders and entities
-            const folderResults = availableFolders
-                .filter(f => f.name.toLowerCase().includes(query))
-                .map(f => ({ ...f, _type: 'folder' as const }));
-            const entityResults = availableEntities
+            // Return only entities for @ mentions
+            return availableEntities
                 .filter(e => e.name.toLowerCase().includes(query))
                 .map(e => ({ ...e, _type: 'entity' as const }));
-            return [...folderResults, ...entityResults];
+        } else if (mention.type === 'folder') {
+            // Return only folders for # mentions
+            return availableFolders
+                .filter(f => f.name.toLowerCase().includes(query))
+                .map(f => ({ ...f, _type: 'folder' as const }));
         } else if (mention.type === 'attribute' && mention.entityContext) {
             return mention.entityContext.properties
                 .filter(p => p.name.toLowerCase().includes(query))
@@ -772,7 +697,32 @@ export const Copilots: React.FC = () => {
         const cursor = e.target.selectionStart;
         const textBeforeCursor = val.slice(0, cursor);
         const lastAt = textBeforeCursor.lastIndexOf('@');
+        const lastHash = textBeforeCursor.lastIndexOf('#');
 
+        // Check for # (folder mention) - takes precedence if more recent
+        if (lastHash !== -1 && lastHash > lastAt) {
+            const textSinceHash = textBeforeCursor.slice(lastHash + 1);
+            if (textSinceHash.includes(' ')) {
+                setMention(prev => ({ ...prev, isActive: false }));
+                return;
+            }
+
+            if (mirrorRef.current) {
+                updateMentionPosition(lastHash + 1, e.target, mirrorRef.current);
+            }
+            setMention({
+                isActive: true,
+                type: 'folder',
+                query: textSinceHash,
+                top: 0,
+                left: 0,
+                triggerIndex: lastHash + 1
+            });
+            setSelectedMentionIndex(0);
+            return;
+        }
+
+        // Check for @ (entity mention)
         if (lastAt !== -1) {
             const textSinceAt = textBeforeCursor.slice(lastAt + 1);
             if (textSinceAt.includes(' ')) {
@@ -829,15 +779,40 @@ export const Copilots: React.FC = () => {
         const text = input;
         let insertText = '';
         let newCursorPos = 0;
+        let triggerChar = '@';
 
         if (mention.type === 'entity') {
-            // Handle both folders and entities
+            // Handle entities with @
             insertText = item.name;
+            triggerChar = '@';
 
             const start = text.lastIndexOf('@', inputRef.current.selectionStart);
             const end = inputRef.current.selectionStart;
 
             const newText = text.slice(0, start) + '@' + insertText + text.slice(end);
+            setInput(newText);
+            newCursorPos = start + 1 + insertText.length;
+        } else if (mention.type === 'folder' && item._type === 'folder') {
+            // Handle folders with # - expand to show contents
+            const folder = item as KnowledgeFolder;
+            
+            // Get entity names inside this folder
+            const folderEntities = availableEntities
+                .filter(e => folder.entityIds.includes(e.id))
+                .map(e => e.name);
+            
+            // Create expanded text showing folder and its contents
+            if (folderEntities.length > 0) {
+                insertText = `${folder.name} (contains: ${folderEntities.map(n => '@' + n).join(', ')})`;
+            } else {
+                insertText = `${folder.name} (empty folder)`;
+            }
+            triggerChar = '#';
+
+            const start = text.lastIndexOf('#', inputRef.current.selectionStart);
+            const end = inputRef.current.selectionStart;
+
+            const newText = text.slice(0, start) + '#' + insertText + text.slice(end);
             setInput(newText);
             newCursorPos = start + 1 + insertText.length;
         } else if (item._type === 'property') {
@@ -1170,7 +1145,7 @@ export const Copilots: React.FC = () => {
                                                         }}
                                                     >
                                                         <div className="bg-[var(--bg-tertiary)] px-3 py-2 border-b border-[var(--border-light)] text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">
-                                                            {mention.type === 'entity' ? 'Folders & Entities' : `Properties of ${mention.entityContext?.name}`}
+                                                            {mention.type === 'entity' ? 'Entities' : mention.type === 'folder' ? 'Folders' : `Properties of ${mention.entityContext?.name}`}
                                                         </div>
                                                         <div className="max-h-48 overflow-y-auto">
                                                             {mentionSuggestions.map((item, index) => (
@@ -1184,15 +1159,17 @@ export const Copilots: React.FC = () => {
                                                                     }`}
                                                                 >
                                                                     {item._type === 'folder' ? (
-                                                                        <Folder size={14} style={{ color: (item as KnowledgeFolder).color || 'var(--text-tertiary)' }} weight="light" />
+                                                                        <Folder size={14} style={{ color: (item as KnowledgeFolder).color || '#3b82f6' }} weight="fill" />
                                                                     ) : item._type === 'entity' ? (
-                                                                        <Database size={14} className="text-[var(--text-tertiary)]" weight="light" />
+                                                                        <Database size={14} className="text-teal-500" weight="light" />
                                                                     ) : (
                                                                         <Hash size={14} className="text-[var(--text-tertiary)]" weight="light" />
                                                                     )}
-                                                                    <span>{item.name}</span>
+                                                                    <span className={item._type === 'folder' ? 'font-medium' : ''}>{item.name}</span>
                                                                     {item._type === 'folder' && (
-                                                                        <span className="text-[10px] text-[var(--text-tertiary)] ml-auto">folder</span>
+                                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 ml-auto">
+                                                                            {(item as KnowledgeFolder).entityIds.length} entities
+                                                                        </span>
                                                                     )}
                                                                 </button>
                                                             ))}
@@ -1217,11 +1194,15 @@ export const Copilots: React.FC = () => {
                                             <div className="flex items-center space-x-4 text-xs text-[var(--text-tertiary)] mt-2">
                                                 <span className="flex items-center">
                                                     <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans text-[var(--text-secondary)]">@</kbd>
-                                                    to mention entities
+                                                    entities
+                                                </span>
+                                                <span className="flex items-center">
+                                                    <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans text-[var(--text-secondary)]">#</kbd>
+                                                    folders
                                                 </span>
                                                 <span className="flex items-center">
                                                     <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans text-[var(--text-secondary)]">.</kbd>
-                                                    for attributes
+                                                    attributes
                                                 </span>
                                             </div>
                                         </form>
@@ -1397,7 +1378,7 @@ export const Copilots: React.FC = () => {
                                             }}
                                         >
                                             <div className="bg-[var(--bg-tertiary)] px-3 py-2 border-b border-[var(--border-light)] text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">
-                                                {mention.type === 'entity' ? 'Folders & Entities' : `Properties of ${mention.entityContext?.name}`}
+                                                {mention.type === 'entity' ? 'Entities' : mention.type === 'folder' ? 'Folders' : `Properties of ${mention.entityContext?.name}`}
                                             </div>
                                             <div className="max-h-48 overflow-y-auto">
                                                 {mentionSuggestions.map((item, index) => (
@@ -1411,15 +1392,17 @@ export const Copilots: React.FC = () => {
                                                         }`}
                                                     >
                                                         {item._type === 'folder' ? (
-                                                            <Folder size={14} style={{ color: (item as KnowledgeFolder).color || 'var(--text-tertiary)' }} weight="light" />
+                                                            <Folder size={14} style={{ color: (item as KnowledgeFolder).color || '#3b82f6' }} weight="fill" />
                                                         ) : item._type === 'entity' ? (
-                                                            <Database size={14} className="text-[var(--text-tertiary)]" weight="light" />
+                                                            <Database size={14} className="text-teal-500" weight="light" />
                                                         ) : (
                                                             <Hash size={14} className="text-[var(--text-tertiary)]" weight="light" />
                                                         )}
-                                                        <span>{item.name}</span>
+                                                        <span className={item._type === 'folder' ? 'font-medium' : ''}>{item.name}</span>
                                                         {item._type === 'folder' && (
-                                                            <span className="text-[10px] text-[var(--text-tertiary)] ml-auto">folder</span>
+                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 ml-auto">
+                                                                {(item as KnowledgeFolder).entityIds.length} entities
+                                                            </span>
                                                         )}
                                                     </button>
                                                 ))}
@@ -1444,11 +1427,15 @@ export const Copilots: React.FC = () => {
                                 <div className="flex items-center space-x-4 text-xs text-[var(--text-tertiary)] mt-2">
                                     <span className="flex items-center">
                                         <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans text-[var(--text-secondary)]">@</kbd>
-                                        to mention entities
+                                        entities
+                                    </span>
+                                    <span className="flex items-center">
+                                        <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans text-[var(--text-secondary)]">#</kbd>
+                                        folders
                                     </span>
                                     <span className="flex items-center">
                                         <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans text-[var(--text-secondary)]">.</kbd>
-                                        for attributes
+                                        attributes
                                     </span>
                                 </div>
                             </form>

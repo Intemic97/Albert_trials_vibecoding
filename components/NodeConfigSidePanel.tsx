@@ -1,15 +1,14 @@
 /**
  * NodeConfigSidePanel
  * 
- * Panel lateral especializado para configuración de nodos de workflow.
- * Wrapper sobre el componente SidePanel genérico con estilos predefinidos.
+ * Panel lateral flotante especializado para configuración de nodos de workflow.
+ * Diseño limpio sin sombras, bordes sutiles y esquinas redondeadas.
  * 
  * @example
  * <NodeConfigSidePanel
  *   isOpen={isOpen}
  *   onClose={handleClose}
  *   title="Configure Node"
- *   icon={Gear}
  * >
  *   <form>...</form>
  * </NodeConfigSidePanel>
@@ -28,12 +27,8 @@ interface NodeConfigSidePanelProps {
     onClose: () => void;
     /** Panel title */
     title: string;
-    /** Icon component to display in header */
-    icon: React.ComponentType<any>;
-    /** Background color for icon container */
-    iconBgColor?: string;
-    /** Icon color */
-    iconColor?: string;
+    /** Optional icon component (not displayed by default for cleaner look) */
+    icon?: React.ComponentType<any>;
     /** Optional description/subtitle */
     description?: string;
     /** Panel content */
@@ -53,12 +48,10 @@ export const NodeConfigSidePanel: React.FC<NodeConfigSidePanelProps> = ({
     onClose,
     title,
     icon,
-    iconBgColor,
-    iconColor,
     description,
     children,
     footer,
-    width = 'xl'
+    width = 'lg'
 }) => {
     // Determine if width is a preset size or custom
     const isPresetSize = ['sm', 'md', 'lg', 'xl'].includes(width);
@@ -70,14 +63,12 @@ export const NodeConfigSidePanel: React.FC<NodeConfigSidePanelProps> = ({
             title={title}
             description={description}
             icon={icon}
-            iconBgColor={iconBgColor}
-            iconColor={iconColor}
             footer={footer}
-            size={isPresetSize ? width as 'sm' | 'md' | 'lg' | 'xl' : 'xl'}
+            size={isPresetSize ? width as 'sm' | 'md' | 'lg' | 'xl' : 'lg'}
             width={!isPresetSize ? width : undefined}
             position="right"
-            showOverlay={true}
-            closeOnOverlayClick={true}
+            showOverlay={false}
+            closeOnClickOutside={true}
             closeOnEscape={true}
             topOffset="63px"
             zIndex={40}

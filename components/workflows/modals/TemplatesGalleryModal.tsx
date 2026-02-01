@@ -15,7 +15,10 @@ import {
     Lightning,
     Calendar,
     ChartBar,
-    CheckCircle
+    CheckCircle,
+    MagnifyingGlass,
+    SortAscending,
+    Star
 } from '@phosphor-icons/react';
 import { WORKFLOW_TEMPLATES, WorkflowTemplate } from '../templates';
 import { getNodeIcon, getNodeIconBg, TEMPLATE_CATEGORY_COLORS, TEMPLATE_TEXT_COLORS } from '../utils/nodeHelpers';
@@ -88,16 +91,20 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onPreview, onCopy
             {/* Visual workflow preview */}
             <div className="bg-[var(--bg-card)]/60 backdrop-blur-sm rounded-lg p-2.5 mb-3 border border-[var(--border-light)]">
                 <div className="flex items-center gap-1.5 overflow-hidden">
-                    {template.nodes.slice(0, 5).map((node, idx) => (
-                        <React.Fragment key={idx}>
-                            <div className="flex-shrink-0 w-6 h-6 rounded bg-[var(--bg-tertiary)] border border-[var(--border-light)] flex items-center justify-center" title={node.label}>
-                                <FlowArrow size={10} className="text-[var(--text-tertiary)]" weight="light" />
-                            </div>
-                            {idx < Math.min(template.nodes.length - 1, 4) && (
-                                <ArrowRight size={10} className="text-[var(--text-tertiary)] flex-shrink-0" weight="light" />
-                            )}
-                        </React.Fragment>
-                    ))}
+                    {template.nodes.slice(0, 5).map((node, idx) => {
+                        const IconComponent = getNodeIcon(node.type);
+                        const iconBg = getNodeIconBg(node.type);
+                        return (
+                            <React.Fragment key={idx}>
+                                <div className="flex-shrink-0 w-6 h-6 rounded bg-[var(--bg-tertiary)] border border-[var(--border-light)] flex items-center justify-center" title={node.label}>
+                                    <IconComponent size={10} className={iconBg} weight="light" />
+                                </div>
+                                {idx < Math.min(template.nodes.length - 1, 4) && (
+                                    <ArrowRight size={10} className="text-[var(--text-tertiary)] flex-shrink-0" weight="light" />
+                                )}
+                            </React.Fragment>
+                        );
+                    })}
                     {template.nodes.length > 5 && (
                         <span className="text-[10px] text-[var(--text-tertiary)] ml-1">+{template.nodes.length - 5}</span>
                     )}
@@ -315,12 +322,36 @@ export const TemplatesGalleryModal: React.FC<TemplatesGalleryModalProps> = ({
     isCopying
 }) => {
     const [selectedCategory, setSelectedCategory] = useState('All');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortBy, setSortBy] = useState<'name' | 'nodes'>('name');
     const [previewingTemplate, setPreviewingTemplate] = useState<WorkflowTemplate | null>(null);
 
     const filteredTemplates = useMemo(() => {
-        if (selectedCategory === 'All') return WORKFLOW_TEMPLATES;
-        return WORKFLOW_TEMPLATES.filter(t => t.category === selectedCategory);
-    }, [selectedCategory]);
+        let templates = WORKFLOW_TEMPLATES;
+        
+        // Filter by category
+        if (selectedCategory !== 'All') {
+            templates = templates.filter(t => t.category === selectedCategory);
+        }
+        
+        // Filter by search query
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            templates = templates.filter(t => 
+                t.name.toLowerCase().includes(query) ||
+                t.description.toLowerCase().includes(query) ||
+                t.category.toLowerCase().includes(query)
+            );
+        }
+        
+        // Sort
+        templates = [...templates].sort((a, b) => {
+            if (sortBy === 'nodes') return b.nodes.length - a.nodes.length;
+            return a.name.localeCompare(b.name);
+        });
+        
+        return templates;
+    }, [selectedCategory, searchQuery, sortBy]);
 
     const handleCopy = async (template: WorkflowTemplate) => {
         await onCopyTemplate(template);
@@ -356,8 +387,35 @@ export const TemplatesGalleryModal: React.FC<TemplatesGalleryModalProps> = ({
                         </div>
                     </div>
 
-                    {/* Category Filter */}
+                    {/* Search and Filters */}
                     <div className="px-6 py-4 border-b border-[var(--border-light)] shrink-0 bg-[var(--bg-tertiary)]/30">
+                        <div className="flex items-center gap-4 mb-3">
+                            {/* Search */}
+                            <div className="relative flex-1 max-w-md">
+                                <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" weight="light" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Search templates..."
+                                    className="w-full pl-9 pr-4 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
+                                />
+                            </div>
+                            
+                            {/* Sort */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-[var(--text-tertiary)]">Sort:</span>
+                                <button
+                                    onClick={() => setSortBy(sortBy === 'name' ? 'nodes' : 'name')}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                                >
+                                    <SortAscending size={14} weight="light" />
+                                    {sortBy === 'name' ? 'Name' : 'Complexity'}
+                                </button>
+                            </div>
+                        </div>
+                        
+                        {/* Category Pills */}
                         <div className="flex items-center gap-2 overflow-x-auto pb-1">
                             {CATEGORIES.map(({ name, icon, color }) => (
                                 <button

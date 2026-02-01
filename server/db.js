@@ -766,6 +766,23 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  // Migration: Add new columns to simulations table for the new data model
+  try {
+    await db.exec(`ALTER TABLE simulations ADD COLUMN sourceEntities TEXT DEFAULT '[]'`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE simulations ADD COLUMN variables TEXT DEFAULT '[]'`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE simulations ADD COLUMN scenariosData TEXT DEFAULT '[]'`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   return db;
 }
 

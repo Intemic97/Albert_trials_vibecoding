@@ -840,11 +840,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         const isNewWorkflow = location.pathname === '/workflow/new';
         const isWorkflowView = location.pathname.startsWith('/workflow/') && !isNewWorkflow;
         
-        console.log('[Workflows] URL sync - pathname:', location.pathname, 'isListView:', isListView, 'isNewWorkflow:', isNewWorkflow, 'isWorkflowView:', isWorkflowView);
-        
         if (isListView) {
-            // On /workflows, show list view and clear current workflow
-            console.log('[Workflows] Switching to list view');
             setCurrentView('list');
             setCurrentWorkflowId(null);
             setNodes([]);
@@ -852,8 +848,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             setWorkflowName('Untitled Workflow');
             lastLoadedWorkflowIdRef.current = null;
         } else if (isNewWorkflow) {
-            // On /workflow/new, show canvas with empty workflow
-            console.log('[Workflows] New workflow - showing canvas');
             setCurrentView('canvas');
             setCurrentWorkflowId(null);
             setNodes([]);
@@ -3771,31 +3765,37 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         e.dataTransfer.dropEffect = 'copy';
     };
 
-    const handleWheel = (e: React.WheelEvent) => {
+    // Wheel handler for canvas zoom (used via native event listener)
+    const handleWheelNative = useCallback((e: WheelEvent) => {
         e.preventDefault();
         
         if (!canvasRef.current) return;
         
         const rect = canvasRef.current.getBoundingClientRect();
-        // Mouse position relative to the canvas element
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
         
-        // Calculate the point in canvas coordinates that's under the mouse
         const worldX = (mouseX - canvasOffset.x) / canvasZoom;
         const worldY = (mouseY - canvasOffset.y) / canvasZoom;
         
-        // Calculate new zoom level
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
         const newZoom = Math.min(Math.max(canvasZoom * delta, 0.25), 3);
         
-        // Calculate new offset to keep the same point under the mouse
         const newOffsetX = mouseX - worldX * newZoom;
         const newOffsetY = mouseY - worldY * newZoom;
         
         setCanvasZoom(newZoom);
         setCanvasOffset({ x: newOffsetX, y: newOffsetY });
-    };
+    }, [canvasOffset, canvasZoom]);
+
+    // Add wheel event listener with passive: false to allow preventDefault
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        
+        canvas.addEventListener('wheel', handleWheelNative, { passive: false });
+        return () => canvas.removeEventListener('wheel', handleWheelNative);
+    }, [handleWheelNative]);
 
     const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
     const [nodeDragged, setNodeDragged] = useState<boolean>(false);
@@ -4760,7 +4760,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             ref={canvasRef}
                             onDragOver={handleDragOver}
                             onDrop={handleDrop}
-                            onWheel={handleWheel}
                             onMouseDown={handleCanvasMouseDown}
                             onMouseMove={(e) => {
                                 handleCanvasMouseMove(e);
@@ -4796,6 +4795,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 cursor: isPanning ? 'grabbing' : 'default'
                             }}
                         >
+                            {/* Dotted background pattern - follows zoom */}
+                            <div 
+                                className="absolute inset-0 pointer-events-none"
+                                style={{
+                                    backgroundImage: `radial-gradient(circle, var(--text-tertiary) 1px, transparent 1px)`,
+                                    backgroundSize: `${20 * canvasZoom}px ${20 * canvasZoom}px`,
+                                    backgroundPosition: `${canvasOffset.x % (20 * canvasZoom)}px ${canvasOffset.y % (20 * canvasZoom)}px`,
+                                    opacity: 0.3
+                                }}
+                            />
                             {/* Remote Cursors */}
                             {Array.from(remoteCursors.values()).map((remote) => {
                                 if (!remote.cursor || remote.cursor.x < 0) return null;

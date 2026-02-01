@@ -73,49 +73,49 @@ export const PythonConfigModal: React.FC<PythonConfigModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Configure Python Code"
-      icon={Code}
+      width="lg"
       footer={
-        <>
+        <div className="flex items-center gap-3 w-full">
           <button
             onClick={onClose}
-            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+            className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onSave}
             disabled={!pythonCode.trim()}
-            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Save
           </button>
-        </>
+        </div>
       }
     >
       <div className="space-y-4">
         {/* Tabs */}
-        <div className="flex border-b border-[var(--border-light)]">
+        <div className="flex gap-1 p-1 bg-[var(--bg-tertiary)] rounded-lg">
           <button
             onClick={() => setActiveTab('code')}
-            className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
               activeTab === 'code'
-                ? 'border-teal-500 text-teal-600'
-                : 'border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                ? 'bg-[var(--bg-card)] text-[var(--text-primary)]'
+                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
             }`}
           >
-            <Code size={14} weight="light" className="inline mr-1.5" />
+            <Code size={16} weight="light" />
             Write Code
           </button>
           {onGenerateCode && (
             <button
               onClick={() => setActiveTab('ai')}
-              className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
                 activeTab === 'ai'
-                  ? 'border-teal-500 text-teal-600'
-                  : 'border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                  ? 'bg-[var(--bg-card)] text-[var(--text-primary)]'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
               }`}
             >
-              <Sparkle size={14} weight="light" className="inline mr-1.5" />
+              <Sparkle size={16} weight="light" />
               AI Generate
             </button>
           )}
@@ -126,12 +126,12 @@ export const PythonConfigModal: React.FC<PythonConfigModalProps> = ({
             {/* Code Editor */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-medium text-[var(--text-primary)]">
+                <label className="text-sm font-semibold text-[var(--text-primary)]">
                   Python Code
                 </label>
                 <button
                   onClick={insertTemplate}
-                  className="text-xs text-teal-600 hover:text-teal-700"
+                  className="text-xs text-[var(--accent-primary)] hover:underline"
                 >
                   Insert template
                 </button>
@@ -141,27 +141,39 @@ export const PythonConfigModal: React.FC<PythonConfigModalProps> = ({
                 onChange={(e) => onPythonCodeChange(e.target.value)}
                 placeholder={DEFAULT_CODE}
                 rows={15}
-                className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-xs font-mono text-[var(--text-primary)] bg-[var(--bg-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)] resize-none"
+                className="w-full px-3 py-2.5 border border-[var(--border-light)] rounded-lg text-sm font-mono text-[var(--text-primary)] bg-[var(--bg-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)] resize-none"
                 spellCheck={false}
               />
             </div>
 
             {/* Help */}
-            <div className="p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
-              <p className="text-xs font-medium text-[var(--text-primary)] mb-2">Available Variables</p>
-              <ul className="text-xs text-[var(--text-tertiary)] space-y-1">
-                <li><code className="text-[var(--text-secondary)]">input_data</code> - List of dictionaries from previous node</li>
-                <li><code className="text-[var(--text-secondary)]">pd</code> - Pandas library</li>
-                <li><code className="text-[var(--text-secondary)]">np</code> - NumPy library</li>
-                <li><code className="text-[var(--text-secondary)]">json</code> - JSON library</li>
-              </ul>
+            <div className="p-3 bg-[var(--bg-tertiary)] rounded-lg">
+              <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider mb-2">Available Variables</p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <code className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded text-[var(--accent-primary)] font-mono text-xs">input_data</code>
+                  <span className="text-[var(--text-tertiary)] text-xs">Data from previous node</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <code className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded text-[var(--accent-primary)] font-mono text-xs">pd</code>
+                  <span className="text-[var(--text-tertiary)] text-xs">Pandas library</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <code className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded text-[var(--accent-primary)] font-mono text-xs">np</code>
+                  <span className="text-[var(--text-tertiary)] text-xs">NumPy library</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <code className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded text-[var(--accent-primary)] font-mono text-xs">json</code>
+                  <span className="text-[var(--text-tertiary)] text-xs">JSON library</span>
+                </div>
+              </div>
             </div>
           </>
         ) : (
           <>
             {/* AI Prompt */}
             <div>
-              <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+              <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">
                 Describe what you want the code to do
               </label>
               <textarea
@@ -169,31 +181,31 @@ export const PythonConfigModal: React.FC<PythonConfigModalProps> = ({
                 onChange={(e) => onPythonAiPromptChange(e.target.value)}
                 placeholder="E.g., Filter rows where the 'status' column equals 'active' and calculate the sum of the 'amount' column"
                 rows={5}
-                className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)] resize-none"
+                className="w-full px-3 py-2.5 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)] resize-none"
               />
             </div>
 
             <button
               onClick={handleGenerateCode}
               disabled={!pythonAiPrompt.trim() || isGenerating}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg text-sm font-medium hover:from-purple-600 hover:to-indigo-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg text-sm font-medium hover:from-purple-600 hover:to-indigo-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isGenerating ? (
                 <>
-                  <SpinnerGap size={16} weight="light" className="animate-spin" />
+                  <SpinnerGap size={18} weight="light" className="animate-spin" />
                   Generating...
                 </>
               ) : (
                 <>
-                  <Sparkle size={16} weight="light" />
+                  <Sparkle size={18} weight="light" />
                   Generate Code
                 </>
               )}
             </button>
 
-            <div className="p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
-              <p className="text-xs text-[var(--text-secondary)]">
-                <span className="font-medium">Tip:</span> Be specific about the input data structure
+            <div className="p-3 bg-[var(--bg-tertiary)] rounded-lg">
+              <p className="text-sm text-[var(--text-secondary)]">
+                <span className="font-medium text-[var(--text-primary)]">Tip:</span> Be specific about the input data structure
                 and the expected output format for better results.
               </p>
             </div>

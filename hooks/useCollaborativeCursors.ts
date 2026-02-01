@@ -152,41 +152,28 @@ export function useCollaborativeCursors({
 
     // Cleanup function - keeps isCleaningUpRef true to prevent reconnection
     const cleanup = useCallback(() => {
-        console.log('[Collab] Cleanup called, current state:', { isCleaningUp: isCleaningUpRef.current, hasWs: !!wsRef.current });
-        
-        // Clear any pending reconnection first
         if (reconnectTimeoutRef.current) {
             clearTimeout(reconnectTimeoutRef.current);
             reconnectTimeoutRef.current = null;
         }
         
-        // Mark as cleaning up to prevent reconnection
         isCleaningUpRef.current = true;
         
         if (wsRef.current) {
             const ws = wsRef.current;
-            wsRef.current = null; // Clear ref first to prevent race conditions
+            wsRef.current = null;
             
-            // Send leave message before closing
             if (ws.readyState === WebSocket.OPEN) {
                 try {
                     ws.send(JSON.stringify({ type: 'leave' }));
-                    console.log('[Collab] Sent leave message');
-                } catch (e) {
-                    console.log('[Collab] Failed to send leave message:', e);
-                }
+                } catch (e) { /* ignore */ }
             }
             
-            // Close with a delay to allow leave message to be sent
-            setTimeout(() => {
-                ws.close();
-                console.log('[Collab] WebSocket closed');
-            }, 50);
+            setTimeout(() => ws.close(), 50);
         }
         
         setIsConnected(false);
         setRemoteCursors(new Map());
-        // Note: isCleaningUpRef stays true - it will be reset when a new connection starts
     }, []);
 
     // Connect to WebSocket
@@ -205,7 +192,6 @@ export function useCollaborativeCursors({
         
         // Clean up any existing connection first
         if (wsRef.current) {
-            console.log('[Collab] Cleaning up existing connection before new one');
             const oldWs = wsRef.current;
             wsRef.current = null;
             
@@ -217,14 +203,9 @@ export function useCollaborativeCursors({
             oldWs.close();
         }
         
-        // Always clear remote cursors when workflowId changes
         setRemoteCursors(new Map());
         setIsConnected(false);
-        
-        // Reset cleaning up flag for new connection
         isCleaningUpRef.current = false;
-        
-        console.log('[Collab] Effect running for workflowId:', workflowId);
         
         if (!enabled || !workflowId || !user) {
             return;
@@ -238,13 +219,11 @@ export function useCollaborativeCursors({
                 wsRef.current = ws;
 
                 ws.onopen = () => {
-                    console.log('[Collab] WebSocket connected, joining workflow:', workflowId);
                     setIsConnected(true);
-                    // Join the workflow room - include orgId for security validation
                     ws.send(JSON.stringify({
                         type: 'join',
                         workflowId,
-                        orgId: user.orgId, // Send organization ID for server-side validation
+                        orgId: user.orgId,
                         user: {
                             id: user.id,
                             name: user.name || user.email?.split('@')[0] || 'Anonymous',
@@ -258,37 +237,18 @@ export function useCollaborativeCursors({
                     try {
                         const message = JSON.parse(event.data);
 
-                        // SECURITY: Validate that messages are for the current workflow
-                        // We use TWO checks:
-                        // 1. currentWorkflowIdRef - what workflow we WANT to be in
-                        // 2. confirmedWorkflowIdRef - what workflow the server CONFIRMED we're in
-                        
                         const wantedWorkflowId = currentWorkflowIdRef.current;
                         const confirmedWorkflowId = confirmedWorkflowIdRef.current;
                         
-                        // For room_state, we accept it if it matches our WANTED workflow
-                        // This is the confirmation message that lets us start accepting other messages
                         if (message.type === 'room_state') {
-                            if (message.workflowId !== wantedWorkflowId) {
-                                console.warn('[Collab] REJECTING room_state for different workflow:', message.workflowId, 'wanted:', wantedWorkflowId);
-                                return;
-                            }
-                            // Confirm we're now in this workflow
+                            if (message.workflowId !== wantedWorkflowId) return;
                             confirmedWorkflowIdRef.current = message.workflowId;
-                            console.log('[Collab] Confirmed workflow:', message.workflowId);
                         } else {
-                            // For all other messages, only accept if we've confirmed the workflow
-                            // AND the message is for our confirmed workflow
-                            if (!confirmedWorkflowId || message.workflowId !== confirmedWorkflowId) {
-                                console.warn('[Collab] REJECTING message - confirmed:', confirmedWorkflowId, 'message:', message.workflowId, 'type:', message.type);
-                                return;
-                            }
+                            if (!confirmedWorkflowId || message.workflowId !== confirmedWorkflowId) return;
                         }
 
                         switch (message.type) {
                             case 'room_state': {
-                                // Initial state with existing users - confirmation already handled above
-                                console.log('[Collab] Room state received for workflow:', message.workflowId, 'existing users:', message.users.length);
                                 const newCursors = new Map<string, RemoteUser>();
                                 message.users.forEach((u: RemoteUser) => {
                                     newCursors.set(u.id, u);
@@ -299,8 +259,6 @@ export function useCollaborativeCursors({
                             }
 
                             case 'user_joined': {
-                                console.log('[Collab] User joined workflow', message.workflowId, ':', message.user.name, 'socketId:', message.id);
-                                console.log('[Collab] Current remoteCursors before adding:', Array.from(remoteCursors.keys()));
                                 setRemoteCursors(prev => {
                                     const newMap = new Map(prev);
                                     newMap.set(message.id, {
@@ -308,7 +266,6 @@ export function useCollaborativeCursors({
                                         user: message.user,
                                         cursor: null
                                     });
-                                    console.log('[Collab] Updated remoteCursors, now has:', Array.from(newMap.keys()));
                                     return newMap;
                                 });
                                 break;
@@ -401,30 +358,19 @@ export function useCollaborativeCursors({
                 };
 
                 ws.onclose = () => {
-                    console.log('[Collab] WebSocket disconnected');
                     setIsConnected(false);
                     wsRef.current = null;
                     
-                    // Only attempt to reconnect if:
-                    // 1. We're not intentionally cleaning up
-                    // 2. The workflowId hasn't changed (if it changed, a new useEffect will handle it)
-                    // CRITICAL: Use ref to check if workflowId is still the same
                     const shouldReconnect = !isCleaningUpRef.current && 
                                            enabled && 
                                            currentWorkflowIdRef.current === workflowId;
                     
                     if (shouldReconnect) {
                         reconnectTimeoutRef.current = window.setTimeout(() => {
-                            // Double-check the workflowId hasn't changed during the timeout
                             if (currentWorkflowIdRef.current === workflowId) {
-                                console.log('[Collab] Attempting reconnect to workflow:', workflowId);
                                 connect();
-                            } else {
-                                console.log('[Collab] Skipping reconnect - workflowId changed from', workflowId, 'to', currentWorkflowIdRef.current);
                             }
                         }, 3000);
-                    } else {
-                        console.log('[Collab] Not reconnecting - cleanup:', isCleaningUpRef.current, 'workflowMatch:', currentWorkflowIdRef.current === workflowId);
                     }
                 };
 

@@ -1701,7 +1701,7 @@ app.delete('/api/records/:id', authenticateToken, async (req, res) => {
 app.post('/api/database/ask', authenticateToken, async (req, res) => {
     console.log('[Database Assistant] Received question');
     try {
-        const { question, conversationHistory, chatId, instructions, allowedEntities } = req.body;
+        const { question, conversationHistory, chatId, instructions, allowedEntities, mentionedEntities } = req.body;
         const orgId = req.user.orgId;
 
         if (!question) {
@@ -1730,17 +1730,34 @@ app.post('/api/database/ask', authenticateToken, async (req, res) => {
             }
         }
 
-        // Fetch entities - filter by allowedEntities if specified
+        // Combine allowed entities with mentioned entities from the message
+        // mentionedEntities are entities explicitly cited in the user's message (via @ or # folder citations)
+        let effectiveEntities = chatAllowedEntities;
+        if (mentionedEntities && Array.isArray(mentionedEntities) && mentionedEntities.length > 0) {
+            if (effectiveEntities && Array.isArray(effectiveEntities) && effectiveEntities.length > 0) {
+                // Combine both lists, removing duplicates
+                effectiveEntities = [...new Set([...effectiveEntities, ...mentionedEntities])];
+            } else {
+                // No allowed entities restriction, but we have mentioned entities - prioritize them
+                effectiveEntities = mentionedEntities;
+            }
+        }
+
+        // Fetch entities - filter by effectiveEntities if specified
         let entitiesQuery = 'SELECT * FROM entities WHERE organizationId = ?';
         let entitiesParams = [orgId];
         
-        if (chatAllowedEntities && Array.isArray(chatAllowedEntities) && chatAllowedEntities.length > 0) {
-            const placeholders = chatAllowedEntities.map(() => '?').join(',');
+        console.log('[Database Assistant] Mentioned entities:', mentionedEntities);
+        console.log('[Database Assistant] Effective entities:', effectiveEntities);
+        
+        if (effectiveEntities && Array.isArray(effectiveEntities) && effectiveEntities.length > 0) {
+            const placeholders = effectiveEntities.map(() => '?').join(',');
             entitiesQuery += ` AND id IN (${placeholders})`;
-            entitiesParams = [orgId, ...chatAllowedEntities];
+            entitiesParams = [orgId, ...effectiveEntities];
         }
         
         const entities = await db.all(entitiesQuery, entitiesParams);
+        console.log('[Database Assistant] Loaded entities:', entities.map(e => ({ id: e.id, name: e.name })));
         
         const databaseContext = {};
         
@@ -3371,6 +3388,160 @@ app.delete('/api/widgets/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Error deleting widget:', error);
         res.status(500).json({ error: 'Failed to delete widget' });
+    }
+});
+
+// ==================== SIMULATIONS ENDPOINTS ====================
+
+// Get all simulations for the organization
+app.get('/api/simulations', authenticateToken, async (req, res) => {
+    try {
+        const simulations = await db.all(
+            'SELECT * FROM simulations WHERE organizationId = ? ORDER BY updatedAt DESC',
+            [req.user.orgId]
+        );
+        
+        // Parse JSON fields
+        const parsed = simulations.map(s => ({
+            ...s,
+            sourceEntities: JSON.parse(s.sourceEntities || '[]'),
+            variables: JSON.parse(s.variables || '[]'),
+            scenarios: JSON.parse(s.scenariosData || '[]')
+        }));
+        
+        res.json(parsed);
+    } catch (error) {
+        console.error('Error fetching simulations:', error);
+        res.status(500).json({ error: 'Failed to fetch simulations' });
+    }
+});
+
+// Get single simulation
+app.get('/api/simulations/:id', authenticateToken, async (req, res) => {
+    try {
+        const simulation = await db.get(
+            'SELECT * FROM simulations WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!simulation) {
+            return res.status(404).json({ error: 'Simulation not found' });
+        }
+        
+        res.json({
+            ...simulation,
+            sourceEntities: JSON.parse(simulation.sourceEntities || '[]'),
+            variables: JSON.parse(simulation.variables || '[]'),
+            scenarios: JSON.parse(simulation.scenariosData || '[]')
+        });
+    } catch (error) {
+        console.error('Error fetching simulation:', error);
+        res.status(500).json({ error: 'Failed to fetch simulation' });
+    }
+});
+
+// Create simulation
+app.post('/api/simulations', authenticateToken, async (req, res) => {
+    try {
+        const { id, name, description, sourceEntities, variables, scenarios } = req.body;
+        const now = new Date().toISOString();
+        const simId = id || generateId();
+        
+        await db.run(
+            `INSERT INTO simulations (id, organizationId, name, description, sourceEntities, variables, scenariosData, createdAt, updatedAt) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                simId,
+                req.user.orgId,
+                name,
+                description || '',
+                JSON.stringify(sourceEntities || []),
+                JSON.stringify(variables || []),
+                JSON.stringify(scenarios || []),
+                now,
+                now
+            ]
+        );
+        
+        res.json({
+            id: simId,
+            name,
+            description,
+            sourceEntities: sourceEntities || [],
+            variables: variables || [],
+            scenarios: scenarios || [],
+            createdAt: now,
+            updatedAt: now
+        });
+    } catch (error) {
+        console.error('Error creating simulation:', error);
+        res.status(500).json({ error: 'Failed to create simulation' });
+    }
+});
+
+// Update simulation
+app.put('/api/simulations/:id', authenticateToken, async (req, res) => {
+    try {
+        const { name, description, sourceEntities, variables, scenarios } = req.body;
+        const now = new Date().toISOString();
+        
+        // Verify ownership
+        const existing = await db.get(
+            'SELECT id FROM simulations WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!existing) {
+            return res.status(404).json({ error: 'Simulation not found' });
+        }
+        
+        await db.run(
+            `UPDATE simulations SET name = ?, description = ?, sourceEntities = ?, variables = ?, scenariosData = ?, updatedAt = ? 
+             WHERE id = ?`,
+            [
+                name,
+                description || '',
+                JSON.stringify(sourceEntities || []),
+                JSON.stringify(variables || []),
+                JSON.stringify(scenarios || []),
+                now,
+                req.params.id
+            ]
+        );
+        
+        res.json({
+            id: req.params.id,
+            name,
+            description,
+            sourceEntities: sourceEntities || [],
+            variables: variables || [],
+            scenarios: scenarios || [],
+            updatedAt: now
+        });
+    } catch (error) {
+        console.error('Error updating simulation:', error);
+        res.status(500).json({ error: 'Failed to update simulation' });
+    }
+});
+
+// Delete simulation
+app.delete('/api/simulations/:id', authenticateToken, async (req, res) => {
+    try {
+        // Verify ownership
+        const existing = await db.get(
+            'SELECT id FROM simulations WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!existing) {
+            return res.status(404).json({ error: 'Simulation not found' });
+        }
+        
+        await db.run('DELETE FROM simulations WHERE id = ?', [req.params.id]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting simulation:', error);
+        res.status(500).json({ error: 'Failed to delete simulation' });
     }
 });
 

@@ -1362,7 +1362,7 @@ const ComparisonChart: React.FC<ComparisonChartProps> = ({ variables, scenarios,
             <h3 className="text-sm font-medium text-[var(--text-primary)] mb-4" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                 Comparación Visual
             </h3>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={300} minWidth={200} minHeight={100}>
                 <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
                     <XAxis type="number" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
@@ -1460,7 +1460,7 @@ const SensitivityAnalysis: React.FC<SensitivityAnalysisProps> = ({
 
             {/* Chart */}
             {variable && data.length > 0 ? (
-                <ResponsiveContainer width="100%" height={250}>
+                <ResponsiveContainer width="100%" height={250} minWidth={200} minHeight={100}>
                     <ComposedChart data={data} margin={{ left: 10, right: 10 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
                         <XAxis dataKey="percentage" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />

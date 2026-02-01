@@ -53,7 +53,7 @@ interface OrgUser {
 
 export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial }) => {
     const { mode, setMode, isDark } = useTheme();
-    const [activeTab, setActiveTab] = useState<'general' | 'team' | 'billing' | 'integrations'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'team' | 'integrations'>('general');
     const [users, setUsers] = useState<OrgUser[]>([]);
     const [isInviting, setIsInviting] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
@@ -474,7 +474,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-5xl mx-auto">
                     <div className="flex gap-0.5 bg-[var(--bg-tertiary)] p-0.5 rounded-lg w-fit mb-6 border border-[var(--border-light)]">
-                        {['General', 'Team', 'Billing', 'Integrations'].map((tab) => (
+                        {['General', 'Team', 'Integrations'].map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab.toLowerCase() as any)}

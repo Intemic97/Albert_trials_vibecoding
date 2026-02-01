@@ -424,7 +424,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
 
     return (
         <div ref={containerRef} style={{ width: '100%', height: height, minHeight: height }}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={100}>
                 {renderChart()}
             </ResponsiveContainer>
         </div>

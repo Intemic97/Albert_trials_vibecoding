@@ -101,6 +101,8 @@ export {
   SidePanel, 
   SidePanelContent, 
   SidePanelSection, 
+  SidePanelField,
+  SidePanelList,
   SidePanelDivider 
 } from './SidePanel';
 export type { SidePanelSize, SidePanelPosition } from './SidePanel';
