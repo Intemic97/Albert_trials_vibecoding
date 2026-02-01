@@ -346,20 +346,24 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
       {/* Modals */}
       {ui.showExecutionHistory && (
         <ExecutionHistoryModal
+          isOpen={ui.showExecutionHistory}
           workflowId={workflow.id || ''}
+          workflowName={workflow.name}
           onClose={() => setShowExecutionHistory(false)}
         />
       )}
       
       {ui.showTemplatesGallery && (
         <TemplatesGalleryModal
+          isOpen={ui.showTemplatesGallery}
           onClose={() => setShowTemplatesGallery(false)}
-          onSelectTemplate={(template) => {
-            setNodes(template.nodes);
-            setConnections(template.connections);
+          onCopyTemplate={async (template) => {
+            setNodes(template.nodes || []);
+            setConnections(template.connections || []);
             setWorkflowMeta({ name: template.name });
             setShowTemplatesGallery(false);
           }}
+          isCopying={false}
         />
       )}
     </div>

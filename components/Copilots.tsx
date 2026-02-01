@@ -1039,11 +1039,11 @@ export const Copilots: React.FC = () => {
     const isEmptyChat = !activeChat || (messages.length <= 1 && messages[0]?.role === 'assistant');
     
     const examplePrompts = [
-        "How many customers do we have?",
-        "Show me products with price over 100",
-        "List all recent orders",
-        "What are my top selling products?",
-        "Show me customer demographics"
+        "¿Cuál es la tasa de defectos de esta semana?",
+        "Muéstrame los lotes fuera de especificación",
+        "Análisis de mermas por línea de producción",
+        "¿Qué materias primas tienen más rechazos?",
+        "Tendencia de calidad últimos 30 días"
     ];
 
     const chatQuery = new URLSearchParams(location.search).get('q')?.toLowerCase() || '';
@@ -1792,9 +1792,9 @@ export const Copilots: React.FC = () => {
                                 </div>
                             </form>
                             <div className="mt-2 flex items-center justify-center gap-4 text-xs text-[var(--text-tertiary)]">
-                                <span>Try: "How many customers do we have?"</span>
+                                <span>Prueba: "¿Cuál es la tasa de defectos?"</span>
                                 <span>•</span>
-                                <span>"Show products with price over 100"</span>
+                                <span>"Muéstrame lotes fuera de especificación"</span>
                             </div>
                         </div>
                     </div>

@@ -270,7 +270,7 @@ export const DatabaseAssistant: React.FC<DatabaseAssistantProps> = ({ isOpen, on
                                 </button>
                             </div>
                             <p className="text-[10px] text-[var(--text-tertiary)] mt-2 text-center">
-                                Try: "How many customers do we have?" or "Show products with price over 100"
+                                Prueba: "¿Cuál es la tasa de defectos?" o "Muéstrame lotes rechazados"
                             </p>
                         </form>
                     </>

@@ -21,6 +21,7 @@ import { API_BASE } from './config';
 
 // Lazy-loaded components for better performance
 const Workflows = React.lazy(() => import('./components/Workflows').then(m => ({ default: m.Workflows })));
+const WorkflowEditor = React.lazy(() => import('./components/workflows/WorkflowEditor').then(m => ({ default: m.WorkflowEditor })));
 const ReportEditor = React.lazy(() => import('./components/ReportEditor').then(m => ({ default: m.ReportEditor })));
 const Dashboard = React.lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
 const Overview = React.lazy(() => import('./components/Overview').then(m => ({ default: m.Overview })));
@@ -989,6 +990,13 @@ function AuthenticatedApp() {
                     } />
                     <Route path="/workflow/:workflowId" element={
                         <Workflows entities={entities} onViewChange={handleNavigate} />
+                    } />
+                    {/* New modular workflow editor (v2) - for testing */}
+                    <Route path="/workflows-v2" element={
+                        <WorkflowEditor entities={entities} onViewChange={handleNavigate} />
+                    } />
+                    <Route path="/workflows-v2/:workflowId" element={
+                        <WorkflowEditor entities={entities} onViewChange={handleNavigate} />
                     } />
                     <Route path="/templates" element={
                         <Reporting entities={entities} companyInfo={undefined} onViewChange={handleNavigate} view="templates" />
