@@ -1,0 +1,176 @@
+---
+description: Context about the Workflows module refactoring and migration
+globs: ["components/workflows/**", "components/Workflows.tsx", "stores/workflowStore.ts", "stores/nodeConfigStore.ts"]
+alwaysApply: false
+---
+
+# Workflows Module Migration
+
+## Overview
+
+The `Workflows.tsx` component (~10,380 lines) is being refactored into a modular architecture using Zustand stores and smaller components. There are now TWO versions running in parallel:
+
+| Version | Route | File | Status |
+|---------|-------|------|--------|
+| **Original** | `/workflows` | `components/Workflows.tsx` | Production, monolithic |
+| **New v2** | `/workflows-v2` | `components/workflows/WorkflowEditor.tsx` | In development, modular |
+
+## Architecture
+
+### Zustand Stores (NEW)
+
+Located in `stores/`:
+
+1. **`workflowStore.ts`** - Central workflow state
+   - `nodes`, `connections` - Graph data
+   - `workflow` - Metadata (id, name, description)
+   - `canvas` - Pan/zoom, selection
+   - `ui` - Sidebar, panels, modals
+   - `execution` - Running state
+   - Actions: `addNode`, `updateNode`, `deleteNode`, `moveNode`, etc.
+
+2. **`nodeConfigStore.ts`** - Node configuration modals
+   - `configuringNodeId` - Which node is being configured
+   - `configuringNodeType` - Type of that node
+   - Temp config states for each node type
+   - Actions: `openConfig`, `closeConfig`, `updateConfig`
+
+### Modular Hooks
+
+Located in `components/workflows/hooks/`:
+
+1. **`useCanvasPanZoom.ts`** - Canvas pan & zoom
+   - `scale`, `offsetX`, `offsetY`
+   - `handleWheel`, `handleMouseDown/Move/Up`
+   - `zoomIn`, `zoomOut`, `resetView`, `fitToContent`
+   - `screenToCanvas`, `canvasToScreen` coordinate conversion
+
+2. **`useNodeDrag.ts`** - Node dragging
+   - `draggingNodeId`, `isDragging`
+   - Grid snapping support
+
+3. **`useConnectionDrag.ts`** - Connection creation
+   - `connectionDrag` state
+   - Precise connector positioning for special nodes
+
+### New Components
+
+Located in `components/workflows/`:
+
+| Component | Purpose |
+|-----------|---------|
+| `WorkflowEditor.tsx` | Main editor (~400 lines vs 10,380 original) |
+| `WorkflowCanvas.tsx` | Canvas with pan/zoom, nodes, connections |
+| `NodePalette.tsx` | Draggable node sidebar |
+| `AIAssistantPanel.tsx` | AI workflow generation + chat |
+| `NodeConfigPanels.tsx` | Configuration panels per node type |
+| `DataPreviewSidePanel.tsx` | Data input/output visualization |
+| `WorkflowNode.tsx` | Individual node rendering |
+| `ConnectionLine.tsx` | Bezier connection paths |
+
+## Key Implementation Details
+
+### Connector Alignment
+
+Special nodes (condition, join, splitColumns) use FIXED OFFSETS for connector positions:
+
+```typescript
+// Condition/SplitColumns outputs
+TRUE/A output: y = nodeY - 37px
+FALSE/B output: y = nodeY + 37px
+
+// Join inputs
+Input A: y = nodeY - 5px
+Input B: y = nodeY + 25px
+```
+
+These offsets are synchronized in:
+- `WorkflowNode.tsx` - CSS positioning of connector divs
+- `ConnectionLine.tsx` - Path calculation in `calculatePath()`
+- `useConnectionDrag.ts` - `getOutputConnectorPosition()` / `getInputConnectorPosition()`
+
+### Drag & Drop
+
+Drag from NodePalette to canvas:
+1. `NodePalette` sets `dataTransfer.setData('application/workflow-node', item.type)`
+2. `WorkflowEditor` wrapper div handles `onDragOver` (preventDefault) and `onDrop`
+3. On drop: create new node at mouse position, add to store
+
+### Node Configuration
+
+To configure a node:
+1. Double-click on node OR click the three-dots menu
+2. `WorkflowEditor.handleNodeConfigure()` calls `nodeConfigStore.openConfig()`
+3. `NodeConfigPanels` renders the appropriate panel based on `configuringNodeType`
+4. On save: `workflowStore.updateNode()` with new config
+
+## Migration Status
+
+### ✅ Completed
+- Zustand stores for state management
+- Canvas pan/zoom/drag hooks
+- WorkflowCanvas component
+- WorkflowEditor with basic toolbar
+- AI Assistant Panel
+- Node configuration panels (FetchData, Condition, LLM, Python, HTTP, Email, Join)
+- Data preview panel
+
+### ⏳ Pending
+- Full node execution (currently simulated)
+- WebSocket integration for real-time updates
+- Collaborative cursors integration
+- Autosave hook integration
+- Undo/Redo integration
+- All node type configurations (Excel, PDF, MySQL, SAP, etc.)
+
+## Usage
+
+```tsx
+// To test the new editor:
+// Navigate to /workflows-v2
+
+// To use stores in components:
+import { useWorkflowStore, useNodeConfigStore } from '@/stores';
+
+const nodes = useWorkflowStore(state => state.nodes);
+const addNode = useWorkflowStore(state => state.addNode);
+
+// To open node config:
+const openConfig = useNodeConfigStore(state => state.openConfig);
+openConfig(nodeId, nodeType, existingConfig);
+```
+
+## Files Reference
+
+```
+stores/
+├── index.ts                    # Exports all stores
+├── workflowStore.ts            # ~400 lines, workflow state
+└── nodeConfigStore.ts          # ~500 lines, config modals
+
+components/workflows/
+├── index.ts                    # Module exports
+├── types.ts                    # TypeScript types
+├── constants.ts                # DRAGGABLE_ITEMS, categories
+├── hooks/
+│   ├── index.ts
+│   ├── useCanvasPanZoom.ts
+│   ├── useNodeDrag.ts
+│   └── useConnectionDrag.ts
+├── WorkflowEditor.tsx          # Main editor component
+├── WorkflowCanvas.tsx          # Canvas rendering
+├── WorkflowNode.tsx            # Node component
+├── NodePalette.tsx             # Drag source sidebar
+├── AIAssistantPanel.tsx        # AI generation panel
+├── NodeConfigPanels.tsx        # Config panels
+├── DataPreviewSidePanel.tsx    # Data preview
+├── ConnectionLine.tsx          # Connection rendering
+└── modals/                     # Modal components
+```
+
+## Important Notes
+
+1. **Do NOT modify** `Workflows.tsx` (original) unless fixing bugs - it's production
+2. **All new features** should go into the v2 components
+3. **Stores are global** - changes reflect across all components using them
+4. **Test at `/workflows-v2`** before considering replacement of original
