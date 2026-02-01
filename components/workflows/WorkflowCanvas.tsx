@@ -448,7 +448,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   // RENDER
   // =========================================================================
   return (
-    <div className="flex-1 relative overflow-hidden bg-[var(--bg-secondary)]">
+    <div className="absolute inset-0 overflow-hidden bg-[var(--bg-secondary)]">
       {/* Canvas container */}
       <div
         ref={canvasRef}

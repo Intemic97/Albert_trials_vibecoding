@@ -329,7 +329,7 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
       </div>
       
       {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Sidebar - Node Palette */}
         <div className={`${ui.isSidebarCollapsed ? 'w-12' : 'w-64'} border-r border-[var(--border-light)] bg-[var(--bg-card)] overflow-y-auto transition-all duration-200`}>
           <NodePalette
