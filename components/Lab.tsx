@@ -2049,6 +2049,22 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                         </div>
                                     </div>
                                 ))}
+                                
+                                {/* Create New Experiment Card */}
+                                <button
+                                    onClick={() => setShowCreateModal(true)}
+                                    className="bg-[var(--bg-card)] border-2 border-dashed border-[var(--border-light)] rounded-xl p-5 cursor-pointer hover:border-[var(--accent-primary)] hover:bg-[var(--bg-hover)] transition-all flex flex-col items-center justify-center min-h-[160px] group"
+                                >
+                                    <div className="w-12 h-12 rounded-full bg-[var(--accent-primary)]/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                        <Plus size={24} className="text-[var(--accent-primary)]" />
+                                    </div>
+                                    <span className="font-medium text-[var(--text-primary)] mb-1">
+                                        New Experiment
+                                    </span>
+                                    <span className="text-xs text-[var(--text-tertiary)]">
+                                        Connect to a workflow
+                                    </span>
+                                </button>
                             </div>
                         )}
                     </div>
