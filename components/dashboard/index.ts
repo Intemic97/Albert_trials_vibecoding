@@ -27,5 +27,7 @@ export {
     ScatterMatrixChart,
     SankeyChart,
     BubbleChart,
+    SeverityTimelineChart,
+    MultiTrackTimelineChart,
     ADVANCED_CHART_TYPES
 } from './AdvancedCharts';

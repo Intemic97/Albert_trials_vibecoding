@@ -9,11 +9,13 @@ import {
     HeatmapChart,
     ScatterMatrixChart,
     SankeyChart,
-    BubbleChart
+    BubbleChart,
+    SeverityTimelineChart,
+    MultiTrackTimelineChart
 } from './dashboard/AdvancedCharts';
 
 export interface WidgetConfig {
-    type: 'bar' | 'line' | 'pie' | 'area' | 'donut' | 'radial' | 'parallel' | 'heatmap' | 'scatter_matrix' | 'sankey' | 'bubble';
+    type: 'bar' | 'line' | 'pie' | 'area' | 'donut' | 'radial' | 'parallel' | 'heatmap' | 'scatter_matrix' | 'sankey' | 'bubble' | 'timeline' | 'multi_timeline';
     title: string;
     description: string;
     explanation?: string;
@@ -29,6 +31,10 @@ export interface WidgetConfig {
     colorKey?: string;
     nodes?: { id: string; value?: number }[];
     links?: { source: string; target: string; value: number }[];
+    // Timeline configs
+    events?: { start: string | Date; end?: string | Date; severity: string; label?: string }[];
+    tracks?: { id: string; title: string; subtitle?: string; events: any[] }[];
+    subtitle?: string;
 }
 
 export interface DateRange {
@@ -523,6 +529,58 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                     />
                 );
                 
+            case 'timeline':
+                // Severity Timeline
+                const timelineEvents = config.events || data.map(d => ({
+                    start: d.start || d.timestamp || d.date || d.time,
+                    end: d.end,
+                    severity: d.severity || 'medium',
+                    label: d.label || d.name || d.description
+                }));
+                return (
+                    <SeverityTimelineChart
+                        title={config.title}
+                        subtitle={config.subtitle || config.description}
+                        events={timelineEvents as any}
+                        height={height}
+                    />
+                );
+                
+            case 'multi_timeline':
+                // Multi-Track Timeline
+                if (config.tracks) {
+                    return (
+                        <MultiTrackTimelineChart
+                            tracks={config.tracks}
+                            height={height}
+                        />
+                    );
+                }
+                // Auto-generate tracks from data grouped by a key
+                const groupKey = config.colorKey || 'asset' || 'detector' || 'category';
+                const groups = new Map<string, any[]>();
+                data.forEach(d => {
+                    const key = d[groupKey] || 'Default';
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key)!.push({
+                        start: d.start || d.timestamp || d.date,
+                        end: d.end,
+                        severity: d.severity || 'medium',
+                        label: d.label
+                    });
+                });
+                const autoTracks = Array.from(groups.entries()).map(([id, events]) => ({
+                    id,
+                    title: id,
+                    events
+                }));
+                return (
+                    <MultiTrackTimelineChart
+                        tracks={autoTracks}
+                        height={height}
+                    />
+                );
+                
             default:
                 return <div className="text-[var(--text-tertiary)]">Unsupported chart type</div>;
         }
@@ -547,7 +605,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
     }
 
     // Advanced charts handle their own sizing
-    const isAdvancedChart = ['parallel', 'heatmap', 'scatter_matrix', 'sankey', 'bubble'].includes(type);
+    const isAdvancedChart = ['parallel', 'heatmap', 'scatter_matrix', 'sankey', 'bubble', 'timeline', 'multi_timeline'].includes(type);
 
     return (
         <div ref={containerRef} style={{ width: '100%', height: height, minHeight: height }} className="relative">

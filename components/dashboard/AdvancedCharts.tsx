@@ -711,6 +711,422 @@ export const BubbleChart: React.FC<BubbleChartProps> = ({
 };
 
 // ============================================================================
+// SEVERITY TIMELINE CHART (Alert/Event Timeline)
+// ============================================================================
+
+const SEVERITY_COLORS = {
+    very_high: '#9333EA', // Purple
+    high: '#DC2626',      // Red
+    medium: '#F97316',    // Orange
+    low: '#FBBF24',       // Yellow/Amber
+    none: '#4B5563',      // Gray
+    na: '#1F2937'         // Dark gray
+};
+
+const SEVERITY_LABELS = {
+    very_high: 'Very high severity',
+    high: 'High severity', 
+    medium: 'Medium severity',
+    low: 'Low severity',
+    none: 'No detection',
+    na: 'N/A'
+};
+
+interface TimelineEvent {
+    start: string | Date;
+    end?: string | Date;
+    severity: 'very_high' | 'high' | 'medium' | 'low' | 'none' | 'na';
+    label?: string;
+}
+
+interface SeverityTimelineProps {
+    title: string;
+    subtitle?: string;
+    events: TimelineEvent[];
+    startDate?: string | Date;
+    endDate?: string | Date;
+    height?: number;
+    showLegend?: boolean;
+}
+
+export const SeverityTimelineChart: React.FC<SeverityTimelineProps> = ({
+    title,
+    subtitle,
+    events,
+    startDate,
+    endDate,
+    height = 120,
+    showLegend = true
+}) => {
+    const [hoveredEvent, setHoveredEvent] = useState<{ event: TimelineEvent; x: number } | null>(null);
+
+    // Calculate time range
+    const timeRange = useMemo(() => {
+        let minTime = startDate ? new Date(startDate).getTime() : Infinity;
+        let maxTime = endDate ? new Date(endDate).getTime() : -Infinity;
+        
+        events.forEach(e => {
+            const start = new Date(e.start).getTime();
+            const end = e.end ? new Date(e.end).getTime() : start + 3600000; // Default 1h
+            minTime = Math.min(minTime, start);
+            maxTime = Math.max(maxTime, end);
+        });
+        
+        // Add padding
+        const range = maxTime - minTime;
+        return {
+            start: minTime - range * 0.02,
+            end: maxTime + range * 0.02,
+            duration: maxTime - minTime + range * 0.04
+        };
+    }, [events, startDate, endDate]);
+
+    // Generate time labels
+    const timeLabels = useMemo(() => {
+        const labels: { time: number; label: string }[] = [];
+        const range = timeRange.end - timeRange.start;
+        const numLabels = 8;
+        
+        for (let i = 0; i <= numLabels; i++) {
+            const time = timeRange.start + (range * i / numLabels);
+            const date = new Date(time);
+            labels.push({
+                time,
+                label: date.toLocaleDateString('en-US', { 
+                    weekday: 'short', 
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }).replace(',', '')
+            });
+        }
+        return labels;
+    }, [timeRange]);
+
+    // Calculate event positions
+    const eventBars = useMemo(() => {
+        return events.map((event, idx) => {
+            const start = new Date(event.start).getTime();
+            const end = event.end ? new Date(event.end).getTime() : start + 3600000;
+            
+            const x = ((start - timeRange.start) / timeRange.duration) * 100;
+            const width = Math.max(0.5, ((end - start) / timeRange.duration) * 100);
+            
+            return {
+                ...event,
+                x,
+                width,
+                index: idx
+            };
+        });
+    }, [events, timeRange]);
+
+    // Get unique severities for legend
+    const activeSeverities = useMemo(() => {
+        const severities = new Set(events.map(e => e.severity));
+        return Array.from(severities);
+    }, [events]);
+
+    return (
+        <div className="w-full" style={{ height }}>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-2">
+                <div>
+                    <h4 className="text-sm font-medium text-[var(--text-primary)]">{title}</h4>
+                    {subtitle && (
+                        <p className="text-xs text-[var(--text-tertiary)]">{subtitle}</p>
+                    )}
+                </div>
+            </div>
+            
+            {/* Timeline */}
+            <div className="relative bg-[var(--bg-tertiary)] rounded-lg overflow-hidden" style={{ height: 40 }}>
+                {/* Track label */}
+                <div className="absolute left-0 top-0 bottom-0 w-auto max-w-[40%] px-2 flex items-center bg-gradient-to-r from-[var(--bg-card)] to-transparent z-10">
+                    <span className="text-[10px] text-[var(--text-secondary)] truncate font-medium">
+                        {subtitle || title}
+                    </span>
+                </div>
+                
+                {/* Event bars */}
+                {eventBars.map((bar, idx) => (
+                    <div
+                        key={idx}
+                        className="absolute top-1 bottom-1 rounded-sm transition-all cursor-pointer hover:brightness-110"
+                        style={{
+                            left: `${bar.x}%`,
+                            width: `${bar.width}%`,
+                            minWidth: '3px',
+                            backgroundColor: SEVERITY_COLORS[bar.severity],
+                            boxShadow: hoveredEvent?.event === bar ? '0 0 8px rgba(255,255,255,0.3)' : 'none'
+                        }}
+                        onMouseEnter={(e) => setHoveredEvent({ event: bar, x: e.clientX })}
+                        onMouseLeave={() => setHoveredEvent(null)}
+                    />
+                ))}
+                
+                {/* Hover indicator line */}
+                {hoveredEvent && (
+                    <div 
+                        className="absolute top-0 bottom-0 w-px bg-white/50 pointer-events-none z-20"
+                        style={{ left: `${(eventBars.find(b => b === hoveredEvent.event)?.x || 0)}%` }}
+                    />
+                )}
+            </div>
+            
+            {/* Time axis */}
+            <div className="relative h-5 mt-1">
+                {timeLabels.map((label, idx) => (
+                    <span
+                        key={idx}
+                        className="absolute text-[9px] text-[var(--text-tertiary)] whitespace-nowrap"
+                        style={{
+                            left: `${(idx / (timeLabels.length - 1)) * 100}%`,
+                            transform: 'translateX(-50%)'
+                        }}
+                    >
+                        {label.label.split(' ').slice(0, 2).join(' ')}
+                    </span>
+                ))}
+            </div>
+            
+            {/* Legend */}
+            {showLegend && (
+                <div className="flex flex-wrap gap-3 mt-2 justify-center">
+                    {Object.entries(SEVERITY_COLORS).map(([key, color]) => {
+                        if (!activeSeverities.includes(key as any) && key !== 'none' && key !== 'na') return null;
+                        return (
+                            <div key={key} className="flex items-center gap-1.5">
+                                <div 
+                                    className="w-3 h-3 rounded-sm" 
+                                    style={{ backgroundColor: color }}
+                                />
+                                <span className="text-[10px] text-[var(--text-tertiary)]">
+                                    {SEVERITY_LABELS[key as keyof typeof SEVERITY_LABELS]}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+            
+            {/* Tooltip */}
+            {hoveredEvent && (
+                <div className="fixed bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-2 shadow-xl text-xs z-50 pointer-events-none"
+                    style={{ 
+                        left: hoveredEvent.x + 10, 
+                        top: '50%',
+                        transform: 'translateY(-50%)'
+                    }}
+                >
+                    <div className="flex items-center gap-2 mb-1">
+                        <div 
+                            className="w-2 h-2 rounded-full" 
+                            style={{ backgroundColor: SEVERITY_COLORS[hoveredEvent.event.severity] }}
+                        />
+                        <span className="font-medium text-[var(--text-primary)]">
+                            {SEVERITY_LABELS[hoveredEvent.event.severity]}
+                        </span>
+                    </div>
+                    <div className="text-[var(--text-tertiary)]">
+                        {new Date(hoveredEvent.event.start).toLocaleString()}
+                    </div>
+                    {hoveredEvent.event.label && (
+                        <div className="text-[var(--text-secondary)] mt-1">
+                            {hoveredEvent.event.label}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ============================================================================
+// MULTI-TRACK TIMELINE (Multiple detectors)
+// ============================================================================
+
+interface TimelineTrack {
+    id: string;
+    title: string;
+    subtitle?: string;
+    events: TimelineEvent[];
+}
+
+interface MultiTrackTimelineProps {
+    tracks: TimelineTrack[];
+    startDate?: string | Date;
+    endDate?: string | Date;
+    height?: number;
+}
+
+export const MultiTrackTimelineChart: React.FC<MultiTrackTimelineProps> = ({
+    tracks,
+    startDate,
+    endDate,
+    height = 300
+}) => {
+    const [hoveredEvent, setHoveredEvent] = useState<{ track: string; event: TimelineEvent; x: number; y: number } | null>(null);
+
+    // Calculate overall time range
+    const timeRange = useMemo(() => {
+        let minTime = startDate ? new Date(startDate).getTime() : Infinity;
+        let maxTime = endDate ? new Date(endDate).getTime() : -Infinity;
+        
+        tracks.forEach(track => {
+            track.events.forEach(e => {
+                const start = new Date(e.start).getTime();
+                const end = e.end ? new Date(e.end).getTime() : start + 3600000;
+                minTime = Math.min(minTime, start);
+                maxTime = Math.max(maxTime, end);
+            });
+        });
+        
+        const range = maxTime - minTime;
+        return {
+            start: minTime - range * 0.02,
+            end: maxTime + range * 0.02,
+            duration: maxTime - minTime + range * 0.04
+        };
+    }, [tracks, startDate, endDate]);
+
+    // Generate time labels
+    const timeLabels = useMemo(() => {
+        const labels: { time: number; label: string }[] = [];
+        const range = timeRange.end - timeRange.start;
+        const numLabels = 10;
+        
+        for (let i = 0; i <= numLabels; i++) {
+            const time = timeRange.start + (range * i / numLabels);
+            const date = new Date(time);
+            labels.push({
+                time,
+                label: date.toLocaleDateString('en-US', { 
+                    weekday: 'short', 
+                    day: '2-digit',
+                    hour: '2-digit'
+                }).replace(',', ' ')
+            });
+        }
+        return labels;
+    }, [timeRange]);
+
+    const trackHeight = Math.min(60, (height - 80) / tracks.length);
+
+    return (
+        <div className="w-full" style={{ height }}>
+            {/* Tracks */}
+            <div className="space-y-2">
+                {tracks.map((track, trackIdx) => (
+                    <div key={track.id}>
+                        {/* Track header */}
+                        <div className="flex items-baseline gap-2 mb-1">
+                            <span className="text-xs font-medium text-[var(--text-primary)]">{track.title}</span>
+                            {track.subtitle && (
+                                <span className="text-[10px] text-[var(--text-tertiary)]">{track.subtitle}</span>
+                            )}
+                        </div>
+                        
+                        {/* Track bar */}
+                        <div 
+                            className="relative bg-[var(--bg-tertiary)] rounded overflow-hidden"
+                            style={{ height: trackHeight }}
+                        >
+                            {/* Label overlay */}
+                            <div className="absolute left-0 top-0 bottom-0 px-2 flex items-center bg-gradient-to-r from-[var(--bg-card)]/90 to-transparent z-10 max-w-[35%]">
+                                <span className="text-[9px] text-[var(--text-secondary)] truncate">
+                                    {track.subtitle || track.title}
+                                </span>
+                            </div>
+                            
+                            {/* Events */}
+                            {track.events.map((event, eventIdx) => {
+                                const start = new Date(event.start).getTime();
+                                const end = event.end ? new Date(event.end).getTime() : start + 3600000;
+                                const x = ((start - timeRange.start) / timeRange.duration) * 100;
+                                const width = Math.max(0.3, ((end - start) / timeRange.duration) * 100);
+                                
+                                return (
+                                    <div
+                                        key={eventIdx}
+                                        className="absolute top-1 bottom-1 rounded-sm cursor-pointer transition-all hover:brightness-125"
+                                        style={{
+                                            left: `${x}%`,
+                                            width: `${width}%`,
+                                            minWidth: '2px',
+                                            backgroundColor: SEVERITY_COLORS[event.severity]
+                                        }}
+                                        onMouseEnter={(e) => setHoveredEvent({ 
+                                            track: track.id, 
+                                            event, 
+                                            x: e.clientX, 
+                                            y: e.clientY 
+                                        })}
+                                        onMouseLeave={() => setHoveredEvent(null)}
+                                    />
+                                );
+                            })}
+                        </div>
+                    </div>
+                ))}
+            </div>
+            
+            {/* Time axis */}
+            <div className="relative h-6 mt-3 border-t border-[var(--border-light)] pt-1">
+                {timeLabels.map((label, idx) => (
+                    <span
+                        key={idx}
+                        className="absolute text-[9px] text-[var(--text-tertiary)] whitespace-nowrap"
+                        style={{
+                            left: `${(idx / (timeLabels.length - 1)) * 100}%`,
+                            transform: 'translateX(-50%)'
+                        }}
+                    >
+                        {label.label}
+                    </span>
+                ))}
+            </div>
+            
+            {/* Legend */}
+            <div className="flex flex-wrap gap-4 mt-3 justify-center">
+                {Object.entries(SEVERITY_COLORS).map(([key, color]) => (
+                    <div key={key} className="flex items-center gap-1.5">
+                        <div className="w-3 h-2 rounded-sm" style={{ backgroundColor: color }} />
+                        <span className="text-[9px] text-[var(--text-tertiary)]">
+                            {SEVERITY_LABELS[key as keyof typeof SEVERITY_LABELS]}
+                        </span>
+                    </div>
+                ))}
+            </div>
+            
+            {/* Tooltip */}
+            {hoveredEvent && (
+                <div 
+                    className="fixed bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-2 shadow-xl text-xs z-50 pointer-events-none"
+                    style={{ left: hoveredEvent.x + 10, top: hoveredEvent.y - 40 }}
+                >
+                    <div className="flex items-center gap-2 mb-1">
+                        <div 
+                            className="w-2.5 h-2.5 rounded-full" 
+                            style={{ backgroundColor: SEVERITY_COLORS[hoveredEvent.event.severity] }}
+                        />
+                        <span className="font-medium text-[var(--text-primary)]">
+                            {SEVERITY_LABELS[hoveredEvent.event.severity]}
+                        </span>
+                    </div>
+                    <div className="text-[var(--text-tertiary)]">
+                        {new Date(hoveredEvent.event.start).toLocaleString()}
+                        {hoveredEvent.event.end && (
+                            <> — {new Date(hoveredEvent.event.end).toLocaleString()}</>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
@@ -764,5 +1180,17 @@ export const ADVANCED_CHART_TYPES = [
         name: 'Bubble Chart', 
         description: '3D scatter with size dimension',
         icon: '◉'
+    },
+    { 
+        id: 'timeline', 
+        name: 'Severity Timeline', 
+        description: 'Alert/event timeline with severity levels',
+        icon: '▬'
+    },
+    { 
+        id: 'multi_timeline', 
+        name: 'Multi-Track Timeline', 
+        description: 'Multiple detector timelines with alerts',
+        icon: '≡'
     }
 ];

@@ -22,7 +22,9 @@ export type WidgetType =
     | 'heatmap'
     | 'scatter_matrix'
     | 'sankey'
-    | 'bubble';
+    | 'bubble'
+    | 'timeline'
+    | 'multi_timeline';
 
 export interface WidgetTemplate {
     id: WidgetType;
@@ -185,6 +187,26 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
         category: 'advanced',
         defaultWidth: 6,
         defaultHeight: 5,
+        requiresData: true
+    },
+    {
+        id: 'timeline',
+        name: 'Severity Timeline',
+        description: 'Alert/event timeline with severity levels',
+        icon: <span className="text-lg">▬</span>,
+        category: 'advanced',
+        defaultWidth: 8,
+        defaultHeight: 3,
+        requiresData: true
+    },
+    {
+        id: 'multi_timeline',
+        name: 'Multi-Track Timeline',
+        description: 'Multiple detector timelines with alerts',
+        icon: <span className="text-lg">≡</span>,
+        category: 'advanced',
+        defaultWidth: 12,
+        defaultHeight: 6,
         requiresData: true
     }
 ];
