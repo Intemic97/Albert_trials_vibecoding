@@ -809,26 +809,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         fetchWorkflows();
     }, []);
 
-    // Auto-hide completed status tags after 5 seconds
-    useEffect(() => {
-        const completedNodes = nodes.filter(n => n.status === 'completed');
-        
-        if (completedNodes.length > 0) {
-            const timers = completedNodes.map(node => {
-                return setTimeout(() => {
-                    setNodes(prev => prev.map(n => 
-                        n.id === node.id && n.status === 'completed' 
-                            ? { ...n, status: 'idle' as const }
-                            : n
-                    ));
-                }, 5000); // Ocultar después de 5 segundos
-            });
-
-            return () => {
-                timers.forEach(timer => clearTimeout(timer));
-            };
-        }
-    }, [nodes]);
     
     // Set correct tab when opening data preview modal
     useEffect(() => {
@@ -2673,7 +2653,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             result = 'No data to evaluate';
                         }
                     } else {
-                        result = 'Not configured';
+                        result = 'Error: Condition not configured';
+                        updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result });
+                        return;
                     }
                     break;
                 case 'addField':
@@ -4071,6 +4053,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
     const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
     const [nodeDragged, setNodeDragged] = useState<boolean>(false);
+    const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
     const handleCanvasMouseDown = (e: React.MouseEvent) => {
         // Panning logic (Middle mouse or Left mouse on canvas)
@@ -4092,9 +4075,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             if (!canvasRef.current) return;
             const canvasRect = canvasRef.current.getBoundingClientRect();
 
-            // Calculate new position in canvas coordinates
-            const x = (e.clientX - canvasRect.left - canvasOffset.x) / canvasZoom;
-            const y = (e.clientY - canvasRect.top - canvasOffset.y) / canvasZoom;
+            // Calculate new position in canvas coordinates, applying the drag offset
+            const x = (e.clientX - canvasRect.left - canvasOffset.x) / canvasZoom - dragOffset.x;
+            const y = (e.clientY - canvasRect.top - canvasOffset.y) / canvasZoom - dragOffset.y;
 
             // Mark that the node was actually dragged (moved)
             setNodeDragged(true);
@@ -4113,6 +4096,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const handleCanvasMouseUp = () => {
         setIsPanning(false);
         setDraggingNodeId(null);
+        setDragOffset({ x: 0, y: 0 });
         // Reset nodeDragged after a small delay to allow onClick to check it
         setTimeout(() => setNodeDragged(false), 10);
         // Clear connection drag if dropped on canvas (not on a valid connector)
@@ -4123,6 +4107,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const handleNodeMouseDown = (e: React.MouseEvent, nodeId: string) => {
         if (e.button === 0) { // Left click only
             e.stopPropagation(); // Prevent canvas panning
+            
+            // Calculate offset between mouse position and node position
+            // This allows dragging the node from any point, not just the center
+            if (canvasRef.current) {
+                const canvasRect = canvasRef.current.getBoundingClientRect();
+                const mouseX = (e.clientX - canvasRect.left - canvasOffset.x) / canvasZoom;
+                const mouseY = (e.clientY - canvasRect.top - canvasOffset.y) / canvasZoom;
+                
+                const node = nodes.find(n => n.id === nodeId);
+                if (node) {
+                    setDragOffset({
+                        x: mouseX - node.x,
+                        y: mouseY - node.y
+                    });
+                }
+            }
+            
             setDraggingNodeId(nodeId);
         }
     };
