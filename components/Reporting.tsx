@@ -516,7 +516,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                     return (
                                         <div
                                             key={report.id}
-                                            onClick={() => navigate(`/reports/${report.id}`)}
+                                            onClick={() => navigate(`/documents/${report.id}`)}
                                             className="group relative bg-white border border-slate-200 rounded-lg p-5 cursor-pointer flex flex-col justify-between min-h-[200px] hover:border-slate-300 hover:shadow-sm transition-all"
                                         >
                                             {/* Header with Status and Actions */}

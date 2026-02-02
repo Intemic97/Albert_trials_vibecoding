@@ -227,11 +227,11 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                     setEditingContent(firstParent.generatedContent || '');
                 }
             } else {
-                navigate('/reports');
+                navigate('/documents');
             }
         } catch (error) {
             console.error('Error fetching report:', error);
-            navigate('/reports');
+            navigate('/documents');
         } finally {
             setLoading(false);
         }
@@ -910,7 +910,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
                             <button
-                                onClick={() => navigate('/reports')}
+                                onClick={() => navigate('/documents')}
                                 className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-[var(--text-secondary)]"
                             >
                                 <ArrowLeft size={20} weight="light" />

@@ -155,7 +155,6 @@ function AuthenticatedApp() {
         if (path.startsWith('/database')) return 'database';
         if (path.startsWith('/templates')) return 'templates';
         if (path.startsWith('/documents')) return 'documents';
-        if (path.startsWith('/reports')) return 'reports';
         if (path.startsWith('/copilots')) return 'copilots';
         if (path.startsWith('/logs')) return 'logs';
         if (path.startsWith('/connections')) return 'connections';
@@ -179,7 +178,6 @@ function AuthenticatedApp() {
             'lab': '/lab',
             'workflows': '/workflows',
             'database': '/database',
-            'reports': '/reports',
             'copilots': '/copilots',
             'logs': '/logs',
             'documentation': '/documentation',
@@ -1003,9 +1001,6 @@ function AuthenticatedApp() {
                     } />
                     <Route path="/documents" element={
                         <Reporting entities={entities} companyInfo={undefined} onViewChange={handleNavigate} view="documents" />
-                    } />
-                    <Route path="/reports" element={
-                        <Reporting entities={entities} companyInfo={undefined} onViewChange={handleNavigate} view="reports" />
                     } />
                     <Route path="/documents/:reportId" element={
                         <ReportEditor entities={entities} companyInfo={undefined} onViewChange={handleNavigate} />
