@@ -2777,15 +2777,63 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                 <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                     Data Source
                                 </label>
-                                <input
-                                    type="text"
-                                    value={newVisualization.source}
-                                    onChange={(e) => setNewVisualization(prev => ({ ...prev, source: e.target.value }))}
-                                    placeholder="e.g., revenue, monthlyProjection"
-                                    className="w-full px-3 py-2.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
-                                />
-                                <p className="text-xs text-[var(--text-tertiary)] mt-1.5">
-                                    The key in the result object to visualize
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={newVisualization.source}
+                                        onChange={(e) => setNewVisualization(prev => ({ ...prev, source: e.target.value }))}
+                                        placeholder="Type or select from entities below..."
+                                        className="w-full px-3 py-2.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
+                                    />
+                                </div>
+                                {/* Entity suggestions */}
+                                {entities && entities.length > 0 && (
+                                    <div className="mt-2">
+                                        <p className="text-xs text-[var(--text-tertiary)] mb-2">
+                                            Available entities:
+                                        </p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {entities.slice(0, 8).map(entity => (
+                                                <button
+                                                    key={entity.id}
+                                                    type="button"
+                                                    onClick={() => setNewVisualization(prev => ({ 
+                                                        ...prev, 
+                                                        source: entity.name,
+                                                        title: prev.title || entity.name
+                                                    }))}
+                                                    className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
+                                                        newVisualization.source === entity.name
+                                                            ? 'bg-[var(--accent-primary)] text-white'
+                                                            : 'bg-[var(--bg-selected)] text-[var(--text-secondary)] hover:bg-[var(--accent-primary)]/20 hover:text-[var(--accent-primary)]'
+                                                    }`}
+                                                >
+                                                    @{entity.name}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {/* Show entity properties if one is selected */}
+                                        {newVisualization.source && entities.find(e => e.name === newVisualization.source)?.properties && (
+                                            <div className="mt-3 p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
+                                                <p className="text-xs font-medium text-[var(--text-secondary)] mb-2">
+                                                    Properties of @{newVisualization.source}:
+                                                </p>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {entities.find(e => e.name === newVisualization.source)?.properties?.map((prop: any, idx: number) => (
+                                                        <span 
+                                                            key={idx}
+                                                            className="px-2 py-0.5 text-xs bg-[var(--bg-primary)] text-[var(--text-tertiary)] rounded"
+                                                        >
+                                                            {prop.name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                                    Select an entity or type a custom key from the result object
                                 </p>
                             </div>
 
