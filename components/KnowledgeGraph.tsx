@@ -32,6 +32,9 @@ interface GraphNode {
     parentId?: string;
     entityId?: string;
     propertyType?: string;
+    orbitRadius?: number;
+    orbitAngle?: number;
+    orbitSpeed?: number;
 }
 
 interface GraphEdge {
@@ -40,23 +43,30 @@ interface GraphEdge {
     target: string;
 }
 
-// Color palette based on design system
+// Vibrant color palette for variety
 const NODE_COLORS = {
-    entity: '#419CAF',      // Primary-medium (teal)
-    text: '#3FB6AE',        // Secondary-medium
-    number: '#F59E0B',      // Amber
+    entity: '#419CAF',      // Primary teal (larger nodes)
+    text: '#3FB6AE',        // Teal variant
+    number: '#F59E0B',      // Amber/Orange
     date: '#EC4899',        // Pink
-    boolean: '#84CC16',     // Lime
+    boolean: '#84CC16',     // Lime green
     email: '#8B5CF6',       // Violet
     url: '#06B6D4',         // Cyan
     default: '#6B7280',     // Gray
 };
 
+// Extended palette for more variety
+const ORBIT_COLORS = [
+    '#419CAF', '#3FB6AE', '#F59E0B', '#EC4899', '#84CC16', 
+    '#8B5CF6', '#06B6D4', '#EF4444', '#10B981', '#F97316',
+    '#6366F1', '#14B8A6', '#FBBF24', '#A855F7', '#22D3EE'
+];
+
 // Force simulation constants
-const REPULSION = 600;
-const ATTRACTION = 0.015;
-const CENTER_PULL = 0.008;
-const DAMPING = 0.85;
+const REPULSION = 400;
+const ATTRACTION = 0.012;
+const CENTER_PULL = 0.006;
+const DAMPING = 0.88;
 
 export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     entities,
@@ -94,61 +104,90 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         return NODE_COLORS.default;
     };
     
-    // Initialize graph
+    // Initialize graph with sphere-like layout
     useEffect(() => {
         const width = containerRef.current?.clientWidth || 800;
         const height = containerRef.current?.clientHeight || 600;
         const centerX = width / 2;
         const centerY = height / 2;
+        const baseRadius = Math.min(width, height) * 0.35;
         
         const newNodes: GraphNode[] = [];
         const newEdges: GraphEdge[] = [];
         
-        // Create entity nodes in a circular layout
-        entities.forEach((entity, i) => {
-            const angle = (i / Math.max(entities.length, 1)) * 2 * Math.PI;
-            const radius = Math.min(width, height) * 0.25;
+        // Calculate total properties for layout
+        let totalProps = 0;
+        entities.forEach(e => totalProps += (e.properties?.length || 0));
+        
+        // Create entity nodes in concentric circles based on number of properties
+        const entityGroups: { entity: Entity; propCount: number }[] = entities.map(e => ({
+            entity: e,
+            propCount: e.properties?.length || 0
+        })).sort((a, b) => b.propCount - a.propCount);
+        
+        // Distribute entities in a spiral pattern from center
+        entityGroups.forEach((group, i) => {
+            const spiralAngle = i * 2.4; // Golden angle for even distribution
+            const spiralRadius = 30 + (i * 35);
+            const entityX = centerX + Math.cos(spiralAngle) * Math.min(spiralRadius, baseRadius * 0.6);
+            const entityY = centerY + Math.sin(spiralAngle) * Math.min(spiralRadius, baseRadius * 0.6);
             
             newNodes.push({
-                id: `entity-${entity.id}`,
+                id: `entity-${group.entity.id}`,
                 type: 'entity',
-                label: entity.name,
-                color: NODE_COLORS.entity,
-                x: centerX + Math.cos(angle) * radius + (Math.random() - 0.5) * 50,
-                y: centerY + Math.sin(angle) * radius + (Math.random() - 0.5) * 50,
+                label: group.entity.name,
+                color: ORBIT_COLORS[i % ORBIT_COLORS.length],
+                x: entityX,
+                y: entityY,
                 vx: 0,
                 vy: 0,
-                radius: 12,
-                entityId: entity.id
+                radius: 8,
+                entityId: group.entity.id
             });
             
-            // Create property nodes around each entity
-            if (showProperties && entity.properties) {
-                entity.properties.forEach((prop, j) => {
-                    const propAngle = (j / entity.properties!.length) * 2 * Math.PI;
-                    const propRadius = 60 + Math.random() * 20;
-                    const entityNode = newNodes.find(n => n.id === `entity-${entity.id}`);
+            // Create property nodes in orbital rings around entity
+            if (showProperties && group.entity.properties) {
+                const props = group.entity.properties;
+                const numProps = props.length;
+                
+                // Multiple orbital rings if many properties
+                const propsPerRing = 8;
+                const numRings = Math.ceil(numProps / propsPerRing);
+                
+                props.forEach((prop, j) => {
+                    const ringIndex = Math.floor(j / propsPerRing);
+                    const posInRing = j % propsPerRing;
+                    const propsInThisRing = Math.min(propsPerRing, numProps - ringIndex * propsPerRing);
+                    
+                    const orbitRadius = 35 + ringIndex * 25;
+                    const angleOffset = ringIndex * 0.3; // Offset each ring
+                    const propAngle = angleOffset + (posInRing / propsInThisRing) * 2 * Math.PI;
+                    
+                    const propColor = getPropertyColor(prop.type);
                     
                     const propNode: GraphNode = {
-                        id: `prop-${entity.id}-${prop.name}`,
+                        id: `prop-${group.entity.id}-${prop.name}`,
                         type: 'property',
                         label: prop.name,
-                        color: getPropertyColor(prop.type),
-                        x: (entityNode?.x || centerX) + Math.cos(propAngle) * propRadius,
-                        y: (entityNode?.y || centerY) + Math.sin(propAngle) * propRadius,
+                        color: propColor,
+                        x: entityX + Math.cos(propAngle) * orbitRadius,
+                        y: entityY + Math.sin(propAngle) * orbitRadius,
                         vx: 0,
                         vy: 0,
-                        radius: 5,
-                        parentId: `entity-${entity.id}`,
-                        propertyType: prop.type
+                        radius: 3,
+                        parentId: `entity-${group.entity.id}`,
+                        propertyType: prop.type,
+                        orbitRadius: orbitRadius,
+                        orbitAngle: propAngle,
+                        orbitSpeed: 0.0003 + Math.random() * 0.0002
                     };
                     
                     newNodes.push(propNode);
                     
                     newEdges.push({
-                        id: `edge-${entity.id}-${prop.name}`,
-                        source: `entity-${entity.id}`,
-                        target: `prop-${entity.id}-${prop.name}`
+                        id: `edge-${group.entity.id}-${prop.name}`,
+                        source: `entity-${group.entity.id}`,
+                        target: `prop-${group.entity.id}-${prop.name}`
                     });
                 });
             }
@@ -182,11 +221,32 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
             });
         });
         
+        // Add outer boundary nodes for sphere effect
+        const boundaryCount = 60;
+        for (let i = 0; i < boundaryCount; i++) {
+            const angle = (i / boundaryCount) * 2 * Math.PI;
+            const radiusVariation = baseRadius + (Math.sin(i * 3) * 20);
+            newNodes.push({
+                id: `boundary-${i}`,
+                type: 'property',
+                label: '',
+                color: ORBIT_COLORS[i % ORBIT_COLORS.length],
+                x: centerX + Math.cos(angle) * radiusVariation,
+                y: centerY + Math.sin(angle) * radiusVariation,
+                vx: 0,
+                vy: 0,
+                radius: 1.5,
+                orbitAngle: angle,
+                orbitRadius: radiusVariation,
+                orbitSpeed: 0.0001
+            });
+        }
+        
         setNodes(newNodes);
         setEdges(newEdges);
     }, [entities, showProperties]);
     
-    // Force simulation
+    // Gentle orbital animation for property nodes
     useEffect(() => {
         if (nodes.length === 0) return;
         
@@ -196,68 +256,83 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         const centerY = height / 2;
         
         let frameCount = 0;
-        const maxFrames = 200;
+        let animating = true;
         
         const simulate = () => {
-            if (frameCount >= maxFrames) return;
+            if (!animating) return;
             
             setNodes(prev => {
                 const updated = prev.map(node => ({ ...node }));
+                const entityMap = new Map<string, GraphNode>();
                 
-                // Calculate forces
-                updated.forEach((node, i) => {
-                    let fx = 0, fy = 0;
-                    
-                    // Repulsion from other nodes
-                    updated.forEach((other, j) => {
-                        if (i === j) return;
+                // First pass: update entities and store positions
+                updated.forEach(node => {
+                    if (node.type === 'entity') {
+                        entityMap.set(node.id, node);
+                    }
+                });
+                
+                // Only apply forces in the first 150 frames for settling
+                if (frameCount < 150) {
+                    updated.forEach((node, i) => {
+                        if (node.type !== 'entity') return;
                         
-                        const dx = node.x - other.x;
-                        const dy = node.y - other.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                        let fx = 0, fy = 0;
                         
-                        if (dist < 150) {
-                            const force = REPULSION / (dist * dist);
-                            fx += (dx / dist) * force;
-                            fy += (dy / dist) * force;
-                        }
-                    });
-                    
-                    // Attraction along edges
-                    edges.forEach(edge => {
-                        if (edge.source === node.id || edge.target === node.id) {
-                            const otherId = edge.source === node.id ? edge.target : edge.source;
-                            const other = updated.find(n => n.id === otherId);
-                            if (!other) return;
+                        // Repulsion from other entities
+                        updated.forEach((other, j) => {
+                            if (i === j || other.type !== 'entity') return;
                             
-                            const dx = other.x - node.x;
-                            const dy = other.y - node.y;
+                            const dx = node.x - other.x;
+                            const dy = node.y - other.y;
                             const dist = Math.sqrt(dx * dx + dy * dy) || 1;
                             
-                            const targetDist = node.type === 'property' ? 70 : 150;
-                            const force = (dist - targetDist) * ATTRACTION;
-                            
-                            fx += (dx / dist) * force;
-                            fy += (dy / dist) * force;
-                        }
+                            if (dist < 120) {
+                                const force = REPULSION / (dist * dist);
+                                fx += (dx / dist) * force;
+                                fy += (dy / dist) * force;
+                            }
+                        });
+                        
+                        // Center gravity
+                        fx += (centerX - node.x) * CENTER_PULL;
+                        fy += (centerY - node.y) * CENTER_PULL;
+                        
+                        // Update velocity
+                        node.vx = (node.vx + fx) * DAMPING;
+                        node.vy = (node.vy + fy) * DAMPING;
+                        
+                        // Update position
+                        node.x += node.vx;
+                        node.y += node.vy;
+                        
+                        // Bounds
+                        node.x = Math.max(80, Math.min(width - 80, node.x));
+                        node.y = Math.max(80, Math.min(height - 80, node.y));
+                        
+                        entityMap.set(node.id, node);
                     });
+                }
+                
+                // Update property positions to orbit around their parent entities
+                updated.forEach(node => {
+                    if (node.parentId && node.orbitRadius && node.orbitAngle !== undefined) {
+                        const parent = entityMap.get(node.parentId);
+                        if (parent) {
+                            // Slow orbital rotation
+                            node.orbitAngle += node.orbitSpeed || 0.0003;
+                            node.x = parent.x + Math.cos(node.orbitAngle) * node.orbitRadius;
+                            node.y = parent.y + Math.sin(node.orbitAngle) * node.orbitRadius;
+                        }
+                    }
                     
-                    // Center gravity (stronger for entities)
-                    const gravity = node.type === 'entity' ? CENTER_PULL : CENTER_PULL * 0.3;
-                    fx += (centerX - node.x) * gravity;
-                    fy += (centerY - node.y) * gravity;
-                    
-                    // Update velocity
-                    node.vx = (node.vx + fx) * DAMPING;
-                    node.vy = (node.vy + fy) * DAMPING;
-                    
-                    // Update position
-                    node.x += node.vx;
-                    node.y += node.vy;
-                    
-                    // Bounds
-                    node.x = Math.max(50, Math.min(width - 50, node.x));
-                    node.y = Math.max(50, Math.min(height - 50, node.y));
+                    // Boundary nodes also orbit slowly around center
+                    if (node.id.startsWith('boundary-') && node.orbitAngle !== undefined) {
+                        node.orbitAngle += node.orbitSpeed || 0.0001;
+                        const r = node.orbitRadius || 250;
+                        node.x = centerX + Math.cos(node.orbitAngle) * r;
+                        node.y = centerY + Math.sin(node.orbitAngle) * r;
+                    }
                 });
                 
                 return updated;
@@ -270,6 +345,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         simulate();
         
         return () => {
+            animating = false;
             if (animationRef.current) {
                 cancelAnimationFrame(animationRef.current);
             }
@@ -427,223 +503,113 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                         onMouseUp={handleMouseUp}
                         onMouseLeave={handleMouseUp}
                         onWheel={handleWheel}
+                        style={{ background: '#1a1d21' }}
                     >
-                        {/* Definitions for gradients and filters */}
-                        <defs>
-                            {/* Background grid */}
-                            <pattern id="grid" width={30 * zoom} height={30 * zoom} patternUnits="userSpaceOnUse">
-                                <circle cx={1} cy={1} r={0.5} fill="rgba(255,255,255,0.03)" />
-                            </pattern>
-                            
-                            {/* Glow filter for nodes */}
-                            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                                <feMerge>
-                                    <feMergeNode in="coloredBlur"/>
-                                    <feMergeNode in="SourceGraphic"/>
-                                </feMerge>
-                            </filter>
-                            
-                            {/* Soft shadow for nodes */}
-                            <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
-                                <feDropShadow dx="0" dy="1" stdDeviation="2" floodOpacity="0.3"/>
-                            </filter>
-                            
-                            {/* Entity gradient */}
-                            <radialGradient id="entityGradient" cx="30%" cy="30%">
-                                <stop offset="0%" stopColor="#5BC4D4" stopOpacity="1"/>
-                                <stop offset="70%" stopColor="#419CAF" stopOpacity="1"/>
-                                <stop offset="100%" stopColor="#2d7a8a" stopOpacity="1"/>
-                            </radialGradient>
-                            
-                            {/* Property gradients by type */}
-                            <radialGradient id="textGradient" cx="30%" cy="30%">
-                                <stop offset="0%" stopColor="#5FD4CB" stopOpacity="1"/>
-                                <stop offset="100%" stopColor="#3FB6AE" stopOpacity="1"/>
-                            </radialGradient>
-                            <radialGradient id="numberGradient" cx="30%" cy="30%">
-                                <stop offset="0%" stopColor="#FBBF24" stopOpacity="1"/>
-                                <stop offset="100%" stopColor="#F59E0B" stopOpacity="1"/>
-                            </radialGradient>
-                            <radialGradient id="dateGradient" cx="30%" cy="30%">
-                                <stop offset="0%" stopColor="#F472B6" stopOpacity="1"/>
-                                <stop offset="100%" stopColor="#EC4899" stopOpacity="1"/>
-                            </radialGradient>
-                            <radialGradient id="booleanGradient" cx="30%" cy="30%">
-                                <stop offset="0%" stopColor="#A3E635" stopOpacity="1"/>
-                                <stop offset="100%" stopColor="#84CC16" stopOpacity="1"/>
-                            </radialGradient>
-                            <radialGradient id="defaultGradient" cx="30%" cy="30%">
-                                <stop offset="0%" stopColor="#9CA3AF" stopOpacity="1"/>
-                                <stop offset="100%" stopColor="#6B7280" stopOpacity="1"/>
-                            </radialGradient>
-                        </defs>
-                        <rect width="100%" height="100%" fill="url(#grid)" />
+                        {/* Clean background - no grid for cleaner look */}
                         
                         <g transform={`translate(${offset.x}, ${offset.y}) scale(${zoom})`}>
-                            {/* Edges */}
+                            {/* Edges - subtle lines */}
                             {edges.map(edge => {
                                 const source = nodes.find(n => n.id === edge.source);
                                 const target = nodes.find(n => n.id === edge.target);
                                 if (!source || !target) return null;
+                                if (target.id.startsWith('boundary-')) return null;
                                 
                                 const isHighlighted = connectedNodes.has(edge.source) && connectedNodes.has(edge.target);
                                 const isVisible = filteredNodeIds.has(edge.source) && filteredNodeIds.has(edge.target);
                                 const isRelation = edge.id.startsWith('relation');
                                 
-                                // Calculate curve control point for subtle bezier
-                                const midX = (source.x + target.x) / 2;
-                                const midY = (source.y + target.y) / 2;
-                                const dx = target.x - source.x;
-                                const dy = target.y - source.y;
-                                const dist = Math.sqrt(dx * dx + dy * dy);
-                                const curvature = Math.min(dist * 0.1, 20);
-                                const ctrlX = midX + (dy / dist) * curvature * (Math.random() > 0.5 ? 1 : -1);
-                                const ctrlY = midY - (dx / dist) * curvature * (Math.random() > 0.5 ? 1 : -1);
-                                
                                 return (
-                                    <g key={edge.id}>
-                                        {/* Glow effect for highlighted edges */}
-                                        {isHighlighted && (
-                                            <path
-                                                d={`M ${source.x} ${source.y} Q ${ctrlX} ${ctrlY} ${target.x} ${target.y}`}
-                                                stroke={isRelation ? '#419CAF' : 'rgba(255,255,255,0.3)'}
-                                                strokeWidth={4}
-                                                strokeOpacity={0.15}
-                                                fill="none"
-                                                style={{ transition: 'all 0.4s ease-out' }}
-                                            />
-                                        )}
-                                        {/* Main edge line */}
-                                        <path
-                                            d={`M ${source.x} ${source.y} Q ${ctrlX} ${ctrlY} ${target.x} ${target.y}`}
-                                            stroke={isRelation ? '#419CAF' : 'rgba(255,255,255,0.25)'}
-                                            strokeWidth={isHighlighted ? 1.2 : 0.6}
-                                            strokeOpacity={isVisible ? (isHighlighted ? 0.9 : 0.35) : 0.05}
-                                            strokeLinecap="round"
-                                            fill="none"
-                                            style={{ transition: 'all 0.4s ease-out' }}
-                                        />
-                                    </g>
+                                    <line
+                                        key={edge.id}
+                                        x1={source.x}
+                                        y1={source.y}
+                                        x2={target.x}
+                                        y2={target.y}
+                                        stroke={isRelation ? '#419CAF' : 'rgba(255,255,255,0.08)'}
+                                        strokeWidth={isHighlighted ? 0.8 : 0.3}
+                                        strokeOpacity={isVisible ? (isHighlighted ? 0.6 : 0.2) : 0.02}
+                                    />
                                 );
                             })}
                             
-                            {/* Nodes */}
+                            {/* Nodes - clean solid circles */}
                             {nodes.map(node => {
                                 const isHovered = hoveredNode === node.id;
                                 const isSelected = selectedEntity === node.entityId;
                                 const isConnected = connectedNodes.has(node.id);
                                 const isVisible = filteredNodeIds.has(node.id);
+                                const isBoundary = node.id.startsWith('boundary-');
                                 
-                                const opacity = isVisible ? (isConnected || (!hoveredNode && !selectedEntity) ? 1 : 0.3) : 0.05;
-                                const scale = isHovered ? 1.3 : (isConnected ? 1.15 : 1);
+                                // Don't show boundary nodes in search
+                                if (isBoundary && searchQuery) return null;
                                 
-                                // Get gradient based on type
-                                const getGradient = () => {
-                                    if (node.type === 'entity') return 'url(#entityGradient)';
-                                    const t = (node.propertyType || '').toLowerCase();
-                                    if (t.includes('text') || t.includes('string')) return 'url(#textGradient)';
-                                    if (t.includes('number') || t.includes('int') || t.includes('float')) return 'url(#numberGradient)';
-                                    if (t.includes('date') || t.includes('time')) return 'url(#dateGradient)';
-                                    if (t.includes('bool')) return 'url(#booleanGradient)';
-                                    return 'url(#defaultGradient)';
-                                };
+                                const opacity = isVisible ? (isConnected || (!hoveredNode && !selectedEntity) ? 1 : 0.4) : 0.1;
+                                const scale = isHovered ? 1.6 : (isSelected ? 1.4 : (isConnected ? 1.2 : 1));
                                 
-                                const nodeRadius = node.type === 'entity' ? 10 : 5;
+                                // Simple radius based on type
+                                const baseRadius = isBoundary ? 1.5 : (node.type === 'entity' ? 6 : 2.5);
                                 
                                 return (
                                     <g
                                         key={node.id}
                                         transform={`translate(${node.x}, ${node.y})`}
                                         style={{ 
-                                            opacity,
-                                            transition: 'opacity 0.4s ease-out'
+                                            opacity: isBoundary ? 0.6 : opacity,
+                                            transition: 'opacity 0.3s ease-out'
                                         }}
-                                        onMouseEnter={() => setHoveredNode(node.id)}
+                                        onMouseEnter={() => !isBoundary && setHoveredNode(node.id)}
                                         onMouseLeave={() => setHoveredNode(null)}
                                         onClick={() => {
                                             if (node.type === 'entity' && node.entityId) {
                                                 setSelectedEntity(selectedEntity === node.entityId ? null : node.entityId);
                                             }
                                         }}
-                                        className="cursor-pointer"
+                                        className={isBoundary ? '' : 'cursor-pointer'}
                                     >
-                                        {/* Outer glow ring - only on hover/selected */}
-                                        {(isHovered || isSelected) && (
-                                            <>
-                                                <circle
-                                                    r={nodeRadius * 3}
-                                                    fill={node.color}
-                                                    opacity={0.08}
-                                                    style={{ transition: 'all 0.3s ease-out' }}
-                                                />
-                                                <circle
-                                                    r={nodeRadius * 2}
-                                                    fill={node.color}
-                                                    opacity={0.15}
-                                                    style={{ transition: 'all 0.3s ease-out' }}
-                                                />
-                                            </>
+                                        {/* Simple solid circle - no shadows */}
+                                        <circle
+                                            r={baseRadius * scale}
+                                            fill={node.color}
+                                            opacity={isBoundary ? 0.7 : 0.9}
+                                            style={{ transition: 'all 0.2s ease-out' }}
+                                        />
+                                        
+                                        {/* Subtle highlight on hover */}
+                                        {(isHovered || isSelected) && !isBoundary && (
+                                            <circle
+                                                r={baseRadius * scale + 3}
+                                                fill="none"
+                                                stroke={node.color}
+                                                strokeWidth={1}
+                                                strokeOpacity={0.4}
+                                            />
                                         )}
                                         
-                                        {/* Subtle ambient glow */}
-                                        <circle
-                                            r={nodeRadius * scale * 1.5}
-                                            fill={node.color}
-                                            opacity={isConnected ? 0.12 : 0.06}
-                                            style={{ transition: 'all 0.3s ease-out' }}
-                                        />
-                                        
-                                        {/* Main node circle with gradient */}
-                                        <circle
-                                            r={nodeRadius * scale}
-                                            fill={getGradient()}
-                                            stroke={isHovered || isSelected ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.1)'}
-                                            strokeWidth={isHovered || isSelected ? 1.5 : 0.5}
-                                            filter={isHovered ? 'url(#glow)' : undefined}
-                                            style={{ 
-                                                transition: 'all 0.25s ease-out',
-                                            }}
-                                        />
-                                        
-                                        {/* Inner highlight for 3D effect */}
-                                        <circle
-                                            r={nodeRadius * scale * 0.5}
-                                            cx={-nodeRadius * 0.25}
-                                            cy={-nodeRadius * 0.25}
-                                            fill="rgba(255,255,255,0.25)"
-                                            style={{ 
-                                                transition: 'all 0.25s ease-out',
-                                                pointerEvents: 'none'
-                                            }}
-                                        />
-                                        
-                                        {/* Label - only show on hover or for entities */}
-                                        {(isHovered || isConnected || node.type === 'entity') && (
+                                        {/* Label - show on hover or for entities */}
+                                        {!isBoundary && (isHovered || (node.type === 'entity' && (isSelected || zoom > 0.8))) && (
                                             <text
-                                                x={nodeRadius * scale + 10}
-                                                y={4}
-                                                fill="rgba(255,255,255,0.85)"
-                                                fontSize={node.type === 'entity' ? 11 : 9}
+                                                x={baseRadius * scale + 6}
+                                                y={3}
+                                                fill="rgba(255,255,255,0.9)"
+                                                fontSize={node.type === 'entity' ? 10 : 8}
                                                 fontWeight={node.type === 'entity' ? 500 : 400}
                                                 fontFamily="system-ui, -apple-system, sans-serif"
                                                 style={{ 
                                                     pointerEvents: 'none',
-                                                    textShadow: '0 1px 4px rgba(0,0,0,0.6)',
-                                                    transition: 'opacity 0.2s ease-out'
                                                 }}
                                             >
                                                 {node.label}
                                             </text>
                                         )}
                                         
-                                        {/* Property type badge */}
+                                        {/* Property type on hover */}
                                         {isHovered && node.type === 'property' && node.propertyType && (
                                             <text
-                                                x={nodeRadius * scale + 10}
-                                                y={16}
-                                                fill="rgba(255,255,255,0.4)"
-                                                fontSize={8}
+                                                x={baseRadius * scale + 6}
+                                                y={13}
+                                                fill="rgba(255,255,255,0.5)"
+                                                fontSize={7}
                                                 fontFamily="system-ui, -apple-system, sans-serif"
                                                 style={{ pointerEvents: 'none' }}
                                             >
