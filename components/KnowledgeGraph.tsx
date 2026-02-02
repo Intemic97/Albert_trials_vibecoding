@@ -428,11 +428,55 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                         onMouseLeave={handleMouseUp}
                         onWheel={handleWheel}
                     >
-                        {/* Background grid */}
+                        {/* Definitions for gradients and filters */}
                         <defs>
+                            {/* Background grid */}
                             <pattern id="grid" width={30 * zoom} height={30 * zoom} patternUnits="userSpaceOnUse">
                                 <circle cx={1} cy={1} r={0.5} fill="rgba(255,255,255,0.03)" />
                             </pattern>
+                            
+                            {/* Glow filter for nodes */}
+                            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                                <feMerge>
+                                    <feMergeNode in="coloredBlur"/>
+                                    <feMergeNode in="SourceGraphic"/>
+                                </feMerge>
+                            </filter>
+                            
+                            {/* Soft shadow for nodes */}
+                            <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+                                <feDropShadow dx="0" dy="1" stdDeviation="2" floodOpacity="0.3"/>
+                            </filter>
+                            
+                            {/* Entity gradient */}
+                            <radialGradient id="entityGradient" cx="30%" cy="30%">
+                                <stop offset="0%" stopColor="#5BC4D4" stopOpacity="1"/>
+                                <stop offset="70%" stopColor="#419CAF" stopOpacity="1"/>
+                                <stop offset="100%" stopColor="#2d7a8a" stopOpacity="1"/>
+                            </radialGradient>
+                            
+                            {/* Property gradients by type */}
+                            <radialGradient id="textGradient" cx="30%" cy="30%">
+                                <stop offset="0%" stopColor="#5FD4CB" stopOpacity="1"/>
+                                <stop offset="100%" stopColor="#3FB6AE" stopOpacity="1"/>
+                            </radialGradient>
+                            <radialGradient id="numberGradient" cx="30%" cy="30%">
+                                <stop offset="0%" stopColor="#FBBF24" stopOpacity="1"/>
+                                <stop offset="100%" stopColor="#F59E0B" stopOpacity="1"/>
+                            </radialGradient>
+                            <radialGradient id="dateGradient" cx="30%" cy="30%">
+                                <stop offset="0%" stopColor="#F472B6" stopOpacity="1"/>
+                                <stop offset="100%" stopColor="#EC4899" stopOpacity="1"/>
+                            </radialGradient>
+                            <radialGradient id="booleanGradient" cx="30%" cy="30%">
+                                <stop offset="0%" stopColor="#A3E635" stopOpacity="1"/>
+                                <stop offset="100%" stopColor="#84CC16" stopOpacity="1"/>
+                            </radialGradient>
+                            <radialGradient id="defaultGradient" cx="30%" cy="30%">
+                                <stop offset="0%" stopColor="#9CA3AF" stopOpacity="1"/>
+                                <stop offset="100%" stopColor="#6B7280" stopOpacity="1"/>
+                            </radialGradient>
                         </defs>
                         <rect width="100%" height="100%" fill="url(#grid)" />
                         
@@ -447,18 +491,40 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                 const isVisible = filteredNodeIds.has(edge.source) && filteredNodeIds.has(edge.target);
                                 const isRelation = edge.id.startsWith('relation');
                                 
+                                // Calculate curve control point for subtle bezier
+                                const midX = (source.x + target.x) / 2;
+                                const midY = (source.y + target.y) / 2;
+                                const dx = target.x - source.x;
+                                const dy = target.y - source.y;
+                                const dist = Math.sqrt(dx * dx + dy * dy);
+                                const curvature = Math.min(dist * 0.1, 20);
+                                const ctrlX = midX + (dy / dist) * curvature * (Math.random() > 0.5 ? 1 : -1);
+                                const ctrlY = midY - (dx / dist) * curvature * (Math.random() > 0.5 ? 1 : -1);
+                                
                                 return (
-                                    <line
-                                        key={edge.id}
-                                        x1={source.x}
-                                        y1={source.y}
-                                        x2={target.x}
-                                        y2={target.y}
-                                        stroke={isRelation ? '#419CAF' : 'rgba(255,255,255,0.15)'}
-                                        strokeWidth={isHighlighted ? 1.5 : 0.5}
-                                        strokeOpacity={isVisible ? (isHighlighted ? 0.8 : 0.4) : 0.05}
-                                        style={{ transition: 'stroke-opacity 0.3s, stroke-width 0.3s' }}
-                                    />
+                                    <g key={edge.id}>
+                                        {/* Glow effect for highlighted edges */}
+                                        {isHighlighted && (
+                                            <path
+                                                d={`M ${source.x} ${source.y} Q ${ctrlX} ${ctrlY} ${target.x} ${target.y}`}
+                                                stroke={isRelation ? '#419CAF' : 'rgba(255,255,255,0.3)'}
+                                                strokeWidth={4}
+                                                strokeOpacity={0.15}
+                                                fill="none"
+                                                style={{ transition: 'all 0.4s ease-out' }}
+                                            />
+                                        )}
+                                        {/* Main edge line */}
+                                        <path
+                                            d={`M ${source.x} ${source.y} Q ${ctrlX} ${ctrlY} ${target.x} ${target.y}`}
+                                            stroke={isRelation ? '#419CAF' : 'rgba(255,255,255,0.25)'}
+                                            strokeWidth={isHighlighted ? 1.2 : 0.6}
+                                            strokeOpacity={isVisible ? (isHighlighted ? 0.9 : 0.35) : 0.05}
+                                            strokeLinecap="round"
+                                            fill="none"
+                                            style={{ transition: 'all 0.4s ease-out' }}
+                                        />
+                                    </g>
                                 );
                             })}
                             
@@ -470,7 +536,20 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                 const isVisible = filteredNodeIds.has(node.id);
                                 
                                 const opacity = isVisible ? (isConnected || (!hoveredNode && !selectedEntity) ? 1 : 0.3) : 0.05;
-                                const scale = isHovered ? 1.5 : (isConnected ? 1.2 : 1);
+                                const scale = isHovered ? 1.3 : (isConnected ? 1.15 : 1);
+                                
+                                // Get gradient based on type
+                                const getGradient = () => {
+                                    if (node.type === 'entity') return 'url(#entityGradient)';
+                                    const t = (node.propertyType || '').toLowerCase();
+                                    if (t.includes('text') || t.includes('string')) return 'url(#textGradient)';
+                                    if (t.includes('number') || t.includes('int') || t.includes('float')) return 'url(#numberGradient)';
+                                    if (t.includes('date') || t.includes('time')) return 'url(#dateGradient)';
+                                    if (t.includes('bool')) return 'url(#booleanGradient)';
+                                    return 'url(#defaultGradient)';
+                                };
+                                
+                                const nodeRadius = node.type === 'entity' ? 10 : 5;
                                 
                                 return (
                                     <g
@@ -478,7 +557,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                         transform={`translate(${node.x}, ${node.y})`}
                                         style={{ 
                                             opacity,
-                                            transition: 'opacity 0.3s'
+                                            transition: 'opacity 0.4s ease-out'
                                         }}
                                         onMouseEnter={() => setHoveredNode(node.id)}
                                         onMouseLeave={() => setHoveredNode(null)}
@@ -489,36 +568,69 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                         }}
                                         className="cursor-pointer"
                                     >
-                                        {/* Glow effect */}
+                                        {/* Outer glow ring - only on hover/selected */}
                                         {(isHovered || isSelected) && (
-                                            <circle
-                                                r={node.radius * 2.5}
-                                                fill={node.color}
-                                                opacity={0.15}
-                                            />
+                                            <>
+                                                <circle
+                                                    r={nodeRadius * 3}
+                                                    fill={node.color}
+                                                    opacity={0.08}
+                                                    style={{ transition: 'all 0.3s ease-out' }}
+                                                />
+                                                <circle
+                                                    r={nodeRadius * 2}
+                                                    fill={node.color}
+                                                    opacity={0.15}
+                                                    style={{ transition: 'all 0.3s ease-out' }}
+                                                />
+                                            </>
                                         )}
                                         
-                                        {/* Node circle */}
+                                        {/* Subtle ambient glow */}
                                         <circle
-                                            r={node.radius * scale}
+                                            r={nodeRadius * scale * 1.5}
                                             fill={node.color}
+                                            opacity={isConnected ? 0.12 : 0.06}
+                                            style={{ transition: 'all 0.3s ease-out' }}
+                                        />
+                                        
+                                        {/* Main node circle with gradient */}
+                                        <circle
+                                            r={nodeRadius * scale}
+                                            fill={getGradient()}
+                                            stroke={isHovered || isSelected ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.1)'}
+                                            strokeWidth={isHovered || isSelected ? 1.5 : 0.5}
+                                            filter={isHovered ? 'url(#glow)' : undefined}
                                             style={{ 
-                                                transition: 'r 0.2s',
-                                                filter: isHovered ? 'brightness(1.3)' : undefined
+                                                transition: 'all 0.25s ease-out',
+                                            }}
+                                        />
+                                        
+                                        {/* Inner highlight for 3D effect */}
+                                        <circle
+                                            r={nodeRadius * scale * 0.5}
+                                            cx={-nodeRadius * 0.25}
+                                            cy={-nodeRadius * 0.25}
+                                            fill="rgba(255,255,255,0.25)"
+                                            style={{ 
+                                                transition: 'all 0.25s ease-out',
+                                                pointerEvents: 'none'
                                             }}
                                         />
                                         
                                         {/* Label - only show on hover or for entities */}
                                         {(isHovered || isConnected || node.type === 'entity') && (
                                             <text
-                                                x={node.radius * scale + 8}
+                                                x={nodeRadius * scale + 10}
                                                 y={4}
-                                                fill="rgba(255,255,255,0.8)"
+                                                fill="rgba(255,255,255,0.85)"
                                                 fontSize={node.type === 'entity' ? 11 : 9}
                                                 fontWeight={node.type === 'entity' ? 500 : 400}
+                                                fontFamily="system-ui, -apple-system, sans-serif"
                                                 style={{ 
                                                     pointerEvents: 'none',
-                                                    textShadow: '0 1px 3px rgba(0,0,0,0.5)'
+                                                    textShadow: '0 1px 4px rgba(0,0,0,0.6)',
+                                                    transition: 'opacity 0.2s ease-out'
                                                 }}
                                             >
                                                 {node.label}
@@ -528,10 +640,11 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                         {/* Property type badge */}
                                         {isHovered && node.type === 'property' && node.propertyType && (
                                             <text
-                                                x={node.radius * scale + 8}
+                                                x={nodeRadius * scale + 10}
                                                 y={16}
                                                 fill="rgba(255,255,255,0.4)"
                                                 fontSize={8}
+                                                fontFamily="system-ui, -apple-system, sans-serif"
                                                 style={{ pointerEvents: 'none' }}
                                             >
                                                 {node.propertyType}
