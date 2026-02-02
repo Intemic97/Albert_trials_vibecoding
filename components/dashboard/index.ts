@@ -19,3 +19,13 @@ export {
     DashboardToolbar
 } from './DashboardToolbar';
 export type { TimeRange } from './DashboardToolbar';
+
+// Advanced Charts
+export {
+    ParallelCoordinatesChart,
+    HeatmapChart,
+    ScatterMatrixChart,
+    SankeyChart,
+    BubbleChart,
+    ADVANCED_CHART_TYPES
+} from './AdvancedCharts';

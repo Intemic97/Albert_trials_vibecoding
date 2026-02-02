@@ -16,14 +16,20 @@ export type WidgetType =
     | 'table'
     | 'stat'
     | 'trend'
-    | 'ai_generated';
+    | 'ai_generated'
+    // Advanced charts
+    | 'parallel'
+    | 'heatmap'
+    | 'scatter_matrix'
+    | 'sankey'
+    | 'bubble';
 
 export interface WidgetTemplate {
     id: WidgetType;
     name: string;
     description: string;
     icon: React.ReactNode;
-    category: 'charts' | 'stats' | 'tables' | 'ai';
+    category: 'charts' | 'stats' | 'tables' | 'ai' | 'advanced';
     defaultWidth: number;
     defaultHeight: number;
     requiresData: boolean;
@@ -129,6 +135,57 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
         defaultWidth: 6,
         defaultHeight: 5,
         requiresData: true
+    },
+    // Advanced Charts
+    {
+        id: 'parallel',
+        name: 'Parallel Coordinates',
+        description: 'Compare multiple dimensions across data points',
+        icon: <span className="text-lg">⫽</span>,
+        category: 'advanced',
+        defaultWidth: 8,
+        defaultHeight: 5,
+        requiresData: true
+    },
+    {
+        id: 'heatmap',
+        name: 'Heatmap',
+        description: 'Show intensity of values in a matrix',
+        icon: <span className="text-lg">▦</span>,
+        category: 'advanced',
+        defaultWidth: 6,
+        defaultHeight: 5,
+        requiresData: true
+    },
+    {
+        id: 'scatter_matrix',
+        name: 'Scatter Matrix',
+        description: 'Pairwise relationships between variables',
+        icon: <span className="text-lg">⋮⋮</span>,
+        category: 'advanced',
+        defaultWidth: 6,
+        defaultHeight: 6,
+        requiresData: true
+    },
+    {
+        id: 'sankey',
+        name: 'Sankey Diagram',
+        description: 'Flow of values between categories',
+        icon: <span className="text-lg">⤳</span>,
+        category: 'advanced',
+        defaultWidth: 8,
+        defaultHeight: 5,
+        requiresData: true
+    },
+    {
+        id: 'bubble',
+        name: 'Bubble Chart',
+        description: '3D scatter with size dimension',
+        icon: <span className="text-lg">◉</span>,
+        category: 'advanced',
+        defaultWidth: 6,
+        defaultHeight: 5,
+        requiresData: true
     }
 ];
 
@@ -146,6 +203,7 @@ export const WidgetGallery: React.FC<WidgetGalleryProps> = ({ onSelect, onClose 
         { id: 'ai', name: 'AI', icon: <Sparkle size={14} weight="light" /> },
         { id: 'stats', name: 'Stats', icon: <NumberCircleOne size={14} weight="light" /> },
         { id: 'charts', name: 'Charts', icon: <ChartBar size={14} weight="light" /> },
+        { id: 'advanced', name: 'Advanced', icon: <Database size={14} weight="light" /> },
         { id: 'tables', name: 'Tables', icon: <Table size={14} weight="light" /> },
     ];
 

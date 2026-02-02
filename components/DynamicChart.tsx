@@ -1,12 +1,19 @@
-import React, { useRef, useState, useEffect, memo, useCallback } from 'react';
+import React, { useRef, useState, useEffect, memo, useCallback, useMemo } from 'react';
 import {
     BarChart, Bar, LineChart, Line, PieChart, Pie, AreaChart, Area,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell,
     RadialBarChart, RadialBar
 } from 'recharts';
+import {
+    ParallelCoordinatesChart,
+    HeatmapChart,
+    ScatterMatrixChart,
+    SankeyChart,
+    BubbleChart
+} from './dashboard/AdvancedCharts';
 
 export interface WidgetConfig {
-    type: 'bar' | 'line' | 'pie' | 'area' | 'donut' | 'radial';
+    type: 'bar' | 'line' | 'pie' | 'area' | 'donut' | 'radial' | 'parallel' | 'heatmap' | 'scatter_matrix' | 'sankey' | 'bubble';
     title: string;
     description: string;
     explanation?: string;
@@ -14,6 +21,14 @@ export interface WidgetConfig {
     xAxisKey: string;
     dataKey: string | string[];
     colors?: string[];
+    // Advanced chart configs
+    dimensions?: string[];
+    yKey?: string;
+    valueKey?: string;
+    sizeKey?: string;
+    colorKey?: string;
+    nodes?: { id: string; value?: number }[];
+    links?: { source: string; target: string; value: number }[];
 }
 
 export interface DateRange {
@@ -428,6 +443,86 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                     </PieChart>
                 );
                 
+            case 'parallel':
+                // Parallel Coordinates Chart
+                const parallelDimensions = config.dimensions || 
+                    (data[0] ? Object.keys(data[0]).filter(k => typeof data[0][k] === 'number').slice(0, 6) : []);
+                return (
+                    <ParallelCoordinatesChart
+                        data={data}
+                        dimensions={parallelDimensions}
+                        colorKey={config.colorKey}
+                        height={height}
+                    />
+                );
+                
+            case 'heatmap':
+                // Heatmap Chart
+                return (
+                    <HeatmapChart
+                        data={data}
+                        xKey={xAxisKey}
+                        yKey={config.yKey || 'category'}
+                        valueKey={config.valueKey || (Array.isArray(dataKey) ? dataKey[0] : dataKey)}
+                        height={height}
+                    />
+                );
+                
+            case 'scatter_matrix':
+                // Scatter Matrix Chart
+                const scatterDimensions = config.dimensions || 
+                    (data[0] ? Object.keys(data[0]).filter(k => typeof data[0][k] === 'number').slice(0, 4) : []);
+                return (
+                    <ScatterMatrixChart
+                        data={data}
+                        dimensions={scatterDimensions}
+                        colorKey={config.colorKey}
+                        height={height}
+                    />
+                );
+                
+            case 'sankey':
+                // Sankey Diagram
+                if (config.nodes && config.links) {
+                    return (
+                        <SankeyChart
+                            nodes={config.nodes}
+                            links={config.links}
+                            height={height}
+                        />
+                    );
+                }
+                // Auto-generate from data if no nodes/links provided
+                const sankeyNodes = Array.from(new Set([
+                    ...data.map(d => d.source || d.from),
+                    ...data.map(d => d.target || d.to)
+                ].filter(Boolean))).map(id => ({ id: id as string }));
+                const sankeyLinks = data.map(d => ({
+                    source: d.source || d.from,
+                    target: d.target || d.to,
+                    value: parseFloat(d[config.valueKey || 'value']) || 1
+                })).filter(l => l.source && l.target);
+                return (
+                    <SankeyChart
+                        nodes={sankeyNodes}
+                        links={sankeyLinks}
+                        height={height}
+                    />
+                );
+                
+            case 'bubble':
+                // Bubble Chart
+                return (
+                    <BubbleChart
+                        data={data}
+                        xKey={xAxisKey}
+                        yKey={config.yKey || (Array.isArray(dataKey) ? dataKey[0] : dataKey)}
+                        sizeKey={config.sizeKey || (Array.isArray(dataKey) && dataKey[1] ? dataKey[1] : 'size')}
+                        colorKey={config.colorKey}
+                        height={height}
+                    />
+                );
+                
             default:
                 return <div className="text-[var(--text-tertiary)]">Unsupported chart type</div>;
         }
@@ -451,11 +546,18 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
         );
     }
 
+    // Advanced charts handle their own sizing
+    const isAdvancedChart = ['parallel', 'heatmap', 'scatter_matrix', 'sankey', 'bubble'].includes(type);
+
     return (
-        <div ref={containerRef} style={{ width: '100%', height: height, minHeight: height }}>
-            <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={100}>
-                {renderChart()}
-            </ResponsiveContainer>
+        <div ref={containerRef} style={{ width: '100%', height: height, minHeight: height }} className="relative">
+            {isAdvancedChart ? (
+                renderChart()
+            ) : (
+                <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={100}>
+                    {renderChart()}
+                </ResponsiveContainer>
+            )}
         </div>
     );
 });
