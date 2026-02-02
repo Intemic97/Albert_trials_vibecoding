@@ -85,9 +85,9 @@ const iconMap: Record<string, React.ComponentType<{ size?: number; className?: s
 };
 
 const statusConfig = {
-    draft: { label: 'Draft', color: 'text-amber-700', bg: 'bg-amber-50', borderColor: 'border-slate-200' },
-    review: { label: 'In Review', color: 'text-slate-700', bg: 'bg-slate-50', borderColor: 'border-slate-200' },
-    ready_to_send: { label: 'Ready', color: 'text-slate-700', bg: 'bg-slate-50', borderColor: 'border-slate-200' }
+    draft: { label: 'Draft', color: 'text-amber-700', bg: 'bg-amber-50', borderColor: 'border-[var(--border-light)]' },
+    review: { label: 'In Review', color: 'text-[var(--text-primary)]', bg: 'bg-[var(--bg-tertiary)]', borderColor: 'border-[var(--border-light)]' },
+    ready_to_send: { label: 'Ready', color: 'text-[var(--text-primary)]', bg: 'bg-[var(--bg-tertiary)]', borderColor: 'border-[var(--border-light)]' }
 };
 
 export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onViewChange, view = 'documents' }) => {
@@ -436,12 +436,12 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
     const headerInfo = getHeaderInfo();
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 relative" data-tutorial="reports-content">
+        <div className="flex flex-col h-full bg-[var(--bg-primary)] relative" data-tutorial="reports-content">
             {/* Header */}
-            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
+            <header className="h-16 bg-[var(--bg-card)] border-b border-[var(--border-light)] flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
                 <div>
-                    <h1 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{headerInfo.title}</h1>
-                    <p className="text-[11px] text-slate-500">{headerInfo.subtitle}</p>
+                    <h1 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{headerInfo.title}</h1>
+                    <p className="text-[11px] text-[var(--text-secondary)]">{headerInfo.subtitle}</p>
                 </div>
                 <div />
             </header>
@@ -456,12 +456,12 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                         {/* Header Section */}
                         <div className="flex items-center justify-between">
                             <div>
-                                <h2 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>My Documents</h2>
-                                <p className="text-xs text-slate-500 mt-1">{reports.length} document{reports.length !== 1 ? 's' : ''}</p>
+                                <h2 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>My Documents</h2>
+                                <p className="text-xs text-[var(--text-secondary)] mt-1">{reports.length} document{reports.length !== 1 ? 's' : ''}</p>
                             </div>
                             <button
                                 onClick={() => setShowNewReportModal(true)}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                             >
                                 <Plus size={14} />
                                 New Document
@@ -471,29 +471,29 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                         {/* Search Documents */}
                         {reports.length > 0 && (
                             <div className="relative">
-                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
                                 <input
                                     type="text"
                                     placeholder="Search by name, creator or reviewer..."
                                     value={documentsSearch}
                                     onChange={(e) => setDocumentsSearch(e.target.value)}
-                                    className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-300 focus:border-slate-300 outline-none placeholder:text-slate-400 hover:border-slate-300 transition-colors"
+                                    className="w-full pl-8 pr-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] outline-none placeholder:text-[var(--text-tertiary)] hover:border-[var(--border-medium)] transition-colors"
                                 />
                             </div>
                         )}
 
                         {reportsLoading ? (
                             <div className="flex items-center justify-center py-16">
-                                <Loader2 className="animate-spin text-slate-400" size={24} />
+                                <Loader2 className="animate-spin text-[var(--text-tertiary)]" size={24} />
                             </div>
                         ) : reports.length === 0 ? (
-                            <div className="bg-white rounded-lg border border-dashed border-slate-200 p-12 text-center">
-                                <FileText className="mx-auto text-slate-300" size={48} />
-                                <p className="text-slate-600 mt-4 text-sm font-medium">No documents yet</p>
-                                <p className="text-slate-400 text-xs mt-1">Create your first document to get started</p>
+                            <div className="bg-[var(--bg-card)] rounded-lg border border-dashed border-[var(--border-light)] p-12 text-center">
+                                <FileText className="mx-auto text-[var(--text-tertiary)]" size={48} />
+                                <p className="text-[var(--text-secondary)] mt-4 text-sm font-medium">No documents yet</p>
+                                <p className="text-[var(--text-tertiary)] text-xs mt-1">Create your first document to get started</p>
                                 <button
                                     onClick={() => setShowNewReportModal(true)}
-                                    className="mt-6 flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
+                                    className="mt-6 flex items-center gap-2 px-4 py-2 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
                                 >
                                     <Plus size={16} />
                                     Create Document
@@ -517,15 +517,15 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                         <div
                                             key={report.id}
                                             onClick={() => navigate(`/documents/${report.id}`)}
-                                            className="group relative bg-white border border-slate-200 rounded-lg p-5 cursor-pointer flex flex-col justify-between min-h-[200px] hover:border-slate-300 hover:shadow-sm transition-all"
+                                            className="group relative bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 cursor-pointer flex flex-col justify-between min-h-[200px] hover:border-[var(--border-medium)] hover:shadow-sm transition-all"
                                         >
                                             {/* Header with Status and Actions */}
                                             <div className="flex items-start justify-between mb-4">
                                                 <div className="flex-1 min-w-0 pr-12">
-                                                    <h3 className="text-base font-normal text-slate-900 group-hover:text-slate-700 transition-colors truncate mb-1" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                    <h3 className="text-base font-normal text-[var(--text-primary)] group-hover:text-[var(--text-secondary)] transition-colors truncate mb-1" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                                                         {report.name}
                                                     </h3>
-                                                    <p className="text-xs text-slate-500 truncate">
+                                                    <p className="text-xs text-[var(--text-secondary)] truncate">
                                                         {report.templateName}
                                                     </p>
                                                 </div>
@@ -540,7 +540,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                                             e.stopPropagation();
                                                             handleDeleteReport(report.id, e);
                                                         }}
-                                                        className="text-slate-300 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                                                        className="text-[var(--text-tertiary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
                                                     >
                                                         <Trash2 size={16} />
                                                     </button>
@@ -549,26 +549,26 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
 
                                             {/* Content */}
                                             <div className="flex-1 space-y-3">
-                                                <div className="flex items-center gap-2 text-xs text-slate-600">
-                                                    <User size={12} className="text-slate-400" />
+                                                <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                    <User size={12} className="text-[var(--text-tertiary)]" />
                                                     <span className="truncate">{report.createdByName}</span>
                                                 </div>
                                                 {report.reviewerName && (
-                                                    <div className="flex items-center gap-2 text-xs text-slate-600">
-                                                        <User size={12} className="text-slate-400" />
+                                                    <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                        <User size={12} className="text-[var(--text-tertiary)]" />
                                                         <span className="truncate">{report.reviewerName}</span>
                                                     </div>
                                                 )}
                                                 {report.deadline && (
-                                                    <div className="flex items-center gap-2 text-xs text-slate-600">
-                                                        <Calendar size={12} className="text-slate-400" />
+                                                    <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                        <Calendar size={12} className="text-[var(--text-tertiary)]" />
                                                         <span>{new Date(report.deadline).toLocaleDateString()}</span>
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Footer */}
-                                            <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+                                            <div className="mt-5 pt-4 border-t border-[var(--border-light)] flex items-center justify-between text-xs text-[var(--text-tertiary)]">
                                                 <span>Updated {new Date(report.updatedAt).toLocaleDateString()}</span>
                                             </div>
                                         </div>
@@ -585,20 +585,20 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                         {/* Header Section */}
                         <div className="flex items-center justify-between">
                             <div>
-                                <h2 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Report Templates</h2>
-                                <p className="text-xs text-slate-500 mt-1">Templates define the structure of your documents</p>
+                                <h2 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Report Templates</h2>
+                                <p className="text-xs text-[var(--text-secondary)] mt-1">Templates define the structure of your documents</p>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={handleCreateWithAI}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                 >
                                     <Bot size={14} />
                                     Create with AI
                                 </button>
                                 <button
                                     onClick={handleCreateTemplate}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                 >
                                     <Plus size={14} />
                                     New Template
@@ -609,29 +609,29 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                         {/* Search Templates */}
                         {templates.length > 0 && (
                             <div className="relative">
-                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
                                 <input
                                     type="text"
                                     placeholder="Search templates by name..."
                                     value={templatesSearch}
                                     onChange={(e) => setTemplatesSearch(e.target.value)}
-                                    className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-300 focus:border-slate-300 outline-none placeholder:text-slate-400 hover:border-slate-300 transition-colors"
+                                    className="w-full pl-8 pr-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--border-medium)] outline-none placeholder:text-[var(--text-tertiary)] hover:border-[var(--border-medium)] transition-colors"
                                 />
                             </div>
                         )}
 
                         {templatesLoading ? (
                             <div className="flex items-center justify-center py-16">
-                                <Loader2 className="animate-spin text-slate-400" size={24} />
+                                <Loader2 className="animate-spin text-[var(--text-tertiary)]" size={24} />
                             </div>
                         ) : templates.length === 0 ? (
-                            <div className="bg-white rounded-lg border border-dashed border-slate-200 p-12 text-center">
-                                <FileText className="mx-auto text-slate-300" size={48} />
-                                <p className="text-slate-600 mt-4 text-sm font-medium">No templates yet</p>
-                                <p className="text-slate-400 text-xs mt-1">Create your first template to structure your documents</p>
+                            <div className="bg-[var(--bg-card)] rounded-lg border border-dashed border-[var(--border-light)] p-12 text-center">
+                                <FileText className="mx-auto text-[var(--text-tertiary)]" size={48} />
+                                <p className="text-[var(--text-secondary)] mt-4 text-sm font-medium">No templates yet</p>
+                                <p className="text-[var(--text-tertiary)] text-xs mt-1">Create your first template to structure your documents</p>
                                 <button
                                     onClick={handleCreateTemplate}
-                                    className="mt-6 flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
+                                    className="mt-6 flex items-center gap-2 px-4 py-2 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
                                 >
                                     <Plus size={16} />
                                     Create Template
@@ -650,7 +650,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                     return (
                                         <div
                                             key={template.id}
-                                            className="group relative bg-white border border-slate-200 rounded-lg p-5 hover:border-slate-300 hover:shadow-md transition-all cursor-pointer flex flex-col"
+                                            className="group relative bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 hover:border-[var(--border-medium)] hover:shadow-md transition-all cursor-pointer flex flex-col"
                                             onClick={(e) => {
                                                 if (!(e.target as HTMLElement).closest('button')) {
                                                     handleEditTemplate(template, e);
@@ -661,14 +661,14 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                             <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                                 <button
                                                     onClick={(e) => handleEditTemplate(template, e)}
-                                                    className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-md text-slate-600 transition-colors shadow-sm"
+                                                    className="p-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] rounded-md text-[var(--text-secondary)] transition-colors shadow-sm"
                                                     title="Edit template"
                                                 >
                                                     <Edit3 size={14} />
                                                 </button>
                                                 <button
                                                     onClick={(e) => handleDeleteTemplate(template.id, e)}
-                                                    className="p-1.5 bg-white border border-red-200 hover:bg-red-50 rounded-md text-red-600 transition-colors shadow-sm"
+                                                    className="p-1.5 bg-[var(--bg-card)] border border-red-200 hover:bg-red-50 rounded-md text-red-600 transition-colors shadow-sm"
                                                     title="Delete template"
                                                 >
                                                     <Trash2 size={14} />
@@ -677,11 +677,11 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
 
                                             {/* Header with icon and title */}
                                             <div className="flex items-start gap-3 pr-12 mb-3">
-                                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center shrink-0 group-hover:from-slate-100 group-hover:to-slate-200 transition-all">
-                                                    <IconComponent size={20} className="text-slate-600" />
+                                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0 group-hover:bg-[var(--bg-hover)] transition-all">
+                                                    <IconComponent size={20} className="text-[var(--text-secondary)]" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="font-normal text-sm text-slate-900 group-hover:text-slate-700 transition-colors leading-tight" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                    <h3 className="font-normal text-sm text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors leading-tight" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                                                         {template.name}
                                                     </h3>
                                                 </div>
@@ -689,24 +689,24 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
 
                                             {/* Description */}
                                             {template.description && (
-                                                <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">
+                                                <p className="text-xs text-[var(--text-secondary)] line-clamp-2 mb-4 leading-relaxed">
                                                     {template.description}
                                                 </p>
                                             )}
                                             
                                             {/* Footer stats */}
-                                            <div className="mt-auto pt-3 border-t border-slate-100 flex items-center gap-3 text-xs text-slate-500">
+                                            <div className="mt-auto pt-3 border-t border-[var(--border-light)] flex items-center gap-3 text-xs text-[var(--text-secondary)]">
                                                 <div className="flex items-center gap-1.5">
-                                                    <FileText size={12} className="text-slate-400" />
-                                                    <span className="font-medium text-slate-600">{template.sections.length}</span>
+                                                    <FileText size={12} className="text-[var(--text-tertiary)]" />
+                                                    <span className="font-medium text-[var(--text-secondary)]">{template.sections.length}</span>
                                                     <span>section{template.sections.length !== 1 ? 's' : ''}</span>
                                                 </div>
                                                 {totalItems > 0 && (
                                                     <>
-                                                        <span className="text-slate-300">•</span>
+                                                        <span className="text-[var(--text-tertiary)]">•</span>
                                                         <div className="flex items-center gap-1.5">
-                                                            <Clipboard size={12} className="text-slate-400" />
-                                                            <span className="font-medium text-slate-600">{totalItems}</span>
+                                                            <Clipboard size={12} className="text-[var(--text-tertiary)]" />
+                                                            <span className="font-medium text-[var(--text-secondary)]">{totalItems}</span>
                                                             <span>item{totalItems !== 1 ? 's' : ''}</span>
                                                         </div>
                                                     </>
@@ -809,22 +809,22 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
             {/* AI Template Assistant Modal */}
             {showAiAssistant && (
                 <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-black/40 backdrop-blur-sm pointer-events-none" onClick={() => setShowAiAssistant(false)}>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-2xl pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-2xl pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="px-6 py-4 border-b border-slate-200">
+                        <div className="px-6 py-4 border-b border-[var(--border-light)]">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                    <Bot size={18} className="text-slate-600" />
+                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0">
+                                    <Bot size={18} className="text-[var(--text-secondary)]" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="text-lg font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                    <h3 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                                         Create Template with AI
                                     </h3>
-                                    <p className="text-xs text-slate-500 mt-0.5">Describe the template you want to create</p>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Describe the template you want to create</p>
                                 </div>
                                 <button
                                     onClick={() => setShowAiAssistant(false)}
-                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                                    className="p-2 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                                 >
                                     <X size={18} />
                                 </button>
@@ -836,7 +836,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                             {!aiGeneratedTemplate ? (
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                             What kind of report template do you need?
                                         </label>
                                         <textarea
@@ -844,10 +844,10 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                             onChange={(e) => setAiPrompt(e.target.value)}
                                             placeholder="Example: Create a production quality report template with sections for batch records, quality checks, deviations, and corrective actions..."
                                             rows={5}
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 resize-none placeholder:text-slate-400 hover:border-slate-300 transition-colors"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--border-medium)] resize-none placeholder:text-[var(--text-tertiary)] hover:border-[var(--border-medium)] transition-colors"
                                             autoFocus
                                         />
-                                        <p className="text-xs text-slate-500 mt-2">
+                                        <p className="text-xs text-[var(--text-secondary)] mt-2">
                                             Be specific about sections, structure, and content you want included
                                         </p>
                                     </div>
@@ -855,14 +855,14 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                     <div className="flex gap-2 justify-end">
                                         <button
                                             onClick={() => setShowAiAssistant(false)}
-                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={handleGenerateTemplate}
                                             disabled={!aiPrompt.trim() || isGeneratingTemplate}
-                                            className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             {isGeneratingTemplate ? (
                                                 <>
@@ -880,19 +880,19 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                                    <div className="bg-[var(--bg-secondary)] rounded-lg p-4 border border-[var(--border-light)]">
                                         <div className="flex items-start gap-3 mb-3">
-                                            <div className="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0">
-                                                {React.createElement(getIconComponent(aiGeneratedTemplate.icon), { size: 20, className: "text-slate-600" })}
+                                            <div className="w-10 h-10 rounded-lg bg-[var(--bg-card)] border border-[var(--border-light)] flex items-center justify-center shrink-0">
+                                                {React.createElement(getIconComponent(aiGeneratedTemplate.icon), { size: 20, className: "text-[var(--text-secondary)]" })}
                                             </div>
                                             <div className="flex-1">
-                                                <h4 className="text-sm font-medium text-slate-900 mb-1">{aiGeneratedTemplate.name}</h4>
+                                                <h4 className="text-sm font-medium text-[var(--text-primary)] mb-1">{aiGeneratedTemplate.name}</h4>
                                                 {aiGeneratedTemplate.description && (
-                                                    <p className="text-xs text-slate-600">{aiGeneratedTemplate.description}</p>
+                                                    <p className="text-xs text-[var(--text-secondary)]">{aiGeneratedTemplate.description}</p>
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-[var(--text-secondary)]">
                                             <span className="font-medium">{aiGeneratedTemplate.sections.length}</span> sections •{' '}
                                             <span className="font-medium">
                                                 {aiGeneratedTemplate.sections.reduce((sum, s) => sum + s.items.length, 0)}
@@ -907,13 +907,13 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                                 setAiGeneratedTemplate(null);
                                                 setAiPrompt('');
                                             }}
-                                            className="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                                         >
                                             Try Again
                                         </button>
                                         <button
                                             onClick={handleUseGeneratedTemplate}
-                                            className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                         >
                                             Use This Template
                                         </button>
@@ -967,22 +967,22 @@ const NewReportModal: React.FC<NewReportModalProps> = ({ templates, orgUsers, on
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg border border-slate-200 shadow-xl w-full max-w-lg">
+            <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl w-full max-w-lg">
                 {/* Header */}
-                <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
-                    <h2 className="text-sm font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>New Document</h2>
+                <div className="px-5 py-4 border-b border-[var(--border-light)] flex items-center justify-between bg-[var(--bg-secondary)]/50">
+                    <h2 className="text-sm font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>New Document</h2>
                     <button
                         onClick={onClose}
-                        className="p-1.5 hover:bg-slate-100 rounded-md transition-colors"
+                        className="p-1.5 hover:bg-[var(--bg-tertiary)] rounded-md transition-colors"
                     >
-                        <X size={20} className="text-slate-500" />
+                        <X size={20} className="text-[var(--text-secondary)]" />
                     </button>
                 </div>
 
                 {/* Content */}
                 <div className="p-5 space-y-4">
                     <div>
-                        <label className="block text-xs font-medium text-slate-600 mb-1">
+                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
                             Document Name *
                         </label>
                         <input
@@ -990,31 +990,31 @@ const NewReportModal: React.FC<NewReportModalProps> = ({ templates, orgUsers, on
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="e.g., Q4 Production Audit"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-slate-300 focus:border-slate-300 outline-none"
+                            className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--border-medium)] outline-none"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                            Description <span className="text-slate-400">(optional)</span>
+                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                            Description <span className="text-[var(--text-tertiary)]">(optional)</span>
                         </label>
                         <textarea
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="Brief description of this document..."
                             rows={2}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-none"
+                            className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-none"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                             Template *
                         </label>
                         <select
                             value={templateId}
                             onChange={(e) => setTemplateId(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
+                            className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-[var(--bg-card)]"
                         >
                             <option value="">Select a template...</option>
                             {templates.map(t => (
@@ -1029,13 +1029,13 @@ const NewReportModal: React.FC<NewReportModalProps> = ({ templates, orgUsers, on
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                            Reviewer <span className="text-slate-400">(optional)</span>
+                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                            Reviewer <span className="text-[var(--text-tertiary)]">(optional)</span>
                         </label>
                         <select
                             value={reviewerId}
                             onChange={(e) => setReviewerId(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
+                            className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-[var(--bg-card)]"
                         >
                             <option value="">No reviewer assigned</option>
                             {orgUsers.map(u => (
@@ -1045,30 +1045,30 @@ const NewReportModal: React.FC<NewReportModalProps> = ({ templates, orgUsers, on
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                            Deadline <span className="text-slate-400">(optional)</span>
+                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                            Deadline <span className="text-[var(--text-tertiary)]">(optional)</span>
                         </label>
                         <input
                             type="date"
                             value={deadline}
                             onChange={(e) => setDeadline(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                            className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
                         />
                     </div>
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-3">
+                <div className="px-6 py-4 border-t border-[var(--border-light)] flex items-center justify-end gap-3">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium transition-colors"
+                        className="px-4 py-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium transition-colors"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleSubmit}
                         disabled={isCreating || templates.length === 0}
-                        className="flex items-center gap-2 px-3 py-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:shadow-none"
+                        className="flex items-center gap-2 px-3 py-2 bg-[#256A65] hover:bg-[#1e554f] disabled:bg-[var(--bg-tertiary)] disabled:text-[var(--text-tertiary)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:shadow-none"
                     >
                         {isCreating ? (
                             <>
@@ -1177,17 +1177,17 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg border border-slate-200 shadow-lg w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-lg w-full max-w-3xl max-h-[90vh] flex flex-col">
                 {/* Header */}
-                <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between shrink-0 bg-slate-50/50">
-                    <h2 className="text-sm font-normal text-slate-900" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                <div className="px-5 py-4 border-b border-[var(--border-light)] flex items-center justify-between shrink-0 bg-[var(--bg-secondary)]/50">
+                    <h2 className="text-sm font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                         {template ? 'Edit Template' : 'Create Template'}
                     </h2>
                     <button
                         onClick={onClose}
-                        className="p-1.5 hover:bg-slate-100 rounded-md transition-colors"
+                        className="p-1.5 hover:bg-[var(--bg-tertiary)] rounded-md transition-colors"
                     >
-                        <X size={20} className="text-slate-500" />
+                        <X size={20} className="text-[var(--text-secondary)]" />
                     </button>
                 </div>
 
@@ -1225,7 +1225,7 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                     {/* Basic Info */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                                 Template Name *
                             </label>
                             <input
@@ -1233,11 +1233,11 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 placeholder="e.g., Monthly Production Report"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                                className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                                 Icon
                             </label>
                             <div className="flex gap-2">
@@ -1248,7 +1248,7 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                                         className={`p-2 rounded-lg border-2 transition-all ${
                                             icon === value
                                                 ? 'border-teal-500 bg-teal-50 text-teal-600'
-                                                : 'border-slate-200 hover:border-slate-300 text-slate-500'
+                                                : 'border-[var(--border-light)] hover:border-[var(--border-medium)] text-[var(--text-secondary)]'
                                         }`}
                                         title={label}
                                     >
@@ -1260,7 +1260,7 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                             Description
                         </label>
                         <input
@@ -1268,14 +1268,14 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="Brief description of this template"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                            className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
                         />
                     </div>
 
                     {/* Sections */}
                     <div>
                         <div className="flex items-center justify-between mb-3">
-                            <label className="text-sm font-medium text-slate-700">Sections</label>
+                            <label className="text-sm font-medium text-[var(--text-primary)]">Sections</label>
                             <button
                                 onClick={addSection}
                                 className="flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700 font-medium"
@@ -1287,22 +1287,22 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
 
                         <div className="space-y-4">
                             {sections.map((section, sIdx) => (
-                                <div key={sIdx} className="border border-slate-200 rounded-lg overflow-hidden">
+                                <div key={sIdx} className="border border-[var(--border-light)] rounded-lg overflow-hidden">
                                     {/* Section Header */}
-                                    <div className="bg-slate-50 px-4 py-3 flex items-center gap-3">
+                                    <div className="bg-[var(--bg-secondary)] px-4 py-3 flex items-center gap-3">
                                         <button
                                             onClick={() => toggleSection(sIdx)}
-                                            className="text-slate-400 hover:text-slate-600"
+                                            className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                                         >
                                             {section.isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                                         </button>
-                                        <span className="text-sm text-slate-500 font-medium">Section {sIdx + 1} Title</span>
+                                        <span className="text-sm text-[var(--text-secondary)] font-medium">Section {sIdx + 1} Title</span>
                                         <input
                                             type="text"
                                             value={section.title}
                                             onChange={(e) => updateSection(sIdx, { title: e.target.value })}
                                             placeholder="e.g., 1. Executive summary"
-                                            className="flex-1 px-2 py-1 border border-slate-200 rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm"
+                                            className="flex-1 px-2 py-1 border border-[var(--border-light)] rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm"
                                         />
                                         <button
                                             onClick={() => addItem(sIdx)}
@@ -1327,38 +1327,38 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                                             {section.items.length > 0 ? (
                                                 <div className="space-y-3">
                                                     {section.items.map((item, iIdx) => (
-                                                        <div key={iIdx} className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                                                        <div key={iIdx} className="bg-[var(--bg-secondary)] rounded-lg p-3 border border-[var(--border-light)]">
                                                             <div className="flex items-start gap-2 mb-2">
-                                                                <GripVertical size={16} className="text-slate-300 mt-2 shrink-0" />
+                                                                <GripVertical size={16} className="text-[var(--text-tertiary)] mt-2 shrink-0" />
                                                                 <div className="flex-1 space-y-2">
                                                                     <div>
-                                                                        <label className="text-xs text-slate-500">Item Title</label>
+                                                                        <label className="text-xs text-[var(--text-secondary)]">Item Title</label>
                                                                         <input
                                                                             type="text"
                                                                             value={item.title}
                                                                             onChange={(e) => updateItem(sIdx, iIdx, { title: e.target.value })}
                                                                             placeholder="e.g., Audit key compliance indicators"
-                                                                            className="w-full px-2 py-1.5 border border-slate-200 rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm"
+                                                                            className="w-full px-2 py-1.5 border border-[var(--border-light)] rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm"
                                                                         />
                                                                     </div>
                                                                     <div>
-                                                                        <label className="text-xs text-slate-500">Content</label>
+                                                                        <label className="text-xs text-[var(--text-secondary)]">Content</label>
                                                                         <textarea
                                                                             value={item.content}
                                                                             onChange={(e) => updateItem(sIdx, iIdx, { content: e.target.value })}
                                                                             placeholder="Description or details for this item..."
                                                                             rows={2}
-                                                                            className="w-full px-2 py-1.5 border border-slate-200 rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm resize-none"
+                                                                            className="w-full px-2 py-1.5 border border-[var(--border-light)] rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm resize-none"
                                                                         />
                                                                     </div>
                                                                     <div>
-                                                                        <label className="text-xs text-slate-500">Generation Rules <span className="text-slate-400">(optional)</span></label>
+                                                                        <label className="text-xs text-[var(--text-secondary)]">Generation Rules <span className="text-[var(--text-tertiary)]">(optional)</span></label>
                                                                         <textarea
                                                                             value={item.generationRules}
                                                                             onChange={(e) => updateItem(sIdx, iIdx, { generationRules: e.target.value })}
                                                                             placeholder="e.g., Use formal tone, include specific examples, max 200 words..."
                                                                             rows={2}
-                                                                            className="w-full px-2 py-1.5 border border-slate-200 rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm resize-none"
+                                                                            className="w-full px-2 py-1.5 border border-[var(--border-light)] rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm resize-none"
                                                                         />
                                                                     </div>
                                                                 </div>
@@ -1374,8 +1374,8 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                                                     ))}
                                                 </div>
                                             ) : (
-                                                <div className="text-center py-4 border-2 border-dashed border-slate-200 rounded-lg">
-                                                    <p className="text-sm text-slate-400">No items in this section</p>
+                                                <div className="text-center py-4 border-2 border-dashed border-[var(--border-light)] rounded-lg">
+                                                    <p className="text-sm text-[var(--text-tertiary)]">No items in this section</p>
                                                     <button
                                                         onClick={() => addItem(sIdx)}
                                                         className="mt-2 text-sm text-teal-600 hover:text-teal-700 font-medium"
@@ -1390,8 +1390,8 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                             ))}
 
                             {sections.length === 0 && (
-                                <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-lg">
-                                    <p className="text-slate-500">No sections yet</p>
+                                <div className="text-center py-8 border-2 border-dashed border-[var(--border-light)] rounded-lg">
+                                    <p className="text-[var(--text-secondary)]">No sections yet</p>
                                     <button
                                         onClick={addSection}
                                         className="mt-2 text-teal-600 hover:text-teal-700 font-medium"
@@ -1405,17 +1405,17 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-3 shrink-0">
+                <div className="px-6 py-4 border-t border-[var(--border-light)] flex items-center justify-end gap-3 shrink-0">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium transition-colors"
+                        className="px-4 py-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium transition-colors"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleSubmit}
                         disabled={isSaving}
-                        className="flex items-center gap-2 px-3 py-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:shadow-none"
+                        className="flex items-center gap-2 px-3 py-2 bg-[#256A65] hover:bg-[#1e554f] disabled:bg-[var(--bg-tertiary)] disabled:text-[var(--text-tertiary)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:shadow-none"
                     >
                         {isSaving ? (
                             <>
