@@ -16,10 +16,36 @@ export interface WidgetConfig {
     colors?: string[];
 }
 
+export interface DateRange {
+    start: string;
+    end: string;
+}
+
 interface DynamicChartProps {
     config: WidgetConfig;
     height?: number;
+    dateRange?: DateRange;
 }
+
+// Helper function to filter data by date range
+const filterDataByDateRange = (data: any[], dateRange?: DateRange): any[] => {
+    if (!dateRange || !data || data.length === 0) return data;
+    
+    const startDate = new Date(dateRange.start);
+    const endDate = new Date(dateRange.end);
+    endDate.setHours(23, 59, 59, 999);
+    
+    // Common date field names to look for
+    const dateFields = ['date', 'fecha', 'timestamp', 'time', 'created_at', 'createdAt', 'month', 'day', 'periodo', 'period'];
+    const dateField = dateFields.find(field => data[0]?.[field] !== undefined);
+    
+    if (!dateField) return data;
+    
+    return data.filter(item => {
+        const itemDate = new Date(item[dateField]);
+        return !isNaN(itemDate.getTime()) && itemDate >= startDate && itemDate <= endDate;
+    });
+};
 
 // Premium color palette - más profesional y elegante
 const DEFAULT_COLORS = [
@@ -131,9 +157,12 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
     );
 };
 
-export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height = 250 }) => {
-    const { type, data, xAxisKey, dataKey, colors = DEFAULT_COLORS } = config;
+export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height = 250, dateRange }) => {
+    const { type, data: rawData, xAxisKey, dataKey, colors = DEFAULT_COLORS } = config;
     const containerRef = useRef<HTMLDivElement>(null);
+    
+    // Filter data by date range if provided
+    const data = React.useMemo(() => filterDataByDateRange(rawData, dateRange), [rawData, dateRange]);
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     const [isReady, setIsReady] = useState(false);
     const [activeIndex, setActiveIndex] = useState<number | null>(null);

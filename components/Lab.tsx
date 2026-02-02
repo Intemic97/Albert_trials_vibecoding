@@ -378,19 +378,41 @@ const KPICard: React.FC<{
 const VisualizationCard: React.FC<{
     config: VisualizationConfig;
     data: any;
-}> = ({ config, data }) => {
+    dateRange?: { start: string; end: string };
+}> = ({ config, data, dateRange }) => {
     const { type, title, dataMapping, color } = config;
     
-    // Extract data based on mapping
+    // Extract and filter data based on mapping and date range
     const chartData = useMemo(() => {
         if (!data) return [];
         
         // Navigate to the data source
         const source = dataMapping.source.split('.').reduce((obj, key) => obj?.[key], data);
-        if (Array.isArray(source)) return source;
-        if (typeof source === 'object') return [source];
-        return [];
-    }, [data, dataMapping.source]);
+        let result = [];
+        if (Array.isArray(source)) result = source;
+        else if (typeof source === 'object') result = [source];
+        else return [];
+        
+        // Filter by date range if applicable
+        if (dateRange && result.length > 0) {
+            const startDate = new Date(dateRange.start);
+            const endDate = new Date(dateRange.end);
+            endDate.setHours(23, 59, 59, 999); // Include end date fully
+            
+            // Try to find a date field in the data
+            const dateFields = ['date', 'fecha', 'timestamp', 'time', 'created_at', 'createdAt', 'month', 'day'];
+            const dateField = dateFields.find(field => result[0]?.[field] !== undefined);
+            
+            if (dateField) {
+                result = result.filter(item => {
+                    const itemDate = new Date(item[dateField]);
+                    return itemDate >= startDate && itemDate <= endDate;
+                });
+            }
+        }
+        
+        return result;
+    }, [data, dataMapping.source, dateRange]);
 
     const getValue = () => {
         if (!data) return null;
@@ -636,6 +658,14 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
     const [quickBookmarkName, setQuickBookmarkName] = useState('');
     const [showQuickBookmark, setShowQuickBookmark] = useState(false);
     const [bookmarkSaved, setBookmarkSaved] = useState(false);
+    
+    // Date range state
+    const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
+        start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        end: new Date().toISOString().split('T')[0]
+    });
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [datePreset, setDatePreset] = useState<string>('7d');
     
     const [newVisualization, setNewVisualization] = useState({
         type: 'kpi' as VisualizationConfig['type'],
@@ -2180,6 +2210,98 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                 </div>
                 
                 <div className="flex items-center gap-2">
+                    {/* Date Range Selector */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowDatePicker(!showDatePicker)}
+                            className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                        >
+                            <Calendar size={14} className="text-[var(--text-tertiary)]" />
+                            <span>
+                                {new Date(dateRange.start).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} - {new Date(dateRange.end).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
+                            </span>
+                            <CaretDown size={12} className="text-[var(--text-tertiary)]" />
+                        </button>
+                        
+                        {showDatePicker && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setShowDatePicker(false)} />
+                                <div className="absolute right-0 top-full mt-2 w-72 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-xl z-50 overflow-hidden">
+                                    {/* Presets */}
+                                    <div className="p-3 border-b border-[var(--border-light)]">
+                                        <p className="text-xs font-medium text-[var(--text-tertiary)] mb-2">Quick Select</p>
+                                        <div className="grid grid-cols-4 gap-1.5">
+                                            {[
+                                                { id: '7d', label: '7D', days: 7 },
+                                                { id: '14d', label: '14D', days: 14 },
+                                                { id: '30d', label: '30D', days: 30 },
+                                                { id: '90d', label: '90D', days: 90 },
+                                            ].map(preset => (
+                                                <button
+                                                    key={preset.id}
+                                                    onClick={() => {
+                                                        const end = new Date();
+                                                        const start = new Date(Date.now() - preset.days * 24 * 60 * 60 * 1000);
+                                                        setDateRange({
+                                                            start: start.toISOString().split('T')[0],
+                                                            end: end.toISOString().split('T')[0]
+                                                        });
+                                                        setDatePreset(preset.id);
+                                                    }}
+                                                    className={`px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                                        datePreset === preset.id
+                                                            ? 'bg-[var(--accent-primary)] text-white'
+                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-selected)]'
+                                                    }`}
+                                                >
+                                                    {preset.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Custom Range */}
+                                    <div className="p-3">
+                                        <p className="text-xs font-medium text-[var(--text-tertiary)] mb-2">Custom Range</p>
+                                        <div className="flex gap-2 items-center">
+                                            <input
+                                                type="date"
+                                                value={dateRange.start}
+                                                onChange={(e) => {
+                                                    setDateRange(prev => ({ ...prev, start: e.target.value }));
+                                                    setDatePreset('custom');
+                                                }}
+                                                className="flex-1 px-2 py-1.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)]"
+                                            />
+                                            <span className="text-xs text-[var(--text-tertiary)]">→</span>
+                                            <input
+                                                type="date"
+                                                value={dateRange.end}
+                                                onChange={(e) => {
+                                                    setDateRange(prev => ({ ...prev, end: e.target.value }));
+                                                    setDatePreset('custom');
+                                                }}
+                                                className="flex-1 px-2 py-1.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)]"
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Apply */}
+                                    <div className="p-3 border-t border-[var(--border-light)] bg-[var(--bg-tertiary)]">
+                                        <button
+                                            onClick={() => setShowDatePicker(false)}
+                                            className="w-full px-3 py-2 bg-[var(--accent-primary)] text-white rounded-lg text-sm font-medium hover:bg-[var(--accent-primary-hover)] transition-colors"
+                                        >
+                                            Apply Range
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    
+                    <div className="w-px h-6 bg-[var(--border-light)]" />
+                    
                     {/* Quick Bookmark */}
                     <div className="relative">
                         <button
@@ -2559,7 +2681,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                         onDragEnd={handleDragEnd}
                                         onDragLeave={() => setDragOverVizId(null)}
                                     >
-                                        <VisualizationCard config={viz} data={lastResult} />
+                                        <VisualizationCard config={viz} data={lastResult} dateRange={dateRange} />
                                         {/* Context Menu Button */}
                                         <div className="absolute top-2 right-2">
                                             <button
@@ -2614,7 +2736,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                         onDragEnd={handleDragEnd}
                                         onDragLeave={() => setDragOverVizId(null)}
                                     >
-                                        <VisualizationCard config={viz} data={lastResult} />
+                                        <VisualizationCard config={viz} data={lastResult} dateRange={dateRange} />
                                         {/* Context Menu Button */}
                                         <div className="absolute top-3 right-3">
                                             <button

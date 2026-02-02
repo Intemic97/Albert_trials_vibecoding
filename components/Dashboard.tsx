@@ -228,10 +228,45 @@ interface WidgetCardProps {
     isSaved?: boolean;
     onNavigate?: (entityId: string) => void;
     entities?: Entity[];
+    dateRange?: { start: string; end: string };
 }
 
+// Helper function to convert TimeRange to DateRange
+const timeRangeToDateRange = (timeRange: TimeRange): { start: string; end: string } => {
+    const end = new Date();
+    let start = new Date();
+    
+    switch (timeRange) {
+        case 'last_hour':
+            start = new Date(end.getTime() - 60 * 60 * 1000);
+            break;
+        case 'last_24h':
+            start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+            break;
+        case 'last_7d':
+            start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+        case 'last_30d':
+            start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+            break;
+        case 'last_90d':
+            start = new Date(end.getTime() - 90 * 24 * 60 * 60 * 1000);
+            break;
+        case 'last_year':
+            start = new Date(end.getTime() - 365 * 24 * 60 * 60 * 1000);
+            break;
+        default:
+            start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+    
+    return {
+        start: start.toISOString().split('T')[0],
+        end: end.toISOString().split('T')[0]
+    };
+};
+
 // Grid Widget Card Component (for use in GridLayout)
-const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = React.memo(({ widget, onRemove }) => {
+const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void; dateRange?: { start: string; end: string } }> = React.memo(({ widget, onRemove, dateRange }) => {
     const [showExplanation, setShowExplanation] = useState(false);
     
     return (
@@ -268,7 +303,7 @@ const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = 
                     </div>
                 )}
                 <div className="flex-1 p-3" style={{ minHeight: 0 }}>
-                    <DynamicChart config={widget} />
+                    <DynamicChart config={widget} dateRange={dateRange} />
                 </div>
                 {widget.explanation && (
                     <div className="px-3 pb-2 pt-1 border-t border-[var(--border-light)] flex-shrink-0">
@@ -290,13 +325,14 @@ const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = 
         </div>
     );
 }, (prevProps, nextProps) => {
-    // Custom comparison for memo - only re-render if widget data or onRemove changes
+    // Custom comparison for memo - only re-render if widget data, onRemove, or dateRange changes
     return prevProps.widget.id === nextProps.widget.id &&
            prevProps.widget.title === nextProps.widget.title &&
-           JSON.stringify(prevProps.widget.config) === JSON.stringify(nextProps.widget.config);
+           JSON.stringify(prevProps.widget.config) === JSON.stringify(nextProps.widget.config) &&
+           JSON.stringify(prevProps.dateRange) === JSON.stringify(nextProps.dateRange);
 });
 
-const WidgetCard: React.FC<WidgetCardProps> = React.memo(({ widget, onSave, onRemove, isSaved, onNavigate, entities }) => {
+const WidgetCard: React.FC<WidgetCardProps> = React.memo(({ widget, onSave, onRemove, isSaved, onNavigate, entities, dateRange }) => {
     const [showExplanation, setShowExplanation] = useState(false);
 
     const renderExplanation = (text: string) => {
@@ -314,7 +350,7 @@ const WidgetCard: React.FC<WidgetCardProps> = React.memo(({ widget, onSave, onRe
                         <span
                             key={index}
                             onClick={() => onNavigate(entity.id)}
-                            className="text-teal-600 font-medium cursor-pointer hover:underline"
+                            className="text-[var(--accent-primary)] font-medium cursor-pointer hover:underline"
                             title={`View ${entityName} details`}
                         >
                             {part}
@@ -352,7 +388,7 @@ const WidgetCard: React.FC<WidgetCardProps> = React.memo(({ widget, onSave, onRe
             <h3 className="text-base font-normal text-[var(--text-primary)] mb-1">{widget.title}</h3>
             <p className="text-xs text-[var(--text-secondary)] mb-3">{widget.description}</p>
 
-            <DynamicChart config={widget} />
+            <DynamicChart config={widget} dateRange={dateRange} />
 
             {widget.explanation && (
                 <div className="mt-3 pt-3 border-t border-[var(--border-light)]">
@@ -1353,6 +1389,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                                 <GridWidgetCard
                                                     widget={widget}
                                                     onRemove={() => removeWidget(widget.id)}
+                                                    dateRange={timeRangeToDateRange(timeRange)}
                                                 />
                                             </div>
                                         ))}
@@ -1389,6 +1426,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                                 onRemove={() => removeWidget('', true, index)}
                                                 onNavigate={onNavigate}
                                                 entities={entities}
+                                                dateRange={timeRangeToDateRange(timeRange)}
                                             />
                                         ))}
                                     </div>
