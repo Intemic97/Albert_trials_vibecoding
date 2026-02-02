@@ -1469,7 +1469,7 @@ function AuthenticatedApp() {
                                             }}
                                             className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-full transition-colors"
                                         >
-                                            <Pencil size={20} />
+                                            <PencilSimple size={20} />
                                         </button>
                                         <button
                                             onClick={() => setSelectedRecord(null)}
