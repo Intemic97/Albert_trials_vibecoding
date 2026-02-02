@@ -536,12 +536,26 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             // Generate new unique IDs for nodes and connections
             const idMapping: { [oldId: string]: string } = {};
             
+            // Scale factor to spread out nodes (nodes are larger now)
+            const SPACING_SCALE = 1.4;
+            
+            // Find the minimum x and y to use as origin for scaling
+            const minX = Math.min(...template.nodes.map(n => n.x));
+            const minY = Math.min(...template.nodes.map(n => n.y));
+            
             const newNodes = template.nodes.map(node => {
                 const newId = generateUUID();
                 idMapping[node.id] = newId;
+                
+                // Scale positions relative to the minimum point
+                const scaledX = minX + (node.x - minX) * SPACING_SCALE;
+                const scaledY = minY + (node.y - minY) * SPACING_SCALE;
+                
                 return {
                     ...node,
                     id: newId,
+                    x: scaledX,
+                    y: scaledY,
                     status: undefined, // Reset status
                     inputData: undefined,
                     outputData: undefined,
@@ -10238,27 +10252,39 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 </div>
                                             </div>
 
-                                            {/* Action Button */}
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    copyTemplateToWorkflows(template);
-                                                }}
-                                                disabled={isCopyingTemplate}
-                                                className="w-full py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
-                                            >
-                                                {isCopyingTemplate ? (
-                                                    <>
-                                                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                        Copying...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Copy size={14} weight="light" />
-                                                        Use Template
-                                                    </>
-                                                )}
-                                            </button>
+                                            {/* Action Buttons */}
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setPreviewingTemplate(template);
+                                                    }}
+                                                    className="flex-1 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <Eye size={14} weight="light" />
+                                                    Preview
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        copyTemplateToWorkflows(template);
+                                                    }}
+                                                    disabled={isCopyingTemplate}
+                                                    className="flex-1 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                                                >
+                                                    {isCopyingTemplate ? (
+                                                        <>
+                                                            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                            Copying...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Copy size={14} weight="light" />
+                                                            Use Template
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
                                         </div>
                                     );
                                 })}
@@ -10320,9 +10346,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         </div>
 
                         {/* Preview Canvas */}
-                        <div className="overflow-hidden bg-[var(--bg-tertiary)] relative border-b border-[var(--border-light)]" style={{ height: '450px' }}>
+                        <div className="overflow-hidden bg-[var(--bg-tertiary)] relative border-b border-[var(--border-light)]" style={{ height: '400px' }}>
                             <div 
-                                className="absolute inset-0 overflow-auto p-8 custom-scrollbar"
+                                className="absolute inset-0 overflow-auto pt-4 px-8 pb-8 custom-scrollbar"
                                 style={{
                                     backgroundImage: `
                                         linear-gradient(to right, #e2e8f0 1px, transparent 1px),
@@ -10331,15 +10357,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     backgroundSize: '20px 20px'
                                 }}
                             >
-                                {/* SVG Connections - offset by padding (32px) */}
-                                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ minWidth: '900px', minHeight: '500px' }}>
+                                {/* SVG Connections - offset by padding */}
+                                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ minWidth: '900px', minHeight: '400px' }}>
                                     {previewingTemplate.connections.map(conn => {
                                         const fromNode = previewingTemplate.nodes.find(n => n.id === conn.fromNodeId);
                                         const toNode = previewingTemplate.nodes.find(n => n.id === conn.toNodeId);
                                         if (!fromNode || !toNode) return null;
                                         
-                                        // Add 32px offset for the p-8 padding on the container
-                                        const padding = 32;
+                                        // Reduced padding for better node visibility
+                                        const padding = 16;
                                         const nodeHeight = 52; // Approximate node height
                                         const nodeWidth = 140;
                                         
@@ -10370,7 +10396,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 </svg>
 
                                 {/* Nodes */}
-                                <div className="relative" style={{ minWidth: '900px', minHeight: '500px' }}>
+                                <div className="relative" style={{ minWidth: '900px', minHeight: '400px' }}>
                                     {previewingTemplate.nodes.map(node => {
                                         const IconComponent = getNodeIcon(node.type);
                                         const iconBg = getNodeIconBg(node.type);

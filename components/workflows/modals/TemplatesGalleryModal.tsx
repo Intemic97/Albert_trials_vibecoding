@@ -111,27 +111,39 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onPreview, onCopy
                 </div>
             </div>
 
-            {/* Action Button */}
-            <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onCopy();
-                }}
-                disabled={isCopying}
-                className="w-full py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
-            >
-                {isCopying ? (
-                    <>
-                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Copying...
-                    </>
-                ) : (
-                    <>
-                        <Copy size={14} weight="light" />
-                        Use Template
-                    </>
-                )}
-            </button>
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onPreview();
+                    }}
+                    className="flex-1 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2"
+                >
+                    <Eye size={14} weight="light" />
+                    Preview
+                </button>
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onCopy();
+                    }}
+                    disabled={isCopying}
+                    className="flex-1 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                >
+                    {isCopying ? (
+                        <>
+                            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Copying...
+                        </>
+                    ) : (
+                        <>
+                            <Copy size={14} weight="light" />
+                            Use Template
+                        </>
+                    )}
+                </button>
+            </div>
         </div>
     );
 };
@@ -169,9 +181,9 @@ const TemplatePreview: React.FC<TemplatePreviewProps> = ({ template, onClose, on
                 </div>
 
                 {/* Preview Canvas */}
-                <div className="overflow-hidden bg-[var(--bg-tertiary)] relative border-b border-[var(--border-light)]" style={{ height: '450px' }}>
+                <div className="overflow-hidden bg-[var(--bg-tertiary)] relative border-b border-[var(--border-light)]" style={{ height: '400px' }}>
                     <div 
-                        className="absolute inset-0 overflow-auto p-8 custom-scrollbar"
+                        className="absolute inset-0 overflow-auto pt-4 px-8 pb-8 custom-scrollbar"
                         style={{
                             backgroundImage: `
                                 linear-gradient(to right, #e2e8f0 1px, transparent 1px),
@@ -181,13 +193,13 @@ const TemplatePreview: React.FC<TemplatePreviewProps> = ({ template, onClose, on
                         }}
                     >
                         {/* SVG Connections */}
-                        <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ minWidth: '900px', minHeight: '500px' }}>
+                        <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ minWidth: '900px', minHeight: '400px' }}>
                             {template.connections.map(conn => {
                                 const fromNode = template.nodes.find(n => n.id === conn.fromNodeId);
                                 const toNode = template.nodes.find(n => n.id === conn.toNodeId);
                                 if (!fromNode || !toNode) return null;
                                 
-                                const padding = 32;
+                                const padding = 16;
                                 const nodeHeight = 52;
                                 const nodeWidth = 140;
                                 
@@ -217,7 +229,7 @@ const TemplatePreview: React.FC<TemplatePreviewProps> = ({ template, onClose, on
                         </svg>
 
                         {/* Nodes */}
-                        <div className="relative" style={{ minWidth: '900px', minHeight: '500px' }}>
+                        <div className="relative" style={{ minWidth: '900px', minHeight: '400px' }}>
                             {template.nodes.map(node => {
                                 const IconComponent = getNodeIcon(node.type);
                                 const iconBg = getNodeIconBg(node.type);
