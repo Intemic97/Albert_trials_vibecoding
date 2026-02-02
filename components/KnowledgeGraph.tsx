@@ -43,24 +43,12 @@ interface GraphEdge {
     target: string;
 }
 
-// Vibrant color palette for variety
+// Simple color palette matching design system
 const NODE_COLORS = {
-    entity: '#419CAF',      // Primary teal (larger nodes)
-    text: '#3FB6AE',        // Teal variant
-    number: '#F59E0B',      // Amber/Orange
-    date: '#EC4899',        // Pink
-    boolean: '#84CC16',     // Lime green
-    email: '#8B5CF6',       // Violet
-    url: '#06B6D4',         // Cyan
-    default: '#6B7280',     // Gray
+    entity: '#419CAF',      // Primary teal - Entities
+    property: '#6B7280',    // Gray - All properties/variables
+    folder: '#F59E0B',      // Amber - Folders (if shown)
 };
-
-// Extended palette for more variety
-const ORBIT_COLORS = [
-    '#419CAF', '#3FB6AE', '#F59E0B', '#EC4899', '#84CC16', 
-    '#8B5CF6', '#06B6D4', '#EF4444', '#10B981', '#F97316',
-    '#6366F1', '#14B8A6', '#FBBF24', '#A855F7', '#22D3EE'
-];
 
 // Force simulation constants
 const REPULSION = 400;
@@ -92,17 +80,8 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     const [nodes, setNodes] = useState<GraphNode[]>([]);
     const [edges, setEdges] = useState<GraphEdge[]>([]);
     
-    // Get color for property type
-    const getPropertyColor = (type: string): string => {
-        const t = type.toLowerCase();
-        if (t.includes('text') || t.includes('string')) return NODE_COLORS.text;
-        if (t.includes('number') || t.includes('int') || t.includes('float') || t.includes('decimal')) return NODE_COLORS.number;
-        if (t.includes('date') || t.includes('time')) return NODE_COLORS.date;
-        if (t.includes('bool')) return NODE_COLORS.boolean;
-        if (t.includes('email')) return NODE_COLORS.email;
-        if (t.includes('url') || t.includes('link')) return NODE_COLORS.url;
-        return NODE_COLORS.default;
-    };
+    // All properties use the same gray color
+    const getPropertyColor = (): string => NODE_COLORS.property;
     
     // Initialize graph with sphere-like layout
     useEffect(() => {
@@ -136,7 +115,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                 id: `entity-${group.entity.id}`,
                 type: 'entity',
                 label: group.entity.name,
-                color: ORBIT_COLORS[i % ORBIT_COLORS.length],
+                color: NODE_COLORS.entity,
                 x: entityX,
                 y: entityY,
                 vx: 0,
@@ -163,7 +142,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                     const angleOffset = ringIndex * 0.3; // Offset each ring
                     const propAngle = angleOffset + (posInRing / propsInThisRing) * 2 * Math.PI;
                     
-                    const propColor = getPropertyColor(prop.type);
+                    const propColor = getPropertyColor();
                     
                     const propNode: GraphNode = {
                         id: `prop-${group.entity.id}-${prop.name}`,
@@ -220,27 +199,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                 });
             });
         });
-        
-        // Add outer boundary nodes for sphere effect
-        const boundaryCount = 60;
-        for (let i = 0; i < boundaryCount; i++) {
-            const angle = (i / boundaryCount) * 2 * Math.PI;
-            const radiusVariation = baseRadius + (Math.sin(i * 3) * 20);
-            newNodes.push({
-                id: `boundary-${i}`,
-                type: 'property',
-                label: '',
-                color: ORBIT_COLORS[i % ORBIT_COLORS.length],
-                x: centerX + Math.cos(angle) * radiusVariation,
-                y: centerY + Math.sin(angle) * radiusVariation,
-                vx: 0,
-                vy: 0,
-                radius: 1.5,
-                orbitAngle: angle,
-                orbitRadius: radiusVariation,
-                orbitSpeed: 0.0001
-            });
-        }
         
         setNodes(newNodes);
         setEdges(newEdges);
@@ -324,14 +282,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                             node.x = parent.x + Math.cos(node.orbitAngle) * node.orbitRadius;
                             node.y = parent.y + Math.sin(node.orbitAngle) * node.orbitRadius;
                         }
-                    }
-                    
-                    // Boundary nodes also orbit slowly around center
-                    if (node.id.startsWith('boundary-') && node.orbitAngle !== undefined) {
-                        node.orbitAngle += node.orbitSpeed || 0.0001;
-                        const r = node.orbitRadius || 250;
-                        node.x = centerX + Math.cos(node.orbitAngle) * r;
-                        node.y = centerY + Math.sin(node.orbitAngle) * r;
                     }
                 });
                 
@@ -513,7 +463,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                 const source = nodes.find(n => n.id === edge.source);
                                 const target = nodes.find(n => n.id === edge.target);
                                 if (!source || !target) return null;
-                                if (target.id.startsWith('boundary-')) return null;
                                 
                                 const isHighlighted = connectedNodes.has(edge.source) && connectedNodes.has(edge.target);
                                 const isVisible = filteredNodeIds.has(edge.source) && filteredNodeIds.has(edge.target);
@@ -526,9 +475,9 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                         y1={source.y}
                                         x2={target.x}
                                         y2={target.y}
-                                        stroke={isRelation ? '#419CAF' : 'rgba(255,255,255,0.08)'}
-                                        strokeWidth={isHighlighted ? 0.8 : 0.3}
-                                        strokeOpacity={isVisible ? (isHighlighted ? 0.6 : 0.2) : 0.02}
+                                        stroke={isRelation ? NODE_COLORS.entity : 'rgba(107,114,128,0.3)'}
+                                        strokeWidth={isHighlighted ? 1 : 0.5}
+                                        strokeOpacity={isVisible ? (isHighlighted ? 0.8 : 0.4) : 0.1}
                                     />
                                 );
                             })}
@@ -539,44 +488,39 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                 const isSelected = selectedEntity === node.entityId;
                                 const isConnected = connectedNodes.has(node.id);
                                 const isVisible = filteredNodeIds.has(node.id);
-                                const isBoundary = node.id.startsWith('boundary-');
-                                
-                                // Don't show boundary nodes in search
-                                if (isBoundary && searchQuery) return null;
                                 
                                 const opacity = isVisible ? (isConnected || (!hoveredNode && !selectedEntity) ? 1 : 0.4) : 0.1;
-                                const scale = isHovered ? 1.6 : (isSelected ? 1.4 : (isConnected ? 1.2 : 1));
+                                const scale = isHovered ? 1.5 : (isSelected ? 1.3 : (isConnected ? 1.1 : 1));
                                 
-                                // Simple radius based on type
-                                const baseRadius = isBoundary ? 1.5 : (node.type === 'entity' ? 6 : 2.5);
+                                // Radius based on type
+                                const baseRadius = node.type === 'entity' ? 8 : 3;
                                 
                                 return (
                                     <g
                                         key={node.id}
                                         transform={`translate(${node.x}, ${node.y})`}
                                         style={{ 
-                                            opacity: isBoundary ? 0.6 : opacity,
+                                            opacity,
                                             transition: 'opacity 0.3s ease-out'
                                         }}
-                                        onMouseEnter={() => !isBoundary && setHoveredNode(node.id)}
+                                        onMouseEnter={() => setHoveredNode(node.id)}
                                         onMouseLeave={() => setHoveredNode(null)}
                                         onClick={() => {
                                             if (node.type === 'entity' && node.entityId) {
                                                 setSelectedEntity(selectedEntity === node.entityId ? null : node.entityId);
                                             }
                                         }}
-                                        className={isBoundary ? '' : 'cursor-pointer'}
+                                        className="cursor-pointer"
                                     >
-                                        {/* Simple solid circle - no shadows */}
+                                        {/* Simple solid circle */}
                                         <circle
                                             r={baseRadius * scale}
                                             fill={node.color}
-                                            opacity={isBoundary ? 0.7 : 0.9}
                                             style={{ transition: 'all 0.2s ease-out' }}
                                         />
                                         
                                         {/* Subtle highlight on hover */}
-                                        {(isHovered || isSelected) && !isBoundary && (
+                                        {(isHovered || isSelected) && (
                                             <circle
                                                 r={baseRadius * scale + 3}
                                                 fill="none"
@@ -587,7 +531,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                         )}
                                         
                                         {/* Label - show on hover or for entities */}
-                                        {!isBoundary && (isHovered || (node.type === 'entity' && (isSelected || zoom > 0.8))) && (
+                                        {(isHovered || (node.type === 'entity' && (isSelected || zoom > 0.8))) && (
                                             <text
                                                 x={baseRadius * scale + 6}
                                                 y={3}
@@ -640,22 +584,14 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                     </div>
                     
                     {/* Legend */}
-                    <div className="absolute bottom-4 right-4 flex items-center gap-4 px-3 py-2 bg-black/40 backdrop-blur-sm rounded text-[9px] text-white/50">
+                    <div className="absolute bottom-4 right-4 flex items-center gap-4 px-3 py-2 bg-black/40 backdrop-blur-sm rounded text-[10px] text-white/60">
                         <div className="flex items-center gap-1.5">
-                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NODE_COLORS.entity }} />
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: NODE_COLORS.entity }} />
                             <span>Entity</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: NODE_COLORS.text }} />
-                            <span>Text</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: NODE_COLORS.number }} />
-                            <span>Number</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: NODE_COLORS.date }} />
-                            <span>Date</span>
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: NODE_COLORS.property }} />
+                            <span>Property</span>
                         </div>
                     </div>
                 </div>
@@ -687,7 +623,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                 >
                                     <div 
                                         className="w-2 h-2 rounded-full flex-shrink-0"
-                                        style={{ backgroundColor: getPropertyColor(prop.type) }}
+                                        style={{ backgroundColor: NODE_COLORS.property }}
                                     />
                                     <span className="text-[11px] text-white/70 truncate flex-1">{prop.name}</span>
                                     <span className="text-[9px] text-white/30">{prop.type}</span>

@@ -224,7 +224,7 @@ export const LogsAndAlerts: React.FC = () => {
             completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
             running: 'bg-[#84C4D1]/20 text-[#256A65] border-[#84C4D1]/40',
             failed: 'bg-red-50 text-red-700 border-red-200',
-            pending: 'bg-amber-50 text-amber-700 border-amber-200'
+            pending: 'bg-amber-500/15 text-amber-500 border-amber-500/30'
         };
         return styles[status as keyof typeof styles] || 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--border-light)]';
     };

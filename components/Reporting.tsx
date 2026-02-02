@@ -85,9 +85,9 @@ const iconMap: Record<string, React.ComponentType<{ size?: number; className?: s
 };
 
 const statusConfig = {
-    draft: { label: 'Draft', color: 'text-amber-700', bg: 'bg-amber-50', borderColor: 'border-[var(--border-light)]' },
+    draft: { label: 'Draft', color: 'text-amber-500', bg: 'bg-amber-500/15', borderColor: 'border-[var(--border-light)]' },
     review: { label: 'In Review', color: 'text-[var(--text-primary)]', bg: 'bg-[var(--bg-tertiary)]', borderColor: 'border-[var(--border-light)]' },
-    ready_to_send: { label: 'Ready', color: 'text-[var(--text-primary)]', bg: 'bg-[var(--bg-tertiary)]', borderColor: 'border-[var(--border-light)]' }
+    ready_to_send: { label: 'Ready', color: 'text-emerald-500', bg: 'bg-emerald-500/15', borderColor: 'border-[var(--border-light)]' }
 };
 
 export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onViewChange, view = 'documents' }) => {
@@ -1193,24 +1193,24 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
 
                 {/* Usage Warning */}
                 {usage?.inUse && (
-                    <div className="px-6 py-3 bg-amber-50 border-b border-amber-100">
+                    <div className="px-6 py-3 bg-amber-500/10 border-b border-amber-500/20">
                         <div className="flex items-start gap-3">
                             <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={20} />
                             <div>
-                                <p className="text-sm font-medium text-amber-800">
+                                <p className="text-sm font-medium text-amber-500">
                                     This template is used in {usage.reportCount} document{usage.reportCount !== 1 ? 's' : ''}
                                 </p>
-                                <p className="text-xs text-amber-600 mt-1">
+                                <p className="text-xs text-amber-500/70 mt-1">
                                     Modifying sections may affect existing documents. Changes to section structure will be applied.
                                 </p>
                                 <div className="mt-2 flex flex-wrap gap-1">
                                     {usage.reports.slice(0, 5).map((report: any) => (
-                                        <span key={report.id} className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
+                                        <span key={report.id} className="px-2 py-0.5 bg-amber-500/15 text-amber-500 rounded text-xs">
                                             {report.name}
                                         </span>
                                     ))}
                                     {usage.reports.length > 5 && (
-                                        <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
+                                        <span className="px-2 py-0.5 bg-amber-500/15 text-amber-500 rounded text-xs">
                                             +{usage.reports.length - 5} more
                                         </span>
                                     )}

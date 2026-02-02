@@ -16,7 +16,7 @@ import {
     CaretUp, ChartBar, ChartPie, Gauge, NumberSquareOne, FlowArrow,
     FolderOpen, Clock, DotsThree, Export, Share, Info,
     ArrowCounterClockwise, FileCsv, FileImage, Keyboard, DotsSixVertical,
-    Lightning, Tag
+    Lightning, Tag, Calendar
 } from '@phosphor-icons/react';
 import { PageHeader } from './PageHeader';
 import { API_BASE } from '../config';
@@ -2363,15 +2363,6 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                     >
                         <Gear size={16} />
                         <span className="hidden sm:inline">Configure</span>
-                    </button>
-                    
-                    {/* Keyboard shortcut hint */}
-                    <button
-                        onClick={() => setShowKeyboardShortcuts(true)}
-                        className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
-                        title="Keyboard shortcuts (?)"
-                    >
-                        <Keyboard size={16} />
                     </button>
                     
                     <button

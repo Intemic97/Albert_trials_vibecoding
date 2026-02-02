@@ -394,7 +394,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                             outerRadius={outerRadius}
                             dataKey={actualDataKey}
                             nameKey={xAxisKey || 'name'}
-                            paddingAngle={3}
+                            paddingAngle={0}
                             animationBegin={0}
                             animationDuration={800}
                             animationEasing="ease-out"
@@ -408,16 +408,14 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                                 stroke: isDarkMode ? '#666' : '#cbd5e1',
                                 strokeWidth: 1,
                             } : false}
-                            filter="url(#shadow)"
                         >
                             {data.map((_, index) => (
                                 <Cell 
                                     key={`cell-${index}`} 
                                     fill={`url(#pieGradient-${index % colors.length})`}
-                                    stroke={isDarkMode ? '#1f1f1f' : '#ffffff'}
-                                    strokeWidth={2}
+                                    stroke="none"
                                     style={{
-                                        transform: activeIndex === index ? 'scale(1.03)' : 'scale(1)',
+                                        transform: activeIndex === index ? 'scale(1.02)' : 'scale(1)',
                                         transformOrigin: 'center',
                                         transition: 'transform 0.2s ease-out',
                                         cursor: 'pointer'
