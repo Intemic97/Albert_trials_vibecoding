@@ -86,6 +86,16 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
     
+    // Import preview state
+    const [importStep, setImportStep] = useState<'upload' | 'preview' | 'importing'>('upload');
+    const [importPreviewData, setImportPreviewData] = useState<Record<string, string>[]>([]);
+    const [importColumns, setImportColumns] = useState<{
+        name: string;
+        detectedType: 'text' | 'number' | 'json';
+        include: boolean;
+    }[]>([]);
+    const [importFileName, setImportFileName] = useState('');
+    
     // Drag state
     const [draggedItem, setDraggedItem] = useState<{ type: 'entity' | 'document' | 'folder'; id: string } | null>(null);
     const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
@@ -467,48 +477,199 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         }
     };
 
+    // Helper to parse CSV (handles quoted values with commas)
+    const parseCSV = (text: string): { headers: string[], data: Record<string, string>[] } => {
+        const lines = text.split('\n').filter(line => line.trim());
+        if (lines.length < 1) return { headers: [], data: [] };
+        
+        // Parse a CSV line respecting quoted values
+        const parseCSVLine = (line: string): string[] => {
+            const result: string[] = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                const nextChar = line[i + 1];
+                
+                if (char === '"' && !inQuotes) {
+                    inQuotes = true;
+                } else if (char === '"' && inQuotes) {
+                    if (nextChar === '"') {
+                        current += '"';
+                        i++; // Skip escaped quote
+                    } else {
+                        inQuotes = false;
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current.trim());
+            return result;
+        };
+        
+        const headers = parseCSVLine(lines[0]).map(h => h.replace(/^["']|["']$/g, ''));
+        const data: Record<string, string>[] = [];
+        
+        for (let i = 1; i < lines.length; i++) {
+            const values = parseCSVLine(lines[i]);
+            const row: Record<string, string> = {};
+            headers.forEach((header, idx) => {
+                row[header] = (values[idx] || '').replace(/^["']|["']$/g, '');
+            });
+            data.push(row);
+        }
+        return { headers, data };
+    };
+
+    // Detect column type
+    const detectColumnType = (values: string[]): 'text' | 'number' | 'json' => {
+        const validValues = values.filter(v => v !== null && v !== undefined && v !== '');
+        if (validValues.length === 0) return 'text';
+        const allNumbers = validValues.every(v => !isNaN(Number(v)) && v !== '');
+        if (allNumbers) return 'number';
+        return 'text';
+    };
+
+    // Step 1: Parse file and show preview
     const handleFileUpload = async (file: File) => {
         if (!file) return;
 
-        const allowedExtensions = ['.csv', '.xlsx', '.xls'];
+        const allowedExtensions = ['.csv'];
         const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
         
         if (!allowedExtensions.includes(fileExtension)) {
-            warning('Invalid file type', 'Please upload a CSV or Excel file');
+            warning('Invalid file type', 'Please upload a CSV file (.csv)');
             return;
         }
 
-        setIsUploadingFile(true);
         try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('createEntity', 'true');
-            formData.append('entityName', newEntityName.trim() || file.name.replace(/\.[^/.]+$/, ''));
+            const text = await file.text();
+            const { headers, data } = parseCSV(text);
+            
+            if (headers.length === 0 || data.length === 0) {
+                showError('Invalid file', 'The CSV file appears to be empty or malformed');
+                return;
+            }
 
-            const res = await fetch(`${API_BASE}/entities/upload`, {
-                method: 'POST',
-                body: formData,
-                credentials: 'include'
+            // Detect column types and create preview columns
+            const columns = headers.map(header => {
+                const values = data.slice(0, 100).map(row => row[header]);
+                return {
+                    name: header,
+                    detectedType: detectColumnType(values),
+                    include: true
+                };
             });
 
-            if (res.ok) {
-                setNewEntityName('');
-                setIsCreatingEntity(false);
-                // Save current folder and reload
-                if (currentFolderId) {
-                    sessionStorage.setItem('kb_currentFolder', currentFolderId);
-                }
-                window.location.reload();
-            } else {
-                const errorData = await res.json();
-                showError('Failed to create entity', errorData.error);
+            setImportFileName(file.name);
+            setImportPreviewData(data);
+            setImportColumns(columns);
+            setImportStep('preview');
+            
+        } catch (error) {
+            console.error('Error parsing file:', error);
+            showError('Failed to parse file', 'Check the file format and try again');
+        }
+    };
+    
+    // Step 2: Execute the actual import
+    const executeImport = async () => {
+        setImportStep('importing');
+        setIsUploadingFile(true);
+        
+        try {
+            const includedColumns = importColumns.filter(c => c.include);
+            
+            if (includedColumns.length === 0) {
+                showError('No columns selected', 'Please select at least one column to import');
+                setImportStep('preview');
+                setIsUploadingFile(false);
+                return;
             }
+            
+            // Generate entity ID
+            const entityId = `entity-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Create properties from selected columns
+            const properties = includedColumns.map((col, idx) => ({
+                id: `prop-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
+                name: col.name,
+                type: col.detectedType,
+                defaultValue: ''
+            }));
+
+            // Create entity
+            const entityName = newEntityName.trim() || importFileName.replace(/\.[^/.]+$/, '');
+            const newEntity = {
+                id: entityId,
+                name: entityName,
+                description: `Imported from ${importFileName} (${importPreviewData.length} records)`,
+                properties,
+                folderId: currentFolderId || undefined
+            };
+
+            const createRes = await fetch(`${API_BASE}/entities`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(newEntity)
+            });
+
+            if (!createRes.ok) {
+                throw new Error('Failed to create entity');
+            }
+
+            // Import records in batches (only included columns)
+            const batchSize = 50;
+            for (let i = 0; i < importPreviewData.length; i += batchSize) {
+                const batch = importPreviewData.slice(i, i + batchSize);
+                
+                for (const row of batch) {
+                    const filteredRow: Record<string, string> = {};
+                    includedColumns.forEach(col => {
+                        filteredRow[col.name] = row[col.name] || '';
+                    });
+                    
+                    await fetch(`${API_BASE}/entities/${entityId}/records`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(filteredRow)
+                    });
+                }
+            }
+
+            success(`Entity "${entityName}" created with ${importPreviewData.length} records`);
+            resetImportState();
+            setIsCreatingEntity(false);
+            
+            // Save current folder and reload
+            if (currentFolderId) {
+                sessionStorage.setItem('kb_currentFolder', currentFolderId);
+            }
+            window.location.reload();
+            
         } catch (error) {
             console.error('Error uploading file:', error);
-            showError('Failed to upload file');
+            showError('Failed to upload file', 'Check the file format and try again');
+            setImportStep('preview');
         } finally {
             setIsUploadingFile(false);
         }
+    };
+    
+    // Reset import state
+    const resetImportState = () => {
+        setImportStep('upload');
+        setImportPreviewData([]);
+        setImportColumns([]);
+        setImportFileName('');
+        setNewEntityName('');
     };
 
     // Drag handlers
@@ -577,7 +738,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setShowKnowledgeGraph(true)}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-violet-500/10 hover:bg-violet-500/20 text-violet-500 rounded-lg text-xs font-medium transition-colors"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-[#419CAF]/10 hover:bg-[#419CAF]/20 text-[#419CAF] rounded-lg text-xs font-medium transition-colors"
                             title="View knowledge graph"
                         >
                             <TreeStructure size={14} weight="light" />
@@ -598,7 +759,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                             title={currentFolder ? `Upload document to "${currentFolder.name}"` : 'Upload document'}
                         >
                             <UploadSimple size={14} weight="light" />
-                            Upload
+                            Upload Document
                         </button>
                         <button
                             onClick={() => openCreateFolderModal(currentFolderId)}
@@ -933,7 +1094,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,.xlsx,.xls"
+                accept=".csv"
                 className="hidden"
                 onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
             />
@@ -1013,91 +1174,268 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
 
             {/* Create Entity Modal */}
             {isCreatingEntity && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-md p-6">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className={`bg-[var(--bg-card)] rounded-xl shadow-2xl w-full p-6 transition-all ${importStep === 'preview' ? 'max-w-3xl' : 'max-w-md'}`}>
                         <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-base font-medium text-[var(--text-primary)]">Create Entity</h2>
-                            <button onClick={() => setIsCreatingEntity(false)} className="p-1 hover:bg-[var(--bg-hover)] rounded-lg">
+                            <div>
+                                <h2 className="text-base font-medium text-[var(--text-primary)]">
+                                    {importStep === 'preview' ? 'Configure Import' : importStep === 'importing' ? 'Importing...' : 'Create Entity'}
+                                </h2>
+                                {importStep === 'preview' && (
+                                    <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
+                                        {importPreviewData.length} rows · {importColumns.filter(c => c.include).length} columns selected
+                                    </p>
+                                )}
+                            </div>
+                            <button onClick={() => { setIsCreatingEntity(false); resetImportState(); }} className="p-1 hover:bg-[var(--bg-hover)] rounded-lg">
                                 <X size={18} weight="light" className="text-[var(--text-secondary)]" />
                             </button>
                         </div>
                         
-                        {currentFolderId && (
+                        {currentFolderId && importStep === 'upload' && (
                             <div className="mb-4 px-3 py-2 bg-[var(--bg-tertiary)] rounded-lg text-xs text-[var(--text-secondary)] flex items-center gap-2">
                                 <Folder size={14} weight="light" style={{ color: currentFolder?.color }} />
                                 Creating in: <span className="font-medium text-[var(--text-primary)]">{currentFolder?.name}</span>
                             </div>
                         )}
                         
-                        <div className="flex gap-2 mb-4">
-                            <button
-                                onClick={() => setUploadMode('manual')}
-                                className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors ${uploadMode === 'manual' ? 'bg-[var(--bg-selected)] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'}`}
-                            >
-                                Manual
-                            </button>
-                            <button
-                                onClick={() => setUploadMode('file')}
-                                className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors ${uploadMode === 'file' ? 'bg-[var(--bg-selected)] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'}`}
-                            >
-                                From File
-                            </button>
-                        </div>
+                        {/* Step: Upload */}
+                        {importStep === 'upload' && (
+                            <>
+                                <div className="flex gap-2 mb-4">
+                                    <button
+                                        onClick={() => setUploadMode('manual')}
+                                        className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors ${uploadMode === 'manual' ? 'bg-[var(--bg-selected)] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'}`}
+                                    >
+                                        Manual
+                                    </button>
+                                    <button
+                                        onClick={() => setUploadMode('file')}
+                                        className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors ${uploadMode === 'file' ? 'bg-[var(--bg-selected)] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'}`}
+                                    >
+                                        From File
+                                    </button>
+                                </div>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Name</label>
+                                        <input
+                                            type="text"
+                                            value={newEntityName}
+                                            onChange={(e) => setNewEntityName(e.target.value)}
+                                            placeholder="Entity name"
+                                            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)]"
+                                            autoFocus
+                                        />
+                                    </div>
+                                    
+                                    {uploadMode === 'manual' ? (
+                                        <div>
+                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Description</label>
+                                            <textarea
+                                                value={newEntityDescription}
+                                                onChange={(e) => setNewEntityDescription(e.target.value)}
+                                                placeholder="Brief description"
+                                                rows={3}
+                                                className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] resize-none"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Upload File</label>
+                                            <div
+                                                onClick={() => fileInputRef.current?.click()}
+                                                className="border-2 border-dashed border-[var(--border-light)] rounded-lg p-8 text-center cursor-pointer hover:border-[var(--border-medium)] transition-colors"
+                                            >
+                                                <UploadSimple size={32} weight="light" className="mx-auto text-[var(--text-tertiary)] mb-2" />
+                                                <p className="text-sm text-[var(--text-secondary)]">Click to upload CSV file</p>
+                                                <p className="text-xs text-[var(--text-tertiary)] mt-1">.csv</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                <div className="flex justify-end gap-2 mt-6">
+                                    <button
+                                        onClick={() => { setIsCreatingEntity(false); resetImportState(); }}
+                                        className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    {uploadMode === 'manual' && (
+                                        <button
+                                            onClick={handleCreateEntity}
+                                            disabled={!newEntityName.trim()}
+                                            className="px-4 py-2 text-sm bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Create
+                                        </button>
+                                    )}
+                                </div>
+                            </>
+                        )}
                         
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Name</label>
-                                <input
-                                    type="text"
-                                    value={newEntityName}
-                                    onChange={(e) => setNewEntityName(e.target.value)}
-                                    placeholder="Entity name"
-                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)]"
-                                    autoFocus
-                                />
-                            </div>
-                            
-                            {uploadMode === 'manual' ? (
-                                <div>
-                                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Description</label>
-                                    <textarea
-                                        value={newEntityDescription}
-                                        onChange={(e) => setNewEntityDescription(e.target.value)}
-                                        placeholder="Brief description"
-                                        rows={3}
-                                        className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] resize-none"
+                        {/* Step: Preview */}
+                        {importStep === 'preview' && (
+                            <>
+                                {/* Entity Name */}
+                                <div className="mb-4">
+                                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Entity Name</label>
+                                    <input
+                                        type="text"
+                                        value={newEntityName}
+                                        onChange={(e) => setNewEntityName(e.target.value)}
+                                        placeholder={importFileName.replace(/\.[^/.]+$/, '')}
+                                        className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)]"
                                     />
                                 </div>
-                            ) : (
-                                <div>
-                                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Upload File</label>
-                                    <div
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="border-2 border-dashed border-[var(--border-light)] rounded-lg p-8 text-center cursor-pointer hover:border-[var(--border-medium)] transition-colors"
-                                    >
-                                        <UploadSimple size={32} weight="light" className="mx-auto text-[var(--text-tertiary)] mb-2" />
-                                        <p className="text-sm text-[var(--text-secondary)]">Click to upload CSV or Excel</p>
-                                        <p className="text-xs text-[var(--text-tertiary)] mt-1">.csv, .xlsx, .xls</p>
+                                
+                                {/* Column Selection */}
+                                <div className="mb-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-xs font-medium text-[var(--text-secondary)]">
+                                            Columns to Import
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setImportColumns(prev => prev.map(c => ({ ...c, include: true })))}
+                                                className="text-[10px] text-[#419CAF] hover:underline"
+                                            >
+                                                Select All
+                                            </button>
+                                            <span className="text-[var(--text-tertiary)]">|</span>
+                                            <button
+                                                onClick={() => setImportColumns(prev => prev.map(c => ({ ...c, include: false })))}
+                                                className="text-[10px] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                                            >
+                                                Deselect All
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
+                                        <div className="grid grid-cols-[auto,1fr,100px,80px] gap-2 px-3 py-2 bg-[var(--bg-tertiary)] text-[10px] font-medium text-[var(--text-tertiary)] uppercase">
+                                            <span></span>
+                                            <span>Column</span>
+                                            <span>Type</span>
+                                            <span>Sample</span>
+                                        </div>
+                                        <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
+                                            {importColumns.map((col, idx) => (
+                                                <div key={idx} className={`grid grid-cols-[auto,1fr,100px,80px] gap-2 px-3 py-2 items-center border-b border-[var(--border-light)] last:border-b-0 ${!col.include ? 'opacity-50' : ''}`}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={col.include}
+                                                        onChange={(e) => {
+                                                            const updated = [...importColumns];
+                                                            updated[idx].include = e.target.checked;
+                                                            setImportColumns(updated);
+                                                        }}
+                                                        className="rounded border-[var(--border-medium)] text-[#419CAF] focus:ring-[#419CAF]"
+                                                    />
+                                                    <span className="text-sm text-[var(--text-primary)] truncate">{col.name}</span>
+                                                    <select
+                                                        value={col.detectedType}
+                                                        onChange={(e) => {
+                                                            const updated = [...importColumns];
+                                                            updated[idx].detectedType = e.target.value as 'text' | 'number' | 'json';
+                                                            setImportColumns(updated);
+                                                        }}
+                                                        className="px-2 py-1 text-xs bg-[var(--bg-primary)] border border-[var(--border-light)] rounded text-[var(--text-primary)]"
+                                                    >
+                                                        <option value="text">Text</option>
+                                                        <option value="number">Number</option>
+                                                        <option value="json">JSON</option>
+                                                    </select>
+                                                    <span className="text-[10px] text-[var(--text-tertiary)] truncate">
+                                                        {importPreviewData[0]?.[col.name] || '-'}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
-                            )}
-                        </div>
+                                
+                                {/* Data Preview */}
+                                <div className="mb-4">
+                                    <label className="text-xs font-medium text-[var(--text-secondary)] mb-2 block">
+                                        Data Preview (first 5 rows)
+                                    </label>
+                                    <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
+                                        <div className="overflow-x-auto max-h-[150px] custom-scrollbar">
+                                            <table className="w-full text-xs">
+                                                <thead className="sticky top-0">
+                                                    <tr className="bg-[var(--bg-tertiary)]">
+                                                        {importColumns.filter(c => c.include).slice(0, 8).map((col, idx) => (
+                                                            <th key={idx} className="px-3 py-2 text-left text-[var(--text-tertiary)] font-medium whitespace-nowrap bg-[var(--bg-tertiary)]">
+                                                                {col.name}
+                                                            </th>
+                                                        ))}
+                                                        {importColumns.filter(c => c.include).length > 8 && (
+                                                            <th className="px-3 py-2 text-left text-[var(--text-tertiary)] font-medium bg-[var(--bg-tertiary)]">
+                                                                +{importColumns.filter(c => c.include).length - 8}
+                                                            </th>
+                                                        )}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {importPreviewData.slice(0, 5).map((row, rowIdx) => (
+                                                        <tr key={rowIdx} className="border-t border-[var(--border-light)]">
+                                                            {importColumns.filter(c => c.include).slice(0, 8).map((col, colIdx) => (
+                                                                <td key={colIdx} className="px-3 py-2 text-[var(--text-secondary)] whitespace-nowrap max-w-[150px] truncate">
+                                                                    {row[col.name] || '-'}
+                                                                </td>
+                                                            ))}
+                                                            {importColumns.filter(c => c.include).length > 8 && (
+                                                                <td className="px-3 py-2 text-[var(--text-tertiary)]">...</td>
+                                                            )}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex justify-between items-center mt-6">
+                                    <button
+                                        onClick={() => { setImportStep('upload'); }}
+                                        className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                    >
+                                        ← Back
+                                    </button>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => { setIsCreatingEntity(false); resetImportState(); }}
+                                            className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={executeImport}
+                                            disabled={importColumns.filter(c => c.include).length === 0}
+                                            className="px-4 py-2 text-sm bg-[#419CAF] hover:bg-[#3a8a9d] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Import {importPreviewData.length} Records
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                         
-                        <div className="flex justify-end gap-2 mt-6">
-                            <button
-                                onClick={() => setIsCreatingEntity(false)}
-                                className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleCreateEntity}
-                                disabled={!newEntityName.trim() || isUploadingFile}
-                                className="px-4 py-2 text-sm bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isUploadingFile ? 'Creating...' : 'Create'}
-                            </button>
-                        </div>
+                        {/* Step: Importing */}
+                        {importStep === 'importing' && (
+                            <div className="py-12 text-center">
+                                <div className="w-12 h-12 mx-auto mb-4 relative">
+                                    <svg className="animate-spin" viewBox="0 0 50 50">
+                                        <circle cx="25" cy="25" r="20" fill="none" stroke="var(--border-medium)" strokeWidth="4" />
+                                        <circle cx="25" cy="25" r="20" fill="none" stroke="#419CAF" strokeWidth="4" strokeLinecap="round" strokeDasharray="80, 200" />
+                                    </svg>
+                                </div>
+                                <p className="text-sm text-[var(--text-primary)]">Importing {importPreviewData.length} records...</p>
+                                <p className="text-xs text-[var(--text-tertiary)] mt-1">This may take a moment</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

@@ -108,14 +108,20 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
     // Generate chart data from daily executions
     const getChartData = () => {
         if (!overviewStats || !overviewStats.dailyExecutions.length) {
+            // Generate mock data for empty state
+            const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const mockData = dayNames.map(day => ({
+                date: day,
+                executions: 0
+            }));
             return {
                 type: 'area' as const,
                 title: 'Workflow Executions',
                 description: 'Last 7 days',
-                data: [],
+                data: mockData,
                 xAxisKey: 'date',
                 dataKey: ['executions'],
-                colors: ['#256A65']
+                colors: ['#419CAF']
             };
         }
         
@@ -135,8 +141,19 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
             data,
             xAxisKey: 'date',
             dataKey: ['executions'],
-            colors: ['#256A65']
+            colors: ['#419CAF']
         };
+    };
+    
+    // Calculate chart stats
+    const chartStats = {
+        total: overviewStats?.dailyExecutions?.reduce((sum, d) => sum + d.count, 0) || 0,
+        average: overviewStats?.dailyExecutions?.length 
+            ? Math.round(overviewStats.dailyExecutions.reduce((sum, d) => sum + d.count, 0) / overviewStats.dailyExecutions.length)
+            : 0,
+        max: overviewStats?.dailyExecutions?.length
+            ? Math.max(...overviewStats.dailyExecutions.map(d => d.count))
+            : 0
     };
 
     const overviewChartConfig = getChartData();
@@ -255,25 +272,36 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
 
                     {/* Chart and Copilots */}
                     <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <h2 className="text-base font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Workflow Activity</h2>
-                                <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
-                                    <div className="flex items-center gap-1">
-                                        <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#256A65]"></span>
+                        <div className="lg:col-span-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl overflow-hidden">
+                            {/* Header */}
+                            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-light)]">
+                                <div>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)]">Workflow Activity</h2>
+                                    <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Last 7 days</p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    {/* Mini Stats */}
+                                    <div className="flex items-center gap-4 pr-4 border-r border-[var(--border-light)]">
+                                        <div className="text-right">
+                                            <p className="text-lg font-semibold text-[var(--text-primary)]">{chartStats.total}</p>
+                                            <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wide">Total</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-lg font-semibold text-[var(--text-primary)]">{chartStats.average}</p>
+                                            <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wide">Avg/day</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+                                        <span className="inline-block w-2 h-2 rounded-full bg-[#419CAF]"></span>
                                         Executions
                                     </div>
                                 </div>
                             </div>
-                            {overviewStats && overviewStats.dailyExecutions.length > 0 ? (
+                            
+                            {/* Chart */}
+                            <div className="p-4" style={{ minHeight: '220px' }}>
                                 <DynamicChart config={overviewChartConfig} />
-                            ) : (
-                                <div className="flex flex-col items-center justify-center py-12 text-center">
-                                    <FlowArrow size={32} weight="light" className="text-[var(--text-tertiary)] mb-3" />
-                                    <p className="text-sm text-[var(--text-secondary)] mb-1">No activity yet</p>
-                                    <p className="text-xs text-[var(--text-tertiary)]">Run your first workflow to see data here</p>
-                                </div>
-                            )}
+                            </div>
                         </div>
 
                         {/* Copilots Section */}

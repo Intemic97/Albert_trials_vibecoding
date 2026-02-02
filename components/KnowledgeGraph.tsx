@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
-    X, MagnifyingGlass, Minus, Plus, ArrowsOut, TreeStructure, Eye
+    X, MagnifyingGlass, Minus, Plus, ArrowsOut, TreeStructure, Eye, CaretRight, Folder as FolderIcon, Database, Tag
 } from '@phosphor-icons/react';
 import { Entity } from '../types';
 
@@ -69,12 +69,17 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     // View state
     const [zoom, setZoom] = useState(1);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
-    const [isDragging, setIsDragging] = useState(false);
+    const [isPanning, setIsPanning] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [hoveredNode, setHoveredNode] = useState<string | null>(null);
     const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
+    const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [showProperties, setShowProperties] = useState(true);
+    
+    // Node drag state
+    const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+    const [nodeDragOffset, setNodeDragOffset] = useState({ x: 0, y: 0 });
     
     // Graph data
     const [nodes, setNodes] = useState<GraphNode[]>([]);
@@ -346,21 +351,69 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         return matching;
     }, [nodes, searchQuery]);
     
+    // Node drag handlers
+    const handleNodeDragStart = (e: React.MouseEvent, node: GraphNode) => {
+        e.stopPropagation();
+        setDraggingNodeId(node.id);
+        
+        // Calculate offset from node center to mouse position
+        const rect = svgRef.current?.getBoundingClientRect();
+        if (rect) {
+            const mouseX = (e.clientX - rect.left - offset.x) / zoom;
+            const mouseY = (e.clientY - rect.top - offset.y) / zoom;
+            setNodeDragOffset({ x: mouseX - node.x, y: mouseY - node.y });
+        }
+    };
+    
     // Pan handlers
     const handleMouseDown = (e: React.MouseEvent) => {
         if (e.target === svgRef.current || (e.target as Element).tagName === 'svg') {
-            setIsDragging(true);
+            setIsPanning(true);
             setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
         }
     };
     
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (isDragging) {
+        if (draggingNodeId) {
+            // Dragging a node
+            const rect = svgRef.current?.getBoundingClientRect();
+            if (rect) {
+                const mouseX = (e.clientX - rect.left - offset.x) / zoom;
+                const mouseY = (e.clientY - rect.top - offset.y) / zoom;
+                
+                setNodes(prev => prev.map(node => {
+                    if (node.id === draggingNodeId) {
+                        const newX = mouseX - nodeDragOffset.x;
+                        const newY = mouseY - nodeDragOffset.y;
+                        
+                        // If dragging an entity, also move its properties
+                        return { ...node, x: newX, y: newY, vx: 0, vy: 0 };
+                    }
+                    // Move properties that belong to the dragged entity
+                    if (node.parentId === draggingNodeId) {
+                        const parent = prev.find(n => n.id === draggingNodeId);
+                        if (parent && node.orbitRadius && node.orbitAngle !== undefined) {
+                            const newParentX = mouseX - nodeDragOffset.x;
+                            const newParentY = mouseY - nodeDragOffset.y;
+                            return {
+                                ...node,
+                                x: newParentX + Math.cos(node.orbitAngle) * node.orbitRadius,
+                                y: newParentY + Math.sin(node.orbitAngle) * node.orbitRadius
+                            };
+                        }
+                    }
+                    return node;
+                }));
+            }
+        } else if (isPanning) {
             setOffset({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
         }
     };
     
-    const handleMouseUp = () => setIsDragging(false);
+    const handleMouseUp = () => {
+        setIsPanning(false);
+        setDraggingNodeId(null);
+    };
     
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault();
@@ -390,6 +443,42 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         if (!selectedEntity) return null;
         return entities.find(e => e.id === selectedEntity);
     }, [selectedEntity, entities]);
+    
+    // Build path for selected node
+    const nodePath = useMemo(() => {
+        if (!selectedNode) return null;
+        
+        const pathParts: { label: string; color: string; type: string }[] = [];
+        
+        if (selectedNode.type === 'property' && selectedNode.parentId) {
+            // Find parent entity
+            const parentNode = nodes.find(n => n.id === selectedNode.parentId);
+            if (parentNode && parentNode.entityId) {
+                const entity = entities.find(e => e.id === parentNode.entityId);
+                if (entity) {
+                    // Check if entity is in a folder
+                    const folder = folders.find(f => f.entityIds?.includes(entity.id));
+                    if (folder) {
+                        pathParts.push({ label: folder.name, color: folder.color || NODE_COLORS.folder, type: 'folder' });
+                    }
+                    pathParts.push({ label: entity.name, color: NODE_COLORS.entity, type: 'entity' });
+                }
+            }
+            pathParts.push({ label: selectedNode.label, color: NODE_COLORS.property, type: 'property' });
+        } else if (selectedNode.type === 'entity' && selectedNode.entityId) {
+            const entity = entities.find(e => e.id === selectedNode.entityId);
+            if (entity) {
+                // Check if entity is in a folder
+                const folder = folders.find(f => f.entityIds?.includes(entity.id));
+                if (folder) {
+                    pathParts.push({ label: folder.name, color: folder.color || NODE_COLORS.folder, type: 'folder' });
+                }
+                pathParts.push({ label: entity.name, color: NODE_COLORS.entity, type: 'entity' });
+            }
+        }
+        
+        return pathParts.length > 0 ? pathParts : null;
+    }, [selectedNode, nodes, entities, folders]);
     
     return (
         <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: '#1a1d21' }}>
@@ -501,16 +590,20 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                         transform={`translate(${node.x}, ${node.y})`}
                                         style={{ 
                                             opacity,
-                                            transition: 'opacity 0.3s ease-out'
+                                            transition: draggingNodeId === node.id ? 'none' : 'opacity 0.3s ease-out',
+                                            cursor: draggingNodeId === node.id ? 'grabbing' : 'grab'
                                         }}
-                                        onMouseEnter={() => setHoveredNode(node.id)}
-                                        onMouseLeave={() => setHoveredNode(null)}
-                                        onClick={() => {
+                                        onMouseEnter={() => !draggingNodeId && setHoveredNode(node.id)}
+                                        onMouseLeave={() => !draggingNodeId && setHoveredNode(null)}
+                                        onMouseDown={(e) => handleNodeDragStart(e, node)}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            // Select node for path display
+                                            setSelectedNode(selectedNode?.id === node.id ? null : node);
                                             if (node.type === 'entity' && node.entityId) {
                                                 setSelectedEntity(selectedEntity === node.entityId ? null : node.entityId);
                                             }
                                         }}
-                                        className="cursor-pointer"
                                     >
                                         {/* Simple solid circle */}
                                         <circle
@@ -565,6 +658,37 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                             })}
                         </g>
                     </svg>
+                    
+                    {/* Path indicator - top left */}
+                    {nodePath && (
+                        <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-2 bg-black/60 backdrop-blur-sm rounded-lg">
+                            {nodePath.map((part, idx) => (
+                                <React.Fragment key={idx}>
+                                    {idx > 0 && (
+                                        <CaretRight size={10} className="text-white/30" />
+                                    )}
+                                    <div className="flex items-center gap-1.5">
+                                        {part.type === 'folder' && <FolderIcon size={12} style={{ color: part.color }} weight="fill" />}
+                                        {part.type === 'entity' && <Database size={12} style={{ color: part.color }} weight="fill" />}
+                                        {part.type === 'property' && <Tag size={10} style={{ color: part.color }} weight="fill" />}
+                                        <span 
+                                            className="text-[11px] font-medium"
+                                            style={{ color: part.type === 'property' ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.9)' }}
+                                        >
+                                            {part.label}
+                                        </span>
+                                    </div>
+                                </React.Fragment>
+                            ))}
+                        </div>
+                    )}
+                    
+                    {/* Drag hint */}
+                    {!nodePath && !draggingNodeId && (
+                        <div className="absolute top-4 left-4 px-3 py-2 bg-black/40 backdrop-blur-sm rounded text-[10px] text-white/40">
+                            Click a node to see its path · Drag nodes to rearrange
+                        </div>
+                    )}
                     
                     {/* Zoom controls */}
                     <div className="absolute bottom-4 left-4 flex items-center gap-0.5 bg-black/40 backdrop-blur-sm rounded p-0.5">

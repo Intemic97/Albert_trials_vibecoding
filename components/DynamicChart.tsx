@@ -68,16 +68,28 @@ const filterDataByDateRange = (data: any[], dateRange?: DateRange): any[] => {
     });
 };
 
-// Premium color palette - más profesional y elegante
+// Premium color palette - Branding colors elegantes
 const DEFAULT_COLORS = [
-    '#256A65', // Primary teal
-    '#5BA9A3', // Light teal
-    '#84C4D1', // Sky blue
-    '#3D7A75', // Dark teal
-    '#A8D5D8', // Pale blue
-    '#1E5A55', // Deep teal
-    '#7EBDC3', // Medium blue
-    '#4A9590', // Muted teal
+    '#419CAF', // Primary teal (main)
+    '#E8985E', // Warm orange (contrast)
+    '#337B8B', // Dark teal
+    '#86D5D0', // Light mint
+    '#265B66', // Deep teal
+    '#D4A574', // Muted orange
+    '#3FB6AE', // Bright teal
+    '#C4937A', // Warm neutral
+];
+
+// Alternative palette for pie/donut - warm golden tones (sophisticated)
+const PIE_COLORS = [
+    '#D4875E', // Deep orange
+    '#E8A870', // Medium orange
+    '#F2C896', // Light orange
+    '#F8DDB8', // Pale orange
+    '#C67B52', // Dark terracotta
+    '#EBBB82', // Golden
+    '#F5D4A8', // Cream orange
+    '#B86B45', // Deep terracotta
 ];
 
 // Tooltip personalizado con mejor diseño
@@ -86,43 +98,48 @@ const CustomTooltip = ({ active, payload, label, isDarkMode }: any) => {
     
     return (
         <div 
-            className="px-3 py-2 rounded-lg shadow-xl border"
+            className="px-3 py-2.5 rounded-lg shadow-lg"
             style={{
-                backgroundColor: isDarkMode ? '#1f1f1f' : '#ffffff',
-                borderColor: isDarkMode ? '#333' : '#e5e7eb',
+                backgroundColor: isDarkMode ? '#252525' : '#ffffff',
+                border: `1px solid ${isDarkMode ? '#333' : '#e5e7eb'}`,
+                backdropFilter: 'blur(8px)',
             }}
         >
             {label && (
                 <p 
-                    className="text-xs font-semibold mb-1.5 pb-1.5 border-b"
+                    className="text-[11px] font-medium mb-2 pb-2 border-b"
                     style={{ 
-                        color: isDarkMode ? '#e8e8e8' : '#1f2937',
+                        color: isDarkMode ? '#9ca3af' : '#6b7280',
                         borderColor: isDarkMode ? '#333' : '#e5e7eb'
                     }}
                 >
                     {label}
                 </p>
             )}
-            {payload.map((entry: any, index: number) => (
-                <div key={index} className="flex items-center gap-2 text-xs">
-                    <div 
-                        className="w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: entry.color || entry.fill }}
-                    />
-                    <span style={{ color: isDarkMode ? '#9ca3af' : '#6b7280' }}>
-                        {entry.name}:
-                    </span>
-                    <span 
-                        className="font-semibold"
-                        style={{ color: isDarkMode ? '#e8e8e8' : '#1f2937' }}
-                    >
-                        {typeof entry.value === 'number' 
-                            ? entry.value.toLocaleString('es-ES', { maximumFractionDigits: 2 })
-                            : entry.value
-                        }
-                    </span>
-                </div>
-            ))}
+            <div className="space-y-1">
+                {payload.map((entry: any, index: number) => (
+                    <div key={index} className="flex items-center justify-between gap-4 text-xs">
+                        <div className="flex items-center gap-2">
+                            <div 
+                                className="w-2 h-2 rounded-full"
+                                style={{ backgroundColor: entry.color || entry.fill }}
+                            />
+                            <span style={{ color: isDarkMode ? '#9ca3af' : '#6b7280' }}>
+                                {entry.name}
+                            </span>
+                        </div>
+                        <span 
+                            className="font-semibold tabular-nums"
+                            style={{ color: isDarkMode ? '#e8e8e8' : '#1f2937' }}
+                        >
+                            {typeof entry.value === 'number' 
+                                ? entry.value.toLocaleString('es-ES', { maximumFractionDigits: 2 })
+                                : entry.value
+                            }
+                        </span>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };
@@ -132,15 +149,15 @@ const CustomLegend = ({ payload, isDarkMode }: any) => {
     if (!payload || !payload.length) return null;
     
     return (
-        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-2">
+        <div className="flex flex-wrap justify-center gap-x-5 gap-y-1.5 mt-3 px-2">
             {payload.map((entry: any, index: number) => (
-                <div key={index} className="flex items-center gap-1.5">
+                <div key={index} className="flex items-center gap-2">
                     <div 
-                        className="w-3 h-3 rounded-sm"
+                        className="w-2.5 h-2.5 rounded-full"
                         style={{ backgroundColor: entry.color }}
                     />
                     <span 
-                        className="text-xs"
+                        className="text-[11px] font-medium"
                         style={{ color: isDarkMode ? '#9ca3af' : '#64748b' }}
                     >
                         {entry.value}
@@ -151,30 +168,61 @@ const CustomLegend = ({ payload, isDarkMode }: any) => {
     );
 };
 
-// Label personalizado para gráficos de pie/donut - más limpio
-const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, fill }: any) => {
-    if (percent < 0.05) return null; // No mostrar etiquetas para valores muy pequeños
+// Label personalizado para gráficos de pie - estilo externo elegante
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value, name, index }: any) => {
+    if (percent < 0.03) return null;
     
     const RADIAN = Math.PI / 180;
-    const radius = outerRadius + 25;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    const sin = Math.sin(-midAngle * RADIAN);
+    const cos = Math.cos(-midAngle * RADIAN);
+    
+    // Punto en el borde del pie
+    const sx = cx + outerRadius * cos;
+    const sy = cy + outerRadius * sin;
+    
+    // Punto del codo de la línea
+    const mx = cx + (outerRadius + 15) * cos;
+    const my = cy + (outerRadius + 15) * sin;
+    
+    // Punto final de la línea
+    const ex = mx + (cos >= 0 ? 1 : -1) * 20;
+    const ey = my;
+    
+    const textAnchor = cos >= 0 ? 'start' : 'end';
+    const isDark = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
     
     return (
-        <text 
-            x={x} 
-            y={y} 
-            fill={fill}
-            textAnchor={x > cx ? 'start' : 'end'} 
-            dominantBaseline="central"
-            style={{ 
-                fontSize: '11px', 
-                fontWeight: 500,
-                textShadow: '0 1px 2px rgba(255,255,255,0.8)'
-            }}
-        >
-            {`${(percent * 100).toFixed(0)}%`}
-        </text>
+        <g>
+            {/* Línea conectora */}
+            <path
+                d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`}
+                stroke={isDark ? '#555' : '#ccc'}
+                fill="none"
+                strokeWidth={1}
+            />
+            {/* Punto en el borde */}
+            <circle cx={sx} cy={sy} r={2} fill={isDark ? '#888' : '#999'} />
+            {/* Valor */}
+            <text
+                x={ex + (cos >= 0 ? 4 : -4)}
+                y={ey - 8}
+                textAnchor={textAnchor}
+                fill={PIE_COLORS[index % PIE_COLORS.length]}
+                style={{ fontSize: '13px', fontWeight: 700 }}
+            >
+                {Math.round(percent * 100)}
+            </text>
+            {/* Nombre */}
+            <text
+                x={ex + (cos >= 0 ? 4 : -4)}
+                y={ey + 6}
+                textAnchor={textAnchor}
+                fill={isDark ? '#9ca3af' : '#6b7280'}
+                style={{ fontSize: '10px', fontWeight: 500 }}
+            >
+                {name}
+            </text>
+        </g>
     );
 };
 
@@ -245,60 +293,73 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
         
         switch (type) {
             case 'bar':
+                // Single color for bars - more elegant
+                const barColor = colors[0] || '#419CAF';
                 return (
-                    <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} barCategoryGap="20%">
                         <defs>
+                            <linearGradient id="barGradientMain" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor={barColor} stopOpacity={0.9} />
+                                <stop offset="100%" stopColor={barColor} stopOpacity={0.6} />
+                            </linearGradient>
                             {colors.map((color, i) => (
                                 <linearGradient key={i} id={`barGradient-${i}`} x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor={color} stopOpacity={1} />
-                                    <stop offset="100%" stopColor={color} stopOpacity={0.7} />
+                                    <stop offset="0%" stopColor={color} stopOpacity={0.9} />
+                                    <stop offset="100%" stopColor={color} stopOpacity={0.6} />
                                 </linearGradient>
                             ))}
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                        <XAxis dataKey={xAxisKey} {...axisProps} />
-                        <YAxis {...axisProps} />
-                        <Tooltip content={<CustomTooltip isDarkMode={isDarkMode} />} />
-                        <Legend content={<CustomLegend isDarkMode={isDarkMode} />} />
+                        <CartesianGrid strokeDasharray="4 4" stroke={gridColor} vertical={false} strokeOpacity={0.5} />
+                        <XAxis dataKey={xAxisKey} {...axisProps} tickMargin={8} />
+                        <YAxis {...axisProps} tickMargin={8} />
+                        <Tooltip content={<CustomTooltip isDarkMode={isDarkMode} />} cursor={{ fill: isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }} />
+                        {Array.isArray(dataKey) && dataKey.length > 1 && (
+                            <Legend content={<CustomLegend isDarkMode={isDarkMode} />} />
+                        )}
                         {Array.isArray(dataKey) ? (
                             dataKey.map((key, index) => (
                                 <Bar 
                                     key={key} 
                                     dataKey={key} 
                                     fill={`url(#barGradient-${index % colors.length})`}
-                                    radius={[6, 6, 0, 0]}
+                                    radius={[4, 4, 0, 0]}
                                     animationDuration={800}
                                     animationEasing="ease-out"
+                                    maxBarSize={50}
                                 />
                             ))
                         ) : (
                             <Bar 
                                 dataKey={dataKey} 
-                                fill={`url(#barGradient-0)`}
-                                radius={[6, 6, 0, 0]}
+                                fill="url(#barGradientMain)"
+                                radius={[4, 4, 0, 0]}
                                 animationDuration={800}
                                 animationEasing="ease-out"
+                                maxBarSize={50}
                             />
                         )}
                     </BarChart>
                 );
                 
             case 'line':
+                const lineColor = colors[0] || '#419CAF';
                 return (
                     <LineChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                         <defs>
                             {colors.map((color, i) => (
                                 <linearGradient key={i} id={`lineGradient-${i}`} x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+                                    <stop offset="0%" stopColor={color} stopOpacity={0.2} />
                                     <stop offset="100%" stopColor={color} stopOpacity={0} />
                                 </linearGradient>
                             ))}
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                        <XAxis dataKey={xAxisKey} {...axisProps} />
-                        <YAxis {...axisProps} />
+                        <CartesianGrid strokeDasharray="4 4" stroke={gridColor} vertical={false} strokeOpacity={0.5} />
+                        <XAxis dataKey={xAxisKey} {...axisProps} tickMargin={8} />
+                        <YAxis {...axisProps} tickMargin={8} />
                         <Tooltip content={<CustomTooltip isDarkMode={isDarkMode} />} />
-                        <Legend content={<CustomLegend isDarkMode={isDarkMode} />} />
+                        {Array.isArray(dataKey) && dataKey.length > 1 && (
+                            <Legend content={<CustomLegend isDarkMode={isDarkMode} />} />
+                        )}
                         {Array.isArray(dataKey) ? (
                             dataKey.map((key, index) => (
                                 <Line 
@@ -306,9 +367,9 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                                     type="monotone" 
                                     dataKey={key} 
                                     stroke={colors[index % colors.length]} 
-                                    strokeWidth={2.5}
-                                    dot={{ r: 4, fill: '#fff', strokeWidth: 2, stroke: colors[index % colors.length] }}
-                                    activeDot={{ r: 6, fill: colors[index % colors.length], strokeWidth: 0 }}
+                                    strokeWidth={2}
+                                    dot={false}
+                                    activeDot={{ r: 5, fill: colors[index % colors.length], strokeWidth: 2, stroke: isDarkMode ? '#1a1a1a' : '#ffffff' }}
                                     animationDuration={1000}
                                 />
                             ))
@@ -316,10 +377,10 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                             <Line 
                                 type="monotone" 
                                 dataKey={dataKey} 
-                                stroke={colors[0]} 
-                                strokeWidth={2.5}
-                                dot={{ r: 4, fill: '#fff', strokeWidth: 2, stroke: colors[0] }}
-                                activeDot={{ r: 6, fill: colors[0], strokeWidth: 0 }}
+                                stroke={lineColor} 
+                                strokeWidth={2}
+                                dot={false}
+                                activeDot={{ r: 5, fill: lineColor, strokeWidth: 2, stroke: isDarkMode ? '#1a1a1a' : '#ffffff' }}
                                 animationDuration={1000}
                             />
                         )}
@@ -327,21 +388,28 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                 );
                 
             case 'area':
+                const areaColor = colors[0] || '#419CAF';
                 return (
                     <AreaChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                         <defs>
+                            <linearGradient id="areaGradientMain" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor={areaColor} stopOpacity={0.3} />
+                                <stop offset="100%" stopColor={areaColor} stopOpacity={0.02} />
+                            </linearGradient>
                             {colors.map((color, i) => (
                                 <linearGradient key={i} id={`areaGradient-${i}`} x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor={color} stopOpacity={0.4} />
-                                    <stop offset="100%" stopColor={color} stopOpacity={0.05} />
+                                    <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+                                    <stop offset="100%" stopColor={color} stopOpacity={0.02} />
                                 </linearGradient>
                             ))}
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                        <XAxis dataKey={xAxisKey} {...axisProps} />
-                        <YAxis {...axisProps} />
+                        <CartesianGrid strokeDasharray="4 4" stroke={gridColor} vertical={false} strokeOpacity={0.5} />
+                        <XAxis dataKey={xAxisKey} {...axisProps} tickMargin={8} />
+                        <YAxis {...axisProps} tickMargin={8} />
                         <Tooltip content={<CustomTooltip isDarkMode={isDarkMode} />} />
-                        <Legend content={<CustomLegend isDarkMode={isDarkMode} />} />
+                        {Array.isArray(dataKey) && dataKey.length > 1 && (
+                            <Legend content={<CustomLegend isDarkMode={isDarkMode} />} />
+                        )}
                         {Array.isArray(dataKey) ? (
                             dataKey.map((key, index) => (
                                 <Area 
@@ -359,9 +427,9 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                             <Area 
                                 type="monotone" 
                                 dataKey={dataKey} 
-                                stroke={colors[0]} 
+                                stroke={areaColor} 
                                 strokeWidth={2}
-                                fill={`url(#areaGradient-0)`}
+                                fill="url(#areaGradientMain)"
                                 animationDuration={1000}
                             />
                         )}
@@ -371,79 +439,68 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
             case 'pie':
             case 'donut':
                 const { innerRadius, outerRadius } = getRadii();
-                const showLabels = dimensions.width > 280;
+                const pieColors = PIE_COLORS;
+                const total = data.reduce((sum, item) => sum + (item[actualDataKey] || 0), 0);
+                
+                // Calculate variable outer radius based on value (larger values extend further)
+                const maxValue = Math.max(...data.map(d => d[actualDataKey] || 0));
+                const getOuterRadius = (value: number) => {
+                    const baseRadius = outerRadius * 0.85;
+                    const extraRadius = outerRadius * 0.15 * (value / maxValue);
+                    return baseRadius + extraRadius;
+                };
                 
                 return (
-                    <PieChart>
+                    <PieChart margin={{ top: 30, right: 60, bottom: 30, left: 60 }}>
                         <defs>
-                            {colors.map((color, i) => (
-                                <linearGradient key={i} id={`pieGradient-${i}`} x1="0" y1="0" x2="1" y2="1">
+                            {pieColors.map((color, i) => (
+                                <linearGradient key={i} id={`pieGradient-${i}`} x1="0" y1="0" x2="0.5" y2="1">
                                     <stop offset="0%" stopColor={color} stopOpacity={1} />
-                                    <stop offset="100%" stopColor={color} stopOpacity={0.75} />
+                                    <stop offset="100%" stopColor={color} stopOpacity={0.85} />
                                 </linearGradient>
                             ))}
-                            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-                                <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.15"/>
-                            </filter>
                         </defs>
                         <Pie
                             data={data}
                             cx="50%"
                             cy="50%"
-                            innerRadius={innerRadius}
-                            outerRadius={outerRadius}
+                            innerRadius={type === 'donut' ? outerRadius * 0.35 : outerRadius * 0.15}
+                            outerRadius={(entry) => getOuterRadius(entry[actualDataKey] || 0)}
                             dataKey={actualDataKey}
                             nameKey={xAxisKey || 'name'}
-                            paddingAngle={0}
+                            paddingAngle={1}
+                            cornerRadius={3}
                             animationBegin={0}
                             animationDuration={800}
                             animationEasing="ease-out"
                             onMouseEnter={onPieEnter}
                             onMouseLeave={onPieLeave}
-                            label={showLabels ? (props) => renderCustomizedLabel({
-                                ...props,
-                                fill: colors[props.index % colors.length]
-                            }) : false}
-                            labelLine={showLabels ? {
-                                stroke: isDarkMode ? '#666' : '#cbd5e1',
-                                strokeWidth: 1,
-                            } : false}
+                            label={renderCustomizedLabel}
+                            labelLine={false}
                         >
-                            {data.map((_, index) => (
+                            {data.map((entry, index) => (
                                 <Cell 
                                     key={`cell-${index}`} 
-                                    fill={`url(#pieGradient-${index % colors.length})`}
+                                    fill={pieColors[index % pieColors.length]}
                                     stroke="none"
                                     style={{
-                                        transform: activeIndex === index ? 'scale(1.02)' : 'scale(1)',
-                                        transformOrigin: 'center',
-                                        transition: 'transform 0.2s ease-out',
+                                        filter: activeIndex === index ? 'brightness(1.08) drop-shadow(0 2px 4px rgba(0,0,0,0.2))' : 'none',
+                                        transition: 'filter 0.2s ease-out',
                                         cursor: 'pointer'
                                     }}
                                 />
                             ))}
                         </Pie>
                         <Tooltip content={<CustomTooltip isDarkMode={isDarkMode} />} />
-                        <Legend 
-                            content={<CustomLegend isDarkMode={isDarkMode} />}
-                            verticalAlign="bottom"
+                        {/* Centro con círculo decorativo */}
+                        <circle
+                            cx="50%"
+                            cy="50%"
+                            r={outerRadius * 0.12}
+                            fill={isDarkMode ? '#252525' : '#ffffff'}
+                            stroke={isDarkMode ? '#333' : '#e5e7eb'}
+                            strokeWidth={1}
                         />
-                        {/* Centro con valor total para donut */}
-                        {(type === 'donut' || type === 'pie') && innerRadius > 0 && (
-                            <text
-                                x="50%"
-                                y="50%"
-                                textAnchor="middle"
-                                dominantBaseline="middle"
-                                style={{
-                                    fontSize: '14px',
-                                    fontWeight: 600,
-                                    fill: isDarkMode ? '#e8e8e8' : '#1f2937'
-                                }}
-                            >
-                                {data.reduce((sum, item) => sum + (item[actualDataKey] || 0), 0).toLocaleString('es-ES')}
-                            </text>
-                        )}
                     </PieChart>
                 );
                 

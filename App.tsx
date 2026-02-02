@@ -15,7 +15,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ErrorBoundary, KeyboardShortcutsProvider, useShortcut, AnnouncerProvider, SkipLink } from './components/ui';
 import { Entity, Property, PropertyType } from './types';
-import { Plus, MagnifyingGlass, Funnel, ArrowLeft, Trash, Link as LinkIcon, TextT, Hash, PencilSimple, X, Code, Paperclip, Download, SpinnerGap, Sparkle } from '@phosphor-icons/react';
+import { Plus, MagnifyingGlass, Funnel, ArrowLeft, Trash, Link as LinkIcon, TextT, Hash, PencilSimple, X, Code, Paperclip, Download, SpinnerGap, Sparkle, TreeStructure } from '@phosphor-icons/react';
 import { Tabs } from './components/Tabs';
 import { API_BASE } from './config';
 
@@ -229,7 +229,7 @@ function AuthenticatedApp() {
     const [newEntityDescription, setNewEntityDescription] = useState('');
 
     // Records State
-    const [activeTab, setActiveTab] = useState<'structure' | 'data'>('structure');
+    const [activeTab, setActiveTab] = useState<'structure' | 'data'>('data');
     const [records, setRecords] = useState<any[]>([]);
     const [isAddingRecord, setIsAddingRecord] = useState(false);
     const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
@@ -261,7 +261,288 @@ function AuthenticatedApp() {
     // File Upload State
     const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
 
+    // Smart Import State
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [importStep, setImportStep] = useState<'source' | 'preview' | 'importing'>('source');
+    const [importFile, setImportFile] = useState<File | null>(null);
+    const [importData, setImportData] = useState<any[]>([]);
+    const [importColumns, setImportColumns] = useState<{
+        name: string;
+        detectedType: PropertyType;
+        include: boolean;
+        sample: any;
+    }[]>([]);
+    const [isDraggingFile, setIsDraggingFile] = useState(false);
+    const [importProgress, setImportProgress] = useState(0);
+    const [importError, setImportError] = useState<string | null>(null);
+
     const activeEntity = entities.find(e => e.id === activeEntityId);
+
+    // Smart Import Functions
+    const detectColumnType = (values: any[]): PropertyType => {
+        const validValues = values.filter(v => v !== null && v !== undefined && v !== '');
+        if (validValues.length === 0) return 'text';
+        
+        // Check if all values are numbers
+        const allNumbers = validValues.every(v => !isNaN(Number(v)) && v !== '');
+        if (allNumbers) return 'number';
+        
+        // Check if values look like JSON
+        const looksLikeJson = validValues.some(v => {
+            if (typeof v === 'string') {
+                const trimmed = v.trim();
+                return (trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+                       (trimmed.startsWith('[') && trimmed.endsWith(']'));
+            }
+            return typeof v === 'object';
+        });
+        if (looksLikeJson) return 'json';
+        
+        return 'text';
+    };
+
+    const parseCSV = (text: string): any[] => {
+        const lines = text.split('\n').filter(line => line.trim());
+        if (lines.length < 2) return [];
+        
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
+        const data: any[] = [];
+        
+        for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(',').map(v => v.trim().replace(/^["']|["']$/g, ''));
+            const row: Record<string, any> = {};
+            headers.forEach((header, idx) => {
+                row[header] = values[idx] || '';
+            });
+            data.push(row);
+        }
+        return data;
+    };
+
+    const handleImportFile = async (file: File) => {
+        setImportError(null);
+        setImportFile(file);
+        
+        try {
+            const text = await file.text();
+            let data: any[] = [];
+            
+            if (file.name.endsWith('.json')) {
+                const parsed = JSON.parse(text);
+                data = Array.isArray(parsed) ? parsed : [parsed];
+            } else if (file.name.endsWith('.csv')) {
+                data = parseCSV(text);
+            } else {
+                setImportError('Unsupported file format. Please use CSV or JSON.');
+                return;
+            }
+            
+            if (data.length === 0) {
+                setImportError('No data found in file.');
+                return;
+            }
+            
+            // Detect columns and types
+            const firstRow = data[0];
+            const columns = Object.keys(firstRow).map(colName => {
+                const values = data.slice(0, 100).map(row => row[colName]);
+                return {
+                    name: colName,
+                    detectedType: detectColumnType(values),
+                    include: true,
+                    sample: firstRow[colName]
+                };
+            });
+            
+            setImportData(data);
+            setImportColumns(columns);
+            setImportStep('preview');
+        } catch (error) {
+            console.error('Error parsing file:', error);
+            setImportError('Error parsing file. Please check the format.');
+        }
+    };
+
+    // State for import mode
+    const [importMode, setImportMode] = useState<'new' | 'existing'>('new');
+
+    const executeImport = async () => {
+        setImportStep('importing');
+        setImportProgress(0);
+        
+        try {
+            const includedColumns = importColumns.filter(c => c.include);
+            let targetEntityId: string;
+            
+            if (importMode === 'new') {
+                // CREATE NEW ENTITY from import
+                const entityName = importFile?.name.replace(/\.(csv|json)$/i, '') || 'Imported Data';
+                
+                // Generate entity ID upfront
+                const generatedEntityId = `entity-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                targetEntityId = generatedEntityId;
+                
+                // Create properties from columns
+                const newProps: Property[] = includedColumns.map((col, idx) => ({
+                    id: `prop-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
+                    name: col.name,
+                    type: col.detectedType,
+                    defaultValue: ''
+                }));
+                
+                // Build property map
+                const propMap: Record<string, string> = {};
+                includedColumns.forEach((col, idx) => {
+                    propMap[col.name] = newProps[idx].id;
+                });
+                
+                // Create new entity
+                const newEntity = {
+                    id: generatedEntityId,
+                    name: entityName,
+                    description: `Imported from ${importFile?.name}`,
+                    properties: newProps,
+                    author: user?.name || 'Unknown',
+                    lastEdited: 'Just now'
+                };
+                
+                const createRes = await fetch(`${API_BASE}/entities`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(newEntity)
+                });
+                
+                if (!createRes.ok) throw new Error('Failed to create entity');
+                
+                setImportProgress(10);
+                
+                // Import records
+                const batchSize = 50;
+                const totalRecords = importData.length;
+                
+                for (let i = 0; i < totalRecords; i += batchSize) {
+                    const batch = importData.slice(i, i + batchSize);
+                    
+                    for (const row of batch) {
+                        const values: Record<string, any> = {};
+                        includedColumns.forEach(col => {
+                            const propId = propMap[col.name];
+                            if (propId) {
+                                values[propId] = col.detectedType === 'json' 
+                                    ? (typeof row[col.name] === 'string' ? row[col.name] : JSON.stringify(row[col.name]))
+                                    : String(row[col.name] ?? '');
+                            }
+                        });
+                        
+                        await fetch(`${API_BASE}/entities/${targetEntityId}/records`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ values })
+                        });
+                    }
+                    
+                    setImportProgress(10 + Math.round(((i + batch.length) / totalRecords) * 90));
+                }
+                
+                // Refresh and navigate to new entity
+                await fetchEntities();
+                setActiveEntityId(targetEntityId);
+                
+            } else {
+                // ADD TO EXISTING ENTITY
+                if (!activeEntity) return;
+                targetEntityId = activeEntity.id;
+                
+                // Refresh entity from server to get latest property IDs
+                const entityRes = await fetch(`${API_BASE}/entities/${targetEntityId}`, { credentials: 'include' });
+                if (!entityRes.ok) throw new Error('Failed to fetch entity');
+                const freshEntity = await entityRes.json();
+                
+                // Map columns to existing properties by name
+                const propMap: Record<string, string> = {};
+                includedColumns.forEach(col => {
+                    const existingProp = freshEntity.properties?.find(
+                        (p: Property) => p.name.toLowerCase() === col.name.toLowerCase()
+                    );
+                    if (existingProp) {
+                        propMap[col.name] = existingProp.id;
+                    }
+                });
+                
+                // Check for unmapped columns
+                const unmappedCols = includedColumns.filter(col => !propMap[col.name]);
+                if (unmappedCols.length > 0) {
+                    setImportError(`Columns not found in entity: ${unmappedCols.map(c => c.name).join(', ')}. Create properties first or use "Create New Entity".`);
+                    setImportStep('preview');
+                    return;
+                }
+                
+                setImportProgress(10);
+                
+                // Import records
+                const batchSize = 50;
+                const totalRecords = importData.length;
+                
+                for (let i = 0; i < totalRecords; i += batchSize) {
+                    const batch = importData.slice(i, i + batchSize);
+                    
+                    for (const row of batch) {
+                        const values: Record<string, any> = {};
+                        includedColumns.forEach(col => {
+                            const propId = propMap[col.name];
+                            if (propId) {
+                                values[propId] = col.detectedType === 'json' 
+                                    ? (typeof row[col.name] === 'string' ? row[col.name] : JSON.stringify(row[col.name]))
+                                    : String(row[col.name] ?? '');
+                            }
+                        });
+                        
+                        await fetch(`${API_BASE}/entities/${targetEntityId}/records`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ values })
+                        });
+                    }
+                    
+                    setImportProgress(10 + Math.round(((i + batch.length) / totalRecords) * 90));
+                }
+                
+                await fetchEntities();
+            }
+            
+            // Refresh records for the target entity
+            const recordsRes = await fetch(`${API_BASE}/entities/${targetEntityId}/records`, { credentials: 'include' });
+            if (recordsRes.ok) {
+                const recordsData = await recordsRes.json();
+                setRecords(recordsData);
+            }
+            
+            // Close modal
+            setTimeout(() => {
+                setIsImportModalOpen(false);
+                resetImportState();
+            }, 500);
+            
+        } catch (error) {
+            console.error('Error importing data:', error);
+            setImportError('Error importing data. Please try again.');
+            setImportStep('preview');
+        }
+    };
+
+    const resetImportState = () => {
+        setImportStep('source');
+        setImportFile(null);
+        setImportData([]);
+        setImportColumns([]);
+        setImportProgress(0);
+        setImportError(null);
+        setIsDraggingFile(false);
+        setImportMode('new');
+    };
 
     // File upload handler
     const handleFileUpload = async (propId: string, file: File) => {
@@ -304,8 +585,23 @@ function AuthenticatedApp() {
             if (query !== null) {
                 setEntitySearchQuery(query);
             }
+            
+            // Extract entityId from URL path /database/:entityId
+            const match = location.pathname.match(/^\/database\/(.+)$/);
+            if (match && match[1] && match[1] !== 'null' && match[1] !== 'undefined') {
+                const urlEntityId = match[1];
+                if (urlEntityId !== activeEntityId) {
+                    setActiveEntityId(urlEntityId);
+                }
+            } else if ((location.pathname === '/database' || match?.[1] === 'null' || match?.[1] === 'undefined') && activeEntityId) {
+                // Clear activeEntityId when navigating back to /database or invalid ID
+                setActiveEntityId(null);
+                if (match?.[1] === 'null' || match?.[1] === 'undefined') {
+                    navigate('/database');
+                }
+            }
         }
-    }, [location.pathname, location.search]);
+    }, [location.pathname, location.search, activeEntityId]);
 
     // Fetch Entities on Mount
     useEffect(() => {
@@ -803,7 +1099,7 @@ function AuthenticatedApp() {
 
         if (prop.type === 'json') {
             return (
-                <div className="font-mono text-xs text-slate-600 bg-slate-100 p-1 rounded truncate max-w-[200px]" title={typeof value === 'string' ? value : JSON.stringify(value)}>
+                <div className="font-mono text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-1.5 rounded truncate max-w-[200px]" title={typeof value === 'string' ? value : JSON.stringify(value)}>
                     {typeof value === 'string' ? value : JSON.stringify(value)}
                 </div>
             );
@@ -1027,6 +1323,7 @@ function AuthenticatedApp() {
                         <Lab 
                             entities={entities} 
                             onNavigate={(entityId) => {
+                                if (!entityId) return;
                                 setActiveEntityId(entityId);
                                 navigate(`/database/${entityId}`);
                             }}
@@ -1036,6 +1333,7 @@ function AuthenticatedApp() {
                         <Lab 
                             entities={entities} 
                             onNavigate={(entityId) => {
+                                if (!entityId) return;
                                 setActiveEntityId(entityId);
                                 navigate(`/database/${entityId}`);
                             }}
@@ -1045,6 +1343,7 @@ function AuthenticatedApp() {
                         <Lab 
                             entities={entities} 
                             onNavigate={(entityId) => {
+                                if (!entityId) return;
                                 setActiveEntityId(entityId);
                                 navigate(`/database/${entityId}`);
                             }}
@@ -1054,6 +1353,7 @@ function AuthenticatedApp() {
                         <KnowledgeBase 
                             entities={entities}
                             onNavigate={(entityId) => {
+                                if (!entityId) return;
                                 setActiveEntityId(entityId);
                                 navigate(`/database/${entityId}`);
                             }}
@@ -1166,120 +1466,120 @@ function AuthenticatedApp() {
 
                             {/* DETAIL VIEW */}
                             {activeEntity && (
-                                <div className="max-w-6xl mx-auto space-y-8">
+                                <div className="max-w-6xl mx-auto space-y-4">
 
-                                    {/* Tab Switcher */}
-                                    <Tabs
-                                        items={[
-                                            { id: 'structure', label: 'Structure & Properties' },
-                                            { id: 'data', label: 'Data Records' }
-                                        ]}
-                                        activeTab={activeTab}
-                                        onChange={setActiveTab}
-                                    />
+                                    {/* Metadata bar - subtle info */}
+                                    <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)]">
+                                        <div className="flex items-center gap-4">
+                                            <span>Created by <span className="text-[var(--text-secondary)]">{activeEntity.author}</span></span>
+                                            <span>·</span>
+                                            <span>Modified <span className="text-[var(--text-secondary)]">{activeEntity.lastEdited}</span></span>
+                                        </div>
+                                        {activeEntity.description && (
+                                            <span className="text-[var(--text-tertiary)] italic max-w-md truncate">{activeEntity.description}</span>
+                                        )}
+                                    </div>
 
-                                    {/* STRUCTURE TAB */}
-                                    {activeTab === 'structure' && (
-                                        <>
-                                            {/* Overview Panel */}
-                                            <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-light)] p-6">
-                                                <h2 className="text-lg font-normal text-[var(--text-primary)] mb-4" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Structure Overview</h2>
-                                                <div className="grid grid-cols-2 gap-6">
-                                                    <div>
-                                                        <label className="block text-xs font-normal text-[var(--text-tertiary)] uppercase tracking-wide mb-1">Description</label>
-                                                        <p className="text-[var(--text-secondary)]">{activeEntity.description || 'No description provided.'}</p>
+                                    {/* Properties Section - Collapsible */}
+                                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] overflow-hidden">
+                                        <button
+                                            onClick={() => setActiveTab(activeTab === 'structure' ? 'data' : 'structure')}
+                                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <TreeStructure size={16} className="text-[var(--text-tertiary)]" />
+                                                <span className="text-sm font-medium text-[var(--text-primary)]">Properties</span>
+                                                <span className="text-xs text-[var(--text-tertiary)]">({activeEntity.properties.length})</span>
+                                                {activeTab !== 'structure' && activeEntity.properties.length > 0 && (
+                                                    <div className="flex items-center gap-1 ml-2">
+                                                        {activeEntity.properties.slice(0, 4).map((prop, propIdx) => (
+                                                            <span 
+                                                                key={prop.id || `collapsed-prop-${propIdx}`}
+                                                                className="px-1.5 py-0.5 text-[10px] rounded bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]"
+                                                            >
+                                                                {prop.name}
+                                                            </span>
+                                                        ))}
+                                                        {activeEntity.properties.length > 4 && (
+                                                            <span className="text-[10px] text-[var(--text-tertiary)]">+{activeEntity.properties.length - 4}</span>
+                                                        )}
                                                     </div>
-                                                    <div>
-                                                        <label className="block text-xs font-normal text-[var(--text-tertiary)] uppercase tracking-wide mb-1">Metadata</label>
-                                                        <div className="text-sm text-[var(--text-secondary)] space-y-1">
-                                                            <p>Created by: <span className="font-medium text-[var(--text-primary)]">{activeEntity.author}</span></p>
-                                                            <p>Last modified: <span className="font-medium text-[var(--text-primary)]">{activeEntity.lastEdited}</span></p>
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                                )}
                                             </div>
+                                            <svg 
+                                                className={`w-4 h-4 text-[var(--text-tertiary)] transition-transform ${activeTab === 'structure' ? 'rotate-180' : ''}`}
+                                                fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                            >
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
 
-                                            {/* Properties Panel */}
-                                            <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-light)] overflow-hidden">
-                                                <div className="p-6 border-b border-[var(--border-light)] flex justify-between items-center bg-[var(--bg-tertiary)]">
-                                                    <div>
-                                                        <h2 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Properties</h2>
-                                                        <p className="text-sm text-[var(--text-secondary)]">Define the data structure for this entity.</p>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => setIsAddingProp(true)}
-                                                        className="flex items-center px-4 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-sm font-medium shadow-sm transition-colors"
-                                                    >
-                                                        <Plus size={16} className="mr-2" weight="light" />
-                                                        Add Property
-                                                    </button>
-                                                </div>
+                                        {/* Expanded Properties Panel */}
+                                        {activeTab === 'structure' && (
+                                            <div className="border-t border-[var(--border-light)]">
                                                 {/* Property List */}
                                                 <div className="divide-y divide-[var(--border-light)]">
                                                     {activeEntity.properties.length === 0 ? (
-                                                        <div className="p-12 text-center text-[var(--text-secondary)]">
-                                                            No properties defined yet. Click "Add Property" to start modeling.
+                                                        <div className="p-6 text-center text-[var(--text-tertiary)] text-sm">
+                                                            No properties defined. Add properties to define your data structure.
                                                         </div>
                                                     ) : (
-                                                        activeEntity.properties.map(prop => (
-                                                            <div key={prop.id} className="p-4 hover:bg-[var(--bg-tertiary)] transition-colors flex items-center justify-between group">
-                                                                <div className="flex items-center space-x-4">
-                                                                    <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center border border-[var(--border-light)]">
+                                                        activeEntity.properties.map((prop, idx) => (
+                                                            <div key={prop.id || `prop-fallback-${idx}`} className="px-4 py-3 hover:bg-[var(--bg-tertiary)] transition-colors flex items-center justify-between group">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-8 h-8 rounded bg-[var(--bg-tertiary)] flex items-center justify-center border border-[var(--border-light)]">
                                                                         {renderIconForType(prop.type)}
                                                                     </div>
                                                                     <div>
-                                                                        <h3 className="text-sm font-normal text-[var(--text-primary)]">{prop.name}</h3>
-                                                                        <p className="text-xs text-[var(--text-tertiary)] flex items-center mt-0.5">
-                                                                            <span className="uppercase tracking-wider font-normal mr-2">{prop.type}</span>
-                                                                            {prop.type === 'relation' && (
-                                                                                <span className="bg-[#256A65]/10 text-[#256A65] px-1.5 rounded text-[10px]">
-                                                                                    → {getRelatedEntityName(prop.relatedEntityId)}
-                                                                                </span>
-                                                                            )}
-                                                                        </p>
+                                                                        <span className="text-sm text-[var(--text-primary)]">{prop.name}</span>
+                                                                        <span className="ml-2 text-[10px] uppercase text-[var(--text-tertiary)]">{prop.type}</span>
+                                                                        {prop.type === 'relation' && (
+                                                                            <span className="ml-1 text-[10px] text-[#419CAF]">→ {getRelatedEntityName(prop.relatedEntityId)}</span>
+                                                                        )}
                                                                     </div>
                                                                 </div>
-                                                                <div className="flex items-center space-x-4">
-                                                                    <div className="text-xs text-right text-[var(--text-tertiary)] mr-4">
-                                                                        Example Value:<br />
-                                                                        <span className="text-[var(--text-secondary)] font-mono">
-                                                                            {prop.type === 'relation' ? 'ID-REF-123' : prop.type === 'file' ? 'document.pdf' : prop.defaultValue}
-                                                                        </span>
-                                                                    </div>
-                                                                    <button
-                                                                        onClick={() => deleteProperty(prop.id)}
-                                                                        className="p-2 text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                                                    >
-                                                                        <Trash size={16} weight="light" />
-                                                                    </button>
-                                                                </div>
+                                                                <button
+                                                                    onClick={() => deleteProperty(prop.id)}
+                                                                    className="p-1.5 text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                                                >
+                                                                    <Trash size={14} weight="light" />
+                                                                </button>
                                                             </div>
                                                         ))
                                                     )}
                                                 </div>
 
-                                                {/* Add Property Form Area */}
-                                                {isAddingProp && (
-                                                    <div className="p-6 bg-[var(--bg-tertiary)] border-t border-[var(--border-light)] animate-in fade-in slide-in-from-top-4 duration-200">
-                                                        <h3 className="text-sm font-normal text-[var(--text-primary)] mb-4">New Property</h3>
-                                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                                                            <div className="md:col-span-4">
-                                                                <label className="block text-xs font-normal text-[var(--text-tertiary)] mb-1">Name</label>
+                                                {/* Add Property - Inline */}
+                                                {!isAddingProp ? (
+                                                    <div className="px-4 py-3 border-t border-[var(--border-light)]">
+                                                        <button
+                                                            onClick={() => setIsAddingProp(true)}
+                                                            className="flex items-center gap-2 text-sm text-[var(--text-tertiary)] hover:text-[#419CAF] transition-colors"
+                                                        >
+                                                            <Plus size={14} />
+                                                            <span>Add property</span>
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="p-4 bg-[var(--bg-tertiary)] border-t border-[var(--border-light)]">
+                                                        <div className="flex items-end gap-3">
+                                                            <div className="flex-1">
+                                                                <label className="block text-[10px] text-[var(--text-tertiary)] mb-1">Name</label>
                                                                 <input
                                                                     autoFocus
                                                                     type="text"
                                                                     value={newPropName}
                                                                     onChange={(e) => setNewPropName(e.target.value)}
-                                                                    placeholder="e.g. Serial Number"
-                                                                    className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] focus:outline-none placeholder:text-[var(--text-tertiary)]"
+                                                                    placeholder="Property name"
+                                                                    className="w-full px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[#419CAF] focus:border-[#419CAF] focus:outline-none"
                                                                 />
                                                             </div>
-                                                            <div className="md:col-span-3">
-                                                                <label className="block text-xs font-normal text-[var(--text-tertiary)] mb-1">Type</label>
+                                                            <div className="w-32">
+                                                                <label className="block text-[10px] text-[var(--text-tertiary)] mb-1">Type</label>
                                                                 <select
                                                                     value={newPropType}
                                                                     onChange={(e) => setNewPropType(e.target.value as PropertyType)}
-                                                                    className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] focus:outline-none"
+                                                                    className="w-full px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[#419CAF] focus:outline-none"
                                                                 >
                                                                     <option value="text">Text</option>
                                                                     <option value="number">Number</option>
@@ -1288,36 +1588,32 @@ function AuthenticatedApp() {
                                                                     <option value="file">File</option>
                                                                 </select>
                                                             </div>
-
                                                             {newPropType === 'relation' && (
-                                                                <div className="md:col-span-3">
-                                                                    <label className="block text-xs font-normal text-[var(--text-tertiary)] mb-1">Related Structure</label>
+                                                                <div className="w-40">
+                                                                    <label className="block text-[10px] text-[var(--text-tertiary)] mb-1">Links to</label>
                                                                     <select
                                                                         value={newPropRelationId}
                                                                         onChange={(e) => setNewPropRelationId(e.target.value)}
-                                                                        className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] focus:outline-none"
+                                                                        className="w-full px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[#419CAF] focus:outline-none"
                                                                     >
-                                                                        <option value="">Select entity...</option>
-                                                                        {entities
-                                                                            .filter(e => e.id !== activeEntity.id) // Prevent self-reference for simplicity
-                                                                            .map(e => (
-                                                                                <option key={e.id} value={e.id}>{e.name}</option>
-                                                                            ))}
+                                                                        <option value="">Select...</option>
+                                                                        {entities.filter(e => e.id !== activeEntity.id).map(e => (
+                                                                            <option key={e.id} value={e.id}>{e.name}</option>
+                                                                        ))}
                                                                     </select>
                                                                 </div>
                                                             )}
-
-                                                            <div className="md:col-span-2 flex space-x-2">
+                                                            <div className="flex gap-2">
                                                                 <button
                                                                     onClick={handleAddProperty}
                                                                     disabled={!newPropName || (newPropType === 'relation' && !newPropRelationId)}
-                                                                    className="flex-1 py-2 bg-[#256A65] text-white rounded-md text-sm font-medium hover:bg-[#1e5a55] disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                    className="px-3 py-1.5 bg-[#419CAF] text-white rounded text-sm font-medium hover:bg-[#3a8a9d] disabled:opacity-50 disabled:cursor-not-allowed"
                                                                 >
-                                                                    Save
+                                                                    Add
                                                                 </button>
                                                                 <button
                                                                     onClick={() => setIsAddingProp(false)}
-                                                                    className="px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)] rounded-md text-sm font-medium hover:bg-[var(--bg-tertiary)]"
+                                                                    className="px-3 py-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-card)] rounded text-sm"
                                                                 >
                                                                     Cancel
                                                                 </button>
@@ -1326,17 +1622,27 @@ function AuthenticatedApp() {
                                                     </div>
                                                 )}
                                             </div>
-                                        </>
-                                    )}
+                                        )}
+                                    </div>
 
-                                    {/* DATA TAB */}
-                                    {activeTab === 'data' && (
-                                        <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-light)] overflow-hidden">
-                                            <div className="p-6 border-b border-[var(--border-light)] flex justify-between items-center bg-[var(--bg-tertiary)]">
-                                                <div>
-                                                    <h2 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Data Records</h2>
-                                                    <p className="text-sm text-[var(--text-secondary)]">Manage the actual data for this entity.</p>
-                                                </div>
+                                    {/* DATA RECORDS - Always visible */}
+                                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] overflow-hidden">
+                                        <div className="px-4 py-3 border-b border-[var(--border-light)] flex justify-between items-center">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium text-[var(--text-primary)]">Records</span>
+                                                <span className="text-xs text-[var(--text-tertiary)]">({records.length})</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        resetImportState();
+                                                        setIsImportModalOpen(true);
+                                                    }}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded text-sm font-medium transition-colors border border-[var(--border-light)]"
+                                                >
+                                                    <Download size={14} className="rotate-180" />
+                                                    Import more data
+                                                </button>
                                                 <div className="relative group/addrecord">
                                                     <button
                                                         onClick={() => {
@@ -1345,119 +1651,115 @@ function AuthenticatedApp() {
                                                             setIsAddingRecord(true);
                                                         }}
                                                         disabled={activeEntity.properties.length === 0}
-                                                        className="flex items-center px-4 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-sm font-medium shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#419CAF] hover:bg-[#3a8a9d] text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
-                                                        <Plus size={16} className="mr-2" weight="light" />
+                                                        <Plus size={14} />
                                                         Add Record
                                                     </button>
                                                     {activeEntity.properties.length === 0 && (
                                                         <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-[var(--bg-selected)] text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/addrecord:opacity-100 transition-opacity pointer-events-none z-50">
-                                                            Add properties to your entity to start adding records
-                                                            <div className="absolute bottom-full right-4 border-4 border-transparent border-b-[var(--bg-selected)]"></div>
+                                                            Add properties first
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
+                                        </div>
 
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-left border-collapse">
-                                                    <thead>
-                                                        <tr className="bg-[var(--bg-tertiary)] border-b border-[var(--border-light)]">
-                                                            {activeEntity.properties.map(prop => (
-                                                                <th key={prop.id} className="px-6 py-3 text-xs font-normal text-[var(--text-tertiary)] uppercase tracking-wider">
-                                                                    {prop.name}
-                                                                </th>
-                                                            ))}
-                                                            {/* Incoming Relations Headers */}
-                                                            {Object.values(incomingData).map(({ sourceEntity, sourceProperty }) => (
-                                                                <th key={sourceProperty.id} className="px-6 py-3 text-xs font-normal text-[#256A65] uppercase tracking-wider bg-[#256A65]/5">
-                                                                    {sourceEntity.name} ({sourceProperty.name})
-                                                                </th>
-                                                            ))}
-                                                            <th className="px-6 py-3 text-right text-[var(--text-tertiary)]">Actions</th>
+                                        <div className="overflow-auto max-h-[500px] custom-scrollbar">
+                                            <table className="w-full text-left border-collapse">
+                                                <thead className="sticky top-0 z-10">
+                                                    <tr className="bg-[var(--bg-tertiary)] border-b border-[var(--border-light)]">
+                                                        {activeEntity.properties.map((prop, pIdx) => (
+                                                            <th key={prop.id || `th-${pIdx}`} className="px-4 py-2.5 text-[10px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider bg-[var(--bg-tertiary)]">
+                                                                {prop.name}
+                                                            </th>
+                                                        ))}
+                                                        {Object.values(incomingData).map(({ sourceEntity, sourceProperty }) => (
+                                                            <th key={sourceProperty.id} className="px-4 py-2.5 text-[10px] font-medium text-[#419CAF] uppercase tracking-wider bg-[#419CAF]/5">
+                                                                {sourceEntity.name}
+                                                            </th>
+                                                        ))}
+                                                        <th className="px-4 py-2.5 text-right text-[10px] font-medium text-[var(--text-tertiary)] uppercase bg-[var(--bg-tertiary)]">Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-[var(--border-light)]">
+                                                    {records.length === 0 ? (
+                                                        <tr>
+                                                            <td colSpan={Math.max(activeEntity.properties.length, 1) + 1 + Object.keys(incomingData).length} className="p-8 text-center text-[var(--text-tertiary)] text-sm">
+                                                                {activeEntity.properties.length === 0 
+                                                                    ? 'Add properties to define your data structure first.'
+                                                                    : 'No records yet. Click "Add Record" to create one.'}
+                                                            </td>
                                                         </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-[var(--border-light)]">
-                                                        {records.length === 0 ? (
-                                                            <tr>
-                                                                <td colSpan={Math.max(activeEntity.properties.length, 1) + 1 + Object.keys(incomingData).length} className="p-12 text-center text-[var(--text-secondary)]">
-                                                                    {activeEntity.properties.length === 0 
-                                                                        ? 'Add properties to your entity first, then you can start adding records.'
-                                                                        : 'No records found. Click "Add Record" to create one.'}
+                                                    ) : (
+                                                        records.map(record => (
+                                                            <tr key={record.id} className="hover:bg-[var(--bg-tertiary)] transition-colors group">
+                                                                {activeEntity.properties.map((prop, pIdx) => (
+                                                                    <td key={prop.id || `td-${pIdx}`} className="px-4 py-3 text-sm text-[var(--text-secondary)]">
+                                                                        {renderCellValue(prop, record.values[prop.id])}
+                                                                    </td>
+                                                                ))}
+                                                                {Object.values(incomingData).map(({ sourceEntity, sourceProperty, records: sourceRecords }) => {
+                                                                    const linkedRecords = sourceRecords.filter(r => {
+                                                                        const val = r.values[sourceProperty.id];
+                                                                        if (!val) return false;
+                                                                        try {
+                                                                            const ids = JSON.parse(val);
+                                                                            return Array.isArray(ids) && ids.includes(record.id);
+                                                                        } catch {
+                                                                            return val === record.id;
+                                                                        }
+                                                                    });
+                                                                    return (
+                                                                        <td key={sourceProperty.id} className="px-4 py-3 text-sm text-[var(--text-secondary)] bg-[#419CAF]/5">
+                                                                            <div className="flex flex-wrap gap-1">
+                                                                                {linkedRecords.length > 0 ? linkedRecords.map(lr => (
+                                                                                    <button
+                                                                                        key={lr.id}
+                                                                                        onClick={() => handleRecordClick(lr, sourceEntity)}
+                                                                                        className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-[#419CAF]/10 text-[#419CAF] hover:bg-[#419CAF]/20 transition-colors"
+                                                                                    >
+                                                                                        {getRecordDisplayName(lr, sourceEntity)}
+                                                                                    </button>
+                                                                                )) : <span className="text-[var(--text-tertiary)] text-xs">-</span>}
+                                                                            </div>
+                                                                        </td>
+                                                                    );
+                                                                })}
+                                                                <td className="px-4 py-3 text-right">
+                                                                    <button
+                                                                        onClick={() => handleEditRecord(record)}
+                                                                        className="p-1.5 text-[var(--text-tertiary)] hover:text-[#419CAF] hover:bg-[#419CAF]/10 rounded transition-colors opacity-0 group-hover:opacity-100 mr-1"
+                                                                    >
+                                                                        <PencilSimple size={14} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => deleteRecord(record.id)}
+                                                                        className="p-1.5 text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                                                    >
+                                                                        <Trash size={14} />
+                                                                    </button>
                                                                 </td>
                                                             </tr>
-                                                        ) : (
-                                                            records.map(record => (
-                                                                <tr key={record.id} className="hover:bg-[var(--bg-tertiary)] transition-colors group">
-                                                                    {activeEntity.properties.map(prop => (
-                                                                        <td key={prop.id} className="px-6 py-4 text-sm text-[var(--text-secondary)]">
-                                                                            {renderCellValue(prop, record.values[prop.id])}
-                                                                        </td>
-                                                                    ))}
-                                                                    {/* Incoming Relations Cells */}
-                                                                    {Object.values(incomingData).map(({ sourceEntity, sourceProperty, records: sourceRecords }) => {
-                                                                        const linkedRecords = sourceRecords.filter(r => {
-                                                                            const val = r.values[sourceProperty.id];
-                                                                            if (!val) return false;
-                                                                            try {
-                                                                                const ids = JSON.parse(val);
-                                                                                return Array.isArray(ids) && ids.includes(record.id);
-                                                                            } catch {
-                                                                                return val === record.id;
-                                                                            }
-                                                                        });
-
-                                                                        return (
-                                                                            <td key={sourceProperty.id} className="px-6 py-4 text-sm text-[var(--text-secondary)] bg-[#256A65]/5">
-                                                                                <div className="flex flex-wrap gap-1">
-                                                                                    {linkedRecords.length > 0 ? linkedRecords.map(lr => (
-                                                                                        <button
-                                                                                            key={lr.id}
-                                                                                            onClick={() => handleRecordClick(lr, sourceEntity)}
-                                                                                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#256A65]/10 text-[#256A65] border border-[#256A65]/20 hover:bg-[#256A65]/20 transition-colors"
-                                                                                        >
-                                                                                            {getRecordDisplayName(lr, sourceEntity)}
-                                                                                        </button>
-                                                                                    )) : <span className="text-[var(--text-tertiary)] text-xs italic">None</span>}
-                                                                                </div>
-                                                                            </td>
-                                                                        );
-                                                                    })}
-                                                                    <td className="px-6 py-4 text-right">
-                                                                        <button
-                                                                            onClick={() => handleEditRecord(record)}
-                                                                            className="p-2 text-[var(--text-tertiary)] hover:text-[#256A65] hover:bg-[#256A65]/10 rounded transition-colors opacity-0 group-hover:opacity-100 mr-2"
-                                                                        >
-                                                                            <PencilSimple size={16} weight="light" />
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => deleteRecord(record.id)}
-                                                                            className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                                                        >
-                                                                            <Trash size={16} weight="light" />
-                                                                        </button>
-                                                                    </td>
-                                                                </tr>
-                                                            ))
-                                                        )}
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                                        ))
+                                                    )}
+                                                </tbody>
+                                            </table>
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
                             )}
                         </div>
 
                         {/* Side Panel for Record Details */}
                         {selectedRecord && selectedRecordEntity && (
-                            <div className="absolute inset-y-0 right-0 w-96 bg-white shadow-2xl border-l border-slate-200 z-50 flex flex-col">
-                                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <div className="absolute inset-y-0 right-0 w-96 bg-[var(--bg-card)] shadow-2xl border-l border-[var(--border-light)] z-50 flex flex-col">
+                                <div className="p-6 border-b border-[var(--border-light)] flex justify-between items-center bg-[var(--bg-tertiary)]">
                                     <div>
-                                        <h2 className="text-lg font-normal text-slate-800">
+                                        <h2 className="text-lg font-normal text-[var(--text-primary)]">
                                             {getRecordDisplayName(selectedRecord, selectedRecordEntity)}
                                         </h2>
-                                        <p className="text-xs text-slate-500 uppercase tracking-wider font-normal mt-1">
+                                        <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-normal mt-1">
                                             {selectedRecordEntity.name}
                                         </p>
                                     </div>
@@ -1467,25 +1769,25 @@ function AuthenticatedApp() {
                                                 handleEditRecord(selectedRecord, selectedRecordEntity);
                                                 setSelectedRecord(null);
                                             }}
-                                            className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-full transition-colors"
+                                            className="p-2 text-[var(--text-tertiary)] hover:text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 rounded-full transition-colors"
                                         >
                                             <PencilSimple size={20} />
                                         </button>
                                         <button
                                             onClick={() => setSelectedRecord(null)}
-                                            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors"
+                                            className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-full transition-colors"
                                         >
                                             <X size={20} weight="light" />
                                         </button>
                                     </div>
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                                    {selectedRecordEntity.properties.map(prop => (
-                                        <div key={prop.id}>
-                                            <label className="block text-xs font-normal text-slate-500 uppercase tracking-wide mb-1">
+                                    {selectedRecordEntity.properties.map((prop, pIdx) => (
+                                        <div key={prop.id || `detail-${pIdx}`}>
+                                            <label className="block text-xs font-normal text-[var(--text-tertiary)] uppercase tracking-wide mb-1">
                                                 {prop.name}
                                             </label>
-                                            <div className="text-sm text-slate-800 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                            <div className="text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] p-3 rounded-lg border border-[var(--border-light)]">
                                                 {prop.type === 'relation' ? (
                                                     renderCellValue(prop, selectedRecord.values[prop.id])
                                                 ) : (
@@ -1494,12 +1796,350 @@ function AuthenticatedApp() {
                                             </div>
                                         </div>
                                     ))}
-                                    <div className="pt-4 border-t border-slate-100">
-                                        <label className="block text-xs font-normal text-slate-400 uppercase tracking-wide mb-1">
+                                    <div className="pt-4 border-t border-[var(--border-light)]">
+                                        <label className="block text-xs font-normal text-[var(--text-tertiary)] uppercase tracking-wide mb-1">
                                             Record ID
                                         </label>
-                                        <p className="text-xs font-mono text-slate-400">{selectedRecord.id}</p>
+                                        <p className="text-xs font-mono text-[var(--text-tertiary)]">{selectedRecord.id}</p>
                                     </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Smart Import Modal */}
+                        {isImportModalOpen && activeEntity && (
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                                <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-2xl animate-in fade-in zoom-in duration-200 overflow-hidden flex flex-col max-h-[90vh]">
+                                    {/* Header */}
+                                    <div className="px-6 py-4 border-b border-[var(--border-light)] flex items-center justify-between flex-shrink-0">
+                                        <div>
+                                            <h2 className="text-lg font-medium text-[var(--text-primary)]">Import Data</h2>
+                                            <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
+                                                Import to <span className="text-[#419CAF]">{activeEntity.name}</span>
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => { setIsImportModalOpen(false); resetImportState(); }}
+                                            className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                                        >
+                                            <X size={18} />
+                                        </button>
+                                    </div>
+
+                                    {/* Content - Scrollable */}
+                                    <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+                                        {importStep === 'source' && (
+                                            <div className="space-y-5">
+                                                {/* Drag & Drop Zone */}
+                                                <div
+                                                    onDragOver={(e) => { e.preventDefault(); setIsDraggingFile(true); }}
+                                                    onDragLeave={() => setIsDraggingFile(false)}
+                                                    onDrop={(e) => {
+                                                        e.preventDefault();
+                                                        setIsDraggingFile(false);
+                                                        const file = e.dataTransfer.files[0];
+                                                        if (file) handleImportFile(file);
+                                                    }}
+                                                    className={`border-2 border-dashed rounded-xl p-10 text-center transition-all ${
+                                                        isDraggingFile 
+                                                            ? 'border-[#419CAF] bg-[#419CAF]/5' 
+                                                            : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'
+                                                    }`}
+                                                >
+                                                    <div className="flex flex-col items-center gap-3">
+                                                        <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
+                                                            isDraggingFile ? 'bg-[#419CAF]/10' : 'bg-[var(--bg-tertiary)]'
+                                                        }`}>
+                                                            <Download size={24} className={`rotate-180 ${isDraggingFile ? 'text-[#419CAF]' : 'text-[var(--text-tertiary)]'}`} />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-medium text-[var(--text-primary)]">
+                                                                Drop your file here
+                                                            </p>
+                                                            <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                                                                or{' '}
+                                                                <label className="text-[#419CAF] hover:underline cursor-pointer">
+                                                                    browse
+                                                                    <input
+                                                                        type="file"
+                                                                        accept=".csv,.json"
+                                                                        onChange={(e) => {
+                                                                            const file = e.target.files?.[0];
+                                                                            if (file) handleImportFile(file);
+                                                                        }}
+                                                                        className="hidden"
+                                                                    />
+                                                                </label>
+                                                            </p>
+                                                        </div>
+                                                        <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wide">
+                                                            Supports CSV, JSON
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {importError && (
+                                                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+                                                        {importError}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {importStep === 'preview' && (
+                                            <div className="space-y-5">
+                                                {/* Import Mode Selector */}
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => setImportMode('new')}
+                                                        className={`flex-1 p-3 rounded-lg border text-sm font-medium transition-all ${
+                                                            importMode === 'new'
+                                                                ? 'border-[#419CAF] bg-[#419CAF]/10 text-[#419CAF]'
+                                                                : 'border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--border-medium)]'
+                                                        }`}
+                                                    >
+                                                        <div className="font-semibold">Create New Entity</div>
+                                                        <div className="text-[10px] mt-0.5 opacity-70">
+                                                            {importFile?.name.replace(/\.(csv|json)$/i, '')}
+                                                        </div>
+                                                    </button>
+                                                    {activeEntity && (
+                                                        <button
+                                                            onClick={() => setImportMode('existing')}
+                                                            className={`flex-1 p-3 rounded-lg border text-sm font-medium transition-all ${
+                                                                importMode === 'existing'
+                                                                    ? 'border-[#419CAF] bg-[#419CAF]/10 text-[#419CAF]'
+                                                                    : 'border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--border-medium)]'
+                                                            }`}
+                                                        >
+                                                            <div className="font-semibold">Add to Existing</div>
+                                                            <div className="text-[10px] mt-0.5 opacity-70">{activeEntity.name}</div>
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                {/* Warning for existing mode */}
+                                                {importMode === 'existing' && activeEntity && (
+                                                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-500">
+                                                        Column names must match existing properties exactly. Properties: {activeEntity.properties.map(p => p.name).join(', ') || 'None'}
+                                                    </div>
+                                                )}
+
+                                                {/* Stats */}
+                                                <div className="flex items-center gap-4 p-3 bg-[var(--bg-tertiary)] rounded-lg">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                                        <span className="text-sm text-[var(--text-primary)]">
+                                                            <strong>{importData.length}</strong> rows
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2 h-2 rounded-full bg-[#419CAF]"></div>
+                                                        <span className="text-sm text-[var(--text-primary)]">
+                                                            <strong>{importColumns.filter(c => c.include).length}</strong> columns
+                                                        </span>
+                                                    </div>
+                                                    {importFile && (
+                                                        <span className="text-xs text-[var(--text-tertiary)] ml-auto">
+                                                            {importFile.name}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Column mapping */}
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <p className="text-xs font-medium text-[var(--text-secondary)]">
+                                                            Column Mapping ({importColumns.length} columns)
+                                                        </p>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => setImportColumns(prev => prev.map(c => ({ ...c, include: true })))}
+                                                                className="text-[10px] text-[#419CAF] hover:underline"
+                                                            >
+                                                                Select All
+                                                            </button>
+                                                            <span className="text-[var(--text-tertiary)]">|</span>
+                                                            <button
+                                                                onClick={() => setImportColumns(prev => prev.map(c => ({ ...c, include: false })))}
+                                                                className="text-[10px] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                                                            >
+                                                                Deselect All
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
+                                                        {/* Fixed header */}
+                                                        <div className="bg-[var(--bg-tertiary)] text-[10px] uppercase text-[var(--text-tertiary)] grid grid-cols-[32px_1fr_100px_150px] border-b border-[var(--border-light)]">
+                                                            <div className="px-3 py-2"></div>
+                                                            <div className="px-3 py-2">Column</div>
+                                                            <div className="px-3 py-2">Type</div>
+                                                            <div className="px-3 py-2">Sample</div>
+                                                        </div>
+                                                        {/* Scrollable body */}
+                                                        <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
+                                                            {importColumns.map((col, idx) => (
+                                                                <div 
+                                                                    key={idx} 
+                                                                    className={`grid grid-cols-[32px_1fr_100px_150px] border-b border-[var(--border-light)] last:border-b-0 ${!col.include ? 'opacity-40' : ''}`}
+                                                                >
+                                                                    <div className="px-3 py-2 flex items-center">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={col.include}
+                                                                            onChange={(e) => {
+                                                                                const updated = [...importColumns];
+                                                                                updated[idx].include = e.target.checked;
+                                                                                setImportColumns(updated);
+                                                                            }}
+                                                                            className="rounded border-[var(--border-medium)] text-[#419CAF] focus:ring-[#419CAF]"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="px-3 py-2 text-sm font-medium text-[var(--text-primary)] truncate">
+                                                                        {col.name}
+                                                                    </div>
+                                                                    <div className="px-3 py-2">
+                                                                        <select
+                                                                            value={col.detectedType}
+                                                                            onChange={(e) => {
+                                                                                const updated = [...importColumns];
+                                                                                updated[idx].detectedType = e.target.value as PropertyType;
+                                                                                setImportColumns(updated);
+                                                                            }}
+                                                                            className="w-full px-2 py-1 text-[10px] bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded text-[var(--text-primary)]"
+                                                                        >
+                                                                            <option value="text">Text</option>
+                                                                            <option value="number">Number</option>
+                                                                            <option value="json">JSON</option>
+                                                                        </select>
+                                                                    </div>
+                                                                    <div className="px-3 py-2 text-[var(--text-tertiary)] font-mono text-[10px] truncate">
+                                                                        {String(col.sample ?? '')}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Preview data */}
+                                                <div>
+                                                    <p className="text-xs font-medium text-[var(--text-secondary)] mb-3">
+                                                        Data Preview (first 5 rows)
+                                                    </p>
+                                                    <div className="border border-[var(--border-light)] rounded-lg overflow-hidden">
+                                                        <div className="overflow-x-auto max-h-[150px] custom-scrollbar">
+                                                            <table className="w-full text-xs">
+                                                                <thead className="sticky top-0">
+                                                                    <tr className="bg-[var(--bg-tertiary)]">
+                                                                        {importColumns.filter(c => c.include).slice(0, 10).map((col, idx) => (
+                                                                            <th key={idx} className="px-3 py-2 text-left text-[var(--text-tertiary)] font-medium whitespace-nowrap">
+                                                                                {col.name}
+                                                                            </th>
+                                                                        ))}
+                                                                        {importColumns.filter(c => c.include).length > 10 && (
+                                                                            <th className="px-3 py-2 text-left text-[var(--text-tertiary)] font-medium whitespace-nowrap">
+                                                                                +{importColumns.filter(c => c.include).length - 10} more
+                                                                            </th>
+                                                                        )}
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-[var(--border-light)]">
+                                                                    {importData.slice(0, 5).map((row, rowIdx) => (
+                                                                        <tr key={rowIdx}>
+                                                                            {importColumns.filter(c => c.include).slice(0, 10).map((col, colIdx) => (
+                                                                                <td key={colIdx} className="px-3 py-2 text-[var(--text-secondary)] whitespace-nowrap max-w-[150px] truncate">
+                                                                                    {String(row[col.name] ?? '')}
+                                                                                </td>
+                                                                            ))}
+                                                                            {importColumns.filter(c => c.include).length > 10 && (
+                                                                                <td className="px-3 py-2 text-[var(--text-tertiary)]">...</td>
+                                                                            )}
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {importError && (
+                                                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+                                                        {importError}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {importStep === 'importing' && (
+                                            <div className="py-10 text-center">
+                                                <div className="w-16 h-16 mx-auto mb-4 relative">
+                                                    <svg className="animate-spin" viewBox="0 0 100 100">
+                                                        <circle 
+                                                            cx="50" cy="50" r="40" 
+                                                            fill="none" 
+                                                            stroke="var(--border-light)" 
+                                                            strokeWidth="8"
+                                                        />
+                                                        <circle 
+                                                            cx="50" cy="50" r="40" 
+                                                            fill="none" 
+                                                            stroke="#419CAF" 
+                                                            strokeWidth="8"
+                                                            strokeLinecap="round"
+                                                            strokeDasharray={`${importProgress * 2.51} 251`}
+                                                            transform="rotate(-90 50 50)"
+                                                        />
+                                                    </svg>
+                                                    <span className="absolute inset-0 flex items-center justify-center text-sm font-medium text-[var(--text-primary)]">
+                                                        {importProgress}%
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-[var(--text-primary)] font-medium">
+                                                    Importing {importData.length} records...
+                                                </p>
+                                                <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                                                    This may take a moment
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Footer */}
+                                    {importStep !== 'importing' && (
+                                        <div className="px-6 py-4 border-t border-[var(--border-light)] flex justify-between items-center bg-[var(--bg-tertiary)]">
+                                            <div>
+                                                {importStep === 'preview' && (
+                                                    <button
+                                                        onClick={() => { setImportStep('source'); setImportError(null); }}
+                                                        className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                                    >
+                                                        ← Back
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => { setIsImportModalOpen(false); resetImportState(); }}
+                                                    className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] rounded-lg transition-colors"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                {importStep === 'preview' && (
+                                                    <button
+                                                        onClick={executeImport}
+                                                        disabled={importColumns.filter(c => c.include).length === 0}
+                                                        className="px-4 py-2 bg-[#419CAF] hover:bg-[#3a8a9d] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                                                    >
+                                                        {importMode === 'new' 
+                                                            ? `Create Entity with ${importData.length} Records`
+                                                            : `Add ${importData.length} Records`
+                                                        }
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -1507,46 +2147,46 @@ function AuthenticatedApp() {
                         {/* Create Entity Modal */}
                         {isCreatingEntity && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-                                <div className="bg-white rounded-lg border border-slate-200 shadow-lg w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden">
-                                    <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/50">
-                                        <h2 className="text-sm font-normal text-slate-700">Create New Entity</h2>
+                                <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-lg w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden">
+                                    <div className="px-5 py-4 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
+                                        <h2 className="text-sm font-normal text-[var(--text-primary)]">Create New Entity</h2>
                                     </div>
 
                                     <div className="p-5 space-y-4">
                                         <div>
-                                            <label className="block text-xs font-medium text-slate-600 mb-1">Entity Name</label>
+                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Entity Name</label>
                                             <input
                                                 autoFocus
                                                 type="text"
                                                 value={newEntityName}
                                                 onChange={(e) => setNewEntityName(e.target.value)}
                                                 placeholder="e.g. Products"
-                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-slate-300 focus:outline-none"
+                                                className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] focus:outline-none placeholder:text-[var(--text-tertiary)]"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
+                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Description</label>
                                             <textarea
                                                 value={newEntityDescription}
                                                 onChange={(e) => setNewEntityDescription(e.target.value)}
                                                 placeholder="Describe what this entity represents..."
                                                 rows={3}
-                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-slate-300 focus:outline-none resize-none"
+                                                className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] focus:outline-none resize-none placeholder:text-[var(--text-tertiary)]"
                                             />
                                         </div>
                                     </div>
 
-                                    <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-200 bg-slate-50/50">
+                                    <div className="flex justify-end gap-2 px-5 py-4 border-t border-[var(--border-light)] bg-[var(--bg-tertiary)]">
                                         <button
                                             onClick={() => setIsCreatingEntity(false)}
-                                            className="px-3 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
+                                            className="px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg font-medium transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={handleCreateEntity}
                                             disabled={!newEntityName.trim()}
-                                            className="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            className="px-3 py-2 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-medium hover:bg-[var(--accent-primary-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                         >
                                             Create Entity
                                         </button>
@@ -1558,16 +2198,16 @@ function AuthenticatedApp() {
                         {/* Add/Edit Record Modal */}
                         {isAddingRecord && currentSchema && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-                                <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
-                                    <h2 className="text-xl font-normal text-slate-800 mb-4">{editingRecordId ? 'Edit Record' : 'Add New Record'}</h2>
+                                <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+                                    <h2 className="text-xl font-normal text-[var(--text-primary)] mb-4">{editingRecordId ? 'Edit Record' : 'Add New Record'}</h2>
 
                                     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                                        {currentSchema.properties.map(prop => {
+                                        {currentSchema.properties.map((prop, propIndex) => {
                                             if (prop.type === 'relation' && prop.relatedEntityId) {
                                                 const relatedInfo = relatedData[prop.relatedEntityId];
                                                 return (
-                                                    <div key={prop.id}>
-                                                        <label className="block text-sm font-medium text-slate-700 mb-1">{prop.name}</label>
+                                                    <div key={prop.id || `form-rel-${propIndex}`}>
+                                                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">{prop.name}</label>
                                                         <select
                                                             multiple
                                                             value={newRecordValues[prop.id] || []}
@@ -1575,7 +2215,7 @@ function AuthenticatedApp() {
                                                                 const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
                                                                 setNewRecordValues({ ...newRecordValues, [prop.id]: selectedOptions });
                                                             }}
-                                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-300 focus:border-slate-300 focus:outline-none min-h-[100px] appearance-none cursor-pointer hover:border-slate-300 transition-colors"
+                                                            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] focus:outline-none min-h-[100px] appearance-none cursor-pointer hover:border-[var(--border-medium)] transition-colors"
                                                         >
                                                             {relatedInfo?.records.map(rec => (
                                                                 <option key={rec.id} value={rec.id}>
@@ -1583,7 +2223,7 @@ function AuthenticatedApp() {
                                                                 </option>
                                                             ))}
                                                         </select>
-                                                        <p className="text-xs text-slate-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+                                                        <p className="text-xs text-[var(--text-tertiary)] mt-1">Hold Ctrl/Cmd to select multiple</p>
                                                     </div>
                                                 );
                                             }
@@ -1595,21 +2235,21 @@ function AuthenticatedApp() {
                                                 } catch (e) {}
                                                 
                                                 return (
-                                                    <div key={prop.id}>
-                                                        <label className="block text-sm font-medium text-slate-700 mb-1">{prop.name}</label>
+                                                    <div key={prop.id || `form-file-${propIndex}`}>
+                                                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">{prop.name}</label>
                                                         <div className="space-y-2">
                                                             {fileInfo && (
-                                                                <div className="flex items-center gap-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
-                                                                    <Paperclip size={16} className="text-purple-500" weight="light" />
-                                                                    <span className="text-sm text-purple-800 truncate flex-1">
+                                                                <div className="flex items-center gap-2 p-2 bg-violet-500/10 border border-violet-500/30 rounded-lg">
+                                                                    <Paperclip size={16} className="text-violet-500" weight="light" />
+                                                                    <span className="text-sm text-violet-500 truncate flex-1">
                                                                         {fileInfo.originalName || fileInfo.filename}
                                                                     </span>
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => setNewRecordValues({ ...newRecordValues, [prop.id]: '' })}
-                                                                        className="p-1 hover:bg-purple-200 rounded transition-colors"
+                                                                        className="p-1 hover:bg-violet-500/20 rounded transition-colors"
                                                                     >
-                                                                        <X size={14} className="text-purple-600" weight="light" />
+                                                                        <X size={14} className="text-violet-500" weight="light" />
                                                                     </button>
                                                                 </div>
                                                             )}
@@ -1627,38 +2267,38 @@ function AuthenticatedApp() {
                                                                 />
                                                                 <label
                                                                     htmlFor={`file-input-${prop.id}`}
-                                                                    className={`flex items-center justify-center gap-2 w-full px-3 py-2 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-colors ${uploadingFiles[prop.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                                    className={`flex items-center justify-center gap-2 w-full px-3 py-2 border-2 border-dashed border-[var(--border-medium)] rounded-lg cursor-pointer hover:border-violet-500 hover:bg-violet-500/5 transition-colors ${uploadingFiles[prop.id] ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                                 >
                                                                     {uploadingFiles[prop.id] ? (
                                                                         <>
-                                                                            <SpinnerGap size={16} className="animate-spin text-purple-500" weight="light" />
-                                                                            <span className="text-sm text-slate-500">Uploading...</span>
+                                                                            <SpinnerGap size={16} className="animate-spin text-violet-500" weight="light" />
+                                                                            <span className="text-sm text-[var(--text-tertiary)]">Uploading...</span>
                                                                         </>
                                                                     ) : (
                                                                         <>
-                                                                            <Paperclip size={16} className="text-slate-400" weight="light" />
-                                                                            <span className="text-sm text-slate-500">
+                                                                            <Paperclip size={16} className="text-[var(--text-tertiary)]" weight="light" />
+                                                                            <span className="text-sm text-[var(--text-tertiary)]">
                                                                                 {fileInfo ? 'Replace file' : 'Choose file'}
                                                                             </span>
                                                                         </>
                                                                     )}
                                                                 </label>
                                                             </div>
-                                                            <p className="text-xs text-slate-500">PDF, Word, Excel, images, or text files (max 50MB)</p>
+                                                            <p className="text-xs text-[var(--text-tertiary)]">PDF, Word, Excel, images, or text files (max 50MB)</p>
                                                         </div>
                                                     </div>
                                                 );
                                             }
                                             return (
-                                                <div key={prop.id}>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-1">{prop.name}</label>
+                                                <div key={prop.id || `form-input-${propIndex}`}>
+                                                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">{prop.name}</label>
                                                     {prop.type === 'json' ? (
                                                         <textarea
                                                             value={newRecordValues[prop.id] || ''}
                                                             onChange={(e) => setNewRecordValues({ ...newRecordValues, [prop.id]: e.target.value })}
                                                             placeholder={`Enter valid JSON for ${prop.name}...`}
                                                             rows={4}
-                                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none font-mono text-sm"
+                                                            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none font-mono text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                                                         />
                                                     ) : (
                                                         <input
@@ -1666,7 +2306,7 @@ function AuthenticatedApp() {
                                                             value={newRecordValues[prop.id] || ''}
                                                             onChange={(e) => setNewRecordValues({ ...newRecordValues, [prop.id]: e.target.value })}
                                                             placeholder={`Enter ${prop.name}...`}
-                                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                                                         />
                                                     )}
                                                 </div>
@@ -1676,15 +2316,15 @@ function AuthenticatedApp() {
                                         {/* Incoming Relations Section */}
                                         {Object.keys(incomingData).length > 0 && (
                                             <>
-                                                <div className="border-t border-slate-200 pt-4 mt-4">
-                                                    <p className="text-xs font-normal text-indigo-600 uppercase tracking-wide mb-3">
+                                                <div className="border-t border-[var(--border-light)] pt-4 mt-4">
+                                                    <p className="text-xs font-normal text-[var(--accent-primary)] uppercase tracking-wide mb-3">
                                                         Incoming Relations
                                                     </p>
                                                 </div>
                                                 {Object.entries(incomingData).map(([propId, { sourceEntity, sourceProperty, records: sourceRecords }]) => (
                                                     <div key={propId}>
-                                                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                                                            {sourceEntity.name} <span className="text-slate-400 font-normal">({sourceProperty.name})</span>
+                                                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+                                                            {sourceEntity.name} <span className="text-[var(--text-tertiary)] font-normal">({sourceProperty.name})</span>
                                                         </label>
                                                         <select
                                                             multiple
@@ -1696,7 +2336,7 @@ function AuthenticatedApp() {
                                                                     [propId]: selectedOptions
                                                                 }));
                                                             }}
-                                                            className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none min-h-[100px]"
+                                                            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--accent-primary)]/30 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none min-h-[100px] text-[var(--text-primary)]"
                                                         >
                                                             {sourceRecords.map(rec => (
                                                                 <option key={rec.id} value={rec.id}>
@@ -1704,7 +2344,7 @@ function AuthenticatedApp() {
                                                                 </option>
                                                             ))}
                                                         </select>
-                                                        <p className="text-xs text-slate-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+                                                        <p className="text-xs text-[var(--text-tertiary)] mt-1">Hold Ctrl/Cmd to select multiple</p>
                                                     </div>
                                                 ))}
                                             </>
@@ -1714,13 +2354,13 @@ function AuthenticatedApp() {
                                     <div className="flex justify-end space-x-3 mt-6">
                                         <button
                                             onClick={() => { setIsAddingRecord(false); setNewRecordValues({}); setEditingRecordId(null); setEditingSchema(null); setEditingIncomingSelections({}); }}
-                                            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
+                                            className="px-4 py-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg font-medium transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={handleSaveRecord}
-                                            className="px-4 py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 transition-colors"
+                                            className="px-4 py-2 bg-[var(--accent-primary)] text-white rounded-lg font-medium hover:bg-[var(--accent-primary-hover)] transition-colors"
                                         >
                                             {editingRecordId ? 'Save Changes' : 'Add Record'}
                                         </button>
@@ -1732,18 +2372,18 @@ function AuthenticatedApp() {
                         {/* Edit Incoming Relation Modal */}
                         {editingIncomingRelation && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-                                <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
-                                    <h2 className="text-xl font-normal text-slate-800 mb-2">
+                                <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+                                    <h2 className="text-xl font-normal text-[var(--text-primary)] mb-2">
                                         Edit Relation
                                     </h2>
-                                    <p className="text-sm text-slate-500 mb-4">
-                                        Select which <span className="font-medium text-indigo-600">{editingIncomingRelation.sourceEntity.name}</span> records 
+                                    <p className="text-sm text-[var(--text-secondary)] mb-4">
+                                        Select which <span className="font-medium text-[var(--accent-primary)]">{editingIncomingRelation.sourceEntity.name}</span> records 
                                         should link to this record via <span className="font-medium">{editingIncomingRelation.sourceProperty.name}</span>
                                     </p>
 
-                                    <div className="max-h-[300px] overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                                    <div className="max-h-[300px] overflow-y-auto border border-[var(--border-light)] rounded-lg divide-y divide-[var(--border-light)]">
                                         {editingIncomingRelation.sourceRecords.length === 0 ? (
-                                            <div className="p-4 text-center text-slate-500 text-sm">
+                                            <div className="p-4 text-center text-[var(--text-tertiary)] text-sm">
                                                 No records available in {editingIncomingRelation.sourceEntity.name}
                                             </div>
                                         ) : (
@@ -1752,7 +2392,7 @@ function AuthenticatedApp() {
                                                 return (
                                                     <label
                                                         key={record.id}
-                                                        className={`flex items-center p-3 cursor-pointer hover:bg-slate-50 transition-colors ${isSelected ? 'bg-indigo-50' : ''}`}
+                                                        className={`flex items-center p-3 cursor-pointer hover:bg-[var(--bg-tertiary)] transition-colors ${isSelected ? 'bg-[var(--accent-primary)]/10' : ''}`}
                                                     >
                                                         <input
                                                             type="checkbox"
@@ -1766,9 +2406,9 @@ function AuthenticatedApp() {
                                                                     return { ...prev, selectedSourceRecordIds: newIds };
                                                                 });
                                                             }}
-                                                            className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                                                            className="w-4 h-4 text-[var(--accent-primary)] border-[var(--border-medium)] rounded focus:ring-[var(--accent-primary)]"
                                                         />
-                                                        <span className={`ml-3 text-sm ${isSelected ? 'text-indigo-800 font-medium' : 'text-slate-700'}`}>
+                                                        <span className={`ml-3 text-sm ${isSelected ? 'text-[var(--accent-primary)] font-medium' : 'text-[var(--text-secondary)]'}`}>
                                                             {getRecordDisplayName(record, editingIncomingRelation.sourceEntity)}
                                                         </span>
                                                     </label>
@@ -1780,13 +2420,13 @@ function AuthenticatedApp() {
                                     <div className="flex justify-end space-x-3 mt-6">
                                         <button
                                             onClick={() => setEditingIncomingRelation(null)}
-                                            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
+                                            className="px-4 py-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg font-medium transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={saveIncomingRelationChanges}
-                                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+                                            className="px-4 py-2 bg-[var(--accent-primary)] text-white rounded-lg font-medium hover:bg-[var(--accent-primary-hover)] transition-colors"
                                         >
                                             Save Changes
                                         </button>

@@ -7,7 +7,10 @@ import {
     GearSix,
     SpinnerGap,
     MagnifyingGlass,
-    X
+    X,
+    Star,
+    ArrowRight,
+    Clock
 } from '@phosphor-icons/react';
 import { PageHeader } from './PageHeader';
 import { API_BASE } from '../config';
@@ -19,9 +22,11 @@ interface Connection {
     icon?: React.ComponentType<{ size?: number; className?: string }>;
     logoUrl?: string;
     description: string;
-    category: 'database' | 'cloud' | 'erp' | 'communication';
+    category: 'database' | 'cloud' | 'erp' | 'crm' | 'productivity' | 'analytics' | 'communication';
     connected: boolean;
     lastSync?: string;
+    popular?: boolean;
+    comingSoon?: boolean;
     config?: {
         host?: string;
         database?: string;
@@ -30,40 +35,111 @@ interface Connection {
 }
 
 const CONNECTIONS: Connection[] = [
+    // CRM & Sales
+    {
+        id: 'salesforce',
+        name: 'Salesforce',
+        type: 'CRM',
+        logoUrl: 'https://cdn.simpleicons.org/salesforce',
+        description: 'Connect to Salesforce CRM for sales, leads, and customer data integration',
+        category: 'crm',
+        connected: false,
+        popular: true
+    },
+    {
+        id: 'dynamics365',
+        name: 'Dynamics 365',
+        type: 'ERP & CRM',
+        logoUrl: 'https://cdn.simpleicons.org/dynamics365',
+        description: 'Connect to Microsoft Dynamics 365 for business operations and CRM',
+        category: 'erp',
+        connected: false,
+        popular: true
+    },
+    // ERP Systems
     {
         id: 'sap',
         name: 'SAP',
         type: 'ERP',
         logoUrl: 'https://cdn.simpleicons.org/sap',
-        description: 'Connect to SAP systems for enterprise data integration',
+        description: 'Connect to SAP S/4HANA and ECC for enterprise data integration',
+        category: 'erp',
+        connected: false,
+        popular: true
+    },
+    {
+        id: 'oracle-erp',
+        name: 'Oracle ERP Cloud',
+        type: 'ERP',
+        logoUrl: 'https://cdn.simpleicons.org/oracle',
+        description: 'Integrate with Oracle ERP Cloud for financial and operational data',
         category: 'erp',
         connected: false
     },
     {
-        id: 'oracle',
-        name: 'Oracle',
-        type: 'Database',
+        id: 'netsuite',
+        name: 'NetSuite',
+        type: 'ERP',
         logoUrl: 'https://cdn.simpleicons.org/oracle',
-        description: 'Connect to Oracle Database for data access and synchronization',
-        category: 'database',
+        description: 'Connect to Oracle NetSuite for unified business management',
+        category: 'erp',
         connected: false
     },
+    // Databases
     {
         id: 'postgresql',
         name: 'PostgreSQL',
         type: 'Database',
         logoUrl: 'https://cdn.simpleicons.org/postgresql',
-        description: 'Connect to PostgreSQL database for real-time data queries',
+        description: 'Connect to PostgreSQL for real-time data queries and analytics',
+        category: 'database',
+        connected: false
+    },
+    {
+        id: 'mysql',
+        name: 'MySQL',
+        type: 'Database',
+        logoUrl: 'https://cdn.simpleicons.org/mysql',
+        description: 'Connect to MySQL databases for data access and synchronization',
         category: 'database',
         connected: false
     },
     {
         id: 'mongodb',
         name: 'MongoDB',
-        type: 'Database',
+        type: 'NoSQL Database',
         logoUrl: 'https://cdn.simpleicons.org/mongodb',
         description: 'Connect to MongoDB for document-based data access',
         category: 'database',
+        connected: false
+    },
+    {
+        id: 'sqlserver',
+        name: 'SQL Server',
+        type: 'Database',
+        logoUrl: 'https://cdn.simpleicons.org/microsoftsqlserver',
+        description: 'Connect to Microsoft SQL Server for enterprise data',
+        category: 'database',
+        connected: false
+    },
+    // Analytics & BI
+    {
+        id: 'powerbi',
+        name: 'Power BI',
+        type: 'Business Intelligence',
+        logoUrl: 'https://cdn.simpleicons.org/powerbi',
+        description: 'Connect to Power BI for advanced analytics and reporting',
+        category: 'analytics',
+        connected: false,
+        popular: true
+    },
+    {
+        id: 'tableau',
+        name: 'Tableau',
+        type: 'Analytics',
+        logoUrl: 'https://cdn.simpleicons.org/tableau',
+        description: 'Integrate with Tableau for data visualization and dashboards',
+        category: 'analytics',
         connected: false
     },
     {
@@ -71,27 +147,95 @@ const CONNECTIONS: Connection[] = [
         name: 'Snowflake',
         type: 'Data Warehouse',
         logoUrl: 'https://cdn.simpleicons.org/snowflake',
-        description: 'Connect to Snowflake data warehouse for analytics',
+        description: 'Connect to Snowflake data cloud for analytics and data sharing',
         category: 'cloud',
         connected: false
     },
+    {
+        id: 'bigquery',
+        name: 'BigQuery',
+        type: 'Data Warehouse',
+        logoUrl: 'https://cdn.simpleicons.org/googlebigquery',
+        description: 'Connect to Google BigQuery for serverless data analytics',
+        category: 'cloud',
+        connected: false
+    },
+    // Productivity & Collaboration
+    {
+        id: 'google-sheets',
+        name: 'Google Sheets',
+        type: 'Spreadsheet',
+        logoUrl: 'https://cdn.simpleicons.org/googlesheets',
+        description: 'Sync data with Google Sheets for easy collaboration',
+        category: 'productivity',
+        connected: false,
+        popular: true
+    },
+    {
+        id: 'excel',
+        name: 'Microsoft Excel',
+        type: 'Spreadsheet',
+        logoUrl: 'https://cdn.simpleicons.org/microsoftexcel',
+        description: 'Connect to Excel files and OneDrive for spreadsheet data',
+        category: 'productivity',
+        connected: false
+    },
+    {
+        id: 'airtable',
+        name: 'Airtable',
+        type: 'Database',
+        logoUrl: 'https://cdn.simpleicons.org/airtable',
+        description: 'Integrate with Airtable for flexible data management',
+        category: 'productivity',
+        connected: false
+    },
+    {
+        id: 'notion',
+        name: 'Notion',
+        type: 'Workspace',
+        logoUrl: 'https://cdn.simpleicons.org/notion',
+        description: 'Connect to Notion databases and pages for content sync',
+        category: 'productivity',
+        connected: false
+    },
+    // Cloud Storage
     {
         id: 'aws-s3',
         name: 'AWS S3',
         type: 'Cloud Storage',
-        logoUrl: 'https://cdn.simpleicons.org/amazonaws',
-        description: 'Connect to Amazon S3 for file storage and data access',
+        logoUrl: 'https://cdn.simpleicons.org/amazons3',
+        description: 'Connect to Amazon S3 for file storage and data lakes',
         category: 'cloud',
         connected: false
     },
     {
-        id: 'azure',
-        name: 'Azure',
-        type: 'Cloud Platform',
+        id: 'azure-blob',
+        name: 'Azure Blob',
+        type: 'Cloud Storage',
         logoUrl: 'https://cdn.simpleicons.org/microsoftazure',
-        description: 'Connect to Microsoft Azure services and data sources',
+        description: 'Connect to Azure Blob Storage for cloud file management',
         category: 'cloud',
         connected: false
+    },
+    {
+        id: 'google-drive',
+        name: 'Google Drive',
+        type: 'Cloud Storage',
+        logoUrl: 'https://cdn.simpleicons.org/googledrive',
+        description: 'Sync files and folders from Google Drive',
+        category: 'cloud',
+        connected: false
+    },
+    // Communication & Project Management
+    {
+        id: 'teams',
+        name: 'Microsoft Teams',
+        type: 'Communication',
+        logoUrl: 'https://cdn.simpleicons.org/microsoftteams',
+        description: 'Send notifications and updates to Microsoft Teams channels',
+        category: 'communication',
+        connected: false,
+        popular: true
     },
     {
         id: 'slack',
@@ -101,6 +245,64 @@ const CONNECTIONS: Connection[] = [
         description: 'Connect to Slack for notifications and workflow integration',
         category: 'communication',
         connected: false
+    },
+    {
+        id: 'jira',
+        name: 'Jira',
+        type: 'Project Management',
+        logoUrl: 'https://cdn.simpleicons.org/jira',
+        description: 'Integrate with Jira for project tracking and issue management',
+        category: 'productivity',
+        connected: false
+    },
+    {
+        id: 'asana',
+        name: 'Asana',
+        type: 'Project Management',
+        logoUrl: 'https://cdn.simpleicons.org/asana',
+        description: 'Connect to Asana for task and project synchronization',
+        category: 'productivity',
+        connected: false
+    },
+    // APIs & Custom
+    {
+        id: 'rest-api',
+        name: 'REST API',
+        type: 'Custom API',
+        logoUrl: 'https://cdn.simpleicons.org/openapiinitiative',
+        description: 'Connect to any REST API with custom configuration',
+        category: 'cloud',
+        connected: false
+    },
+    {
+        id: 'graphql',
+        name: 'GraphQL',
+        type: 'Custom API',
+        logoUrl: 'https://cdn.simpleicons.org/graphql',
+        description: 'Connect to GraphQL endpoints for flexible data queries',
+        category: 'cloud',
+        connected: false
+    },
+    // Coming Soon
+    {
+        id: 'linkedin',
+        name: 'LinkedIn',
+        type: 'Social',
+        logoUrl: 'https://cdn.simpleicons.org/linkedin',
+        description: 'Import contacts and company data from LinkedIn Sales Navigator',
+        category: 'crm',
+        connected: false,
+        comingSoon: true
+    },
+    {
+        id: 'zendesk',
+        name: 'Zendesk',
+        type: 'Support',
+        logoUrl: 'https://cdn.simpleicons.org/zendesk',
+        description: 'Integrate with Zendesk for customer support data',
+        category: 'crm',
+        connected: false,
+        comingSoon: true
     }
 ];
 
@@ -190,11 +392,27 @@ export const Connections: React.FC = () => {
 
     const getCategoryColor = (category: string) => {
         switch (category) {
-            case 'database': return 'bg-[var(--bg-tertiary)] border-[var(--border-light)] text-blue-500';
-            case 'cloud': return 'bg-[var(--bg-tertiary)] border-[var(--border-light)] text-purple-500';
-            case 'erp': return 'bg-[var(--bg-tertiary)] border-[var(--border-light)] text-emerald-500';
-            case 'communication': return 'bg-[var(--bg-tertiary)] border-[var(--border-light)] text-amber-500';
-            default: return 'bg-[var(--bg-tertiary)] border-[var(--border-light)] text-[var(--text-secondary)]';
+            case 'database': return 'text-blue-500';
+            case 'cloud': return 'text-purple-500';
+            case 'erp': return 'text-emerald-500';
+            case 'crm': return 'text-orange-500';
+            case 'analytics': return 'text-cyan-500';
+            case 'productivity': return 'text-pink-500';
+            case 'communication': return 'text-amber-500';
+            default: return 'text-[var(--text-secondary)]';
+        }
+    };
+    
+    const getCategoryBg = (category: string) => {
+        switch (category) {
+            case 'database': return 'bg-blue-500/10 border-blue-500/20';
+            case 'cloud': return 'bg-purple-500/10 border-purple-500/20';
+            case 'erp': return 'bg-emerald-500/10 border-emerald-500/20';
+            case 'crm': return 'bg-orange-500/10 border-orange-500/20';
+            case 'analytics': return 'bg-cyan-500/10 border-cyan-500/20';
+            case 'productivity': return 'bg-pink-500/10 border-pink-500/20';
+            case 'communication': return 'bg-amber-500/10 border-amber-500/20';
+            default: return 'bg-[var(--bg-tertiary)] border-[var(--border-light)]';
         }
     };
 
@@ -206,43 +424,50 @@ export const Connections: React.FC = () => {
     });
 
     const categories = [
-        { id: 'all', label: 'All' },
-        { id: 'database', label: 'Databases' },
-        { id: 'cloud', label: 'Cloud' },
-        { id: 'erp', label: 'ERP' },
-        { id: 'communication', label: 'Communication' }
+        { id: 'all', label: 'All', count: connections.filter(c => !c.comingSoon).length },
+        { id: 'crm', label: 'CRM & Sales', count: connections.filter(c => c.category === 'crm' && !c.comingSoon).length },
+        { id: 'erp', label: 'ERP', count: connections.filter(c => c.category === 'erp').length },
+        { id: 'database', label: 'Databases', count: connections.filter(c => c.category === 'database').length },
+        { id: 'analytics', label: 'Analytics', count: connections.filter(c => c.category === 'analytics').length },
+        { id: 'productivity', label: 'Productivity', count: connections.filter(c => c.category === 'productivity').length },
+        { id: 'cloud', label: 'Cloud', count: connections.filter(c => c.category === 'cloud').length },
+        { id: 'communication', label: 'Communication', count: connections.filter(c => c.category === 'communication').length }
     ];
 
     return (
         <div className="flex flex-col h-full bg-[var(--bg-primary)]">
             {/* Header */}
-            <PageHeader title="Connections" subtitle="Manage your data source integrations" />
+            <PageHeader title="Connections" subtitle="Integrate with your data sources and business tools" />
 
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                <div className="max-w-7xl mx-auto space-y-6">
+                <div className="max-w-7xl mx-auto space-y-8">
+                    
                     {/* Filters */}
-                    <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-4">
-                        <div className="flex flex-wrap items-center gap-3">
-                            {/* Category Filter */}
-                            <div className="flex items-center gap-2">
+                    <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
+                        <div className="flex flex-col lg:flex-row gap-4">
+                            {/* Category Pills */}
+                            <div className="flex flex-wrap items-center gap-2">
                                 {categories.map(cat => (
                                     <button
                                         key={cat.id}
                                         onClick={() => setCategoryFilter(cat.id)}
-                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                                             categoryFilter === cat.id
-                                                ? 'bg-[var(--bg-selected)] text-white'
-                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                                                ? 'bg-[#419CAF] text-white shadow-sm'
+                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
                                         }`}
                                     >
                                         {cat.label}
+                                        <span className={`ml-1.5 ${categoryFilter === cat.id ? 'text-white/70' : 'text-[var(--text-tertiary)]'}`}>
+                                            {cat.count}
+                                        </span>
                                     </button>
                                 ))}
                             </div>
 
                             {/* Search */}
-                            <div className="flex-1 min-w-[200px]">
+                            <div className="flex-1 min-w-[200px] lg:max-w-xs ml-auto">
                                 <div className="relative">
                                     <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} weight="light" />
                                     <input
@@ -250,7 +475,7 @@ export const Connections: React.FC = () => {
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         placeholder="Search connections..."
-                                        className="w-full pl-9 pr-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)] hover:border-[var(--border-medium)] transition-colors"
+                                        className="w-full pl-9 pr-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#419CAF] focus:border-[#419CAF] placeholder:text-[var(--text-tertiary)] hover:border-[var(--border-medium)] transition-colors"
                                     />
                                 </div>
                             </div>
@@ -259,11 +484,18 @@ export const Connections: React.FC = () => {
 
                     {/* Connections Grid */}
                     {filteredConnections.length === 0 ? (
-                        <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-12 text-center">
+                        <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-12 text-center">
+                            <Database size={40} className="mx-auto text-[var(--text-tertiary)] mb-3" weight="light" />
                             <p className="text-sm text-[var(--text-secondary)]">No connections found matching your filters.</p>
+                            <button 
+                                onClick={() => { setCategoryFilter('all'); setSearchQuery(''); }}
+                                className="mt-3 text-sm text-[#419CAF] hover:underline"
+                            >
+                                Clear filters
+                            </button>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {filteredConnections.map((connection) => {
                             const Icon = connection.icon || Database;
                             const hasLogoError = logoErrors.has(connection.id);
@@ -271,11 +503,15 @@ export const Connections: React.FC = () => {
                             return (
                                 <div
                                     key={connection.id}
-                                    className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 hover:shadow-md transition-all duration-200"
+                                    className={`bg-[var(--bg-card)] border rounded-xl p-5 transition-all duration-200 group ${
+                                        connection.comingSoon 
+                                            ? 'border-[var(--border-light)] opacity-70' 
+                                            : 'border-[var(--border-light)] hover:border-[#419CAF]/50 hover:shadow-lg'
+                                    }`}
                                 >
-                                    <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-start justify-between mb-3">
                                         <div className="flex items-center gap-3">
-                                            <div className={`p-2.5 rounded-lg ${getCategoryColor(connection.category)} flex items-center justify-center min-w-[40px] min-h-[40px] bg-[var(--bg-card)]`}>
+                                            <div className={`p-2.5 rounded-xl ${getCategoryBg(connection.category)} border flex items-center justify-center min-w-[44px] min-h-[44px] group-hover:scale-105 transition-transform`}>
                                                 {connection.logoUrl && !hasLogoError ? (
                                                     <img 
                                                         src={connection.logoUrl} 
@@ -286,45 +522,59 @@ export const Connections: React.FC = () => {
                                                         }}
                                                     />
                                                 ) : (
-                                                    <Icon size={20} weight="light" />
+                                                    <Icon size={22} className={getCategoryColor(connection.category)} weight="light" />
                                                 )}
                                             </div>
                                             <div>
-                                                <h3 className="text-base font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
-                                                    {connection.name}
-                                                </h3>
-                                                <span className={`inline-block px-2 py-0.5 rounded-md border text-xs font-medium mt-1 ${getCategoryColor(connection.category)}`}>
+                                                <div className="flex items-center gap-2">
+                                                    <h3 className="text-sm font-medium text-[var(--text-primary)]">
+                                                        {connection.name}
+                                                    </h3>
+                                                    {connection.popular && !connection.comingSoon && (
+                                                        <Star size={12} className="text-amber-500" weight="fill" />
+                                                    )}
+                                                </div>
+                                                <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-medium mt-1 ${getCategoryBg(connection.category)} ${getCategoryColor(connection.category)}`}>
                                                     {connection.type}
                                                 </span>
                                             </div>
                                         </div>
-                                        {connection.connected ? (
-                                            <div className="flex items-center gap-1 text-emerald-500">
-                                                <CheckCircle size={16} weight="fill" />
+                                        {connection.comingSoon ? (
+                                            <span className="px-2 py-1 rounded-md bg-purple-500/10 text-purple-500 text-[10px] font-medium">
+                                                Soon
+                                            </span>
+                                        ) : connection.connected ? (
+                                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10">
+                                                <CheckCircle size={14} className="text-emerald-500" weight="fill" />
+                                                <span className="text-[10px] font-medium text-emerald-500">Active</span>
                                             </div>
-                                        ) : (
-                                            <div className="flex items-center gap-1 text-[var(--text-tertiary)]">
-                                                <XCircle size={16} weight="light" />
-                                            </div>
-                                        )}
+                                        ) : null}
                                     </div>
 
-                                    <p className="text-xs text-[var(--text-secondary)] mb-4 line-clamp-2">
+                                    <p className="text-xs text-[var(--text-secondary)] mb-4 line-clamp-2 min-h-[32px]">
                                         {connection.description}
                                     </p>
 
                                     {connection.connected && connection.lastSync && (
-                                        <p className="text-xs text-[var(--text-tertiary)] mb-4">
+                                        <p className="text-[10px] text-[var(--text-tertiary)] mb-3 flex items-center gap-1">
+                                            <Clock size={10} weight="light" />
                                             Last sync: {new Date(connection.lastSync).toLocaleDateString()}
                                         </p>
                                     )}
 
                                     <div className="flex items-center gap-2">
-                                        {connection.connected ? (
+                                        {connection.comingSoon ? (
+                                            <button
+                                                disabled
+                                                className="flex-1 px-3 py-2 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] rounded-lg text-xs font-medium cursor-not-allowed"
+                                            >
+                                                Coming Soon
+                                            </button>
+                                        ) : connection.connected ? (
                                             <>
                                                 <button
                                                     onClick={() => handleDisconnect(connection.id)}
-                                                    className="flex-1 px-2.5 py-1.5 border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                                    className="flex-1 px-3 py-2 border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                                 >
                                                     Disconnect
                                                 </button>
@@ -333,7 +583,7 @@ export const Connections: React.FC = () => {
                                                         setSelectedConnection(connection);
                                                         setShowConfigModal(true);
                                                     }}
-                                                    className="px-2 py-1.5 border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                                    className="px-3 py-2 border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                                 >
                                                     <GearSix size={14} weight="light" />
                                                 </button>
@@ -341,10 +591,11 @@ export const Connections: React.FC = () => {
                                         ) : (
                                             <button
                                                 onClick={() => handleConnect(connection)}
-                                                className="flex-1 px-2.5 py-1.5 bg-[var(--bg-selected)] text-white rounded-lg text-xs font-medium hover:bg-[#555555] transition-colors flex items-center justify-center gap-1.5"
+                                                className="flex-1 px-3 py-2 bg-[#419CAF] hover:bg-[#3a8a9d] text-white rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 group-hover:shadow-md"
                                             >
-                                                <Plus size={12} weight="light" />
+                                                <Plus size={14} weight="light" />
                                                 Connect
+                                                <ArrowRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" weight="light" />
                                             </button>
                                         )}
                                     </div>

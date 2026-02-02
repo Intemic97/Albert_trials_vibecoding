@@ -2896,17 +2896,14 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                         value={newVisualization.source}
                                         onChange={(e) => setNewVisualization(prev => ({ ...prev, source: e.target.value }))}
                                         placeholder="Type or select from entities below..."
-                                        className="w-full px-3 py-2.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
+                                        className="w-full px-3 py-2.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#419CAF]"
                                     />
                                 </div>
                                 {/* Entity suggestions */}
                                 {entities && entities.length > 0 && (
-                                    <div className="mt-2">
-                                        <p className="text-xs text-[var(--text-tertiary)] mb-2">
-                                            Available entities:
-                                        </p>
+                                    <div className="mt-3">
                                         <div className="flex flex-wrap gap-1.5">
-                                            {entities.slice(0, 8).map(entity => (
+                                            {entities.slice(0, 6).map(entity => (
                                                 <button
                                                     key={entity.id}
                                                     type="button"
@@ -2915,27 +2912,32 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                                         source: entity.name,
                                                         title: prev.title || entity.name
                                                     }))}
-                                                    className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
+                                                    className={`px-2.5 py-1 text-xs rounded-md transition-all ${
                                                         newVisualization.source === entity.name
-                                                            ? 'bg-[var(--accent-primary)] text-white'
-                                                            : 'bg-[var(--bg-selected)] text-[var(--text-secondary)] hover:bg-[var(--accent-primary)]/20 hover:text-[var(--accent-primary)]'
+                                                            ? 'bg-[#419CAF] text-white'
+                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
                                                     }`}
                                                 >
-                                                    @{entity.name}
+                                                    {entity.name}
                                                 </button>
                                             ))}
+                                            {entities.length > 6 && (
+                                                <span className="px-2.5 py-1 text-xs text-[var(--text-tertiary)]">
+                                                    +{entities.length - 6} more
+                                                </span>
+                                            )}
                                         </div>
                                         {/* Show entity properties if one is selected */}
                                         {newVisualization.source && entities.find(e => e.name === newVisualization.source)?.properties && (
-                                            <div className="mt-3 p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
-                                                <p className="text-xs font-medium text-[var(--text-secondary)] mb-2">
-                                                    Properties of @{newVisualization.source}:
+                                            <div className="mt-3 p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-light)]">
+                                                <p className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-2">
+                                                    Properties
                                                 </p>
                                                 <div className="flex flex-wrap gap-1">
                                                     {entities.find(e => e.name === newVisualization.source)?.properties?.map((prop: any, idx: number) => (
                                                         <span 
                                                             key={idx}
-                                                            className="px-2 py-0.5 text-xs bg-[var(--bg-primary)] text-[var(--text-tertiary)] rounded"
+                                                            className="px-2 py-0.5 text-[10px] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded border border-[var(--border-light)]"
                                                         >
                                                             {prop.name}
                                                         </span>
@@ -2945,9 +2947,6 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                         )}
                                     </div>
                                 )}
-                                <p className="text-xs text-[var(--text-tertiary)] mt-2">
-                                    Select an entity or type a custom key from the result object
-                                </p>
                             </div>
 
                             {/* Format (for KPI) */}
@@ -2956,15 +2955,15 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                     <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                         Format
                                     </label>
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-1.5">
                                         {FORMAT_OPTIONS.map(opt => (
                                             <button
                                                 key={opt.value}
                                                 onClick={() => setNewVisualization(prev => ({ ...prev, format: opt.value as any }))}
-                                                className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                                                className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
                                                     newVisualization.format === opt.value
-                                                        ? 'bg-[var(--accent-primary)] text-white'
-                                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-selected)]'
+                                                        ? 'bg-[#419CAF] text-white'
+                                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50'
                                                 }`}
                                             >
                                                 {opt.label}

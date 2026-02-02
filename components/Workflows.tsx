@@ -4019,37 +4019,66 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         e.dataTransfer.dropEffect = 'copy';
     };
 
-    // Wheel handler for canvas zoom (used via native event listener)
-    const handleWheelNative = useCallback((e: WheelEvent) => {
-        e.preventDefault();
-        
-        if (!canvasRef.current) return;
-        
-        const rect = canvasRef.current.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        
-        const worldX = (mouseX - canvasOffset.x) / canvasZoom;
-        const worldY = (mouseY - canvasOffset.y) / canvasZoom;
-        
-        const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        const newZoom = Math.min(Math.max(canvasZoom * delta, 0.25), 3);
-        
-        const newOffsetX = mouseX - worldX * newZoom;
-        const newOffsetY = mouseY - worldY * newZoom;
-        
-        setCanvasZoom(newZoom);
-        setCanvasOffset({ x: newOffsetX, y: newOffsetY });
-    }, [canvasOffset, canvasZoom]);
+    // Refs to read current values without recreating handler
+    const zoomRef = useRef(canvasZoom);
+    const offsetRef = useRef(canvasOffset);
+    
+    // Keep refs in sync with state
+    useEffect(() => {
+        zoomRef.current = canvasZoom;
+        offsetRef.current = canvasOffset;
+    }, [canvasZoom, canvasOffset]);
 
-    // Add wheel event listener with passive: false to allow preventDefault
+    // Wheel handler - stable, updates state directly for immediate response
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         
-        canvas.addEventListener('wheel', handleWheelNative, { passive: false });
-        return () => canvas.removeEventListener('wheel', handleWheelNative);
-    }, [handleWheelNative]);
+        const handleWheel = (e: WheelEvent) => {
+            e.preventDefault();
+            
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            // Read from refs (always current, no stale closure)
+            const currentZoom = zoomRef.current;
+            const currentOffset = offsetRef.current;
+            
+            const worldX = (mouseX - currentOffset.x) / currentZoom;
+            const worldY = (mouseY - currentOffset.y) / currentZoom;
+            
+            let zoomDelta: number;
+            
+            // Always use continuous zoom, but adjust sensitivity
+            // Trackpad typically has ctrlKey/metaKey or smaller deltaY values
+            const isTrackpad = e.ctrlKey || e.metaKey || Math.abs(e.deltaY) < 50;
+            
+            if (isTrackpad) {
+                // Trackpad: more sensitive, continuous zoom
+                // deltaY is negative for zoom in, positive for zoom out
+                zoomDelta = 1 - (e.deltaY * 0.015);
+            } else {
+                // Mouse wheel: less sensitive, still continuous but larger steps
+                zoomDelta = 1 - (e.deltaY * 0.003);
+            }
+            
+            const newZoom = Math.min(Math.max(currentZoom * zoomDelta, 0.1), 4);
+            const newOffsetX = mouseX - worldX * newZoom;
+            const newOffsetY = mouseY - worldY * newZoom;
+            
+            // Update refs immediately for next event
+            zoomRef.current = newZoom;
+            offsetRef.current = { x: newOffsetX, y: newOffsetY };
+            
+            // Update state directly - React batches these automatically
+            setCanvasZoom(newZoom);
+            setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+        };
+        
+        canvas.addEventListener('wheel', handleWheel, { passive: false });
+        return () => canvas.removeEventListener('wheel', handleWheel);
+    }, []); // Empty deps - handler never changes, uses refs for current values
 
     const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
     const [nodeDragged, setNodeDragged] = useState<boolean>(false);
