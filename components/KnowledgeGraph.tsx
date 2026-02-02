@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
-    X, MagnifyingGlass, Minus, Plus, ArrowsOut, TreeStructure, Eye, CaretRight, Folder as FolderIcon, Database, Tag
+    X, MagnifyingGlass, Minus, Plus, ArrowsOut, TreeStructure, Eye, CaretRight, Folder as FolderIcon, Database, Tag, ArrowLeft
 } from '@phosphor-icons/react';
 import { Entity } from '../types';
 
@@ -35,6 +35,7 @@ interface GraphNode {
     orbitRadius?: number;
     orbitAngle?: number;
     orbitSpeed?: number;
+    fixed?: boolean; // True if user manually moved this node
 }
 
 interface GraphEdge {
@@ -64,7 +65,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
 }) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const animationRef = useRef<number>();
+    const animationRef = useRef<number | undefined>(undefined);
     
     // View state
     const [zoom, setZoom] = useState(1);
@@ -178,10 +179,39 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         });
         
         // Detect relationships between entities
+        // 1. First, check explicit relations (properties with type 'relation' and relatedEntityId)
         entities.forEach(entity => {
             if (!entity.properties) return;
             
             entity.properties.forEach(prop => {
+                // Check for explicit relation type with relatedEntityId
+                if (prop.type === 'relation' && prop.relatedEntityId) {
+                    const relatedEntity = entities.find(e => e.id === prop.relatedEntityId);
+                    if (relatedEntity) {
+                        const edgeId = `relation-${entity.id}-${relatedEntity.id}`;
+                        const reverseEdgeId = `relation-${relatedEntity.id}-${entity.id}`;
+                        
+                        // Avoid duplicate edges
+                        if (!newEdges.find(e => e.id === edgeId || e.id === reverseEdgeId)) {
+                            newEdges.push({
+                                id: edgeId,
+                                source: `entity-${entity.id}`,
+                                target: `entity-${relatedEntity.id}`
+                            });
+                        }
+                    }
+                }
+            });
+        });
+        
+        // 2. Also detect implicit relationships by property naming conventions
+        entities.forEach(entity => {
+            if (!entity.properties) return;
+            
+            entity.properties.forEach(prop => {
+                // Skip if already a relation type (handled above)
+                if (prop.type === 'relation') return;
+                
                 const propLower = prop.name.toLowerCase();
                 
                 entities.forEach(other => {
@@ -193,7 +223,9 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                         propLower === `${otherLower}id`) {
                         
                         const edgeId = `relation-${entity.id}-${other.id}`;
-                        if (!newEdges.find(e => e.id === edgeId)) {
+                        const reverseEdgeId = `relation-${other.id}-${entity.id}`;
+                        
+                        if (!newEdges.find(e => e.id === edgeId || e.id === reverseEdgeId)) {
                             newEdges.push({
                                 id: edgeId,
                                 source: `entity-${entity.id}`,
@@ -236,9 +268,10 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                 });
                 
                 // Only apply forces in the first 150 frames for settling
+                // Skip nodes that are fixed (manually moved by user)
                 if (frameCount < 150) {
                     updated.forEach((node, i) => {
-                        if (node.type !== 'entity') return;
+                        if (node.type !== 'entity' || node.fixed) return;
                         
                         let fx = 0, fy = 0;
                         
@@ -278,7 +311,9 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                 }
                 
                 // Update property positions to orbit around their parent entities
+                // Skip nodes that are fixed (manually moved) or being dragged
                 updated.forEach(node => {
+                    if (node.fixed) return; // Skip manually positioned nodes
                     if (node.parentId && node.orbitRadius && node.orbitAngle !== undefined) {
                         const parent = entityMap.get(node.parentId);
                         if (parent) {
@@ -411,18 +446,50 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     };
     
     const handleMouseUp = () => {
+        // Mark the dragged node as "fixed" so simulation won't move it
+        if (draggingNodeId) {
+            setNodes(prev => prev.map(node => 
+                node.id === draggingNodeId ? { ...node, fixed: true } : node
+            ));
+        }
         setIsPanning(false);
         setDraggingNodeId(null);
     };
     
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault();
-        setZoom(z => Math.max(0.3, Math.min(3, z * (e.deltaY > 0 ? 0.95 : 1.05))));
+        
+        const rect = svgRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        
+        // Get mouse position relative to the SVG
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        // Calculate the point in world coordinates under the mouse
+        const worldX = (mouseX - offset.x) / zoom;
+        const worldY = (mouseY - offset.y) / zoom;
+        
+        // Calculate new zoom
+        const zoomFactor = e.deltaY > 0 ? 0.95 : 1.05;
+        const newZoom = Math.max(0.3, Math.min(3, zoom * zoomFactor));
+        
+        // Adjust offset to keep the same point under the mouse
+        const newOffsetX = mouseX - worldX * newZoom;
+        const newOffsetY = mouseY - worldY * newZoom;
+        
+        setZoom(newZoom);
+        setOffset({ x: newOffsetX, y: newOffsetY });
     };
     
     const zoomIn = () => setZoom(z => Math.min(3, z * 1.2));
     const zoomOut = () => setZoom(z => Math.max(0.3, z / 1.2));
-    const resetView = () => { setZoom(1); setOffset({ x: 0, y: 0 }); };
+    const resetView = () => { 
+        setZoom(1); 
+        setOffset({ x: 0, y: 0 }); 
+        // Unfix all nodes so they can be repositioned by the simulation
+        setNodes(prev => prev.map(node => ({ ...node, fixed: false })));
+    };
     
     // Get connected nodes for highlighting
     const connectedNodes = useMemo(() => {
@@ -484,13 +551,26 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: '#1a1d21' }}>
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
-                <div className="flex items-center gap-3">
-                    <TreeStructure size={18} weight="light" className="text-[#419CAF]" />
-                    <div>
-                        <h1 className="text-sm font-medium text-white/90">Knowledge Graph</h1>
-                        <p className="text-[10px] text-white/40">
-                            {entities.length} entities · {nodes.filter(n => n.type === 'property').length} properties
-                        </p>
+                <div className="flex items-center gap-4">
+                    {/* Back button */}
+                    <button
+                        onClick={onClose}
+                        className="flex items-center gap-2 px-2 py-1.5 text-white/60 hover:bg-white/10 rounded-md transition-colors text-sm"
+                    >
+                        <ArrowLeft size={14} weight="light" />
+                        <span className="font-medium">Back</span>
+                    </button>
+                    
+                    <div className="h-6 w-px bg-white/10"></div>
+                    
+                    <div className="flex items-center gap-3">
+                        <TreeStructure size={18} weight="light" className="text-[#419CAF]" />
+                        <div>
+                            <h1 className="text-sm font-medium text-white/90">Knowledge Graph</h1>
+                            <p className="text-[10px] text-white/40">
+                                {entities.length} entities · {nodes.filter(n => n.type === 'property').length} properties
+                            </p>
+                        </div>
                     </div>
                 </div>
                 
@@ -564,7 +644,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                         y1={source.y}
                                         x2={target.x}
                                         y2={target.y}
-                                        stroke={isRelation ? NODE_COLORS.entity : 'rgba(107,114,128,0.3)'}
+                                        stroke="rgba(107,114,128,0.3)"
                                         strokeWidth={isHighlighted ? 1 : 0.5}
                                         strokeOpacity={isVisible ? (isHighlighted ? 0.8 : 0.4) : 0.1}
                                     />

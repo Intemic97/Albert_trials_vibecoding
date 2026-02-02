@@ -4078,7 +4078,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         
         canvas.addEventListener('wheel', handleWheel, { passive: false });
         return () => canvas.removeEventListener('wheel', handleWheel);
-    }, []); // Empty deps - handler never changes, uses refs for current values
+    }, [currentView]); // Re-attach when view changes (canvas mounts/unmounts)
 
     const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
     const [nodeDragged, setNodeDragged] = useState<boolean>(false);
