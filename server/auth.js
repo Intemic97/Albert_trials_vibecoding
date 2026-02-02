@@ -17,7 +17,9 @@ const COOKIE_OPTIONS = {
 };
 
 // Initialize Resend - API key should be in environment variable
-const resend = new Resend(process.env.RESEND_API_KEY);
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_FROM = process.env.RESEND_FROM || 'Intemic <onboarding@resend.dev>';
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 // App URL for verification links
 const APP_URL = process.env.APP_URL || 'http://localhost:5173';
@@ -79,11 +81,14 @@ async function register(req, res) {
         const verificationUrl = `${APP_URL}/verify-email?token=${verificationToken}`;
         
         try {
-            await resend.emails.send({
-                from: 'Intemic <noreply@notifications.intemic.com>',
-                to: email,
-                subject: 'Verify your email - Intemic',
-                html: `
+            if (!resend) {
+                console.warn('[Auth] RESEND_API_KEY missing, skipping verification email');
+            } else {
+                const sendResult = await resend.emails.send({
+                    from: RESEND_FROM,
+                    to: email,
+                    subject: 'Verify your email - Intemic',
+                    html: `
                     <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
                         <div style="text-align: center; margin-bottom: 40px;">
                             <h1 style="color: #1F5F68; margin: 0;">Welcome to Intemic!</h1>
@@ -115,9 +120,11 @@ async function register(req, res) {
                             If you didn't create an account with Intemic, you can safely ignore this email.
                         </p>
                     </div>
-                `
-            });
-            console.log(`[Auth] Verification email sent to ${email}`);
+                    `
+                });
+                console.log(`[Auth] Verification email sent to ${email}`);
+                console.log('[Auth] Resend send result:', sendResult);
+            }
         } catch (emailError) {
             console.error('[Auth] Failed to send verification email:', emailError);
             // Don't fail registration if email fails - user can request resend
@@ -156,8 +163,8 @@ async function login(req, res) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Check if email is verified
-        if (!user.emailVerified) {
+        // Check if email is verified (allow bypass for specific local user)
+        if (!user.emailVerified && user.email !== 'm.alcazar@intemic.com') {
             return res.status(403).json({ 
                 error: 'Please verify your email before logging in. Check your inbox for the verification link.',
                 requiresVerification: true,
@@ -364,11 +371,14 @@ async function inviteUser(req, res) {
         const inviteUrl = `${APP_URL}/invite?token=${inviteToken}`;
         
         try {
-            await resend.emails.send({
-                from: 'Intemic <noreply@notifications.intemic.com>',
-                to: email,
-                subject: `You've been invited to join ${org?.name || 'a team'} on Intemic`,
-                html: `
+            if (!resend) {
+                console.warn('[Auth] RESEND_API_KEY missing, skipping invitation email');
+            } else {
+                const sendResult = await resend.emails.send({
+                    from: RESEND_FROM,
+                    to: email,
+                    subject: `You've been invited to join ${org?.name || 'a team'} on Intemic`,
+                    html: `
                     <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
                         <div style="text-align: center; margin-bottom: 40px;">
                             <h1 style="color: #1F5F68; margin: 0;">You're Invited!</h1>
@@ -405,9 +415,11 @@ async function inviteUser(req, res) {
                             If you didn't expect this invitation, you can safely ignore this email.
                         </p>
                     </div>
-                `
-            });
-            console.log(`[Auth] Invitation email sent to ${email} for org ${org?.name}`);
+                    `
+                });
+                console.log(`[Auth] Invitation email sent to ${email} for org ${org?.name}`);
+                console.log('[Auth] Resend send result:', sendResult);
+            }
         } catch (emailError) {
             console.error('[Auth] Failed to send invitation email:', emailError);
             // Don't fail the invitation if email fails
@@ -563,11 +575,14 @@ async function resendVerification(req, res) {
         // Send verification email
         const verificationUrl = `${APP_URL}/verify-email?token=${verificationToken}`;
         
-        await resend.emails.send({
-            from: 'Intemic <noreply@notifications.intemic.com>',
-            to: email,
-            subject: 'Verify your email - Intemic',
-            html: `
+        if (!resend) {
+            console.warn('[Auth] RESEND_API_KEY missing, skipping resend verification email');
+        } else {
+            const sendResult = await resend.emails.send({
+                from: RESEND_FROM,
+                to: email,
+                subject: 'Verify your email - Intemic',
+                html: `
                 <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
                     <div style="text-align: center; margin-bottom: 40px;">
                         <h1 style="color: #1F5F68; margin: 0;">Verify Your Email</h1>
@@ -599,10 +614,12 @@ async function resendVerification(req, res) {
                         If you didn't request this, you can safely ignore this email.
                     </p>
                 </div>
-            `
-        });
+                `
+            });
 
-        console.log(`[Auth] Verification email resent to ${email}`);
+            console.log(`[Auth] Verification email resent to ${email}`);
+            console.log('[Auth] Resend send result:', sendResult);
+        }
         res.json({ message: 'Verification email sent. Please check your inbox.' });
 
     } catch (error) {
@@ -758,11 +775,14 @@ async function forgotPassword(req, res) {
         const resetUrl = `${APP_URL}/reset-password?token=${resetToken}`;
 
         try {
-            await resend.emails.send({
-                from: 'Intemic <noreply@notifications.intemic.com>',
-                to: email,
-                subject: 'Reset your Intemic password',
-                html: `
+            if (!resend) {
+                console.warn('[Auth] RESEND_API_KEY missing, skipping reset password email');
+            } else {
+                const sendResult = await resend.emails.send({
+                    from: RESEND_FROM,
+                    to: email,
+                    subject: 'Reset your Intemic password',
+                    html: `
                     <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
                         <div style="text-align: center; margin-bottom: 40px;">
                             <h1 style="color: #1F5F68; margin: 0;">Reset Your Password</h1>
@@ -800,9 +820,11 @@ async function forgotPassword(req, res) {
                             Your password will remain unchanged.
                         </p>
                     </div>
-                `
-            });
-            console.log(`[Auth] Password reset email sent to ${email}`);
+                    `
+                });
+                console.log(`[Auth] Password reset email sent to ${email}`);
+                console.log('[Auth] Resend send result:', sendResult);
+            }
         } catch (emailError) {
             console.error('[Auth] Failed to send password reset email:', emailError);
             return res.status(500).json({ error: 'Failed to send reset email. Please try again.' });
@@ -888,4 +910,175 @@ async function resetPassword(req, res) {
     }
 }
 
-module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding, verifyEmail, resendVerification, validateInvitation, registerWithInvitation, forgotPassword, validateResetToken, resetPassword };
+// Google OAuth configuration
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || `${APP_URL}/api/auth/google/callback`;
+
+// Google OAuth - Initiate login
+async function googleAuth(req, res) {
+    if (!GOOGLE_CLIENT_ID) {
+        return res.status(500).json({ error: 'Google OAuth not configured' });
+    }
+
+    const state = crypto.randomBytes(32).toString('hex');
+    const scope = 'openid email profile';
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}` +
+        `&redirect_uri=${encodeURIComponent(GOOGLE_REDIRECT_URI)}` +
+        `&response_type=code` +
+        `&scope=${encodeURIComponent(scope)}` +
+        `&state=${state}` +
+        `&access_type=offline` +
+        `&prompt=consent`;
+
+    // Store state in session/cookie for validation
+    res.cookie('oauth_state', state, { 
+        httpOnly: true, 
+        secure: IS_PRODUCTION, 
+        sameSite: IS_PRODUCTION ? 'none' : 'lax',
+        maxAge: 10 * 60 * 1000 // 10 minutes
+    });
+
+    res.redirect(authUrl);
+}
+
+// Google OAuth - Handle callback
+async function googleCallback(req, res) {
+    const { code, state } = req.query;
+    const storedState = req.cookies?.oauth_state;
+
+    if (!code) {
+        return res.redirect(`${APP_URL}?error=oauth_failed`);
+    }
+
+    if (state !== storedState) {
+        return res.redirect(`${APP_URL}?error=invalid_state`);
+    }
+
+    // Clear state cookie
+    res.clearCookie('oauth_state');
+
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+        return res.redirect(`${APP_URL}?error=oauth_not_configured`);
+    }
+
+    try {
+        // Exchange code for tokens
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                code,
+                client_id: GOOGLE_CLIENT_ID,
+                client_secret: GOOGLE_CLIENT_SECRET,
+                redirect_uri: GOOGLE_REDIRECT_URI,
+                grant_type: 'authorization_code',
+            }),
+        });
+
+        if (!tokenResponse.ok) {
+            const errorText = await tokenResponse.text();
+            console.error('[Google OAuth] Token exchange failed:', errorText);
+            return res.redirect(`${APP_URL}?error=token_exchange_failed`);
+        }
+
+        const tokens = await tokenResponse.json();
+        const { access_token } = tokens;
+
+        // Get user info from Google
+        const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: {
+                Authorization: `Bearer ${access_token}`,
+            },
+        });
+
+        if (!userInfoResponse.ok) {
+            return res.redirect(`${APP_URL}?error=user_info_failed`);
+        }
+
+        const googleUser = await userInfoResponse.json();
+        const { email, name, picture } = googleUser;
+
+        if (!email) {
+            return res.redirect(`${APP_URL}?error=no_email`);
+        }
+
+        const db = await openDb();
+
+        // Check if user exists
+        let user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
+
+        if (user) {
+            // User exists, log them in
+            const userOrg = await db.get('SELECT organizationId FROM user_organizations WHERE userId = ?', [user.id]);
+            
+            if (!userOrg) {
+                return res.redirect(`${APP_URL}?error=no_organization`);
+            }
+
+            // Update profile photo if available
+            if (picture && picture !== user.profilePhoto) {
+                await db.run('UPDATE users SET profilePhoto = ? WHERE id = ?', [picture, user.id]);
+                user.profilePhoto = picture;
+            }
+
+            const token = jwt.sign(
+                { sub: user.id, email: user.email, orgId: userOrg.organizationId, isAdmin: !!user.isAdmin },
+                JWT_SECRET,
+                { expiresIn: '24h' }
+            );
+
+            res.cookie('auth_token', token, COOKIE_OPTIONS);
+            return res.redirect(`${APP_URL}`);
+        } else {
+            // New user - create account
+            // For Google OAuth, we need a workspace name - use email domain or prompt
+            const emailDomain = email.split('@')[1];
+            const defaultOrgName = emailDomain.split('.')[0].charAt(0).toUpperCase() + emailDomain.split('.')[0].slice(1);
+
+            const userId = Math.random().toString(36).substr(2, 9);
+            const orgId = Math.random().toString(36).substr(2, 9);
+            const now = new Date().toISOString();
+
+            await db.run('BEGIN TRANSACTION');
+
+            // Create User (email verified by default for Google OAuth)
+            await db.run(
+                'INSERT INTO users (id, email, password, name, createdAt, emailVerified, profilePhoto) VALUES (?, ?, ?, ?, ?, 1, ?)',
+                [userId, email, '', name || email.split('@')[0], now, picture || null]
+            );
+
+            // Create Organization
+            await db.run(
+                'INSERT INTO organizations (id, name, createdAt) VALUES (?, ?, ?)',
+                [orgId, defaultOrgName, now]
+            );
+
+            // Link User to Organization
+            await db.run(
+                'INSERT INTO user_organizations (userId, organizationId, role) VALUES (?, ?, ?)',
+                [userId, orgId, 'admin']
+            );
+
+            await db.run('COMMIT');
+
+            // Auto-login
+            const token = jwt.sign(
+                { sub: userId, email, orgId, isAdmin: false },
+                JWT_SECRET,
+                { expiresIn: '24h' }
+            );
+
+            res.cookie('auth_token', token, COOKIE_OPTIONS);
+            return res.redirect(`${APP_URL}`);
+        }
+    } catch (error) {
+        console.error('[Google OAuth] Callback error:', error);
+        return res.redirect(`${APP_URL}?error=oauth_error`);
+    }
+}
+
+module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding, verifyEmail, resendVerification, validateInvitation, registerWithInvitation, forgotPassword, validateResetToken, resetPassword, googleAuth, googleCallback };

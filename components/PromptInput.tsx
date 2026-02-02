@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Entity, Property } from '../types';
-import { Send, Database, Hash, ArrowLeftCircle } from 'lucide-react';
+import { Database, Hash, ArrowCircleLeft, PaperPlaneTilt } from '@phosphor-icons/react';
 
 interface PromptInputProps {
     entities: Entity[];
@@ -298,19 +298,33 @@ export const PromptInput: React.FC<PromptInputProps> = ({
                     onChange={handleInput}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
-                    className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-lg resize-none focus:outline-none focus:bg-white transition-colors text-slate-800 leading-relaxed"
+                    className="w-full h-32 p-4 pr-14 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] transition-colors text-[var(--text-primary)] leading-relaxed placeholder:text-[var(--text-tertiary)]"
                 />
+                
+                {/* Inline Send Button (like Copilots) */}
+                <button
+                    onClick={handleSubmit}
+                    disabled={isGenerating || !prompt.trim()}
+                    className="absolute right-3 bottom-3 w-10 h-10 flex items-center justify-center bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Send (Enter)"
+                >
+                    {isGenerating ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                        <PaperPlaneTilt size={16} weight="light" />
+                    )}
+                </button>
 
                 {/* Suggestion Popover */}
                 {mention.isActive && suggestions.length > 0 && (
                     <div
-                        className="absolute z-50 w-64 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+                        className="absolute z-50 w-64 bg-[var(--bg-card)] rounded-lg shadow-xl border border-[var(--border-light)] overflow-hidden animate-in fade-in zoom-in-95 duration-100"
                         style={{
                             top: mention.top,
                             left: mention.left
                         }}
                     >
-                        <div className="bg-slate-50 px-3 py-2 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        <div className="bg-slate-50 px-3 py-2 border-b border-[var(--border-light)] text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">
                             {mention.type === 'entity' ? (inputData && inputData.length > 0 ? 'Data Sources' : 'Entities') : `Properties of ${mention.entityContext?.name}`}
                         </div>
                         <div className="max-h-48 overflow-y-auto">
@@ -320,17 +334,17 @@ export const PromptInput: React.FC<PromptInputProps> = ({
                                     onClick={() => selectSuggestion(item)}
                                     className={`w-full text-left px-4 py-2 text-sm flex items-center space-x-2 transition-colors ${index === selectedIndex
                                         ? 'bg-teal-50 text-teal-700'
-                                        : 'text-slate-700 hover:bg-slate-50'
+                                        : 'text-[var(--text-primary)] hover:bg-slate-50'
                                         }`}
                                 >
                                     {mention.type === 'entity' ? (
                                         item.id === '__input_data__' ? (
-                                            <ArrowLeftCircle size={14} className="text-teal-500" />
+                                            <ArrowCircleLeft size={14} weight="light" className="text-teal-500" />
                                         ) : (
-                                            <Database size={14} className="text-slate-400" />
+                                            <Database size={14} weight="light" className="text-[var(--text-tertiary)]" />
                                         )
                                     ) : (
-                                        <Hash size={14} className="text-slate-400" />
+                                        <Hash size={14} weight="light" className="text-[var(--text-tertiary)]" />
                                     )}
                                     <span>{item.name}</span>
                                 </button>
@@ -347,34 +361,18 @@ export const PromptInput: React.FC<PromptInputProps> = ({
             </div>
 
             {!hideButton && (
-                <div className="flex justify-between items-center mt-4">
-                    <div className="flex items-center space-x-4 text-xs text-slate-400">
+                <div className="flex justify-between items-center mt-3">
+                    <div className="flex items-center space-x-4 text-xs text-[var(--text-tertiary)]">
                         <span className="flex items-center">
-                            <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded mr-1.5 font-sans">@</kbd>
+                            <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans">@</kbd>
                             to mention entities
                         </span>
                         <span className="flex items-center">
-                            <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded mr-1.5 font-sans">.</kbd>
+                            <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans">.</kbd>
                             for attributes
                         </span>
                     </div>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={isGenerating || !prompt.trim()}
-                        className="flex items-center px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {isGenerating ? (
-                            <>
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                                Generating...
-                            </>
-                        ) : (
-                            <>
-                                <Send size={16} className="mr-2" />
-                                {buttonLabel}
-                            </>
-                        )}
-                    </button>
+                    <span className="text-xs text-[var(--text-tertiary)]">{buttonLabel}</span>
                 </div>
             )}
         </div>

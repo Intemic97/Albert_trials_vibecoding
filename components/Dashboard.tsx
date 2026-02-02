@@ -1,24 +1,200 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Entity } from '../types';
-import { Database, Sparkles, X, Info, Plus, Share2, LayoutDashboard, ChevronDown, Copy, Check, Trash2, Link, ExternalLink } from 'lucide-react';
+import { Database, Sparkle, X, Info, Plus, Share, CaretDown, Copy, Check, Trash, Link, ArrowSquareOut, Layout, MagnifyingGlass, ArrowLeft, Calendar, Clock, CaretRight, DotsSixVertical, GearSix, ArrowsClockwise } from '@phosphor-icons/react';
 import { PromptInput } from './PromptInput';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
-import { ProfileMenu } from './ProfileMenu';
+import { Pagination } from './Pagination';
+import { PageHeader } from './PageHeader';
 import { API_BASE } from '../config';
+import GridLayout, { Layout as LayoutItem } from 'react-grid-layout';
+import { useNotifications } from '../hooks/useNotifications';
+import { ToastContainer } from './ui/Toast';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
 
-// Generate UUID that works in non-HTTPS contexts
-const generateUUID = (): string => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID();
+// New Grafana-style components
+import { 
+    WidgetGallery, 
+    WidgetConfigurator, 
+    DashboardToolbar,
+    ChartWidget,
+    WidgetTemplate,
+    WidgetFullConfig,
+    WIDGET_TEMPLATES
+} from './dashboard/index';
+import type { TimeRange } from './dashboard/index';
+
+// Custom styles to ensure resize handles are visible
+// Documentation: https://github.com/react-grid-layout/react-grid-layout
+const gridLayoutStyles = `
+  .react-grid-item {
+    transition: all 200ms ease;
+    transition-property: left, top, width, height;
+  }
+  .react-grid-item.cssTransforms {
+    transition-property: transform, width, height;
+  }
+  .react-grid-item.resizing {
+    z-index: 1;
+    will-change: width, height;
+  }
+  .react-grid-item.react-draggable-dragging {
+    transition: none;
+    z-index: 3;
+    will-change: transform;
+  }
+  .react-grid-item.dropping {
+    visibility: hidden;
+  }
+  .react-grid-item > .react-resizable-handle {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    z-index: 10;
+  }
+  .react-grid-item > .react-resizable-handle::after {
+    content: "";
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    width: 6px;
+    height: 6px;
+    border-right: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+    border-bottom: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+  }
+  .react-grid-item:hover > .react-resizable-handle::after {
+    border-color: var(--accent-primary, #2383E2);
+  }
+  .react-grid-item > .react-resizable-handle-se {
+    bottom: 0;
+    right: 0;
+    cursor: se-resize;
+  }
+  .react-grid-item > .react-resizable-handle-s {
+    bottom: 0;
+    left: 50%;
+    margin-left: -10px;
+    cursor: s-resize;
+  }
+  .react-grid-item > .react-resizable-handle-s::after {
+    left: 50%;
+    margin-left: -3px;
+    bottom: 3px;
+    width: 6px;
+    height: 2px;
+    border: none;
+    border-bottom: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+  }
+  .react-grid-item > .react-resizable-handle-e {
+    right: 0;
+    top: 50%;
+    margin-top: -10px;
+    cursor: e-resize;
+  }
+  .react-grid-item > .react-resizable-handle-e::after {
+    top: 50%;
+    margin-top: -3px;
+    right: 3px;
+    width: 2px;
+    height: 6px;
+    border: none;
+    border-right: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+  }
+  .react-grid-item > .react-resizable-handle-w {
+    left: 0;
+    top: 50%;
+    margin-top: -10px;
+    cursor: w-resize;
+  }
+  .react-grid-item > .react-resizable-handle-w::after {
+    top: 50%;
+    margin-top: -3px;
+    left: 3px;
+    width: 2px;
+    height: 6px;
+    border: none;
+    border-left: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+  }
+  .react-grid-item > .react-resizable-handle-n {
+    top: 0;
+    left: 50%;
+    margin-left: -10px;
+    cursor: n-resize;
+  }
+  .react-grid-item > .react-resizable-handle-n::after {
+    left: 50%;
+    margin-left: -3px;
+    top: 3px;
+    width: 6px;
+    height: 2px;
+    border: none;
+    border-top: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+  }
+  .react-grid-item > .react-resizable-handle-ne {
+    top: 0;
+    right: 0;
+    cursor: ne-resize;
+  }
+  .react-grid-item > .react-resizable-handle-ne::after {
+    right: 3px;
+    top: 3px;
+    border-right: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+    border-top: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+    border-bottom: none;
+    border-left: none;
+  }
+  .react-grid-item > .react-resizable-handle-nw {
+    top: 0;
+    left: 0;
+    cursor: nw-resize;
+  }
+  .react-grid-item > .react-resizable-handle-nw::after {
+    left: 3px;
+    top: 3px;
+    border-left: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+    border-top: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+    border-bottom: none;
+    border-right: none;
+  }
+  .react-grid-item > .react-resizable-handle-sw {
+    bottom: 0;
+    left: 0;
+    cursor: sw-resize;
+  }
+  .react-grid-item > .react-resizable-handle-sw::after {
+    left: 3px;
+    bottom: 3px;
+    border-left: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+    border-bottom: 2px solid var(--text-tertiary, rgba(0, 0, 0, 0.3));
+    border-top: none;
+    border-right: none;
+  }
+  .react-grid-item:hover > .react-resizable-handle {
+    background: rgba(35, 131, 226, 0.05);
+    border-radius: 4px;
+  }
+  .react-grid-placeholder {
+    background: var(--accent-primary, #2383E2);
+    opacity: 0.2;
+    transition-duration: 100ms;
+    z-index: 2;
+    border-radius: 8px;
+  }
+`;
+
+// Inject styles
+if (typeof document !== 'undefined') {
+    const styleId = 'grid-layout-custom-styles';
+    if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = gridLayoutStyles;
+        document.head.appendChild(style);
     }
-    // Fallback for HTTP contexts
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-};
+}
+
+import { generateUUID } from '../utils/uuid';
 
 interface DashboardData {
     id: string;
@@ -33,6 +209,10 @@ interface DashboardData {
 interface SavedWidget extends WidgetConfig {
     id: string;
     position?: number;
+    gridX?: number;
+    gridY?: number;
+    gridWidth?: number;
+    gridHeight?: number;
 }
 
 interface DashboardProps {
@@ -50,7 +230,73 @@ interface WidgetCardProps {
     entities?: Entity[];
 }
 
-const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSaved, onNavigate, entities }) => {
+// Grid Widget Card Component (for use in GridLayout)
+const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void }> = React.memo(({ widget, onRemove }) => {
+    const [showExplanation, setShowExplanation] = useState(false);
+    
+    return (
+        <div 
+            className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-sm flex flex-col relative" 
+            style={{ height: '100%', width: '100%', overflow: 'hidden' }}
+        >
+            {/* Drag Handle - Entire header is draggable */}
+            <div className="drag-handle cursor-move px-3 py-2 border-b border-[var(--border-light)] flex items-center justify-between group hover:bg-[var(--bg-hover)] transition-all select-none flex-shrink-0 rounded-t-lg" style={{ pointerEvents: 'auto', touchAction: 'none' }}>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <div className="flex items-center justify-center w-5 h-5 rounded bg-[var(--bg-tertiary)] group-hover:bg-[var(--border-light)] transition-colors">
+                        <DotsSixVertical size={12} weight="bold" className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] transition-colors" />
+                    </div>
+                    <h3 className="text-sm font-medium text-[var(--text-primary)] truncate">{widget.title}</h3>
+                </div>
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        onRemove();
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="p-1.5 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0 z-10"
+                    title="Delete Widget"
+                >
+                    <X size={14} weight="light" />
+                </button>
+            </div>
+            {/* Chart container - takes all remaining space */}
+            <div className="flex-1 flex flex-col min-h-0" style={{ overflow: 'hidden' }}>
+                {widget.description && (
+                    <div className="px-3 pt-2 pb-1 flex-shrink-0">
+                        <p className="text-xs text-[var(--text-secondary)]">{widget.description}</p>
+                    </div>
+                )}
+                <div className="flex-1 p-3" style={{ minHeight: 0 }}>
+                    <DynamicChart config={widget} />
+                </div>
+                {widget.explanation && (
+                    <div className="px-3 pb-2 pt-1 border-t border-[var(--border-light)] flex-shrink-0">
+                        <button
+                            onClick={() => setShowExplanation(!showExplanation)}
+                            className="flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-slate-800 font-medium"
+                        >
+                            <Info size={12} weight="light" />
+                            How did I prepare this?
+                        </button>
+                        {showExplanation && (
+                            <div className="mt-2 p-2 bg-[var(--bg-tertiary)] rounded-lg text-xs text-[var(--text-primary)] leading-relaxed">
+                                {widget.explanation}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}, (prevProps, nextProps) => {
+    // Custom comparison for memo - only re-render if widget data or onRemove changes
+    return prevProps.widget.id === nextProps.widget.id &&
+           prevProps.widget.title === nextProps.widget.title &&
+           JSON.stringify(prevProps.widget.config) === JSON.stringify(nextProps.widget.config);
+});
+
+const WidgetCard: React.FC<WidgetCardProps> = React.memo(({ widget, onSave, onRemove, isSaved, onNavigate, entities }) => {
     const [showExplanation, setShowExplanation] = useState(false);
 
     const renderExplanation = (text: string) => {
@@ -81,43 +327,45 @@ const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSav
     };
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 relative group">
-            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-4 relative group">
+            <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                 {!isSaved && onSave && (
                     <button
                         onClick={() => onSave(widget)}
-                        className="p-1 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded transition-colors"
+                        className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded transition-colors"
                         title="Save to Dashboard"
+                        aria-label="Save to Dashboard"
                     >
-                        <Plus size={16} />
+                        <Plus size={16} weight="light" aria-hidden="true" />
                     </button>
                 )}
                 <button
                     onClick={onRemove}
-                    className={`p-1 text-slate-400 rounded transition-colors hover:text-red-500 hover:bg-red-50`}
+                    className="p-1 text-[var(--text-tertiary)] rounded transition-colors hover:text-red-500 hover:bg-red-50"
                     title={isSaved ? "Delete Widget" : "Remove"}
+                    aria-label={isSaved ? "Delete Widget" : "Remove"}
                 >
-                    <X size={16} />
+                    <X size={14} weight="light" aria-hidden="true" />
                 </button>
             </div>
 
-            <h3 className="text-lg font-semibold text-slate-800 mb-1">{widget.title}</h3>
-            <p className="text-xs text-slate-500 mb-4">{widget.description}</p>
+            <h3 className="text-base font-normal text-[var(--text-primary)] mb-1">{widget.title}</h3>
+            <p className="text-xs text-[var(--text-secondary)] mb-3">{widget.description}</p>
 
             <DynamicChart config={widget} />
 
             {widget.explanation && (
-                <div className="mt-4 pt-4 border-t border-slate-100">
+                <div className="mt-3 pt-3 border-t border-[var(--border-light)]">
                     <button
                         onClick={() => setShowExplanation(!showExplanation)}
-                        className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium"
+                        className="flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-slate-800 font-medium"
                     >
-                        <Info size={12} />
+                        <Info size={12} weight="light" />
                         How did I prepare this?
                     </button>
 
                     {showExplanation && (
-                        <div className="mt-2 p-3 bg-teal-50 rounded-lg text-xs text-slate-700 leading-relaxed animate-in fade-in slide-in-from-top-1 whitespace-pre-wrap">
+                        <div className="mt-2 p-3 bg-[var(--bg-tertiary)] rounded-lg text-xs text-[var(--text-primary)] leading-relaxed animate-in fade-in slide-in-from-top-1 whitespace-pre-wrap">
                             {renderExplanation(widget.explanation)}
                         </div>
                     )}
@@ -125,21 +373,25 @@ const WidgetCard: React.FC<WidgetCardProps> = ({ widget, onSave, onRemove, isSav
             )}
         </div>
     );
-};
+});
 
 export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onViewChange }) => {
     const { dashboardId: urlDashboardId } = useParams();
     const navigate = useNavigate();
     
+    // Notifications
+    const { notifications, removeNotification, success, error: showError, warning } = useNotifications(3000);
+    
     // Dashboard state
     const [dashboards, setDashboards] = useState<DashboardData[]>([]);
     const [selectedDashboardId, setSelectedDashboardId] = useState<string | null>(null);
-    const [showDashboardDropdown, setShowDashboardDropdown] = useState(false);
     
     // Sync URL param with state - load dashboard from URL when it changes
     useEffect(() => {
         if (urlDashboardId) {
             setSelectedDashboardId(urlDashboardId);
+        } else {
+            setSelectedDashboardId(null);
         }
     }, [urlDashboardId]);
     
@@ -164,6 +416,139 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     const [isGenerating, setIsGenerating] = useState(false);
     const generatedWidgetsRef = useRef<HTMLDivElement>(null);
     
+    // Grid layout state
+    const [layout, setLayout] = useState<LayoutItem[]>([]);
+    const [isDragging, setIsDragging] = useState(false);
+    const [gridWidth, setGridWidth] = useState(1200);
+    
+    // Modal state for adding widgets
+    const [showAddWidgetModal, setShowAddWidgetModal] = useState(false);
+    const [selectedVisualizationType, setSelectedVisualizationType] = useState<string>('');
+    
+    // New Grafana-style states
+    const [showWidgetGallery, setShowWidgetGallery] = useState(false);
+    const [selectedWidgetTemplate, setSelectedWidgetTemplate] = useState<WidgetTemplate | null>(null);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [timeRange, setTimeRange] = useState<TimeRange>('last_30d');
+    const [refreshInterval, setRefreshInterval] = useState(0); // 0 = disabled
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    
+    // Auto refresh effect
+    useEffect(() => {
+        if (refreshInterval > 0 && selectedDashboardId) {
+            const intervalId = setInterval(() => {
+                handleRefreshDashboard();
+            }, refreshInterval * 1000);
+            return () => clearInterval(intervalId);
+        }
+    }, [refreshInterval, selectedDashboardId]);
+    
+    const handleRefreshDashboard = async () => {
+        if (!selectedDashboardId || isRefreshing) return;
+        setIsRefreshing(true);
+        await fetchWidgets(selectedDashboardId);
+        setTimeout(() => setIsRefreshing(false), 500);
+    };
+    
+    const handleWidgetTemplateSelect = (template: WidgetTemplate) => {
+        setShowWidgetGallery(false);
+        if (template.id === 'ai_generated') {
+            // For AI generated, show the old modal
+            setShowAddWidgetModal(true);
+        } else {
+            // For data-driven widgets, show configurator
+            setSelectedWidgetTemplate(template);
+        }
+    };
+    
+    const handleSaveConfiguredWidget = async (config: WidgetFullConfig) => {
+        if (!selectedDashboardId) return;
+        
+        try {
+            const id = generateUUID();
+            const template = selectedWidgetTemplate || WIDGET_TEMPLATES.find(t => t.id === config.type);
+            
+            // Find position for new widget
+            const maxY = layout.length > 0 ? Math.max(...layout.map(l => l.y + l.h)) : 0;
+            const gridX = 0;
+            const gridY = maxY;
+            const gridW = template?.defaultWidth || 6;
+            const gridH = template?.defaultHeight || 4;
+            
+            const widgetConfig: WidgetConfig = {
+                type: config.type === 'bar_chart' ? 'bar' : 
+                      config.type === 'line_chart' ? 'line' : 
+                      config.type === 'area_chart' ? 'area' : 
+                      config.type === 'pie_chart' ? 'pie' : 'bar',
+                title: config.title,
+                description: config.description || '',
+                data: config.data || [],
+                xAxisKey: 'name',
+                dataKey: 'value',
+                colors: config.colors
+            };
+            
+            const res = await fetch(`${API_BASE}/dashboards/${selectedDashboardId}/widgets`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id,
+                    title: config.title,
+                    description: config.description,
+                    config: widgetConfig,
+                    gridX,
+                    gridY,
+                    gridWidth: gridW,
+                    gridHeight: gridH
+                }),
+                credentials: 'include'
+            });
+            
+            if (res.ok) {
+                await fetchWidgets(selectedDashboardId);
+                success('Widget added successfully');
+            }
+        } catch (error) {
+            console.error('Error saving widget:', error);
+            showError('Failed to add widget');
+        }
+        
+        setSelectedWidgetTemplate(null);
+    };
+    
+    // Update grid width on window resize
+    useEffect(() => {
+        const updateGridWidth = () => {
+            if (typeof window !== 'undefined') {
+                const container = document.getElementById('dashboard-container');
+                if (container) {
+                    // Subtract padding (32px total: 16px on each side)
+                    setGridWidth(container.clientWidth - 32);
+                } else {
+                    // Fallback: sidebar (240px) + padding (32px) + margins
+                    setGridWidth(window.innerWidth - 320);
+                }
+            }
+        };
+        
+        // Initial calculation
+        const timeoutId = setTimeout(updateGridWidth, 100);
+        
+        // Update on resize with debounce
+        let resizeTimeout: NodeJS.Timeout;
+        const handleResize = () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(updateGridWidth, 150);
+        };
+        
+        window.addEventListener('resize', handleResize);
+        return () => {
+            clearTimeout(timeoutId);
+            clearTimeout(resizeTimeout);
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [selectedDashboardId]);
+    
     // Share state
     const [shareUrl, setShareUrl] = useState('');
     const [copied, setCopied] = useState(false);
@@ -181,6 +566,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             fetchWidgets(selectedDashboardId);
         } else {
             setSavedWidgets([]);
+            setLayout([]);
         }
     }, [selectedDashboardId]);
 
@@ -207,10 +593,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     if (urlDashboardId && data.find(d => d.id === urlDashboardId)) {
                         // URL has valid dashboard ID - just set it (don't navigate again)
                         setSelectedDashboardId(urlDashboardId);
-                    } else if (!selectedDashboardId) {
-                        // No URL param and nothing selected - select first and update URL
-                        selectDashboard(data[0].id);
+                    } else if (urlDashboardId && !data.find(d => d.id === urlDashboardId)) {
+                        // URL has invalid dashboard ID - reset to list view
+                        setSelectedDashboardId(null);
                     }
+                } else {
+                    setSelectedDashboardId(null);
                 }
             }
         } catch (error) {
@@ -223,17 +611,41 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             const res = await fetch(`${API_BASE}/dashboards/${dashboardId}/widgets`, { credentials: 'include' });
             const data = await res.json();
             if (Array.isArray(data)) {
-                setSavedWidgets(data.map((w: any) => ({
+                const widgets = data.map((w: any) => ({
                     ...w.config,
                     id: w.id,
-                    position: w.position
-                })));
+                    position: w.position,
+                    gridX: w.gridX ?? 0,
+                    gridY: w.gridY ?? 0,
+                    gridWidth: w.gridWidth ?? 6,
+                    gridHeight: w.gridHeight ?? 4
+                }));
+                setSavedWidgets(widgets);
+                
+                // Update layout for react-grid-layout
+                const newLayout = widgets.map((w: SavedWidget, index: number) => ({
+                    i: w.id,
+                    x: w.gridX ?? (index % 2) * 6,
+                    y: w.gridY ?? Math.floor(index / 2) * 4,
+                    w: w.gridWidth ?? 6,
+                    h: w.gridHeight ?? 4,
+                    minW: 2,
+                    minH: 2,
+                    maxW: 12,
+                    maxH: 20,
+                    isResizable: true,
+                    isDraggable: true,
+                    static: false
+                }));
+                setLayout(newLayout);
             } else {
                 setSavedWidgets([]);
+                setLayout([]);
             }
         } catch (error) {
             console.error('Error fetching widgets:', error);
             setSavedWidgets([]);
+            setLayout([]);
         }
     };
 
@@ -262,7 +674,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             }
         } catch (error) {
             console.error('Error creating dashboard:', error);
-            alert('Failed to create dashboard.');
+            showError('Failed to create dashboard', 'Please try again');
         }
     };
 
@@ -348,7 +760,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             }
         } catch (error) {
             console.error('Error deleting dashboard:', error);
-            alert('Failed to delete dashboard.');
+            showError('Failed to delete dashboard', 'Please try again');
         }
     };
 
@@ -376,7 +788,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             }
         } catch (error) {
             console.error('Error sharing dashboard:', error);
-            alert('Failed to share dashboard.');
+            showError('Failed to share dashboard', 'Please try again');
         }
     };
 
@@ -409,8 +821,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const handleGenerateWidget = async (prompt: string, mentionedEntityIds: string[]) => {
+    const handleGenerateWidget = async (prompt: string, mentionedEntityIds: string[], visualizationType?: string) => {
         setIsGenerating(true);
+
+        // Enhance prompt with visualization type if selected
+        let enhancedPrompt = prompt;
+        if (visualizationType && visualizationType !== 'auto') {
+            enhancedPrompt = `${visualizationType} of ${prompt}`;
+        }
 
         // Save prompt as feedback for analytics
         try {
@@ -433,7 +851,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    prompt,
+                    prompt: enhancedPrompt,
                     mentionedEntityIds
                 }),
                 credentials: 'include'
@@ -447,20 +865,60 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             setGeneratedWidgets(prev => [widgetConfig, ...prev]);
         } catch (error) {
             console.error('Error generating widget:', error);
-            alert('Failed to generate widget. Please try again.');
+            showError('Failed to generate widget', 'Please try again');
         } finally {
             setIsGenerating(false);
         }
     };
 
-    const handleSaveWidget = async (widget: WidgetConfig) => {
+    const handleSaveWidget = async (widget: WidgetConfig, gridPosition?: { x: number; y: number; w: number; h: number }) => {
         if (!selectedDashboardId) {
-            alert('Please select or create a dashboard first.');
+            warning('No dashboard selected', 'Please select or create a dashboard first');
             return;
         }
         
         try {
             const id = generateUUID();
+            
+            // Calculate smart position if not provided
+            let finalPosition = gridPosition;
+            if (!finalPosition) {
+                // Find the best position for the new widget
+                const defaultWidth = 6; // Half width (6 of 12 columns)
+                const defaultHeight = 4;
+                
+                if (layout.length === 0) {
+                    // First widget goes at top-left
+                    finalPosition = { x: 0, y: 0, w: defaultWidth, h: defaultHeight };
+                } else {
+                    // Find the last row and check for space
+                    const lastWidget = layout.reduce((latest, item) => {
+                        // Find the widget that was added most recently (highest y, or rightmost at highest y)
+                        if (item.y > latest.y || (item.y === latest.y && item.x > latest.x)) {
+                            return item;
+                        }
+                        return latest;
+                    }, layout[0]);
+                    
+                    // Calculate the rightmost point in the last row
+                    const lastRowY = lastWidget.y;
+                    const widgetsInLastRow = layout.filter(item => 
+                        item.y < lastRowY + lastWidget.h && item.y + item.h > lastRowY
+                    );
+                    const rightmostInRow = Math.max(...widgetsInLastRow.map(item => item.x + item.w));
+                    
+                    // Check if there's space to the right in the last row
+                    if (rightmostInRow + defaultWidth <= 12) {
+                        // Place next to the rightmost widget in the last row
+                        finalPosition = { x: rightmostInRow, y: lastRowY, w: defaultWidth, h: defaultHeight };
+                    } else {
+                        // No space in the last row, create a new row
+                        const maxY = Math.max(...layout.map(item => item.y + item.h));
+                        finalPosition = { x: 0, y: maxY, w: defaultWidth, h: defaultHeight };
+                    }
+                }
+            }
+            
             const res = await fetch(`${API_BASE}/dashboards/${selectedDashboardId}/widgets`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -468,19 +926,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     id,
                     title: widget.title,
                     description: widget.description,
-                    config: widget
+                    config: widget,
+                    gridX: finalPosition.x,
+                    gridY: finalPosition.y,
+                    gridWidth: finalPosition.w,
+                    gridHeight: finalPosition.h
                 }),
                 credentials: 'include'
             });
 
             if (res.ok) {
-                const savedWidget = await res.json();
-                setSavedWidgets(prev => [...prev, { ...widget, id: savedWidget.id, position: savedWidget.position }]);
+                await fetchWidgets(selectedDashboardId);
                 setGeneratedWidgets(prev => prev.filter(w => w !== widget));
             }
         } catch (error) {
             console.error('Error saving widget:', error);
-            alert('Failed to save widget.');
+            showError('Failed to save widget', 'Please try again');
         }
     };
 
@@ -493,12 +954,84 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     method: 'DELETE',
                     credentials: 'include'
                 });
-                setSavedWidgets(prev => prev.filter(w => w.id !== widgetId));
+                await fetchWidgets(selectedDashboardId!);
             } catch (error) {
                 console.error('Error deleting widget:', error);
             }
         }
     };
+
+    const handleLayoutChange = useCallback(async (newLayout: LayoutItem[]) => {
+        setLayout(newLayout);
+        
+        // Update widget positions in backend
+        if (!selectedDashboardId) return;
+        
+        // Don't save during active drag/resize - wait for stop
+        if (isDragging) {
+            return;
+        }
+        
+        // Debounce API calls to avoid too many requests
+        const timeoutId = setTimeout(async () => {
+            for (const item of newLayout) {
+                try {
+                    await fetch(`${API_BASE}/widgets/${item.i}/grid`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            gridX: item.x,
+                            gridY: item.y,
+                            gridWidth: item.w,
+                            gridHeight: item.h
+                        })
+                    });
+                } catch (error) {
+                    console.error('Error updating widget position:', error);
+                }
+            }
+        }, 300);
+        
+        return () => clearTimeout(timeoutId);
+    }, [selectedDashboardId, isDragging]);
+
+    const handleDragStart = () => {
+        setIsDragging(true);
+    };
+    
+    const handleDragStop = useCallback((layout: LayoutItem[]) => {
+        setIsDragging(false);
+        // Force save layout after drag stops
+        setLayout(layout);
+        if (selectedDashboardId) {
+            // Save immediately after drag stops
+            setTimeout(async () => {
+                let savedCount = 0;
+                for (const item of layout) {
+                    try {
+                        await fetch(`${API_BASE}/widgets/${item.i}/grid`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                gridX: item.x,
+                                gridY: item.y,
+                                gridWidth: item.w,
+                                gridHeight: item.h
+                            })
+                        });
+                        savedCount++;
+                    } catch (error) {
+                        console.error('Error updating widget position:', error);
+                    }
+                }
+                if (savedCount > 0) {
+                    success('Layout saved');
+                }
+            }, 100);
+        }
+    }, [selectedDashboardId, success]);
 
     const openShareModalIfShared = () => {
         if (selectedDashboard?.shareToken) {
@@ -510,127 +1043,204 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         }
     };
 
-    return (
-        <div className="flex flex-col h-full bg-slate-50" data-tutorial="dashboard-content">
-            {/* Header */}
-            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-20 shrink-0">
-                <div className="flex items-center gap-4">
-                    <LayoutDashboard className="text-teal-600" size={24} />
-                    
-                    {/* Dashboard Selector */}
-                    <div className="relative">
-                        <button
-                            onClick={() => setShowDashboardDropdown(!showDashboardDropdown)}
-                            className="flex items-center gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
-                        >
-                            <span className="font-semibold text-slate-800">
-                                {selectedDashboard?.name || 'Select Dashboard'}
-                            </span>
-                            <ChevronDown size={16} className="text-slate-500" />
-                        </button>
-                        
-                        {showDashboardDropdown && (
-                            <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-slate-200 z-30 py-1">
-                                {dashboards.map(dashboard => (
-                                    <button
-                                        key={dashboard.id}
-                                        onClick={() => {
-                                            selectDashboard(dashboard.id);
-                                            setShowDashboardDropdown(false);
-                                        }}
-                                        className={`w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center justify-between ${
-                                            dashboard.id === selectedDashboardId ? 'bg-teal-50 text-teal-700' : 'text-slate-700'
-                                        }`}
-                                    >
-                                        <span className="truncate">{dashboard.name}</span>
-                                        {dashboard.isPublic === 1 && (
-                                            <Link size={12} className="text-teal-500 shrink-0 ml-2" />
-                                        )}
-                                    </button>
-                                ))}
-                                {dashboards.length === 0 && (
-                                    <div className="px-4 py-2 text-sm text-slate-500">No dashboards yet</div>
-                                )}
-                                <div className="border-t border-slate-100 mt-1 pt-1">
-                                    <button
-                                        onClick={() => {
-                                            handleCreateDashboard();
-                                            setShowDashboardDropdown(false);
-                                        }}
-                                        className="w-full text-left px-4 py-2 hover:bg-slate-50 text-teal-600 flex items-center gap-2"
-                                    >
-                                        <Plus size={16} />
-                                        New Dashboard
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    
-                    {/* Dashboard Actions */}
-                    {selectedDashboard && (
-                        <div className="flex items-center gap-1">
-                            <button
-                                onClick={openShareModalIfShared}
-                                className={`p-2 rounded-lg transition-colors ${
-                                    selectedDashboard.isPublic 
-                                        ? 'text-teal-600 hover:bg-teal-50' 
-                                        : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-                                }`}
-                                title={selectedDashboard.isPublic ? "Manage Share Link" : "Share Dashboard"}
-                            >
-                                <Share2 size={18} />
-                            </button>
-                            <button
-                                onClick={handleDeleteDashboard}
-                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Delete Dashboard"
-                            >
-                                <Trash2 size={18} />
-                            </button>
-                        </div>
-                    )}
-                </div>
-                <div className="flex items-center space-x-4">
-                    <ProfileMenu onNavigate={onViewChange} />
-                </div>
-            </header>
+    const [dashboardSearchQuery, setDashboardSearchQuery] = useState('');
+    const [currentDashboardPage, setCurrentDashboardPage] = useState(1);
+    const dashboardsPerPage = 6;
+    
+    // Memoized filtered dashboards to avoid recalculating on every render
+    const filteredDashboards = useMemo(() => 
+        dashboards.filter(d => 
+            d.name.toLowerCase().includes(dashboardSearchQuery.toLowerCase())
+        ), [dashboards, dashboardSearchQuery]
+    );
+    
+    const totalDashboardPages = useMemo(() => 
+        Math.ceil(filteredDashboards.length / dashboardsPerPage),
+        [filteredDashboards.length]
+    );
+    
+    const paginatedDashboards = useMemo(() => 
+        filteredDashboards.slice(
+            (currentDashboardPage - 1) * dashboardsPerPage,
+            currentDashboardPage * dashboardsPerPage
+        ), [filteredDashboards, currentDashboardPage]
+    );
+    
+    // Reset to page 1 when search changes
+    useEffect(() => {
+        setCurrentDashboardPage(1);
+    }, [dashboardSearchQuery]);
 
-            {/* Click outside to close dropdown */}
-            {showDashboardDropdown && (
-                <div 
-                    className="fixed inset-0 z-10" 
-                    onClick={() => setShowDashboardDropdown(false)}
-                />
+
+    return (
+        <div className="flex flex-col h-full bg-[var(--bg-primary)]" data-tutorial="dashboard-content">
+            {/* Top Header - Only show when no dashboard is selected */}
+            {!selectedDashboardId && (
+                <PageHeader title="Dashboards" subtitle="Create and manage your data visualizations" />
             )}
 
-            {/* Main Content */}
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                <div className="max-w-7xl mx-auto space-y-8">
-
-                    {/* No Dashboard Selected State */}
-                    {!selectedDashboard && dashboards.length === 0 && (
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
-                            <LayoutDashboard className="mx-auto text-slate-300 mb-4" size={48} />
-                            <h3 className="text-lg font-semibold text-slate-600 mb-2">Create your first dashboard</h3>
-                            <p className="text-sm text-slate-500 max-w-md mx-auto mb-6">
-                                Dashboards let you organize and share your visualizations with your team.
-                            </p>
+            {/* Content */}
+            <div className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-primary)]">
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+            {!selectedDashboardId ? (
+                /* Dashboards List View */
+                <>
+                    {/* Content Area */}
+                    <div className="p-8">
+                        {/* Toolbar */}
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-4">
+                                <div className="relative">
+                                    <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={14} weight="light" aria-hidden="true" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search dashboards..."
+                                        value={dashboardSearchQuery}
+                                        onChange={(e) => setDashboardSearchQuery(e.target.value)}
+                                        className="pl-8 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] w-60 placeholder:text-[var(--text-tertiary)]"
+                                        aria-label="Search dashboards"
+                                    />
+                                </div>
+                                <p className="text-sm text-[var(--text-secondary)]">
+                                    {filteredDashboards.length} {filteredDashboards.length === 1 ? 'dashboard' : 'dashboards'}
+                                </p>
+                            </div>
                             <button
                                 onClick={handleCreateDashboard}
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                             >
-                                <Plus size={18} />
+                                <Plus size={14} weight="light" className="mr-2" />
                                 Create Dashboard
                             </button>
                         </div>
-                    )}
 
-                    {/* Dashboard Content */}
-                    {selectedDashboard && (
-                        <>
-                            {/* Editable Title */}
-                            <div className="mb-2">
+                        {/* Dashboards Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-6">
+                            {paginatedDashboards.map((dashboard) => (
+                                <div
+                                    key={dashboard.id}
+                                    onClick={() => selectDashboard(dashboard.id)}
+                                    className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 cursor-pointer group relative flex flex-col justify-between min-h-[200px] overflow-hidden"
+                                >
+                                    <div className="flex-1">
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-light)] flex items-center justify-center flex-shrink-0 hover:bg-[var(--bg-selected)] transition-all">
+                                                    <Layout size={18} weight="light" className="text-[var(--text-secondary)]" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <h3 className="text-base font-normal text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors truncate" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                                                            {dashboard.name}
+                                                        </h3>
+                                                        {dashboard.isPublic === 1 && (
+                                                            <Link size={14} weight="light" className="text-[var(--text-tertiary)] flex-shrink-0" />
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteDashboard(dashboard.id);
+                                                }}
+                                                className="text-slate-300 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                                aria-label={`Delete dashboard ${dashboard.name}`}
+                                            >
+                                                <Trash size={16} weight="light" aria-hidden="true" />
+                                            </button>
+                                        </div>
+
+                                        {dashboard.description && (
+                                            <p className="text-sm text-[var(--text-secondary)] mb-4 line-clamp-2 leading-relaxed">
+                                                {dashboard.description}
+                                            </p>
+                                        )}
+
+                                        <div className="space-y-2 mt-5 pt-4 border-t border-[var(--border-light)]">
+                                            {dashboard.createdAt && (
+                                                <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                    <Calendar size={12} weight="light" className="text-[var(--text-tertiary)]" />
+                                                    <span>Created {new Date(dashboard.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                                </div>
+                                            )}
+                                            {dashboard.updatedAt && (
+                                                <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                    <Clock size={12} weight="light" className="text-[var(--text-tertiary)]" />
+                                                    <span>Updated {new Date(dashboard.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between mt-5 pt-4 border-t border-[var(--border-light)]">
+                                        <div className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary)]">
+                                            <CaretRight size={14} weight="light" className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            <span className="opacity-0 group-hover:opacity-100 transition-opacity font-medium text-[var(--text-primary)]">Open dashboard</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+
+                            {/* Create New Card - Only show if no pagination */}
+                            {totalDashboardPages <= 1 && (
+                                <div
+                                    onClick={handleCreateDashboard}
+                                    className="border border-dashed border-[var(--border-medium)] rounded-lg flex flex-col items-center justify-center min-h-[200px] text-[var(--text-tertiary)] cursor-pointer group"
+                                >
+                                    <div className="w-12 h-12 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center mb-4">
+                                        <Plus size={24} weight="light" className="text-[var(--text-tertiary)]" />
+                                    </div>
+                                    <span className="font-medium text-sm">Create new dashboard</span>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Pagination */}
+                        {totalDashboardPages > 1 && (
+                            <div className="mt-6">
+                                <Pagination
+                                    currentPage={currentDashboardPage}
+                                    totalPages={totalDashboardPages}
+                                    onPageChange={setCurrentDashboardPage}
+                                    itemsPerPage={dashboardsPerPage}
+                                    totalItems={filteredDashboards.length}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </>
+            ) : selectedDashboardId ? (
+                <>
+                    {/* Grafana-style Toolbar */}
+                    <DashboardToolbar
+                        dashboardName={selectedDashboard?.name || 'Dashboard'}
+                        onBack={() => {
+                            setSelectedDashboardId(null);
+                            navigate('/dashboard', { replace: true });
+                        }}
+                        onShare={openShareModalIfShared}
+                        onDelete={handleDeleteDashboard}
+                        onAddWidget={() => setShowWidgetGallery(true)}
+                        timeRange={timeRange}
+                        onTimeRangeChange={setTimeRange}
+                        refreshInterval={refreshInterval}
+                        onRefreshIntervalChange={setRefreshInterval}
+                        onRefresh={handleRefreshDashboard}
+                        isRefreshing={isRefreshing}
+                        isEditMode={isEditMode}
+                        onToggleEditMode={() => setIsEditMode(!isEditMode)}
+                    />
+
+                    {/* Main Content */}
+                    <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                        <div className="max-w-7xl mx-auto space-y-6" id="dashboard-container">
+
+                            {/* Dashboard Content */}
+                            {selectedDashboard && (
+                                <>
+                                            {/* Editable Title */}
+                                    <div className="mb-2">
                                 {isEditingTitle ? (
                                     <input
                                         type="text"
@@ -638,7 +1248,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                         onChange={e => setEditingTitle(e.target.value)}
                                         onBlur={handleSaveTitle}
                                         onKeyDown={e => e.key === 'Enter' && handleSaveTitle()}
-                                        className="text-2xl font-bold text-slate-800 bg-transparent border-b-2 border-teal-500 focus:outline-none w-full"
+                                        className="text-base font-normal text-[var(--text-primary)] bg-transparent border-b border-[var(--border-medium)] focus:border-slate-400 focus:outline-none w-full"
                                         autoFocus
                                     />
                                 ) : (
@@ -647,7 +1257,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                             setEditingTitle(selectedDashboard.name);
                                             setIsEditingTitle(true);
                                         }}
-                                        className="text-2xl font-bold text-slate-800 cursor-pointer hover:text-teal-600 transition-colors"
+                                        className="text-base font-normal text-[var(--text-primary)] cursor-pointer hover:text-[var(--text-primary)] transition-colors"
                                         title="Click to edit"
                                     >
                                         {selectedDashboard.name}
@@ -655,8 +1265,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                 )}
                             </div>
 
-                            {/* Editable Description */}
-                            <div className="mb-6">
+                                    {/* Editable Description */}
+                                    <div className="mb-5">
                                 {isEditingDescription ? (
                                     <input
                                         type="text"
@@ -665,7 +1275,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                         onBlur={handleSaveDescription}
                                         onKeyDown={e => e.key === 'Enter' && handleSaveDescription()}
                                         placeholder="Add a description..."
-                                        className="text-sm text-slate-500 bg-transparent border-b border-slate-300 focus:border-teal-500 focus:outline-none w-full"
+                                        className="text-sm text-[var(--text-secondary)] bg-transparent border-b border-[var(--border-light)] focus:border-slate-400 focus:outline-none w-full"
                                         autoFocus
                                     />
                                 ) : (
@@ -674,7 +1284,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                             setEditingDescription(selectedDashboard.description || '');
                                             setIsEditingDescription(true);
                                         }}
-                                        className="text-sm text-slate-500 cursor-pointer hover:text-slate-700 transition-colors"
+                                        className="text-sm text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)] transition-colors"
                                         title="Click to edit"
                                     >
                                         {selectedDashboard.description || 'Click to add description...'}
@@ -682,52 +1292,100 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                 )}
                             </div>
 
-                            {/* Saved Widgets Section */}
-                            {savedWidgets.length > 0 && (
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Grid Layout for Widgets */}
+                            <div id="dashboard-container" className="relative min-h-[400px] w-full">
+                                {savedWidgets.length > 0 ? (
+                                    <GridLayout
+                                        className="layout"
+                                        layout={layout}
+                                        cols={12}
+                                        rowHeight={60}
+                                        width={gridWidth || 1200}
+                                        onLayoutChange={handleLayoutChange}
+                                        onDragStart={handleDragStart}
+                                        onDragStop={handleDragStop}
+                                        onResizeStart={() => setIsDragging(true)}
+                                        onResizeStop={(layout) => {
+                                            setIsDragging(false);
+                                            handleLayoutChange(layout);
+                                            // Save immediately after resize stops
+                                            if (selectedDashboardId) {
+                                                setTimeout(async () => {
+                                                    let savedCount = 0;
+                                                    for (const item of layout) {
+                                                        try {
+                                                            await fetch(`${API_BASE}/widgets/${item.i}/grid`, {
+                                                                method: 'PUT',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                credentials: 'include',
+                                                                body: JSON.stringify({
+                                                                    gridX: item.x,
+                                                                    gridY: item.y,
+                                                                    gridWidth: item.w,
+                                                                    gridHeight: item.h
+                                                                })
+                                                            });
+                                                            savedCount++;
+                                                        } catch (error) {
+                                                            console.error('Error updating widget size:', error);
+                                                        }
+                                                    }
+                                                    if (savedCount > 0) {
+                                                        success('Layout saved');
+                                                    }
+                                                }, 100);
+                                            }
+                                        }}
+                                        isDraggable={isEditMode}
+                                        isResizable={isEditMode}
+                                        draggableHandle=".drag-handle"
+                                        margin={[16, 16]}
+                                        containerPadding={[16, 16]}
+                                        compactType={null}
+                                        preventCollision={true}
+                                        useCSSTransforms={true}
+                                        resizeHandles={['se', 's', 'e', 'sw', 'nw', 'ne', 'n', 'w']}
+                                        allowOverlap={false}
+                                        style={{ position: 'relative' }}
+                                    >
                                         {savedWidgets.map((widget) => (
-                                            <WidgetCard
-                                                key={widget.id}
-                                                widget={widget}
-                                                onRemove={() => removeWidget(widget.id)}
-                                                isSaved={true}
-                                                onNavigate={onNavigate}
-                                                entities={entities}
-                                            />
+                                            <div key={widget.id} className="h-full">
+                                                <GridWidgetCard
+                                                    widget={widget}
+                                                    onRemove={() => removeWidget(widget.id)}
+                                                />
+                                            </div>
                                         ))}
+                                    </GridLayout>
+                                ) : (
+                                    <div className="bg-[var(--bg-card)] rounded-lg border-2 border-dashed border-[var(--border-medium)] p-12 text-center">
+                                        <Database className="mx-auto text-slate-300 mb-3" size={40} weight="light" />
+                                        <h3 className="text-base font-normal text-[var(--text-primary)] mb-2">No widgets yet</h3>
+                                        <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto mb-4">
+                                            Click the + button to add widgets and create custom visualizations.
+                                        </p>
                                     </div>
-                                </div>
-                            )}
-
-                            {/* AI Widget Generator */}
-                            <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-xl shadow-lg p-4">
-                                <div className="bg-white rounded-lg p-3">
-                                    <PromptInput
-                                        entities={entities}
-                                        onGenerate={handleGenerateWidget}
-                                        isGenerating={isGenerating}
-                                        placeholder="Describe a chart... e.g. 'Bar chart of @Customers by total orders'"
-                                        buttonLabel="Generate"
-                                        className="text-slate-800"
-                                    />
-                                </div>
+                                )}
                             </div>
 
-                            {/* Generated Widgets Section */}
+                            {/* Generated Widgets Preview Section (temporary, before adding to grid) */}
                             {generatedWidgets.length > 0 && (
-                                <div ref={generatedWidgetsRef} className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
-                                    <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                                        <Sparkles size={18} className="text-teal-500" />
+                                <div ref={generatedWidgetsRef} className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500 mt-6">
+                                    <h3 className="text-base font-normal text-[var(--text-primary)] flex items-center gap-2">
+                                        <Sparkle size={14} weight="light" className="text-[var(--text-secondary)]" />
                                         New Widgets
-                                        <span className="text-xs font-normal text-slate-500">(click + to save to dashboard)</span>
+                                        <span className="text-xs font-normal text-[var(--text-secondary)]">(click + to add to dashboard)</span>
                                     </h3>
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                         {generatedWidgets.map((widget, index) => (
                                             <WidgetCard
                                                 key={index}
                                                 widget={widget}
-                                                onSave={handleSaveWidget}
+                                                onSave={(w) => {
+                                                    // Find next available position in grid
+                                                    const maxY = layout.length > 0 ? Math.max(...layout.map(l => l.y + l.h)) : 0;
+                                                    handleSaveWidget(w, { x: 0, y: maxY, w: 4, h: 3 });
+                                                }}
                                                 onRemove={() => removeWidget('', true, index)}
                                                 onNavigate={onNavigate}
                                                 entities={entities}
@@ -737,74 +1395,270 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                 </div>
                             )}
 
-                            {/* Empty State when no widgets */}
-                            {savedWidgets.length === 0 && generatedWidgets.length === 0 && (
-                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
-                                    <Database className="mx-auto text-slate-300 mb-4" size={48} />
-                                    <h3 className="text-lg font-semibold text-slate-600 mb-2">No widgets yet</h3>
-                                    <p className="text-sm text-slate-500 max-w-md mx-auto">
-                                        Use the prompt below to create custom charts and visualizations from your data.
-                                    </p>
+                            {/* Floating Add Widget Button */}
+                            {selectedDashboard && (
+                                <button
+                                    onClick={() => setShowWidgetGallery(true)}
+                                    className="fixed bottom-8 right-8 bg-[#256A65] text-white rounded-2xl px-5 py-3.5 shadow-xl hover:shadow-2xl hover:bg-[#1e5a55] transition-all duration-300 z-50 flex items-center gap-3 group hover:scale-105 active:scale-95"
+                                    title="Add Widget"
+                                >
+                                    <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                                        <Plus size={16} weight="bold" className="group-hover:rotate-90 transition-transform duration-300" />
+                                    </div>
+                                    <span className="text-sm font-medium hidden sm:inline">Add widget</span>
+                                </button>
+                            )}
+                            
+                            {/* Widget Gallery Modal */}
+                            {showWidgetGallery && (
+                                <WidgetGallery
+                                    onSelect={handleWidgetTemplateSelect}
+                                    onClose={() => setShowWidgetGallery(false)}
+                                />
+                            )}
+                            
+                            {/* Widget Configurator Modal */}
+                            {selectedWidgetTemplate && (
+                                <WidgetConfigurator
+                                    template={selectedWidgetTemplate}
+                                    entities={entities}
+                                    onSave={handleSaveConfiguredWidget}
+                                    onCancel={() => setSelectedWidgetTemplate(null)}
+                                />
+                            )}
+
+                            {/* Add Widget Modal */}
+                            {showAddWidgetModal && (
+                                <div 
+                                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                                    role="dialog"
+                                    aria-modal="true"
+                                >
+                                    {/* Overlay with blur */}
+                                    <div 
+                                        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-200"
+                                        onClick={() => {
+                                            setShowAddWidgetModal(false);
+                                            setSelectedVisualizationType('');
+                                        }}
+                                    />
+                                    
+                                    {/* Modal Content */}
+                                    <div 
+                                        className="relative w-full max-w-2xl bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl transform transition-all duration-200 animate-in fade-in zoom-in-95 max-h-[90vh] flex flex-col"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        {/* Header */}
+                                        <div className="flex items-start justify-between p-5 border-b border-[var(--border-light)] shrink-0">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2.5 bg-[var(--bg-tertiary)] rounded-lg">
+                                                    <Sparkle size={20} weight="light" className="text-[var(--text-secondary)]" />
+                                                </div>
+                                                <div>
+                                                    <h2 
+                                                        className="text-lg font-medium text-[var(--text-primary)]"
+                                                        style={{ fontFamily: "'Berkeley Mono', monospace" }}
+                                                    >
+                                                        Add Widget
+                                                    </h2>
+                                                    <p className="text-sm text-[var(--text-secondary)] mt-0.5">
+                                                        Describe what you want to visualize
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    setShowAddWidgetModal(false);
+                                                    setSelectedVisualizationType('');
+                                                }}
+                                                className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                                                aria-label="Close modal"
+                                            >
+                                                <X size={18} weight="light" />
+                                            </button>
+                                        </div>
+                                        
+                                        {/* Body */}
+                                        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                                            {/* Visualization Type Selector */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                                                    Visualization Type
+                                                </label>
+                                                <div className="relative">
+                                                    <select
+                                                        value={selectedVisualizationType}
+                                                        onChange={(e) => setSelectedVisualizationType(e.target.value)}
+                                                        className="w-full px-4 py-2.5 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20 focus:border-[var(--accent-primary)] appearance-none cursor-pointer transition-all"
+                                                    >
+                                                        <option value="auto">Auto (let AI decide)</option>
+                                                        <option value="Bar chart">Bar Chart</option>
+                                                        <option value="Line chart">Line Chart</option>
+                                                        <option value="Area chart">Area Chart</option>
+                                                        <option value="Pie chart">Pie Chart</option>
+                                                        <option value="Table">Table</option>
+                                                        <option value="Scatter plot">Scatter Plot</option>
+                                                        <option value="Heatmap">Heatmap</option>
+                                                        <option value="Gauge">Gauge</option>
+                                                        <option value="Funnel chart">Funnel Chart</option>
+                                                    </select>
+                                                    <CaretDown size={16} weight="light" className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" />
+                                                </div>
+                                            </div>
+
+                                            {/* Prompt Input */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                                                    Describe your visualization
+                                                </label>
+                                                <PromptInput
+                                                    entities={entities}
+                                                    onGenerate={(prompt, mentionedEntityIds) => {
+                                                        handleGenerateWidget(prompt, mentionedEntityIds, selectedVisualizationType);
+                                                        setShowAddWidgetModal(false);
+                                                        setSelectedVisualizationType('');
+                                                    }}
+                                                    isGenerating={isGenerating}
+                                                    placeholder="e.g. '@Customers by total orders' or 'Monthly revenue trend'"
+                                                    buttonLabel="Generate Widget"
+                                                />
+                                            </div>
+
+                                            {/* Tips Section */}
+                                            <div className="p-4 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
+                                                <div className="flex items-start gap-3">
+                                                    <Info size={16} weight="light" className="text-[var(--text-secondary)] mt-0.5 flex-shrink-0" />
+                                                    <div className="text-xs text-[var(--text-secondary)]">
+                                                        <p className="font-medium text-[var(--text-primary)] mb-2">Quick Tips</p>
+                                                        <ul className="space-y-1.5">
+                                                            <li className="flex items-center gap-2">
+                                                                <kbd className="px-1.5 py-0.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-[10px] font-mono">@</kbd>
+                                                                <span>Mention entities (e.g., @Customers)</span>
+                                                            </li>
+                                                            <li className="flex items-center gap-2">
+                                                                <kbd className="px-1.5 py-0.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-[10px] font-mono">.</kbd>
+                                                                <span>Access attributes (e.g., @Customers.totalOrders)</span>
+                                                            </li>
+                                                            <li className="flex items-center gap-2">
+                                                                <span className="w-5 h-5 flex items-center justify-center bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-[10px]">↵</span>
+                                                                <span>Press Enter or click button to generate</span>
+                                                            </li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
-                        </>
-                    )}
+                                </>
+                            )}
 
+                        </div>
+                    </div>
+                </>
+            ) : null}
                 </div>
             </div>
 
-
             {/* Share Dashboard Modal */}
             {showShareModal && (
-                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setShowShareModal(false)}>
-                    <div className="bg-white rounded-xl shadow-xl p-6 w-[450px]" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <Share2 size={20} className="text-teal-600" />
-                            Share Dashboard
-                        </h3>
-                        <p className="text-sm text-slate-600 mb-4">
-                            Anyone with this link can view your dashboard without logging in.
-                        </p>
-                        <div className="flex gap-2 mb-4">
-                            <input
-                                type="text"
-                                value={shareUrl}
-                                readOnly
-                                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-600"
-                            />
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                    role="dialog"
+                    aria-modal="true"
+                >
+                    {/* Overlay with blur */}
+                    <div 
+                        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-200"
+                        onClick={() => setShowShareModal(false)}
+                    />
+                    
+                    {/* Modal Content */}
+                    <div 
+                        className="relative w-full max-w-md bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl transform transition-all duration-200 animate-in fade-in zoom-in-95 flex flex-col"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="flex items-start justify-between p-5 border-b border-[var(--border-light)] shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-[var(--bg-tertiary)] rounded-lg">
+                                    <Share size={20} weight="light" className="text-[var(--text-secondary)]" />
+                                </div>
+                                <div>
+                                    <h2 
+                                        className="text-lg font-medium text-[var(--text-primary)]"
+                                        style={{ fontFamily: "'Berkeley Mono', monospace" }}
+                                    >
+                                        Share Dashboard
+                                    </h2>
+                                    <p className="text-sm text-[var(--text-secondary)] mt-0.5">
+                                        Anyone with this link can view
+                                    </p>
+                                </div>
+                            </div>
                             <button
-                                onClick={copyShareUrl}
-                                className={`px-3 py-2 rounded-lg flex items-center gap-1 text-sm font-medium transition-colors ${
-                                    copied 
-                                        ? 'bg-green-100 text-green-700' 
-                                        : 'bg-teal-600 text-white hover:bg-teal-700'
-                                }`}
+                                onClick={() => setShowShareModal(false)}
+                                className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                                aria-label="Close modal"
                             >
-                                {copied ? <Check size={16} /> : <Copy size={16} />}
-                                {copied ? 'Copied!' : 'Copy'}
+                                <X size={18} weight="light" />
                             </button>
                         </div>
-                        <div className="flex gap-2 mb-4">
+
+                        {/* Content */}
+                        <div className="p-5 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                                    Share Link
+                                </label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={shareUrl}
+                                        readOnly
+                                        className="flex-1 px-4 py-2.5 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20 focus:border-[var(--accent-primary)] transition-all"
+                                    />
+                                    <button
+                                        onClick={copyShareUrl}
+                                        className={`px-4 py-2.5 rounded-lg flex items-center gap-2 text-sm font-medium transition-all shrink-0 ${
+                                            copied 
+                                                ? 'bg-green-50 text-green-700 border border-green-200' 
+                                                : 'bg-[var(--bg-selected)] text-white hover:bg-[#555555] shadow-sm hover:shadow-md'
+                                        }`}
+                                    >
+                                        {copied ? <Check size={16} weight="light" /> : <Copy size={16} weight="light" />}
+                                        {copied ? 'Copied!' : 'Copy'}
+                                    </button>
+                                </div>
+                            </div>
+                            
                             <a
                                 href={shareUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700"
+                                className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"
                             >
-                                <ExternalLink size={14} />
-                                Open in new tab
+                                <ArrowSquareOut size={14} weight="light" />
+                                <span>Open in new tab</span>
                             </a>
                         </div>
-                        <div className="flex gap-2 justify-between border-t border-slate-100 pt-4">
-                            <button
-                                onClick={handleUnshareDashboard}
-                                className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium"
-                            >
-                                Stop Sharing
-                            </button>
+
+                        {/* Footer */}
+                        <div className="border-t border-[var(--border-light)] p-5 shrink-0 flex items-center justify-between gap-3">
+                            {selectedDashboard?.isPublic ? (
+                                <button
+                                    onClick={handleUnshareDashboard}
+                                    className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
+                                >
+                                    Stop Sharing
+                                </button>
+                            ) : (
+                                <div />
+                            )}
                             <button
                                 onClick={() => setShowShareModal(false)}
-                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium"
+                                className="px-4 py-2.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
                             >
                                 Done
                             </button>
@@ -812,6 +1666,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     </div>
                 </div>
             )}
+            
+            {/* Toast Notifications */}
+            <ToastContainer 
+                notifications={notifications} 
+                onDismiss={removeNotification}
+                position="bottom-right"
+            />
         </div>
     );
 };
+

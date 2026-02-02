@@ -1,0 +1,329 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Berkeley Mono font */
+@font-face {
+  font-family: 'Berkeley Mono';
+  src: url('/fonts/BerkeleyMono-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Theme CSS Variables - Light Mode (default) */
+:root {
+  /* Backgrounds */
+  --bg-primary: #F8F8F8;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #F0F0F0;
+  --bg-hover: rgba(0, 0, 0, 0.03);
+  --bg-active: rgba(0, 0, 0, 0.05);
+  --bg-sidebar: #F8F8F8;
+  --bg-card: #FFFFFF;
+  --bg-modal: #FFFFFF;
+  --bg-input: #FFFFFF;
+  --bg-selected: #464545;
+  
+  /* Text */
+  --text-primary: #37352F;
+  --text-secondary: #6B6B6B;
+  --text-tertiary: #9B9B9B;
+  --text-muted: #B4B4B4;
+  --text-inverse: #FFFFFF;
+  --text-on-selected: #F8F8F8;
+  
+  /* Borders */
+  --border-light: #E8E8E8;
+  --border-medium: #D0D0D0;
+  --border-dark: #B0B0B0;
+  --border-focus: #464545;
+  
+  /* Sidebar */
+  --sidebar-bg: #F8F8F8;
+  --sidebar-text: #707070;
+  --sidebar-text-hover: #505050;
+  --sidebar-text-active: #F8F8F8;
+  --sidebar-bg-hover: rgba(112, 112, 112, 0.1);
+  --sidebar-bg-active: #616365;
+  --sidebar-border: #E0E0E0;
+  --sidebar-icon: #707070;
+  --sidebar-icon-active: #F8F8F8;
+  --sidebar-section-label: #707070;
+  
+  /* Accents */
+  --accent-primary: #2383E2;
+  --accent-success: #0F766E;
+  --accent-warning: #D97706;
+  --accent-error: #DC2626;
+  --accent-info: #0EA5E9;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  
+  /* Logo */
+  --logo-filter: brightness(0) saturate(100%) invert(45%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(90%);
+  
+  /* Transitions */
+  --theme-transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Dark Mode */
+[data-theme="dark"] {
+  /* Backgrounds - Notion-inspired */
+  --bg-primary: #191919;
+  --bg-secondary: #202020;
+  --bg-tertiary: #2F2F2F;
+  --bg-hover: rgba(255, 255, 255, 0.03);
+  --bg-active: rgba(255, 255, 255, 0.05);
+  --bg-sidebar: #202020;
+  --bg-card: #252525;
+  --bg-modal: #252525;
+  --bg-input: #2F2F2F;
+  --bg-selected: #37352F;
+  
+  /* Text */
+  --text-primary: #E8E8E8;
+  --text-secondary: #A0A0A0;
+  --text-tertiary: #6B6B6B;
+  --text-muted: #505050;
+  --text-inverse: #191919;
+  --text-on-selected: #E8E8E8;
+  
+  /* Borders */
+  --border-light: #333333;
+  --border-medium: #404040;
+  --border-dark: #505050;
+  --border-focus: #5C5C5C;
+  
+  /* Sidebar */
+  --sidebar-bg: #202020;
+  --sidebar-text: #9B9B9B;
+  --sidebar-text-hover: #E8E8E8;
+  --sidebar-text-active: #E8E8E8;
+  --sidebar-bg-hover: rgba(255, 255, 255, 0.05);
+  --sidebar-bg-active: #37352F;
+  --sidebar-border: #333333;
+  --sidebar-icon: #9B9B9B;
+  --sidebar-icon-active: #E8E8E8;
+  --sidebar-section-label: #6B6B6B;
+  
+  /* Accents */
+  --accent-primary: #529CCA;
+  --accent-success: #2DD4BF;
+  --accent-warning: #FBBF24;
+  --accent-error: #F87171;
+  --accent-info: #38BDF8;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+  
+  /* Logo */
+  --logo-filter: brightness(0) invert(1) opacity(0.8);
+}
+
+/* Base styles */
+body {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary);
+  transition: var(--theme-transition);
+}
+
+#root {
+  background-color: var(--bg-primary);
+  transition: var(--theme-transition);
+}
+
+/* Force all headings to use Berkeley Mono */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Berkeley Mono', monospace !important;
+  font-weight: normal !important;
+}
+
+/* React Grid Layout styles */
+.react-grid-layout {
+  position: relative;
+}
+
+.react-grid-item {
+  transition: all 200ms ease;
+  transition-property: left, top, width, height;
+  position: relative;
+  overflow: visible !important;
+}
+
+.react-grid-item > * {
+  overflow: hidden;
+}
+
+.react-grid-item.cssTransforms {
+  transition-property: transform, width, height;
+}
+
+.react-grid-item.resizing {
+  transition: none;
+  z-index: 100;
+  will-change: width, height;
+}
+
+.react-grid-item.react-draggable-dragging {
+  transition: none;
+  z-index: 3;
+  will-change: transform;
+}
+
+.react-grid-item.dropping {
+  visibility: hidden;
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: rgb(203, 213, 225);
+  opacity: 0.2;
+  transition-duration: 100ms;
+  z-index: 2;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -o-user-select: none;
+  user-select: none;
+  border-radius: 0.5rem;
+}
+
+.react-resizable-handle {
+  position: absolute !important;
+  box-sizing: border-box !important;
+  background: rgba(148, 163, 184, 0.4) !important;
+  opacity: 0 !important;
+  transition: opacity 0.15s ease !important;
+  z-index: 1000 !important;
+  pointer-events: auto !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  border: 2px solid rgba(148, 163, 184, 0.6) !important;
+}
+
+.react-grid-item:hover .react-resizable-handle {
+  opacity: 1 !important;
+  background: rgba(148, 163, 184, 0.6) !important;
+}
+
+.react-grid-item.resizing .react-resizable-handle {
+  opacity: 1 !important;
+  background: rgba(59, 130, 246, 0.8) !important;
+  border-color: rgb(59, 130, 246) !important;
+  z-index: 1001 !important;
+}
+
+.react-resizable-handle:hover {
+  background-color: rgba(71, 85, 105, 0.8) !important;
+  border-color: rgb(71, 85, 105) !important;
+  opacity: 1 !important;
+}
+
+/* Specific handles for different directions */
+.react-resizable-handle-se {
+  bottom: 0 !important;
+  right: 0 !important;
+  cursor: se-resize !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 0 0 0.5rem 0 !important;
+}
+
+.react-resizable-handle-s {
+  bottom: 0 !important;
+  left: 0 !important;
+  cursor: s-resize !important;
+  width: 100% !important;
+  height: 10px !important;
+  border-left: none !important;
+  border-right: none !important;
+}
+
+.react-resizable-handle-e {
+  right: 0 !important;
+  top: 0 !important;
+  cursor: e-resize !important;
+  width: 10px !important;
+  height: 100% !important;
+  border-top: none !important;
+  border-bottom: none !important;
+}
+
+.react-resizable-handle-w {
+  left: 0 !important;
+  top: 0 !important;
+  cursor: w-resize !important;
+  width: 10px !important;
+  height: 100% !important;
+  border-top: none !important;
+  border-bottom: none !important;
+}
+
+.react-resizable-handle-n {
+  top: 0 !important;
+  left: 0 !important;
+  cursor: n-resize !important;
+  width: 100% !important;
+  height: 10px !important;
+  border-left: none !important;
+  border-right: none !important;
+}
+
+.react-resizable-handle-sw {
+  bottom: 0 !important;
+  left: 0 !important;
+  cursor: sw-resize !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 0 0 0 0.5rem !important;
+}
+
+.react-resizable-handle-nw {
+  top: 0 !important;
+  left: 0 !important;
+  cursor: nw-resize !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 0.5rem 0 0 0 !important;
+}
+
+.react-resizable-handle-ne {
+  top: 0 !important;
+  right: 0 !important;
+  cursor: ne-resize !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 0 0.5rem 0 0 !important;
+}
+
+.react-resizable-handle.resizing {
+  opacity: 1 !important;
+  background-color: rgba(59, 130, 246, 0.8) !important;
+}
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--border-dark);
+}

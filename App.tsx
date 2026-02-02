@@ -1,48 +1,83 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
+import { TopNav } from './components/TopNav';
 import { EntityCard } from './components/EntityCard';
-import { Reporting } from './components/Reporting';
-import { ReportEditor } from './components/ReportEditor';
-import { Dashboard } from './components/Dashboard';
-import { Overview } from './components/Overview';
-import { Workflows } from './components/Workflows';
-import { PublicWorkflowForm } from './components/PublicWorkflowForm';
 import { LoginPage } from './components/LoginPage';
 import { VerifyEmail } from './components/VerifyEmail';
 import { AcceptInvite } from './components/AcceptInvite';
+import { CommandPalette, useCommandPalette } from './components/CommandPalette';
 import { ForgotPassword } from './components/ForgotPassword';
 import { ResetPassword } from './components/ResetPassword';
-import { InteractiveTutorial } from './components/InteractiveTutorial';
-import { Settings } from './components/Settings';
-import { SharedDashboard } from './components/SharedDashboard';
-import { AdminPanel } from './components/AdminPanel';
+import { ReportBugModal } from './components/ReportBugModal';
 import { OnboardingModal } from './components/OnboardingModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
+import { ErrorBoundary, KeyboardShortcutsProvider, useShortcut, AnnouncerProvider, SkipLink } from './components/ui';
 import { Entity, Property, PropertyType } from './types';
-import { Plus, Search, Filter, ArrowLeft, Trash2, Database, Link as LinkIcon, Type, Hash, Pencil, X, Code, Paperclip, Download, Loader2, Sparkles } from 'lucide-react';
-import { Copilots } from './components/Copilots';
-import { ProfileMenu } from './components/ProfileMenu';
+import { Plus, MagnifyingGlass, Funnel, ArrowLeft, Trash, Link as LinkIcon, TextT, Hash, PencilSimple, X, Code, Paperclip, Download, SpinnerGap, Sparkle } from '@phosphor-icons/react';
+import { Tabs } from './components/Tabs';
 import { API_BASE } from './config';
+
+// Lazy-loaded components for better performance
+const Workflows = React.lazy(() => import('./components/Workflows').then(m => ({ default: m.Workflows })));
+const ReportEditor = React.lazy(() => import('./components/ReportEditor').then(m => ({ default: m.ReportEditor })));
+const Dashboard = React.lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
+const Overview = React.lazy(() => import('./components/Overview').then(m => ({ default: m.Overview })));
+const Reporting = React.lazy(() => import('./components/Reporting').then(m => ({ default: m.Reporting })));
+const Copilots = React.lazy(() => import('./components/Copilots').then(m => ({ default: m.Copilots })));
+const KnowledgeBase = React.lazy(() => import('./components/KnowledgeBase').then(m => ({ default: m.KnowledgeBase })));
+const Simulations = React.lazy(() => import('./components/Simulations').then(m => ({ default: m.Simulations })));
+const Settings = React.lazy(() => import('./components/Settings').then(m => ({ default: m.Settings })));
+const AdminPanel = React.lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
+const LogsAndAlerts = React.lazy(() => import('./components/LogsAndAlerts').then(m => ({ default: m.LogsAndAlerts })));
+const Connections = React.lazy(() => import('./components/Connections').then(m => ({ default: m.Connections })));
+const Documentation = React.lazy(() => import('./components/Documentation').then(m => ({ default: m.Documentation })));
+const SharedDashboard = React.lazy(() => import('./components/SharedDashboard').then(m => ({ default: m.SharedDashboard })));
+const PublicWorkflowForm = React.lazy(() => import('./components/PublicWorkflowForm').then(m => ({ default: m.PublicWorkflowForm })));
+const InteractiveTutorial = React.lazy(() => import('./components/InteractiveTutorial').then(m => ({ default: m.InteractiveTutorial })));
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="flex items-center justify-center h-full min-h-[400px]">
+    <div className="flex flex-col items-center gap-3">
+      <SpinnerGap className="w-8 h-8 animate-spin text-[var(--text-tertiary)]" weight="light" />
+      <span className="text-sm text-[var(--text-tertiary)]">Loading...</span>
+    </div>
+  </div>
+);
 
 export default function App() {
     return (
-        <BrowserRouter>
-            <Routes>
-                <Route path="/shared/:shareToken" element={<SharedDashboardWrapper />} />
-                <Route path="/*" element={
-                    <AuthProvider>
-                        <AuthenticatedApp />
-                    </AuthProvider>
-                } />
-            </Routes>
-        </BrowserRouter>
+        <ErrorBoundary>
+            <ThemeProvider>
+                <AnnouncerProvider>
+                    <KeyboardShortcutsProvider>
+                        <BrowserRouter>
+                            <SkipLink href="#main-content" />
+                            <Routes>
+                                <Route path="/shared/:shareToken" element={<SharedDashboardWrapper />} />
+                                <Route path="/*" element={
+                                    <AuthProvider>
+                                        <AuthenticatedApp />
+                                    </AuthProvider>
+                                } />
+                            </Routes>
+                        </BrowserRouter>
+                    </KeyboardShortcutsProvider>
+                </AnnouncerProvider>
+            </ThemeProvider>
+        </ErrorBoundary>
     );
 }
 
 function SharedDashboardWrapper() {
     const { shareToken } = useParams();
-    return <SharedDashboard shareToken={shareToken || ''} />;
+    return (
+        <Suspense fallback={<PageLoader />}>
+            <SharedDashboard shareToken={shareToken || ''} />
+        </Suspense>
+    );
 }
 
 function AuthenticatedApp() {
@@ -54,8 +89,58 @@ function AuthenticatedApp() {
     const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
     const previousUserIdRef = React.useRef<string | undefined>(undefined);
     
+    // Command Palette (Cmd+K)
+    const commandPalette = useCommandPalette();
+    
     // Tutorial state
     const [showTutorial, setShowTutorial] = useState(false);
+    const [showReportBug, setShowReportBug] = useState(false);
+    
+    // Global keyboard shortcuts
+    useShortcut('go-home', {
+        key: 'h',
+        modifiers: ['cmd', 'shift'],
+        description: 'Go to Overview',
+        category: 'Navigation',
+        action: () => navigate('/'),
+        global: true
+    }, [navigate]);
+    
+    useShortcut('go-workflows', {
+        key: 'w',
+        modifiers: ['cmd', 'shift'],
+        description: 'Go to Workflows',
+        category: 'Navigation',
+        action: () => navigate('/workflows'),
+        global: true
+    }, [navigate]);
+    
+    useShortcut('go-dashboard', {
+        key: 'd',
+        modifiers: ['cmd', 'shift'],
+        description: 'Go to Dashboard',
+        category: 'Navigation',
+        action: () => navigate('/dashboard'),
+        global: true
+    }, [navigate]);
+    
+    useShortcut('go-settings', {
+        key: ',',
+        modifiers: ['cmd'],
+        description: 'Go to Settings',
+        category: 'Navigation',
+        action: () => navigate('/settings'),
+        global: true
+    }, [navigate]);
+    
+    // Listen for report bug event from Sidebar
+    React.useEffect(() => {
+        const handleShowReportBug = () => {
+            setShowReportBug(true);
+        };
+        window.addEventListener('showReportBug', handleShowReportBug);
+        return () => window.removeEventListener('showReportBug', handleShowReportBug);
+    }, []);
     
     // Track if onboarding was pending to detect when it completes
     const wasOnboardingPendingRef = React.useRef<boolean>(false);
@@ -64,26 +149,39 @@ function AuthenticatedApp() {
     const getCurrentView = () => {
         const path = location.pathname;
         if (path.startsWith('/dashboard')) return 'dashboard';
+        if (path.startsWith('/simulations')) return 'simulations';
         if (path.startsWith('/workflow')) return 'workflows';
         if (path.startsWith('/database')) return 'database';
+        if (path.startsWith('/templates')) return 'templates';
+        if (path.startsWith('/documents')) return 'documents';
         if (path.startsWith('/reports')) return 'reports';
         if (path.startsWith('/copilots')) return 'copilots';
+        if (path.startsWith('/logs')) return 'logs';
+        if (path.startsWith('/connections')) return 'connections';
+        if (path.startsWith('/documentation')) return 'documentation';
         if (path.startsWith('/settings')) return 'settings';
         if (path.startsWith('/admin')) return 'admin';
         return 'overview';
     };
 
     const currentView = getCurrentView();
+    const hideSidebarForRoutes = location.pathname.match(/^\/documents\/[^/]+$/) ||
+        location.pathname.match(/^\/workflow\/[^/]+$/) ||
+        location.pathname.match(/^\/copilots/) ||
+        location.pathname.match(/^\/documentation/);
 
     // Navigation helper that maps view names to routes
     const handleNavigate = (view: string) => {
         const routes: Record<string, string> = {
             'overview': '/overview',
             'dashboard': '/dashboard',
+            'simulations': '/simulations',
             'workflows': '/workflows',
             'database': '/database',
             'reports': '/reports',
             'copilots': '/copilots',
+            'logs': '/logs',
+            'documentation': '/documentation',
             'settings': '/settings',
             'admin': '/admin',
         };
@@ -199,6 +297,16 @@ function AuthenticatedApp() {
 
     // Entity Search State
     const [entitySearchQuery, setEntitySearchQuery] = useState('');
+
+    useEffect(() => {
+        if (location.pathname.startsWith('/database')) {
+            const params = new URLSearchParams(location.search);
+            const query = params.get('q');
+            if (query !== null) {
+                setEntitySearchQuery(query);
+            }
+        }
+    }, [location.pathname, location.search]);
 
     // Fetch Entities on Mount
     useEffect(() => {
@@ -713,9 +821,9 @@ function AuthenticatedApp() {
                             rel="noopener noreferrer"
                             className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800 hover:bg-purple-200 transition-colors gap-1"
                         >
-                            <Paperclip size={12} />
+                            <Paperclip size={12} weight="light" />
                             {fileData.originalName || fileData.filename}
-                            <Download size={12} />
+                            <Download size={12} weight="light" />
                         </a>
                     );
                 }
@@ -757,18 +865,18 @@ function AuthenticatedApp() {
 
     const renderIconForType = (type: PropertyType) => {
         switch (type) {
-            case 'text': return <Type size={16} className="text-slate-400" />;
-            case 'number': return <Hash size={16} className="text-slate-400" />;
-            case 'relation': return <LinkIcon size={16} className="text-teal-500" />;
-            case 'json': return <Code size={16} className="text-amber-500" />;
-            case 'file': return <Paperclip size={16} className="text-purple-500" />;
+            case 'text': return <TextT size={16} className="text-slate-400" weight="light" />;
+            case 'number': return <Hash size={16} className="text-slate-400" weight="light" />;
+            case 'relation': return <LinkIcon size={16} className="text-teal-500" weight="light" />;
+            case 'json': return <Code size={16} className="text-amber-500" weight="light" />;
+            case 'file': return <Paperclip size={16} className="text-purple-500" weight="light" />;
         }
     };
 
     const currentSchema = editingSchema || activeEntity;
 
     if (isLoading) {
-        return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Loading...</div>;
+        return <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center text-[var(--text-primary)] transition-colors duration-200">Loading...</div>;
     }
 
     // These routes should be accessible regardless of authentication status
@@ -778,13 +886,15 @@ function AuthenticatedApp() {
 
     if (isPublicPath) {
         return (
-            <Routes>
-                <Route path="/verify-email" element={<VerifyEmail />} />
-                <Route path="/invite" element={<AcceptInvite />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/form/:workflowId" element={<PublicWorkflowForm />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-            </Routes>
+            <Suspense fallback={<PageLoader />}>
+                <Routes>
+                    <Route path="/verify-email" element={<VerifyEmail />} />
+                    <Route path="/invite" element={<AcceptInvite />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/form/:workflowId" element={<PublicWorkflowForm />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                </Routes>
+            </Suspense>
         );
     }
 
@@ -800,7 +910,7 @@ function AuthenticatedApp() {
     const showOnboarding = user && !user.onboardingCompleted;
 
     return (
-        <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+        <div className="flex min-h-screen bg-[var(--bg-primary)] font-sans text-[var(--text-primary)] text-[15px] transition-colors duration-200">
             {showOnboarding && (
                 <OnboardingModal onComplete={() => {
                     // Post-onboarding actions (fetchEntities + tutorial) are handled by 
@@ -809,27 +919,51 @@ function AuthenticatedApp() {
             )}
             
             {showTutorial && (
-                <InteractiveTutorial 
-                    onComplete={() => {
-                        localStorage.setItem('intemic_tutorial_completed', 'true');
-                        setShowTutorial(false);
-                        // Dispatch event so Settings can update its toggle
-                        window.dispatchEvent(new Event('tutorialCompleted'));
-                    }}
-                    onSkip={() => {
-                        localStorage.setItem('intemic_tutorial_completed', 'true');
-                        setShowTutorial(false);
-                        // Dispatch event so Settings can update its toggle
-                        window.dispatchEvent(new Event('tutorialCompleted'));
-                    }}
+                <Suspense fallback={<PageLoader />}>
+                    <InteractiveTutorial 
+                        onComplete={() => {
+                            localStorage.setItem('intemic_tutorial_completed', 'true');
+                            setShowTutorial(false);
+                            // Dispatch event so Settings can update its toggle
+                            window.dispatchEvent(new Event('tutorialCompleted'));
+                        }}
+                        onSkip={() => {
+                            localStorage.setItem('intemic_tutorial_completed', 'true');
+                            setShowTutorial(false);
+                            // Dispatch event so Settings can update its toggle
+                            window.dispatchEvent(new Event('tutorialCompleted'));
+                        }}
+                    />
+                </Suspense>
+            )}
+            
+            <ReportBugModal 
+                isOpen={showReportBug} 
+                onClose={() => setShowReportBug(false)} 
+            />
+            
+            {/* Command Palette (Cmd+K) */}
+            <CommandPalette 
+                isOpen={commandPalette.isOpen} 
+                onClose={commandPalette.close} 
+                entities={entities}
+            />
+            
+            {/* Hide sidebar when in report editor, workflow editor, workflows, or copilots for more space */}
+            {!hideSidebarForRoutes && (
+                <Sidebar 
+                    activeView={currentView} 
+                    onNavigate={handleNavigate}
+                    onShowTutorial={() => setShowTutorial(true)}
                 />
             )}
-            {/* Hide sidebar when in report editor, workflow editor, or copilots for more space */}
-            {!location.pathname.match(/^\/reports\/[^/]+$/) && !location.pathname.match(/^\/workflow\/[^/]+$/) && !location.pathname.match(/^\/copilots/) && (
-                <Sidebar activeView={currentView} onNavigate={handleNavigate} />
-            )}
 
-            <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
+            <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+                {!hideSidebarForRoutes && (
+                    <TopNav activeView={currentView} />
+                )}
+                <main id="main-content" className="flex-1 flex flex-col min-h-0 overflow-hidden relative bg-[var(--bg-primary)] transition-colors duration-200" tabIndex={-1}>
+                <Suspense fallback={<PageLoader />}>
                 <Routes>
                     <Route path="/" element={<Navigate to="/overview" replace />} />
                     <Route path="/overview" element={
@@ -856,14 +990,29 @@ function AuthenticatedApp() {
                     <Route path="/workflow/:workflowId" element={
                         <Workflows entities={entities} onViewChange={handleNavigate} />
                     } />
-                    <Route path="/reports" element={
-                        <Reporting entities={entities} companyInfo={undefined} onViewChange={handleNavigate} />
+                    <Route path="/templates" element={
+                        <Reporting entities={entities} companyInfo={undefined} onViewChange={handleNavigate} view="templates" />
                     } />
-                    <Route path="/reports/:reportId" element={
+                    <Route path="/documents" element={
+                        <Reporting entities={entities} companyInfo={undefined} onViewChange={handleNavigate} view="documents" />
+                    } />
+                    <Route path="/reports" element={
+                        <Reporting entities={entities} companyInfo={undefined} onViewChange={handleNavigate} view="reports" />
+                    } />
+                    <Route path="/documents/:reportId" element={
                         <ReportEditor entities={entities} companyInfo={undefined} onViewChange={handleNavigate} />
                     } />
                     <Route path="/copilots" element={
                         <Copilots />
+                    } />
+                    <Route path="/logs" element={
+                        <LogsAndAlerts />
+                    } />
+                    <Route path="/connections" element={
+                        <Connections />
+                    } />
+                    <Route path="/documentation" element={
+                        <Documentation />
                     } />
                     <Route path="/settings" element={
                         <Settings onViewChange={handleNavigate} onShowTutorial={() => setShowTutorial(true)} />
@@ -871,71 +1020,108 @@ function AuthenticatedApp() {
                     <Route path="/admin" element={
                         <AdminPanel onNavigate={handleNavigate} />
                     } />
-                    <Route path="/database/:entityId?" element={
+                    <Route path="/simulations" element={
+                        <Simulations 
+                            entities={entities} 
+                            onNavigate={(entityId) => {
+                                setActiveEntityId(entityId);
+                                navigate(`/database/${entityId}`);
+                            }}
+                        />
+                    } />
+                    <Route path="/simulations/:simulationId" element={
+                        <Simulations 
+                            entities={entities} 
+                            onNavigate={(entityId) => {
+                                setActiveEntityId(entityId);
+                                navigate(`/database/${entityId}`);
+                            }}
+                        />
+                    } />
+                    <Route path="/simulations/:simulationId/scenarios/:scenarioId" element={
+                        <Simulations 
+                            entities={entities} 
+                            onNavigate={(entityId) => {
+                                setActiveEntityId(entityId);
+                                navigate(`/database/${entityId}`);
+                            }}
+                        />
+                    } />
+                    <Route path="/database" element={
+                        <KnowledgeBase 
+                            entities={entities}
+                            onNavigate={(entityId) => {
+                                setActiveEntityId(entityId);
+                                navigate(`/database/${entityId}`);
+                            }}
+                        />
+                    } />
+                    <Route path="/database/:entityId" element={
                     <div data-tutorial="database-content" className="contents">
                         {/* Top Header */}
-                        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
+                        <header className="h-16 bg-[var(--bg-primary)] border-b border-[var(--border-light)] flex items-center justify-between px-8 z-10">
                             {activeEntity ? (
                                 <div className="flex items-center">
                                     <button
-                                        onClick={() => setActiveEntityId(null)}
-                                        className="mr-4 p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500"
+                                        onClick={() => {
+                                            setActiveEntityId(null);
+                                            navigate('/database');
+                                        }}
+                                        className="mr-4 p-2 hover:bg-[var(--bg-tertiary)] rounded-full transition-colors text-[var(--text-secondary)]"
                                     >
-                                        <ArrowLeft size={20} />
+                                        <ArrowLeft size={20} weight="light" />
                                     </button>
                                     <div>
-                                        <h1 className="text-xl font-bold text-slate-800">
+                                        <h1 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                             {activeEntity.name}
                                         </h1>
-                                        <p className="text-xs text-slate-500">Managing structure properties</p>
+                                        <p className="text-[11px] text-[var(--text-secondary)]">Managing structure properties</p>
                                     </div>
                                 </div>
                             ) : (
                                 <div>
-                                    <h1 className="text-xl font-bold text-slate-800">Your database</h1>
-                                    <p className="text-sm text-slate-500">View and manage your different entities</p>
+                                    <h1 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Your database</h1>
+                                    <p className="text-[11px] text-[var(--text-secondary)]">View and manage your different entities</p>
                                 </div>
                             )}
 
-                            <div className="flex items-center space-x-4">
-                                <ProfileMenu onNavigate={handleNavigate} />
-                            </div>
+                            <div />
                         </header>
 
                         {/* Content Area */}
-                        <div data-tutorial="database-main" className="flex-1 overflow-y-auto p-8 custom-scrollbar relative">
+                        <div data-tutorial="database-main" className="flex-1 overflow-y-auto p-8 custom-scrollbar">
 
                             {/* LIST VIEW */}
                             {!activeEntityId && (
-                                <div className="space-y-6">
+                                <div>
                                     {/* Toolbar */}
-                                    <div className="flex justify-between items-center">
-                                                <div className="text-sm text-slate-500">
+                                    <div className="flex justify-between items-center mb-6">
+                                                <div className="text-sm text-[var(--text-secondary)]">
                                                     {entitySearchQuery 
                                                         ? `Showing ${entities.filter(e => e.name.toLowerCase().includes(entitySearchQuery.toLowerCase()) || e.description?.toLowerCase().includes(entitySearchQuery.toLowerCase())).length} of ${entities.length} entities`
                                                         : `Total: ${entities.length} entities`
                                                     }
                                                 </div>
-                                                <div className="flex space-x-3">
+                                                <div className="flex items-center gap-3">
                                                     <div className="relative">
-                                                        <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                                                        <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={14} weight="light" />
                                                         <input
                                                             type="text"
                                                             placeholder="Search entities..."
                                                             value={entitySearchQuery}
                                                             onChange={(e) => setEntitySearchQuery(e.target.value)}
-                                                            className="pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent w-64 shadow-sm"
+                                                            className="pl-8 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] w-60 placeholder:text-[var(--text-tertiary)]"
                                                         />
                                                     </div>
-                                                    <button className="flex items-center px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm transition-colors">
-                                                        <Filter size={16} className="mr-2" />
+                                                    <button className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors">
+                                                        <Funnel size={14} className="mr-2" weight="light" />
                                                         Filter
                                                     </button>
                                                     <button
                                                         onClick={() => setIsCreatingEntity(true)}
-                                                        className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-md transition-colors"
+                                                        className="flex items-center px-3 py-1.5 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                                     >
-                                                        <Plus size={16} className="mr-2" />
+                                                        <Plus size={14} className="mr-2" weight="light" />
                                                         Create Entity
                                                     </button>
                                                 </div>
@@ -963,10 +1149,10 @@ function AuthenticatedApp() {
                                                 {/* Empty State / Add New Placeholder */}
                                                 <div
                                                     onClick={() => setIsCreatingEntity(true)}
-                                                    className="border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center min-h-[200px] text-slate-400 hover:border-teal-500 hover:text-teal-600 hover:bg-teal-50 transition-all cursor-pointer group"
+                                                    className="border-2 border-dashed border-[var(--border-medium)] rounded-xl flex flex-col items-center justify-center min-h-[200px] text-[var(--text-tertiary)] hover:border-[#256A65] hover:text-[#256A65] hover:bg-[#256A65]/5 transition-all cursor-pointer group"
                                                 >
-                                                    <div className="p-4 bg-slate-100 rounded-full mb-3 group-hover:bg-white">
-                                                        <Plus size={24} />
+                                                    <div className="p-4 bg-[var(--bg-tertiary)] rounded-full mb-3 group-hover:bg-[var(--bg-card)]">
+                                                        <Plus size={24} weight="light" />
                                                     </div>
                                                     <span className="font-medium">Create new entity</span>
                                                 </div>
@@ -980,82 +1166,70 @@ function AuthenticatedApp() {
                                 <div className="max-w-6xl mx-auto space-y-8">
 
                                     {/* Tab Switcher */}
-                                    <div className="flex space-x-6 border-b border-slate-200">
-                                        <button
-                                            onClick={() => setActiveTab('structure')}
-                                            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'structure'
-                                                ? 'border-teal-600 text-teal-600'
-                                                : 'border-transparent text-slate-500 hover:text-slate-700'
-                                                }`}
-                                        >
-                                            Structure & Properties
-                                        </button>
-                                        <button
-                                            onClick={() => setActiveTab('data')}
-                                            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'data'
-                                                ? 'border-teal-600 text-teal-600'
-                                                : 'border-transparent text-slate-500 hover:text-slate-700'
-                                                }`}
-                                        >
-                                            Data Records
-                                        </button>
-                                    </div>
+                                    <Tabs
+                                        items={[
+                                            { id: 'structure', label: 'Structure & Properties' },
+                                            { id: 'data', label: 'Data Records' }
+                                        ]}
+                                        activeTab={activeTab}
+                                        onChange={setActiveTab}
+                                    />
 
                                     {/* STRUCTURE TAB */}
                                     {activeTab === 'structure' && (
                                         <>
                                             {/* Overview Panel */}
-                                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                                                <h2 className="text-lg font-semibold text-slate-800 mb-4">Structure Overview</h2>
+                                            <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-light)] p-6">
+                                                <h2 className="text-lg font-normal text-[var(--text-primary)] mb-4" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Structure Overview</h2>
                                                 <div className="grid grid-cols-2 gap-6">
                                                     <div>
-                                                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Description</label>
-                                                        <p className="text-slate-700">{activeEntity.description || 'No description provided.'}</p>
+                                                        <label className="block text-xs font-normal text-[var(--text-tertiary)] uppercase tracking-wide mb-1">Description</label>
+                                                        <p className="text-[var(--text-secondary)]">{activeEntity.description || 'No description provided.'}</p>
                                                     </div>
                                                     <div>
-                                                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Metadata</label>
-                                                        <div className="text-sm text-slate-600 space-y-1">
-                                                            <p>Created by: <span className="font-medium text-slate-800">{activeEntity.author}</span></p>
-                                                            <p>Last modified: <span className="font-medium text-slate-800">{activeEntity.lastEdited}</span></p>
+                                                        <label className="block text-xs font-normal text-[var(--text-tertiary)] uppercase tracking-wide mb-1">Metadata</label>
+                                                        <div className="text-sm text-[var(--text-secondary)] space-y-1">
+                                                            <p>Created by: <span className="font-medium text-[var(--text-primary)]">{activeEntity.author}</span></p>
+                                                            <p>Last modified: <span className="font-medium text-[var(--text-primary)]">{activeEntity.lastEdited}</span></p>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {/* Properties Panel */}
-                                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                            <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-light)] overflow-hidden">
+                                                <div className="p-6 border-b border-[var(--border-light)] flex justify-between items-center bg-[var(--bg-tertiary)]">
                                                     <div>
-                                                        <h2 className="text-lg font-semibold text-slate-800">Properties</h2>
-                                                        <p className="text-sm text-slate-500">Define the data structure for this entity.</p>
+                                                        <h2 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Properties</h2>
+                                                        <p className="text-sm text-[var(--text-secondary)]">Define the data structure for this entity.</p>
                                                     </div>
                                                     <button
                                                         onClick={() => setIsAddingProp(true)}
-                                                        className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-sm transition-colors"
+                                                        className="flex items-center px-4 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-sm font-medium shadow-sm transition-colors"
                                                     >
-                                                        <Plus size={16} className="mr-2" />
+                                                        <Plus size={16} className="mr-2" weight="light" />
                                                         Add Property
                                                     </button>
                                                 </div>
                                                 {/* Property List */}
-                                                <div className="divide-y divide-slate-100">
+                                                <div className="divide-y divide-[var(--border-light)]">
                                                     {activeEntity.properties.length === 0 ? (
-                                                        <div className="p-12 text-center text-slate-500">
+                                                        <div className="p-12 text-center text-[var(--text-secondary)]">
                                                             No properties defined yet. Click "Add Property" to start modeling.
                                                         </div>
                                                     ) : (
                                                         activeEntity.properties.map(prop => (
-                                                            <div key={prop.id} className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between group">
+                                                            <div key={prop.id} className="p-4 hover:bg-[var(--bg-tertiary)] transition-colors flex items-center justify-between group">
                                                                 <div className="flex items-center space-x-4">
-                                                                    <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center border border-slate-200">
+                                                                    <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center border border-[var(--border-light)]">
                                                                         {renderIconForType(prop.type)}
                                                                     </div>
                                                                     <div>
-                                                                        <h3 className="text-sm font-bold text-slate-800">{prop.name}</h3>
-                                                                        <p className="text-xs text-slate-500 flex items-center mt-0.5">
-                                                                            <span className="uppercase tracking-wider font-semibold mr-2">{prop.type}</span>
+                                                                        <h3 className="text-sm font-normal text-[var(--text-primary)]">{prop.name}</h3>
+                                                                        <p className="text-xs text-[var(--text-tertiary)] flex items-center mt-0.5">
+                                                                            <span className="uppercase tracking-wider font-normal mr-2">{prop.type}</span>
                                                                             {prop.type === 'relation' && (
-                                                                                <span className="bg-teal-100 text-teal-800 px-1.5 rounded text-[10px]">
+                                                                                <span className="bg-[#256A65]/10 text-[#256A65] px-1.5 rounded text-[10px]">
                                                                                     → {getRelatedEntityName(prop.relatedEntityId)}
                                                                                 </span>
                                                                             )}
@@ -1063,17 +1237,17 @@ function AuthenticatedApp() {
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex items-center space-x-4">
-                                                                    <div className="text-xs text-right text-slate-400 mr-4">
+                                                                    <div className="text-xs text-right text-[var(--text-tertiary)] mr-4">
                                                                         Example Value:<br />
-                                                                        <span className="text-slate-600 font-mono">
+                                                                        <span className="text-[var(--text-secondary)] font-mono">
                                                                             {prop.type === 'relation' ? 'ID-REF-123' : prop.type === 'file' ? 'document.pdf' : prop.defaultValue}
                                                                         </span>
                                                                     </div>
                                                                     <button
                                                                         onClick={() => deleteProperty(prop.id)}
-                                                                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                                                        className="p-2 text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded transition-colors opacity-0 group-hover:opacity-100"
                                                                     >
-                                                                        <Trash2 size={16} />
+                                                                        <Trash size={16} weight="light" />
                                                                     </button>
                                                                 </div>
                                                             </div>
@@ -1083,26 +1257,26 @@ function AuthenticatedApp() {
 
                                                 {/* Add Property Form Area */}
                                                 {isAddingProp && (
-                                                    <div className="p-6 bg-slate-50 border-t border-slate-200 animate-in fade-in slide-in-from-top-4 duration-200">
-                                                        <h3 className="text-sm font-bold text-slate-800 mb-4">New Property</h3>
+                                                    <div className="p-6 bg-[var(--bg-tertiary)] border-t border-[var(--border-light)] animate-in fade-in slide-in-from-top-4 duration-200">
+                                                        <h3 className="text-sm font-normal text-[var(--text-primary)] mb-4">New Property</h3>
                                                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                                                             <div className="md:col-span-4">
-                                                                <label className="block text-xs font-semibold text-slate-500 mb-1">Name</label>
+                                                                <label className="block text-xs font-normal text-[var(--text-tertiary)] mb-1">Name</label>
                                                                 <input
                                                                     autoFocus
                                                                     type="text"
                                                                     value={newPropName}
                                                                     onChange={(e) => setNewPropName(e.target.value)}
                                                                     placeholder="e.g. Serial Number"
-                                                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                                    className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] focus:outline-none placeholder:text-[var(--text-tertiary)]"
                                                                 />
                                                             </div>
                                                             <div className="md:col-span-3">
-                                                                <label className="block text-xs font-semibold text-slate-500 mb-1">Type</label>
+                                                                <label className="block text-xs font-normal text-[var(--text-tertiary)] mb-1">Type</label>
                                                                 <select
                                                                     value={newPropType}
                                                                     onChange={(e) => setNewPropType(e.target.value as PropertyType)}
-                                                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                                    className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] focus:outline-none"
                                                                 >
                                                                     <option value="text">Text</option>
                                                                     <option value="number">Number</option>
@@ -1114,11 +1288,11 @@ function AuthenticatedApp() {
 
                                                             {newPropType === 'relation' && (
                                                                 <div className="md:col-span-3">
-                                                                    <label className="block text-xs font-semibold text-slate-500 mb-1">Related Structure</label>
+                                                                    <label className="block text-xs font-normal text-[var(--text-tertiary)] mb-1">Related Structure</label>
                                                                     <select
                                                                         value={newPropRelationId}
                                                                         onChange={(e) => setNewPropRelationId(e.target.value)}
-                                                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                                        className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] focus:outline-none"
                                                                     >
                                                                         <option value="">Select entity...</option>
                                                                         {entities
@@ -1134,13 +1308,13 @@ function AuthenticatedApp() {
                                                                 <button
                                                                     onClick={handleAddProperty}
                                                                     disabled={!newPropName || (newPropType === 'relation' && !newPropRelationId)}
-                                                                    className="flex-1 py-2 bg-slate-800 text-white rounded-md text-sm font-medium hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                    className="flex-1 py-2 bg-[#256A65] text-white rounded-md text-sm font-medium hover:bg-[#1e5a55] disabled:opacity-50 disabled:cursor-not-allowed"
                                                                 >
                                                                     Save
                                                                 </button>
                                                                 <button
                                                                     onClick={() => setIsAddingProp(false)}
-                                                                    className="px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-md text-sm font-medium hover:bg-slate-50"
+                                                                    className="px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)] rounded-md text-sm font-medium hover:bg-[var(--bg-tertiary)]"
                                                                 >
                                                                     Cancel
                                                                 </button>
@@ -1154,11 +1328,11 @@ function AuthenticatedApp() {
 
                                     {/* DATA TAB */}
                                     {activeTab === 'data' && (
-                                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                        <div className="bg-[var(--bg-card)] rounded-xl shadow-sm border border-[var(--border-light)] overflow-hidden">
+                                            <div className="p-6 border-b border-[var(--border-light)] flex justify-between items-center bg-[var(--bg-tertiary)]">
                                                 <div>
-                                                    <h2 className="text-lg font-semibold text-slate-800">Data Records</h2>
-                                                    <p className="text-sm text-slate-500">Manage the actual data for this entity.</p>
+                                                    <h2 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Data Records</h2>
+                                                    <p className="text-sm text-[var(--text-secondary)]">Manage the actual data for this entity.</p>
                                                 </div>
                                                 <div className="relative group/addrecord">
                                                     <button
@@ -1168,15 +1342,15 @@ function AuthenticatedApp() {
                                                             setIsAddingRecord(true);
                                                         }}
                                                         disabled={activeEntity.properties.length === 0}
-                                                        className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
+                                                        className="flex items-center px-4 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-sm font-medium shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
-                                                        <Plus size={16} className="mr-2" />
+                                                        <Plus size={16} className="mr-2" weight="light" />
                                                         Add Record
                                                     </button>
                                                     {activeEntity.properties.length === 0 && (
-                                                        <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/addrecord:opacity-100 transition-opacity pointer-events-none z-50">
+                                                        <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-[var(--bg-selected)] text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/addrecord:opacity-100 transition-opacity pointer-events-none z-50">
                                                             Add properties to your entity to start adding records
-                                                            <div className="absolute bottom-full right-4 border-4 border-transparent border-b-slate-900"></div>
+                                                            <div className="absolute bottom-full right-4 border-4 border-transparent border-b-[var(--bg-selected)]"></div>
                                                         </div>
                                                     )}
                                                 </div>
@@ -1185,25 +1359,25 @@ function AuthenticatedApp() {
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-left border-collapse">
                                                     <thead>
-                                                        <tr className="bg-slate-50 border-b border-slate-200">
+                                                        <tr className="bg-[var(--bg-tertiary)] border-b border-[var(--border-light)]">
                                                             {activeEntity.properties.map(prop => (
-                                                                <th key={prop.id} className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                                                <th key={prop.id} className="px-6 py-3 text-xs font-normal text-[var(--text-tertiary)] uppercase tracking-wider">
                                                                     {prop.name}
                                                                 </th>
                                                             ))}
                                                             {/* Incoming Relations Headers */}
                                                             {Object.values(incomingData).map(({ sourceEntity, sourceProperty }) => (
-                                                                <th key={sourceProperty.id} className="px-6 py-3 text-xs font-semibold text-teal-600 uppercase tracking-wider bg-teal-50/50">
+                                                                <th key={sourceProperty.id} className="px-6 py-3 text-xs font-normal text-[#256A65] uppercase tracking-wider bg-[#256A65]/5">
                                                                     {sourceEntity.name} ({sourceProperty.name})
                                                                 </th>
                                                             ))}
-                                                            <th className="px-6 py-3 text-right">Actions</th>
+                                                            <th className="px-6 py-3 text-right text-[var(--text-tertiary)]">Actions</th>
                                                         </tr>
                                                     </thead>
-                                                    <tbody className="divide-y divide-slate-100">
+                                                    <tbody className="divide-y divide-[var(--border-light)]">
                                                         {records.length === 0 ? (
                                                             <tr>
-                                                                <td colSpan={Math.max(activeEntity.properties.length, 1) + 1 + Object.keys(incomingData).length} className="p-12 text-center text-slate-500">
+                                                                <td colSpan={Math.max(activeEntity.properties.length, 1) + 1 + Object.keys(incomingData).length} className="p-12 text-center text-[var(--text-secondary)]">
                                                                     {activeEntity.properties.length === 0 
                                                                         ? 'Add properties to your entity first, then you can start adding records.'
                                                                         : 'No records found. Click "Add Record" to create one.'}
@@ -1211,9 +1385,9 @@ function AuthenticatedApp() {
                                                             </tr>
                                                         ) : (
                                                             records.map(record => (
-                                                                <tr key={record.id} className="hover:bg-slate-50 transition-colors group">
+                                                                <tr key={record.id} className="hover:bg-[var(--bg-tertiary)] transition-colors group">
                                                                     {activeEntity.properties.map(prop => (
-                                                                        <td key={prop.id} className="px-6 py-4 text-sm text-slate-700">
+                                                                        <td key={prop.id} className="px-6 py-4 text-sm text-[var(--text-secondary)]">
                                                                             {renderCellValue(prop, record.values[prop.id])}
                                                                         </td>
                                                                     ))}
@@ -1231,17 +1405,17 @@ function AuthenticatedApp() {
                                                                         });
 
                                                                         return (
-                                                                            <td key={sourceProperty.id} className="px-6 py-4 text-sm text-slate-700 bg-teal-50/10">
+                                                                            <td key={sourceProperty.id} className="px-6 py-4 text-sm text-[var(--text-secondary)] bg-[#256A65]/5">
                                                                                 <div className="flex flex-wrap gap-1">
                                                                                     {linkedRecords.length > 0 ? linkedRecords.map(lr => (
                                                                                         <button
                                                                                             key={lr.id}
                                                                                             onClick={() => handleRecordClick(lr, sourceEntity)}
-                                                                                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200 hover:bg-indigo-200 transition-colors"
+                                                                                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#256A65]/10 text-[#256A65] border border-[#256A65]/20 hover:bg-[#256A65]/20 transition-colors"
                                                                                         >
                                                                                             {getRecordDisplayName(lr, sourceEntity)}
                                                                                         </button>
-                                                                                    )) : <span className="text-slate-400 text-xs italic">None</span>}
+                                                                                    )) : <span className="text-[var(--text-tertiary)] text-xs italic">None</span>}
                                                                                 </div>
                                                                             </td>
                                                                         );
@@ -1249,15 +1423,15 @@ function AuthenticatedApp() {
                                                                     <td className="px-6 py-4 text-right">
                                                                         <button
                                                                             onClick={() => handleEditRecord(record)}
-                                                                            className="p-2 text-slate-300 hover:text-teal-500 hover:bg-teal-50 rounded transition-colors opacity-0 group-hover:opacity-100 mr-2"
+                                                                            className="p-2 text-[var(--text-tertiary)] hover:text-[#256A65] hover:bg-[#256A65]/10 rounded transition-colors opacity-0 group-hover:opacity-100 mr-2"
                                                                         >
-                                                                            <Pencil size={16} />
+                                                                            <PencilSimple size={16} weight="light" />
                                                                         </button>
                                                                         <button
                                                                             onClick={() => deleteRecord(record.id)}
                                                                             className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
                                                                         >
-                                                                            <Trash2 size={16} />
+                                                                            <Trash size={16} weight="light" />
                                                                         </button>
                                                                     </td>
                                                                 </tr>
@@ -1277,10 +1451,10 @@ function AuthenticatedApp() {
                             <div className="absolute inset-y-0 right-0 w-96 bg-white shadow-2xl border-l border-slate-200 z-50 flex flex-col">
                                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                                     <div>
-                                        <h2 className="text-lg font-bold text-slate-800">
+                                        <h2 className="text-lg font-normal text-slate-800">
                                             {getRecordDisplayName(selectedRecord, selectedRecordEntity)}
                                         </h2>
-                                        <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mt-1">
+                                        <p className="text-xs text-slate-500 uppercase tracking-wider font-normal mt-1">
                                             {selectedRecordEntity.name}
                                         </p>
                                     </div>
@@ -1298,14 +1472,14 @@ function AuthenticatedApp() {
                                             onClick={() => setSelectedRecord(null)}
                                             className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors"
                                         >
-                                            <X size={20} />
+                                            <X size={20} weight="light" />
                                         </button>
                                     </div>
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                                     {selectedRecordEntity.properties.map(prop => (
                                         <div key={prop.id}>
-                                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                                            <label className="block text-xs font-normal text-slate-500 uppercase tracking-wide mb-1">
                                                 {prop.name}
                                             </label>
                                             <div className="text-sm text-slate-800 bg-slate-50 p-3 rounded-lg border border-slate-100">
@@ -1318,7 +1492,7 @@ function AuthenticatedApp() {
                                         </div>
                                     ))}
                                     <div className="pt-4 border-t border-slate-100">
-                                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                                        <label className="block text-xs font-normal text-slate-400 uppercase tracking-wide mb-1">
                                             Record ID
                                         </label>
                                         <p className="text-xs font-mono text-slate-400">{selectedRecord.id}</p>
@@ -1330,44 +1504,46 @@ function AuthenticatedApp() {
                         {/* Create Entity Modal */}
                         {isCreatingEntity && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-                                <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
-                                    <h2 className="text-xl font-bold text-slate-800 mb-4">Create New Entity</h2>
+                                <div className="bg-white rounded-lg border border-slate-200 shadow-lg w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden">
+                                    <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/50">
+                                        <h2 className="text-sm font-normal text-slate-700">Create New Entity</h2>
+                                    </div>
 
-                                    <div className="space-y-4">
+                                    <div className="p-5 space-y-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">Entity Name</label>
+                                            <label className="block text-xs font-medium text-slate-600 mb-1">Entity Name</label>
                                             <input
                                                 autoFocus
                                                 type="text"
                                                 value={newEntityName}
                                                 onChange={(e) => setNewEntityName(e.target.value)}
                                                 placeholder="e.g. Products"
-                                                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-slate-300 focus:outline-none"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                                            <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
                                             <textarea
                                                 value={newEntityDescription}
                                                 onChange={(e) => setNewEntityDescription(e.target.value)}
                                                 placeholder="Describe what this entity represents..."
                                                 rows={3}
-                                                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none resize-none"
+                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-slate-300 focus:outline-none resize-none"
                                             />
                                         </div>
                                     </div>
 
-                                    <div className="flex justify-end space-x-3 mt-6">
+                                    <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-200 bg-slate-50/50">
                                         <button
                                             onClick={() => setIsCreatingEntity(false)}
-                                            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
+                                            className="px-3 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={handleCreateEntity}
                                             disabled={!newEntityName.trim()}
-                                            className="px-4 py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            className="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                         >
                                             Create Entity
                                         </button>
@@ -1380,7 +1556,7 @@ function AuthenticatedApp() {
                         {isAddingRecord && currentSchema && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
                                 <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
-                                    <h2 className="text-xl font-bold text-slate-800 mb-4">{editingRecordId ? 'Edit Record' : 'Add New Record'}</h2>
+                                    <h2 className="text-xl font-normal text-slate-800 mb-4">{editingRecordId ? 'Edit Record' : 'Add New Record'}</h2>
 
                                     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                                         {currentSchema.properties.map(prop => {
@@ -1396,7 +1572,7 @@ function AuthenticatedApp() {
                                                                 const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
                                                                 setNewRecordValues({ ...newRecordValues, [prop.id]: selectedOptions });
                                                             }}
-                                                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none min-h-[100px]"
+                                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-300 focus:border-slate-300 focus:outline-none min-h-[100px] appearance-none cursor-pointer hover:border-slate-300 transition-colors"
                                                         >
                                                             {relatedInfo?.records.map(rec => (
                                                                 <option key={rec.id} value={rec.id}>
@@ -1421,7 +1597,7 @@ function AuthenticatedApp() {
                                                         <div className="space-y-2">
                                                             {fileInfo && (
                                                                 <div className="flex items-center gap-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
-                                                                    <Paperclip size={16} className="text-purple-500" />
+                                                                    <Paperclip size={16} className="text-purple-500" weight="light" />
                                                                     <span className="text-sm text-purple-800 truncate flex-1">
                                                                         {fileInfo.originalName || fileInfo.filename}
                                                                     </span>
@@ -1430,7 +1606,7 @@ function AuthenticatedApp() {
                                                                         onClick={() => setNewRecordValues({ ...newRecordValues, [prop.id]: '' })}
                                                                         className="p-1 hover:bg-purple-200 rounded transition-colors"
                                                                     >
-                                                                        <X size={14} className="text-purple-600" />
+                                                                        <X size={14} className="text-purple-600" weight="light" />
                                                                     </button>
                                                                 </div>
                                                             )}
@@ -1452,12 +1628,12 @@ function AuthenticatedApp() {
                                                                 >
                                                                     {uploadingFiles[prop.id] ? (
                                                                         <>
-                                                                            <Loader2 size={16} className="animate-spin text-purple-500" />
+                                                                            <SpinnerGap size={16} className="animate-spin text-purple-500" weight="light" />
                                                                             <span className="text-sm text-slate-500">Uploading...</span>
                                                                         </>
                                                                     ) : (
                                                                         <>
-                                                                            <Paperclip size={16} className="text-slate-400" />
+                                                                            <Paperclip size={16} className="text-slate-400" weight="light" />
                                                                             <span className="text-sm text-slate-500">
                                                                                 {fileInfo ? 'Replace file' : 'Choose file'}
                                                                             </span>
@@ -1498,7 +1674,7 @@ function AuthenticatedApp() {
                                         {Object.keys(incomingData).length > 0 && (
                                             <>
                                                 <div className="border-t border-slate-200 pt-4 mt-4">
-                                                    <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-3">
+                                                    <p className="text-xs font-normal text-indigo-600 uppercase tracking-wide mb-3">
                                                         Incoming Relations
                                                     </p>
                                                 </div>
@@ -1554,7 +1730,7 @@ function AuthenticatedApp() {
                         {editingIncomingRelation && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
                                 <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
-                                    <h2 className="text-xl font-bold text-slate-800 mb-2">
+                                    <h2 className="text-xl font-normal text-slate-800 mb-2">
                                         Edit Relation
                                     </h2>
                                     <p className="text-sm text-slate-500 mb-4">
@@ -1619,7 +1795,9 @@ function AuthenticatedApp() {
                     </div>
                     } />
                 </Routes>
-            </main>
+                </Suspense>
+                </main>
+            </div>
         </div>
     );
 }

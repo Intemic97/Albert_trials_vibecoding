@@ -1,0 +1,195 @@
+/**
+ * UI Components Library
+ * 
+ * Biblioteca de componentes reutilizables con diseño consistente.
+ * Todos los componentes soportan el sistema de temas (light/dark mode).
+ * 
+ * @example
+ * import { Button, Card, Input, Modal } from '@/components/ui';
+ * 
+ * @example
+ * import { 
+ *   Badge, StatusBadge,
+ *   Dropdown, Menu,
+ *   Toast, ToastContainer,
+ *   Tabs, TabsList
+ * } from '@/components/ui';
+ */
+
+// ============================================================================
+// CORE COMPONENTS
+// ============================================================================
+
+// Button - Botones con variantes y estados
+export { Button } from './Button';
+export type { ButtonVariant, ButtonSize } from './Button';
+
+// Card - Contenedores de contenido
+export { Card, CardHeader, CardFooter } from './Card';
+export type { CardVariant, CardPadding } from './Card';
+
+// Input - Campos de formulario
+export { Input, Textarea, Select } from './Input';
+export type { InputSize } from './Input';
+
+// Modal - Diálogos y ventanas modales
+export { Modal } from './Modal';
+export type { ModalSize } from './Modal';
+
+// ============================================================================
+// DISPLAY COMPONENTS
+// ============================================================================
+
+// Badge - Etiquetas y estados
+export { Badge, StatusBadge, Tag } from './Badge';
+export type { BadgeVariant, BadgeSize, StatusType } from './Badge';
+
+// EmptyState - Estados vacíos
+export { EmptyState, InlineEmptyState } from './EmptyState';
+export type { EmptyStateType } from './EmptyState';
+
+// Skeleton - Loaders y placeholders
+export { 
+  Skeleton, 
+  SkeletonText, 
+  SkeletonCard, 
+  SkeletonWorkflowCard,
+  SkeletonTable, 
+  SkeletonList, 
+  SkeletonSidebar,
+  SkeletonPage 
+} from './Skeleton';
+
+// Tooltip - Información contextual
+export { Tooltip, TooltipTrigger } from './Tooltip';
+
+// ============================================================================
+// NAVIGATION COMPONENTS
+// ============================================================================
+
+// Dropdown - Menús desplegables
+export { 
+  Dropdown, 
+  SelectDropdown, 
+  Menu, 
+  MenuItem, 
+  MenuDivider 
+} from './Dropdown';
+
+// Tabs - Navegación por pestañas
+export { 
+  Tabs, 
+  TabsList, 
+  TabsTrigger, 
+  TabsContent, 
+  SimpleTabs 
+} from './TabsUI';
+
+// ============================================================================
+// FEEDBACK COMPONENTS
+// ============================================================================
+
+// Toast - Notificaciones
+export { Toast, ToastContainer, showToast } from './Toast';
+
+// ============================================================================
+// LAYOUT COMPONENTS
+// ============================================================================
+
+// SidePanel - Panel lateral deslizante
+export { 
+  SidePanel, 
+  SidePanelContent, 
+  SidePanelSection, 
+  SidePanelDivider 
+} from './SidePanel';
+export type { SidePanelSize, SidePanelPosition } from './SidePanel';
+
+// ============================================================================
+// PERFORMANCE COMPONENTS
+// ============================================================================
+
+// OptimizedChart - Charts memoizados para mejor rendimiento
+export { 
+  OptimizedChart,
+  type ChartType,
+  type ChartDataPoint,
+  type OptimizedChartProps
+} from './OptimizedChart';
+
+// VirtualList - Listas virtualizadas para grandes datasets
+export { 
+  VirtualList, 
+  VirtualGrid,
+  type VirtualListProps,
+  type VirtualGridProps 
+} from './VirtualList';
+
+// ============================================================================
+// ERROR HANDLING
+// ============================================================================
+
+// ErrorBoundary - Captura errores en componentes
+export { 
+  ErrorBoundary, 
+  ErrorFallback, 
+  SectionErrorBoundary,
+  withErrorBoundary,
+  useErrorHandler
+} from './ErrorBoundary';
+
+// ============================================================================
+// KEYBOARD SHORTCUTS
+// ============================================================================
+
+// KeyboardShortcuts - Sistema de atajos de teclado
+export { 
+  KeyboardShortcutsProvider,
+  useKeyboardShortcuts,
+  useShortcut,
+  ShortcutBadge,
+  type Shortcut
+} from './KeyboardShortcuts';
+
+// ============================================================================
+// ACCESSIBILITY
+// ============================================================================
+
+// Accessibility components and hooks
+export {
+  VisuallyHidden,
+  SkipLink,
+  FocusTrap,
+  LiveRegion,
+  AnnouncerProvider,
+  useAnnouncer,
+  RovingTabIndex,
+  getFocusableElements,
+  isFocusable,
+  useFocusManager,
+  useKeyboardNavigation,
+  useEscapeKey,
+  useReturnFocus
+} from './Accessibility';
+
+// ============================================================================
+// CONFIRM DIALOG
+// ============================================================================
+
+// ConfirmDialog - Diálogo de confirmación accesible
+export {
+  ConfirmDialog,
+  useConfirmDialog
+} from './ConfirmDialog';
+
+// ============================================================================
+// FILE EXPLORER COMPONENTS
+// ============================================================================
+
+// Breadcrumbs - Navegación por ruta
+export { Breadcrumbs } from './Breadcrumbs';
+export type { BreadcrumbItem } from './Breadcrumbs';
+
+// FolderTree - Árbol de carpetas
+export { FolderTree } from './FolderTree';
+export type { FolderNode } from './FolderTree';

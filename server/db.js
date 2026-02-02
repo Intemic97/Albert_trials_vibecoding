@@ -94,6 +94,7 @@ async function initDb() {
       organizationId TEXT,
       name TEXT NOT NULL,
       data TEXT NOT NULL,
+      tags TEXT,
       createdAt TEXT,
       updatedAt TEXT,
       FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
@@ -122,6 +123,41 @@ async function initDb() {
       position INTEGER DEFAULT 0,
       createdAt TEXT,
       FOREIGN KEY(dashboardId) REFERENCES dashboards(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS simulations (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT,
+      name TEXT NOT NULL,
+      description TEXT,
+      baseDatasetId TEXT,
+      baseDatasetName TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS scenarios (
+      id TEXT PRIMARY KEY,
+      simulationId TEXT,
+      name TEXT NOT NULL,
+      description TEXT,
+      variables TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(simulationId) REFERENCES simulations(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS list_items (
+      id TEXT PRIMARY KEY,
+      scenarioId TEXT,
+      label TEXT NOT NULL,
+      value TEXT,
+      type TEXT NOT NULL,
+      formula TEXT,
+      metadata TEXT,
+      createdAt TEXT,
+      FOREIGN KEY(scenarioId) REFERENCES scenarios(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS pending_approvals (
@@ -304,6 +340,130 @@ async function initDb() {
     );
   `);
 
+  // Create Knowledge Base documents table
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS knowledge_documents (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT,
+      name TEXT NOT NULL,
+      type TEXT,
+      source TEXT,
+      filePath TEXT,
+      googleDriveId TEXT,
+      googleDriveUrl TEXT,
+      mimeType TEXT,
+      fileSize INTEGER,
+      extractedText TEXT,
+      summary TEXT,
+      metadata TEXT,
+      tags TEXT,
+      relatedEntityIds TEXT,
+      uploadedBy TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(uploadedBy) REFERENCES users(id)
+    );
+  `);
+
+  // Create Knowledge Base document chunks table (for semantic search)
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS knowledge_document_chunks (
+      id TEXT PRIMARY KEY,
+      documentId TEXT,
+      chunkIndex INTEGER,
+      content TEXT,
+      embedding TEXT,
+      FOREIGN KEY(documentId) REFERENCES knowledge_documents(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Create knowledge folders table
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS knowledge_folders (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT,
+      name TEXT NOT NULL,
+      description TEXT,
+      color TEXT DEFAULT '#3b82f6',
+      parentId TEXT,
+      documentIds TEXT DEFAULT '[]',
+      entityIds TEXT DEFAULT '[]',
+      createdBy TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(parentId) REFERENCES knowledge_folders(id) ON DELETE SET NULL
+    );
+  `);
+
+  // Create dashboard-workflow connections table
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS dashboard_workflow_connections (
+      id TEXT PRIMARY KEY,
+      dashboardId TEXT,
+      widgetId TEXT,
+      workflowId TEXT,
+      nodeId TEXT,
+      executionId TEXT,
+      outputPath TEXT,
+      refreshMode TEXT DEFAULT 'manual',
+      refreshInterval INTEGER,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(dashboardId) REFERENCES dashboards(id) ON DELETE CASCADE,
+      FOREIGN KEY(widgetId) REFERENCES widgets(id) ON DELETE CASCADE,
+      FOREIGN KEY(workflowId) REFERENCES workflows(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Create notifications table
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      orgId TEXT,
+      userId TEXT,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT,
+      link TEXT,
+      metadata TEXT,
+      createdAt TEXT,
+      FOREIGN KEY(orgId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Create notification reads table (tracks which users have read which notifications)
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS notification_reads (
+      id TEXT PRIMARY KEY,
+      notificationId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      readAt TEXT,
+      UNIQUE(notificationId, userId),
+      FOREIGN KEY(notificationId) REFERENCES notifications(id) ON DELETE CASCADE,
+      FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Create alert configurations table
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS alert_configs (
+      id TEXT PRIMARY KEY,
+      orgId TEXT NOT NULL,
+      userId TEXT,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      condition TEXT,
+      threshold TEXT,
+      entityId TEXT,
+      enabled INTEGER DEFAULT 1,
+      createdAt TEXT,
+      FOREIGN KEY(orgId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+
   // Migration: Add profilePhoto and companyRole columns to users table if they don't exist
   try {
     await db.exec(`ALTER TABLE users ADD COLUMN profilePhoto TEXT`);
@@ -336,6 +496,13 @@ async function initDb() {
   }
   try {
     await db.exec(`ALTER TABLE workflows ADD COLUMN lastEditedByName TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add tags column to workflows table
+  try {
+    await db.exec(`ALTER TABLE workflows ADD COLUMN tags TEXT`);
   } catch (e) {
     // Column already exists, ignore
   }
@@ -545,12 +712,59 @@ async function initDb() {
       organizationId TEXT NOT NULL,
       title TEXT NOT NULL,
       messages TEXT NOT NULL,
+      instructions TEXT,
+      allowedEntities TEXT,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
       FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
     );
   `);
+
+  // Add new columns if they don't exist
+  try {
+    await db.exec(`ALTER TABLE copilot_chats ADD COLUMN instructions TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  try {
+    await db.exec(`ALTER TABLE copilot_chats ADD COLUMN allowedEntities TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add grid layout columns to widgets table
+  try {
+    await db.exec(`ALTER TABLE widgets ADD COLUMN gridX INTEGER DEFAULT 0`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE widgets ADD COLUMN gridY INTEGER DEFAULT 0`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE widgets ADD COLUMN gridWidth INTEGER DEFAULT 1`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE widgets ADD COLUMN gridHeight INTEGER DEFAULT 1`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE widgets ADD COLUMN dataSource TEXT DEFAULT 'entity'`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await db.exec(`ALTER TABLE widgets ADD COLUMN workflowConnectionId TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
 
   return db;
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { Lock, ArrowLeft, Loader2, CheckCircle, XCircle, KeyRound } from 'lucide-react';
+import { Lock, ArrowLeft, SpinnerGap, CheckCircle, XCircle, Key } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 
 export function ResetPassword() {
@@ -91,10 +91,19 @@ export function ResetPassword() {
     // Loading state
     if (status === 'loading') {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-                <div className="w-full max-w-md text-center">
-                    <Loader2 className="w-12 h-12 text-blue-400 animate-spin mx-auto mb-4" />
-                    <p className="text-slate-400">Validating reset link...</p>
+            <div className="min-h-screen bg-[#191919] flex flex-col">
+                <div className="pt-8 pb-4 flex justify-center">
+                    <img
+                        src="/logo.svg"
+                        alt="Intemic"
+                        className="h-8 w-auto object-contain brightness-0 invert opacity-90"
+                    />
+                </div>
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                        <SpinnerGap weight="bold" className="w-10 h-10 text-[#256A65] animate-spin mx-auto mb-4" />
+                        <p className="text-[#9b9b9b] text-sm">Validating reset link...</p>
+                    </div>
                 </div>
             </div>
         );
@@ -103,32 +112,48 @@ export function ResetPassword() {
     // Invalid token
     if (status === 'invalid') {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-                <div className="w-full max-w-md">
-                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
+            <div className="min-h-screen bg-[#191919] flex flex-col">
+                <div className="pt-8 pb-4 flex justify-center">
+                    <img
+                        src="/logo.svg"
+                        alt="Intemic"
+                        className="h-8 w-auto object-contain brightness-0 invert opacity-90"
+                    />
+                </div>
+
+                <div className="flex-1 flex items-center justify-center px-4">
+                    <div className="w-full max-w-sm text-center">
                         <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <XCircle className="w-8 h-8 text-red-400" />
+                            <XCircle weight="fill" className="w-8 h-8 text-red-400" />
                         </div>
-                        <h1 className="text-2xl font-bold text-white mb-2">Invalid or Expired Link</h1>
-                        <p className="text-slate-400 mb-6">{error}</p>
-                        <p className="text-slate-500 text-sm mb-6">
+                        <h1 className="text-xl font-medium text-[#e8e8e8] mb-3" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
+                            Invalid or expired link
+                        </h1>
+                        <p className="text-[#9b9b9b] mb-6 text-sm">{error}</p>
+                        <p className="text-[#6b6b6b] text-sm mb-8">
                             Password reset links expire after 1 hour. Please request a new one.
                         </p>
                         <div className="space-y-3">
                             <Link
                                 to="/forgot-password"
-                                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                className="w-full bg-[#256A65] hover:bg-[#1e5a55] text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center text-sm"
                             >
-                                Request New Link
+                                Request new link
                             </Link>
                             <button
                                 onClick={() => navigate('/login')}
-                                className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 rounded-lg transition-colors"
+                                className="w-full bg-[#2f2f2f] hover:bg-[#3f3f3f] text-[#e8e8e8] font-medium py-3 rounded-lg transition-colors border border-[#404040] text-sm"
                             >
-                                Back to Login
+                                Back to sign in
                             </button>
                         </div>
                     </div>
+                </div>
+
+                <div className="py-6 text-center">
+                    <p className="text-xs text-[#505050]">
+                        © {new Date().getFullYear()} Intemic. All rights reserved.
+                    </p>
                 </div>
             </div>
         );
@@ -137,23 +162,39 @@ export function ResetPassword() {
     // Success state
     if (status === 'success') {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-                <div className="w-full max-w-md">
-                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl text-center">
+            <div className="min-h-screen bg-[#191919] flex flex-col">
+                <div className="pt-8 pb-4 flex justify-center">
+                    <img
+                        src="/logo.svg"
+                        alt="Intemic"
+                        className="h-8 w-auto object-contain brightness-0 invert opacity-90"
+                    />
+                </div>
+
+                <div className="flex-1 flex items-center justify-center px-4">
+                    <div className="w-full max-w-sm text-center">
                         <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <CheckCircle className="w-8 h-8 text-emerald-400" />
+                            <CheckCircle weight="fill" className="w-8 h-8 text-emerald-400" />
                         </div>
-                        <h1 className="text-2xl font-bold text-white mb-2">Password Reset!</h1>
-                        <p className="text-slate-400 mb-6">
-                            Your password has been successfully updated. You can now log in with your new password.
+                        <h1 className="text-xl font-medium text-[#e8e8e8] mb-3" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
+                            Password reset!
+                        </h1>
+                        <p className="text-[#9b9b9b] mb-8 text-sm">
+                            Your password has been successfully updated. You can now sign in with your new password.
                         </p>
                         <button
                             onClick={() => navigate('/login')}
-                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+                            className="w-full bg-[#256A65] hover:bg-[#1e5a55] text-white font-medium py-3 rounded-lg transition-colors text-sm"
                         >
-                            Go to Login
+                            Go to sign in
                         </button>
                     </div>
+                </div>
+
+                <div className="py-6 text-center">
+                    <p className="text-xs text-[#505050]">
+                        © {new Date().getFullYear()} Intemic. All rights reserved.
+                    </p>
                 </div>
             </div>
         );
@@ -161,54 +202,58 @@ export function ResetPassword() {
 
     // Reset form
     return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-            <div className="w-full max-w-md">
-                <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl">
+        <div className="min-h-screen bg-[#191919] flex flex-col">
+            <div className="pt-8 pb-4 flex justify-center">
+                <img
+                    src="/logo.svg"
+                    alt="Intemic"
+                    className="h-8 w-auto object-contain brightness-0 invert opacity-90"
+                />
+            </div>
+
+            <div className="flex-1 flex items-center justify-center px-4">
+                <div className="w-full max-w-sm">
                     {/* Header */}
                     <div className="text-center mb-8">
-                        <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <KeyRound className="w-8 h-8 text-blue-400" />
+                        <div className="w-14 h-14 bg-[#256A65]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Key weight="light" className="w-7 h-7 text-[#256A65]" />
                         </div>
-                        <h1 className="text-2xl font-bold text-white mb-2">Set New Password</h1>
-                        <p className="text-slate-400">
-                            Create a new password for <span className="text-white font-medium">{email}</span>
+                        <h1 className="text-xl font-medium text-[#e8e8e8] mb-3" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
+                            Set new password
+                        </h1>
+                        <p className="text-[#9b9b9b] text-sm">
+                            Create a new password for <span className="text-[#e8e8e8] font-medium">{email}</span>
                         </p>
                     </div>
 
                     {/* Form */}
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300">New Password</label>
-                            <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                                <input
-                                    type="password"
-                                    required
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                                    placeholder="••••••••"
-                                    value={formData.password}
-                                    onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                />
-                            </div>
+                        <div className="relative">
+                            <Lock weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6b6b6b]" />
+                            <input
+                                type="password"
+                                required
+                                className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[#256A65] focus:ring-1 focus:ring-[#256A65] transition-all text-sm"
+                                placeholder="New password"
+                                value={formData.password}
+                                onChange={e => setFormData({ ...formData, password: e.target.value })}
+                            />
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300">Confirm New Password</label>
-                            <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                                <input
-                                    type="password"
-                                    required
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                                    placeholder="••••••••"
-                                    value={formData.confirmPassword}
-                                    onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
-                                />
-                            </div>
+                        <div className="relative">
+                            <Lock weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6b6b6b]" />
+                            <input
+                                type="password"
+                                required
+                                className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[#256A65] focus:ring-1 focus:ring-[#256A65] transition-all text-sm"
+                                placeholder="Confirm new password"
+                                value={formData.confirmPassword}
+                                onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                            />
                         </div>
 
                         {error && (
-                            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+                            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400 text-center">
                                 {error}
                             </div>
                         )}
@@ -216,12 +261,12 @@ export function ResetPassword() {
                         <button
                             type="submit"
                             disabled={status === 'submitting'}
-                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full bg-[#256A65] hover:bg-[#1e5a55] text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                         >
                             {status === 'submitting' ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <SpinnerGap weight="bold" className="w-4 h-4 animate-spin" />
                             ) : (
-                                'Reset Password'
+                                'Reset password'
                             )}
                         </button>
                     </form>
@@ -229,15 +274,20 @@ export function ResetPassword() {
                     <div className="mt-6 text-center">
                         <Link
                             to="/login"
-                            className="text-sm text-slate-400 hover:text-white transition-colors flex items-center justify-center gap-2"
+                            className="text-sm text-[#6b6b6b] hover:text-[#9b9b9b] transition-colors flex items-center justify-center gap-2"
                         >
-                            <ArrowLeft className="w-4 h-4" />
-                            Back to Login
+                            <ArrowLeft weight="bold" className="w-4 h-4" />
+                            Back to sign in
                         </Link>
                     </div>
                 </div>
             </div>
+
+            <div className="py-6 text-center">
+                <p className="text-xs text-[#505050]">
+                    © {new Date().getFullYear()} Intemic. All rights reserved.
+                </p>
+            </div>
         </div>
     );
 }
-

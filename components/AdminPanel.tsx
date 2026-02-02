@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building2, GitBranch, LayoutDashboard, Database, Shield, ShieldCheck, ArrowLeft, RefreshCw, ChevronDown, ChevronUp, Briefcase, Target, Megaphone, CheckCircle2, Clock, MessageSquare, Trash2, Search, X } from 'lucide-react';
+import { Users, Buildings, GitBranch, Layout, Database, Shield, ShieldCheck, ArrowLeft, ArrowsClockwise, CaretDown, CaretUp, Briefcase, Target, Megaphone, CheckCircle, Clock, ChatCircle, Trash, MagnifyingGlass, X } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
-import { ProfileMenu } from './ProfileMenu';
 
 interface AdminStats {
     users: number;
@@ -145,105 +144,100 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+            <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
                 <div className="animate-spin text-teal-600">
-                    <RefreshCw size={32} />
+                    <ArrowsClockwise size={32} weight="light" />
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
+        <div className="h-screen flex flex-col bg-[var(--bg-primary)] overflow-hidden">
             {/* Header */}
-            <header className="bg-white border-b border-slate-200 px-6 py-4 flex-shrink-0">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <header className="h-16 bg-[var(--bg-primary)] border-b border-[var(--border-light)] px-8 flex-shrink-0">
+                <div className="max-w-7xl mx-auto flex items-center justify-between h-full">
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => onNavigate?.('entities')}
-                            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                            className="p-1.5 hover:bg-[var(--bg-tertiary)] rounded-md transition-colors"
                         >
-                            <ArrowLeft size={20} className="text-slate-600" />
+                            <ArrowLeft size={18} weight="light" className="text-[var(--text-secondary)]" />
                         </button>
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-gradient-to-br from-red-500 to-red-600 rounded-lg">
-                                <Shield size={24} className="text-white" />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold text-slate-800">Admin Panel</h1>
-                                <p className="text-sm text-slate-500">Platform administration</p>
-                            </div>
+                        <div>
+                            <h1 className="text-lg font-normal text-[var(--text-primary)]">Admin Panel</h1>
+                            <p className="text-[11px] text-[var(--text-secondary)]">Platform administration</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={fetchData}
                             disabled={isRefreshing}
-                            className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                            className="p-1.5 hover:bg-[var(--bg-tertiary)] rounded-md transition-colors disabled:opacity-50"
                         >
-                            <RefreshCw size={20} className={`text-slate-600 ${isRefreshing ? 'animate-spin' : ''}`} />
+                            <ArrowsClockwise size={18} weight="light" className={`text-[var(--text-secondary)] ${isRefreshing ? 'animate-spin' : ''}`} />
                         </button>
-                        <ProfileMenu onNavigate={onNavigate} />
+                        <div />
                     </div>
                 </div>
             </header>
 
             <main className="flex-1 overflow-y-auto">
-                <div className="max-w-7xl mx-auto px-6 py-8">
+                <div className="max-w-7xl mx-auto px-6 py-6">
                 {/* Stats Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 rounded-lg">
-                                <Users size={20} className="text-blue-600" />
+                            <div className="p-2 bg-[#84C4D1]/20 rounded-lg">
+                                <Users size={20} weight="light" className="text-[#256A65]" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-slate-800">{stats?.users || 0}</p>
-                                <p className="text-xs text-slate-500">Users</p>
+                                <p className="text-2xl font-normal text-slate-800">{stats?.users || 0}</p>
+                                <p className="text-xs text-[var(--text-secondary)]">Users</p>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-purple-100 rounded-lg">
-                                <Building2 size={20} className="text-purple-600" />
+                            <div className="p-2 bg-[#256A65]/10 rounded-lg">
+                                <Buildings size={20} weight="light" className="text-[#256A65]" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-slate-800">{stats?.organizations || 0}</p>
-                                <p className="text-xs text-slate-500">Organizations</p>
+                                <p className="text-2xl font-normal text-slate-800">{stats?.organizations || 0}</p>
+                                <p className="text-xs text-[var(--text-secondary)]">Organizations</p>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-teal-100 rounded-lg">
-                                <GitBranch size={20} className="text-teal-600" />
+                                <GitBranch size={20} weight="light" className="text-teal-600" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-slate-800">{stats?.workflows || 0}</p>
-                                <p className="text-xs text-slate-500">Workflows</p>
+                                <p className="text-2xl font-normal text-slate-800">{stats?.workflows || 0}</p>
+                                <p className="text-xs text-[var(--text-secondary)]">Workflows</p>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-orange-100 rounded-lg">
-                                <LayoutDashboard size={20} className="text-orange-600" />
+                                <Layout size={20} weight="light" className="text-orange-600" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-slate-800">{stats?.dashboards || 0}</p>
-                                <p className="text-xs text-slate-500">Dashboards</p>
+                                <p className="text-2xl font-normal text-slate-800">{stats?.dashboards || 0}</p>
+                                <p className="text-xs text-[var(--text-secondary)]">Dashboards</p>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-green-100 rounded-lg">
-                                <Database size={20} className="text-green-600" />
+                                <Database size={20} weight="light" className="text-green-600" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-slate-800">{stats?.entities || 0}</p>
-                                <p className="text-xs text-slate-500">Entities</p>
+                                <p className="text-2xl font-normal text-slate-800">{stats?.entities || 0}</p>
+                                <p className="text-xs text-[var(--text-secondary)]">Entities</p>
                             </div>
                         </div>
                     </div>
@@ -256,10 +250,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                         className={`px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors ${
                             activeTab === 'users'
                                 ? 'bg-teal-600 text-white'
-                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                                : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:bg-[var(--bg-tertiary)]'
                         }`}
                     >
-                        <Users size={18} />
+                        <Users size={18} weight="light" />
                         Users ({users.length})
                     </button>
                     <button
@@ -267,39 +261,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                         className={`px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors ${
                             activeTab === 'feedback'
                                 ? 'bg-teal-600 text-white'
-                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                                : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:bg-[var(--bg-tertiary)]'
                         }`}
                     >
-                        <MessageSquare size={18} />
+                        <ChatCircle size={18} weight="light" />
                         Node Feedback ({nodeFeedback.length})
                     </button>
                 </div>
 
                 {/* Users Table */}
                 {activeTab === 'users' && (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-slate-200">
+                <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] overflow-hidden">
+                    <div className="px-6 py-4 border-b border-[var(--border-light)]">
                         <div className="flex items-center justify-between gap-4">
-                            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                                <Users size={20} className="text-slate-600" />
+                            <h2 className="text-lg font-normal text-slate-800 flex items-center gap-2">
+                                <Users size={20} weight="light" className="text-[var(--text-secondary)]" />
                                 Registered Users
                             </h2>
                             {/* Search Input */}
                             <div className="relative">
-                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <MagnifyingGlass size={16} weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
                                 <input
                                     type="text"
                                     value={userSearchQuery}
                                     onChange={(e) => setUserSearchQuery(e.target.value)}
                                     placeholder="Search by name or email..."
-                                    className="pl-9 pr-8 py-2 w-64 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                                    className="pl-9 pr-8 py-2 w-64 border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                                 />
                                 {userSearchQuery && (
                                     <button
                                         onClick={() => setUserSearchQuery('')}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-600"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-[var(--bg-tertiary)] rounded text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                                     >
-                                        <X size={14} />
+                                        <X size={14} weight="light" />
                                     </button>
                                 )}
                             </div>
@@ -307,14 +301,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full">
-                            <thead className="bg-slate-50">
+                            <thead className="bg-[var(--bg-tertiary)]">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">User</th>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Organizations</th>
-                                    <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Workflows</th>
-                                    <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Dashboards</th>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Registered</th>
-                                    <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Admin</th>
+                                    <th className="px-6 py-3 text-left text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">User</th>
+                                    <th className="px-6 py-3 text-left text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Organizations</th>
+                                    <th className="px-6 py-3 text-center text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Workflows</th>
+                                    <th className="px-6 py-3 text-center text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Dashboards</th>
+                                    <th className="px-6 py-3 text-left text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Registered</th>
+                                    <th className="px-6 py-3 text-center text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Admin</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200">
@@ -330,16 +324,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                                     .map((u) => (
                                     <React.Fragment key={u.id}>
                                         <tr 
-                                            className="hover:bg-slate-50 transition-colors cursor-pointer"
+                                            className="hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer"
                                             onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)}
                                         >
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
-                                                    <button className="p-1 hover:bg-slate-200 rounded transition-colors">
+                                                    <button className="p-1 hover:bg-[var(--bg-selected)] rounded transition-colors">
                                                         {expandedUserId === u.id ? (
-                                                            <ChevronUp size={16} className="text-slate-400" />
+                                                            <CaretUp size={16} weight="light" className="text-[var(--text-tertiary)]" />
                                                         ) : (
-                                                            <ChevronDown size={16} className="text-slate-400" />
+                                                            <CaretDown size={16} weight="light" className="text-[var(--text-tertiary)]" />
                                                         )}
                                                     </button>
                                                     {u.profilePhoto ? (
@@ -349,7 +343,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                                                             className="w-10 h-10 rounded-full object-cover"
                                                         />
                                                     ) : (
-                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white font-semibold">
+                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white font-normal">
                                                             {u.name?.charAt(0).toUpperCase() || u.email.charAt(0).toUpperCase()}
                                                         </div>
                                                     )}
@@ -358,17 +352,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                                                             <p className="font-medium text-slate-800">{u.name || 'No name'}</p>
                                                             {u.onboardingCompleted ? (
                                                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-green-100 text-green-600 rounded text-xs" title="Onboarding completed">
-                                                                    <CheckCircle2 size={12} />
+                                                                    <CheckCircle size={12} weight="light" />
                                                                 </span>
                                                             ) : (
                                                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-600 rounded text-xs" title="Onboarding pending">
-                                                                    <Clock size={12} />
+                                                                    <Clock size={12} weight="light" />
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <p className="text-sm text-slate-500">{u.email}</p>
+                                                        <p className="text-sm text-[var(--text-secondary)]">{u.email}</p>
                                                         {u.companyRole && (
-                                                            <p className="text-xs text-slate-400">{u.companyRole}</p>
+                                                            <p className="text-xs text-[var(--text-tertiary)]">{u.companyRole}</p>
                                                         )}
                                                     </div>
                                                 </div>
@@ -376,7 +370,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                                             <td className="px-6 py-4">
                                                 <div className="flex flex-wrap gap-1">
                                                     {u.organizations?.split(',').map((org, i) => (
-                                                        <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs">
+                                                        <span key={i} className="px-2 py-0.5 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded text-xs">
                                                             {org.trim()}
                                                         </span>
                                                     ))}
@@ -384,17 +378,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-50 text-teal-700 rounded-full text-sm font-medium">
-                                                    <GitBranch size={14} />
+                                                    <GitBranch size={14} weight="light" />
                                                     {u.workflowCount}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-50 text-orange-700 rounded-full text-sm font-medium">
-                                                    <LayoutDashboard size={14} />
+                                                    <Layout size={14} weight="light" />
                                                     {u.dashboardCount}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-sm text-slate-600">
+                                            <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
                                                 {formatDate(u.createdAt)}
                                             </td>
                                             <td className="px-6 py-4 text-center">
@@ -406,49 +400,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                                                     className={`p-2 rounded-lg transition-colors ${
                                                         u.isAdmin 
                                                             ? 'bg-red-100 text-red-600 hover:bg-red-200' 
-                                                            : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600'
+                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:bg-[var(--bg-selected)] hover:text-[var(--text-secondary)]'
                                                     }`}
                                                     title={u.isAdmin ? 'Remove admin' : 'Make admin'}
                                                 >
-                                                    {u.isAdmin ? <ShieldCheck size={18} /> : <Shield size={18} />}
+                                                    {u.isAdmin ? <ShieldCheck size={18} weight="light" /> : <Shield size={18} weight="light" />}
                                                 </button>
                                             </td>
                                         </tr>
                                         {/* Expanded onboarding details */}
                                         {expandedUserId === u.id && (
-                                            <tr className="bg-slate-50">
+                                            <tr className="bg-[var(--bg-tertiary)]">
                                                 <td colSpan={6} className="px-6 py-4">
                                                     <div className="ml-10">
-                                                        <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                                                            <Users size={16} />
+                                                        <h4 className="text-sm font-normal text-[var(--text-primary)] mb-3 flex items-center gap-2">
+                                                            <Users size={16} weight="light" />
                                                             Onboarding Information
                                                         </h4>
                                                         {u.onboardingCompleted ? (
                                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                                <div className="bg-white rounded-lg p-3 border border-slate-200">
-                                                                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                                                                        <Briefcase size={12} />
+                                                                <div className="bg-[var(--bg-card)] rounded-lg p-3 border border-[var(--border-light)]">
+                                                                    <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] mb-1">
+                                                                        <Briefcase size={12} weight="light" />
                                                                         Role
                                                                     </div>
                                                                     <p className="text-sm font-medium text-slate-800">{u.onboardingRole || '-'}</p>
                                                                 </div>
-                                                                <div className="bg-white rounded-lg p-3 border border-slate-200">
-                                                                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                                                                        <Building2 size={12} />
+                                                                <div className="bg-[var(--bg-card)] rounded-lg p-3 border border-[var(--border-light)]">
+                                                                    <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] mb-1">
+                                                                        <Buildings size={12} weight="light" />
                                                                         Industry
                                                                     </div>
                                                                     <p className="text-sm font-medium text-slate-800">{u.onboardingIndustry || '-'}</p>
                                                                 </div>
-                                                                <div className="bg-white rounded-lg p-3 border border-slate-200">
-                                                                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                                                                        <Target size={12} />
+                                                                <div className="bg-[var(--bg-card)] rounded-lg p-3 border border-[var(--border-light)]">
+                                                                    <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] mb-1">
+                                                                        <Target size={12} weight="light" />
                                                                         Use Case
                                                                     </div>
                                                                     <p className="text-sm font-medium text-slate-800">{u.onboardingUseCase || '-'}</p>
                                                                 </div>
-                                                                <div className="bg-white rounded-lg p-3 border border-slate-200">
-                                                                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                                                                        <Megaphone size={12} />
+                                                                <div className="bg-[var(--bg-card)] rounded-lg p-3 border border-[var(--border-light)]">
+                                                                    <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] mb-1">
+                                                                        <Megaphone size={12} weight="light" />
                                                                         Source
                                                                     </div>
                                                                     <p className="text-sm font-medium text-slate-800">{u.onboardingSource || '-'}</p>
@@ -457,7 +451,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                                                         ) : (
                                                             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-700 text-sm">
                                                                 <p className="flex items-center gap-2">
-                                                                    <Clock size={16} />
+                                                                    <Clock size={16} weight="light" />
                                                                     This user hasn't completed the onboarding survey yet.
                                                                 </p>
                                                             </div>
@@ -472,7 +466,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                         </table>
                     </div>
                     {users.length === 0 && (
-                        <div className="px-6 py-12 text-center text-slate-500">
+                        <div className="px-6 py-12 text-center text-[var(--text-secondary)]">
                             No users found
                         </div>
                     )}
@@ -480,8 +474,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                         const query = userSearchQuery.toLowerCase();
                         return (u.name?.toLowerCase() || '').includes(query) || (u.email?.toLowerCase() || '').includes(query);
                     }).length === 0 && (
-                        <div className="px-6 py-12 text-center text-slate-500">
-                            <Search size={32} className="mx-auto mb-3 opacity-30" />
+                        <div className="px-6 py-12 text-center text-[var(--text-secondary)]">
+                            <MagnifyingGlass size={32} weight="light" className="mx-auto mb-3 opacity-30" />
                             <p>No users match "{userSearchQuery}"</p>
                             <button 
                                 onClick={() => setUserSearchQuery('')}
@@ -496,18 +490,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
 
                 {/* Node Feedback Table */}
                 {activeTab === 'feedback' && (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-slate-200">
-                        <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                            <MessageSquare size={20} className="text-teal-600" />
+                <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] overflow-hidden">
+                    <div className="px-6 py-4 border-b border-[var(--border-light)]">
+                        <h2 className="text-lg font-normal text-slate-800 flex items-center gap-2">
+                            <ChatCircle size={20} weight="light" className="text-teal-600" />
                             Node Feedback
                         </h2>
-                        <p className="text-sm text-slate-500 mt-1">User suggestions for workflow node improvements</p>
+                        <p className="text-sm text-[var(--text-secondary)] mt-1">User suggestions for workflow node improvements</p>
                     </div>
                     {nodeFeedback.length > 0 ? (
                         <div className="divide-y divide-slate-100">
                             {nodeFeedback.map((feedback) => (
-                                <div key={feedback.id} className="p-4 hover:bg-slate-50 transition-colors">
+                                <div key={feedback.id} className="p-4 hover:bg-[var(--bg-tertiary)] transition-colors">
                                     <div className="flex items-start justify-between gap-4">
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-2">
@@ -526,7 +520,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                                                         : `🔧 ${feedback.nodeLabel || feedback.nodeType}`}
                                                 </span>
                                                 {feedback.workflowName && (
-                                                    <span className="text-xs text-slate-400">
+                                                    <span className="text-xs text-[var(--text-tertiary)]">
                                                         in workflow: {feedback.workflowName}
                                                     </span>
                                                 )}
@@ -534,14 +528,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                                             <p className="text-sm text-slate-800 whitespace-pre-wrap mb-2">
                                                 {feedback.feedbackText}
                                             </p>
-                                            <div className="flex items-center gap-4 text-xs text-slate-500">
+                                            <div className="flex items-center gap-4 text-xs text-[var(--text-secondary)]">
                                                 <span className="flex items-center gap-1">
-                                                    <Users size={12} />
+                                                    <Users size={12} weight="light" />
                                                     {feedback.userName || feedback.userEmail || 'Unknown user'}
                                                 </span>
                                                 {feedback.organizationName && (
                                                     <span className="flex items-center gap-1">
-                                                        <Building2 size={12} />
+                                                        <Buildings size={12} weight="light" />
                                                         {feedback.organizationName}
                                                     </span>
                                                 )}
@@ -558,18 +552,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                                         </div>
                                         <button
                                             onClick={() => deleteFeedback(feedback.id)}
-                                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                            className="p-2 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                             title="Delete feedback"
                                         >
-                                            <Trash2 size={16} />
+                                            <Trash size={16} weight="light" />
                                         </button>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="px-6 py-12 text-center text-slate-500">
-                            <MessageSquare size={32} className="mx-auto mb-3 opacity-30" />
+                        <div className="px-6 py-12 text-center text-[var(--text-secondary)]">
+                            <ChatCircle size={32} weight="light" className="mx-auto mb-3 opacity-30" />
                             <p>No feedback received yet</p>
                             <p className="text-xs mt-1">User feedback will appear here when submitted</p>
                         </div>
