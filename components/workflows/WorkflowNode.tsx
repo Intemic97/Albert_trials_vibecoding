@@ -136,6 +136,10 @@ export const WorkflowNode: React.FC<WorkflowNodeProps> = ({
     <div
       data-node-id={node.id}
       onClick={() => onNodeClick(node.id)}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        onConfigure(node.id);
+      }}
       onMouseDown={(e) => onNodeDragStart(e, node.id)}
       style={{
         position: 'absolute',

@@ -207,7 +207,7 @@ export const TrendWidget: React.FC<TrendWidgetProps> = ({
             </div>
             
             <div className="w-24 h-12">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={50} minHeight={50}>
                     <AreaChart data={data}>
                         <defs>
                             <linearGradient id={`sparkGradient-${title}`} x1="0" y1="0" x2="0" y2="1">
@@ -264,7 +264,7 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({ config, onRemove }) =>
             
             case 'bar_chart':
                 return (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={50} minHeight={50}>
                         <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
                             <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
@@ -284,7 +284,7 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({ config, onRemove }) =>
             
             case 'line_chart':
                 return (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={50} minHeight={50}>
                         <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
                             <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
@@ -304,7 +304,7 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({ config, onRemove }) =>
             
             case 'area_chart':
                 return (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={50} minHeight={50}>
                         <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                             <defs>
                                 <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
@@ -330,7 +330,7 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({ config, onRemove }) =>
             
             case 'pie_chart':
                 return (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={50} minHeight={50}>
                         <PieChart>
                             <Pie
                                 data={data}
@@ -386,7 +386,7 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({ config, onRemove }) =>
             default:
                 // For AI generated or unknown types, try to render as bar chart
                 return (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={50} minHeight={50}>
                         <BarChart data={data}>
                             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
                             <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />

@@ -912,11 +912,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         const isNewWorkflow = location.pathname === '/workflow/new';
         const isWorkflowView = location.pathname.startsWith('/workflow/') && !isNewWorkflow;
         
-        console.log('[Workflows] URL sync - pathname:', location.pathname, 'isListView:', isListView, 'isNewWorkflow:', isNewWorkflow, 'isWorkflowView:', isWorkflowView);
-        
         if (isListView) {
-            // On /workflows, show list view and clear current workflow
-            console.log('[Workflows] Switching to list view');
             setCurrentView('list');
             setCurrentWorkflowId(null);
             setNodes([]);
@@ -924,8 +920,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             setWorkflowName('Untitled Workflow');
             lastLoadedWorkflowIdRef.current = null;
         } else if (isNewWorkflow) {
-            // On /workflow/new, show canvas with empty workflow
-            console.log('[Workflows] New workflow - showing canvas');
             setCurrentView('canvas');
             setCurrentWorkflowId(null);
             setNodes([]);
@@ -4043,31 +4037,37 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         e.dataTransfer.dropEffect = 'copy';
     };
 
-    const handleWheel = (e: React.WheelEvent) => {
+    // Wheel handler for canvas zoom (used via native event listener)
+    const handleWheelNative = useCallback((e: WheelEvent) => {
         e.preventDefault();
         
         if (!canvasRef.current) return;
         
         const rect = canvasRef.current.getBoundingClientRect();
-        // Mouse position relative to the canvas element
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
         
-        // Calculate the point in canvas coordinates that's under the mouse
         const worldX = (mouseX - canvasOffset.x) / canvasZoom;
         const worldY = (mouseY - canvasOffset.y) / canvasZoom;
         
-        // Calculate new zoom level
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
         const newZoom = Math.min(Math.max(canvasZoom * delta, 0.25), 3);
         
-        // Calculate new offset to keep the same point under the mouse
         const newOffsetX = mouseX - worldX * newZoom;
         const newOffsetY = mouseY - worldY * newZoom;
         
         setCanvasZoom(newZoom);
         setCanvasOffset({ x: newOffsetX, y: newOffsetY });
-    };
+    }, [canvasOffset, canvasZoom]);
+
+    // Add wheel event listener with passive: false to allow preventDefault
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        
+        canvas.addEventListener('wheel', handleWheelNative, { passive: false });
+        return () => canvas.removeEventListener('wheel', handleWheelNative);
+    }, [handleWheelNative]);
 
     const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
     const [nodeDragged, setNodeDragged] = useState<boolean>(false);
@@ -5032,7 +5032,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             ref={canvasRef}
                             onDragOver={handleDragOver}
                             onDrop={handleDrop}
-                            onWheel={handleWheel}
                             onMouseDown={handleCanvasMouseDown}
                             onMouseMove={(e) => {
                                 handleCanvasMouseMove(e);
@@ -5068,6 +5067,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 cursor: isPanning ? 'grabbing' : 'default'
                             }}
                         >
+                            {/* Dotted background pattern - follows zoom */}
+                            <div 
+                                className="absolute inset-0 pointer-events-none"
+                                style={{
+                                    backgroundImage: `radial-gradient(circle, var(--text-tertiary) 1px, transparent 1px)`,
+                                    backgroundSize: `${20 * canvasZoom}px ${20 * canvasZoom}px`,
+                                    backgroundPosition: `${canvasOffset.x % (20 * canvasZoom)}px ${canvasOffset.y % (20 * canvasZoom)}px`,
+                                    opacity: 0.3
+                                }}
+                            />
                             {/* Remote Cursors */}
                             {Array.from(remoteCursors.values()).map((remote) => {
                                 if (!remote.cursor || remote.cursor.x < 0) return null;
@@ -5235,46 +5244,35 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         // Centro del círculo = node.x + 160 + 10
                                         const x1 = fromNode.x + NODE_HALF_WIDTH + CONNECTOR_RADIUS;
                                         
-                                        // Calculate Y1 - connectors are positioned at vertical center
-                                        // top-1/2 + -translate-y-1/2 = centro vertical del nodo = node.y
+                                        // Calculate Y1 - use fixed offsets from node center
                                         let y1 = fromNode.y;
                                         
                                         if (fromNode.type === 'condition' || fromNode.type === 'splitColumns') {
-                                            const estimatedHalfHeight = 65; // Aproximadamente 130px de altura total
-                                            
+                                            // Use fixed vertical offsets that match the connector positions
+                                            // TRUE/A connector: 37px above center
+                                            // FALSE/B connector: 37px below center
                                             if ((fromNode.type === 'condition' && conn.outputType === 'true') ||
                                                 (fromNode.type === 'splitColumns' && conn.outputType === 'A')) {
-                                                // Top connector: top:28px + translate(50%, -50%)
-                                                // Centro = node.y - halfHeight + 28
-                                                y1 = fromNode.y - estimatedHalfHeight + 28;
+                                                y1 = fromNode.y - 37;
                                             } else if ((fromNode.type === 'condition' && conn.outputType === 'false') ||
                                                        (fromNode.type === 'splitColumns' && conn.outputType === 'B')) {
-                                                // Bottom connector: bottom:28px + translate(50%, 50%)
-                                                // Centro = node.y + halfHeight - 28
-                                                y1 = fromNode.y + estimatedHalfHeight - 28;
+                                                y1 = fromNode.y + 37;
                                             }
                                         }
                                         
                                         // INPUT CONNECTORS (left side of toNode)
-                                        // left-0 = borde izquierdo del nodo = node.x - 160
-                                        // -translate-x-1/2 mueve el contenedor -10px a la izquierda (50% de 20px)
-                                        // Centro del círculo = node.x - 160 - 10
                                         const x2 = toNode.x - NODE_HALF_WIDTH - CONNECTOR_RADIUS;
                                         
-                                        // Calculate Y2 - connectors are positioned at vertical center
-                                        // top-1/2 + -translate-y-1/2 = centro vertical del nodo = node.y
+                                        // Calculate Y2 - use fixed offsets from node center
                                         let y2 = toNode.y;
                                         
                                         if (toNode.type === 'join') {
-                                            const estimatedHalfHeight = 65; // Altura aproximada del nodo join / 2
+                                            // Join node has fixed connector positions
+                                            // Input A: 5px above center, Input B: 25px below center
                                             if (conn.inputPort === 'A') {
-                                                // Input A: top:60px + translate(-50%, -50%)
-                                                // Centro = node.y - halfHeight + 60
-                                                y2 = toNode.y - estimatedHalfHeight + 60;
+                                                y2 = toNode.y - 5;
                                             } else if (conn.inputPort === 'B') {
-                                                // Input B: top:90px + translate(-50%, -50%)
-                                                // Centro = node.y - halfHeight + 90
-                                                y2 = toNode.y - estimatedHalfHeight + 90;
+                                                y2 = toNode.y + 25;
                                             }
                                         }
 
@@ -5965,8 +5963,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 {node.type === 'condition' ? (
                                                     // Condition nodes have TWO output connectors: TRUE and FALSE
                                                     <>
-                                                        {/* TRUE output - top right (green) - fixed position */}
-                                                        <div className="absolute right-0 group/connector z-30 pointer-events-auto" style={{ top: '28px', transform: 'translate(50%, -50%)' }}>
+                                                        {/* TRUE output - above center (green) */}
+                                                        <div className="absolute right-0 group/connector z-30 pointer-events-auto" style={{ top: 'calc(50% - 37px)', transform: 'translate(50%, -50%)' }}>
                                                             {/* Larger hit area */}
                                                             <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
                                                                 onMouseDown={(e) => {
@@ -5982,10 +5980,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             <div className={`w-5 h-5 bg-green-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'true' ? 'border-green-500 scale-125 bg-green-100 shadow-md' : 'border-green-400 group-hover/connector:border-green-500 group-hover/connector:bg-green-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} 
                                                                 title="TRUE path" />
                                                         </div>
-                                                        <span className="absolute -right-6 text-[9px] font-normal text-[#256A65]" style={{ top: '28px', transform: 'translateY(-50%)' }}>✓</span>
+                                                        <span className="absolute -right-6 text-[9px] font-normal text-[#256A65]" style={{ top: 'calc(50% - 37px)', transform: 'translateY(-50%)' }}>✓</span>
 
-                                                        {/* FALSE output - bottom right (red) - fixed position */}
-                                                        <div className="absolute right-0 group/connector z-30 pointer-events-auto" style={{ bottom: '28px', transform: 'translate(50%, 50%)' }}>
+                                                        {/* FALSE output - below center (red) */}
+                                                        <div className="absolute right-0 group/connector z-30 pointer-events-auto" style={{ top: 'calc(50% + 37px)', transform: 'translate(50%, -50%)' }}>
                                                             {/* Larger hit area */}
                                                             <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
                                                                 onMouseDown={(e) => {
@@ -6001,13 +5999,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             <div className={`w-5 h-5 bg-red-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'false' ? 'border-red-500 scale-125 bg-red-100 shadow-md' : 'border-red-400 group-hover/connector:border-red-500 group-hover/connector:bg-red-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} 
                                                                 title="FALSE path" />
                                                         </div>
-                                                        <span className="absolute -right-6 text-[9px] font-normal text-red-600" style={{ bottom: '28px', transform: 'translateY(50%)' }}>✗</span>
+                                                        <span className="absolute -right-6 text-[9px] font-normal text-red-600" style={{ top: 'calc(50% + 37px)', transform: 'translateY(-50%)' }}>✗</span>
                                                     </>
                                                 ) : node.type === 'splitColumns' ? (
                                                     // Split Columns nodes have TWO output connectors: A and B
                                                     <>
-                                                        {/* Output A - top right (blue) - fixed position */}
-                                                        <div className="absolute right-0 group/connector z-30 pointer-events-auto" style={{ top: '28px', transform: 'translate(50%, -50%)' }}>
+                                                        {/* Output A - above center (blue) */}
+                                                        <div className="absolute right-0 group/connector z-30 pointer-events-auto" style={{ top: 'calc(50% - 37px)', transform: 'translate(50%, -50%)' }}>
                                                             {/* Larger hit area */}
                                                             <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
                                                                 onMouseDown={(e) => {
@@ -6023,10 +6021,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             <div className={`w-5 h-5 bg-[#256A65]/10 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'A' ? 'border-[#256A65] scale-125 bg-[#256A65]/20 shadow-md' : 'border-[#256A65]/60 group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/20 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} 
                                                                 title="Output A" />
                                                         </div>
-                                                        <span className="absolute -right-6 text-[9px] font-normal text-blue-600" style={{ top: '28px', transform: 'translateY(-50%)' }}>A</span>
+                                                        <span className="absolute -right-6 text-[9px] font-normal text-blue-600" style={{ top: 'calc(50% - 37px)', transform: 'translateY(-50%)' }}>A</span>
 
-                                                        {/* Output B - bottom right (purple) - fixed position */}
-                                                        <div className="absolute right-0 group/connector z-30 pointer-events-auto" style={{ bottom: '28px', transform: 'translate(50%, 50%)' }}>
+                                                        {/* Output B - below center (purple) */}
+                                                        <div className="absolute right-0 group/connector z-30 pointer-events-auto" style={{ top: 'calc(50% + 37px)', transform: 'translate(50%, -50%)' }}>
                                                             {/* Larger hit area */}
                                                             <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
                                                                 onMouseDown={(e) => {
@@ -6042,7 +6040,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             <div className={`w-5 h-5 bg-purple-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'B' ? 'border-purple-500 scale-125 bg-purple-100 shadow-md' : 'border-purple-400 group-hover/connector:border-purple-500 group-hover/connector:bg-purple-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} 
                                                                 title="Output B" />
                                                         </div>
-                                                        <span className="absolute -right-6 text-[9px] font-normal text-purple-600" style={{ bottom: '28px', transform: 'translateY(50%)' }}>B</span>
+                                                        <span className="absolute -right-6 text-[9px] font-normal text-purple-600" style={{ top: 'calc(50% + 37px)', transform: 'translateY(-50%)' }}>B</span>
                                                     </>
                                                 ) : (
                                                     // Regular nodes have ONE output connector - centered on right edge
@@ -6067,10 +6065,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 {/* Input connector(s) - all nodes except triggers */}
                                                 {node.type !== 'trigger' && (
                                                     node.type === 'join' ? (
-                                                        // Join nodes have TWO input connectors: A and B - fixed positions
+                                                        // Join nodes have TWO input connectors: A and B - positioned relative to center
                                                         <>
-                                                            {/* Input A - top left */}
-                                                            <div className="absolute left-0 group/connector z-30 pointer-events-auto" style={{ top: '60px', transform: 'translate(-50%, -50%)' }}>
+                                                            {/* Input A - above center */}
+                                                            <div className="absolute left-0 group/connector z-30 pointer-events-auto" style={{ top: 'calc(50% - 5px)', transform: 'translate(-50%, -50%)' }}>
                                                                 {/* Larger hit area */}
                                                                 <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
                                                                     onMouseUp={(e) => {
@@ -6082,8 +6080,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 <div className={`w-5 h-5 bg-[var(--bg-card)] border-2 rounded-full transition-all shadow-sm pointer-events-none border-[var(--border-medium)] group-hover/connector:border-cyan-500 group-hover/connector:bg-cyan-50 group-hover/connector:scale-110 group-hover/connector:shadow-md`}
                                                                     title="Input A" />
                                                             </div>
-                                                            {/* Input B - bottom left */}
-                                                            <div className="absolute left-0 group/connector z-30 pointer-events-auto" style={{ top: '90px', transform: 'translate(-50%, -50%)' }}>
+                                                            {/* Input B - below center */}
+                                                            <div className="absolute left-0 group/connector z-30 pointer-events-auto" style={{ top: 'calc(50% + 25px)', transform: 'translate(-50%, -50%)' }}>
                                                                 {/* Larger hit area */}
                                                                 <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" 
                                                                     onMouseUp={(e) => {
@@ -6140,27 +6138,24 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 {dragConnectionStart && dragConnectionCurrent && (() => {
                                     const startNode = nodes.find(n => n.id === dragConnectionStart.nodeId)!;
                                     const { NODE_WIDTH, NODE_HALF_WIDTH, CONNECTOR_SIZE, CONNECTOR_RADIUS } = CANVAS_CONSTANTS;
-                                    const ESTIMATED_NODE_HALF_HEIGHT = 65;
                                     
                                     // Use the actual clicked position if available, otherwise calculate
-                                    // OUTPUT connector: right-0 + translate-x-1/2 = node.x + 160 + 10
                                     const startX = dragConnectionStart.x || (startNode.x + NODE_HALF_WIDTH + CONNECTOR_RADIUS);
-                                    // top-1/2 -translate-y-1/2 = centro vertical = node.y
                                     let startY = dragConnectionStart.y || startNode.y;
                                     
-                                    // If we need to calculate Y position for special node types
+                                    // Calculate Y position for special node types using fixed offsets
                                     if (!dragConnectionStart.y) {
                                         if (startNode.type === 'condition') {
                                             if (dragConnectionStart.outputType === 'true') {
-                                                startY = startNode.y - ESTIMATED_NODE_HALF_HEIGHT + 28;
+                                                startY = startNode.y - 37;
                                             } else if (dragConnectionStart.outputType === 'false') {
-                                                startY = startNode.y + ESTIMATED_NODE_HALF_HEIGHT - 28;
+                                                startY = startNode.y + 37;
                                             }
                                         } else if (startNode.type === 'splitColumns') {
                                             if (dragConnectionStart.outputType === 'A') {
-                                                startY = startNode.y - ESTIMATED_NODE_HALF_HEIGHT + 28;
+                                                startY = startNode.y - 37;
                                             } else if (dragConnectionStart.outputType === 'B') {
-                                                startY = startNode.y + ESTIMATED_NODE_HALF_HEIGHT - 28;
+                                                startY = startNode.y + 37;
                                             }
                                         }
                                     }
@@ -9905,8 +9900,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </div>
 
                                         {selectedExecution.inputs && Object.keys(selectedExecution.inputs).length > 0 && (
-                                            <div className="bg-blue-50 rounded-lg p-4">
-                                                <h4 className="font-normal text-blue-800 mb-2 flex items-center gap-2">
+                                            <div className="bg-blue-500/10 rounded-lg p-4">
+                                                <h4 className="font-normal text-blue-500 mb-2 flex items-center gap-2">
                                                     <ArrowRight size={16} />
                                                     Inputs
                                                 </h4>

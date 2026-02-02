@@ -179,3 +179,22 @@ export { WorkflowToolbar } from './WorkflowToolbar';
 
 // Data Preview Panel - Preview de datos en tiempo real
 export { DataPreviewPanel, InlineDataPreview } from './DataPreviewPanel';
+
+// ============================================================================
+// MODULAR COMPONENTS (Zustand-based)
+// ============================================================================
+
+// Workflow Canvas - Canvas principal con stores de Zustand
+export { WorkflowCanvas } from './WorkflowCanvas';
+
+// Workflow Editor - Editor completo modular
+export { WorkflowEditor } from './WorkflowEditor';
+
+// AI Assistant Panel - Panel de asistente IA
+export { AIAssistantPanel } from './AIAssistantPanel';
+
+// Node Configuration Panels - Paneles de configuración por tipo de nodo
+export { NodeConfigPanels } from './NodeConfigPanels';
+
+// Data Preview Panel - Panel de previsualización de datos
+export { DataPreviewSidePanel } from './DataPreviewSidePanel';

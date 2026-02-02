@@ -49,7 +49,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
             if (res.ok) {
                 const data = await res.json();
-                console.log('[Auth] User data from server:', data.user);
                 setUser(data.user);
                 fetchOrganizations();
             } else {

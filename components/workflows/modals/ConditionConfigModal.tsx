@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { WarningCircle } from '@phosphor-icons/react';
+import { Warning } from '@phosphor-icons/react';
 import { NodeConfigSidePanel } from '../../NodeConfigSidePanel';
 import { WorkflowNode, Connection } from '../types';
 
@@ -76,59 +76,66 @@ export const ConditionConfigModal: React.FC<ConditionConfigModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Configure Condition"
-      icon={WarningCircle}
       footer={
-        <>
+        <div className="flex items-center gap-3 w-full">
           <button
             onClick={onClose}
-            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+            className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onSave}
             disabled={!conditionField}
-            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Save
           </button>
-        </>
+        </div>
       }
     >
       <div className="space-y-5">
         {/* Processing Mode */}
         <div>
-          <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-3">
             Processing Mode
           </label>
           <div className="space-y-2">
-            <label className={`flex items-start p-2.5 border rounded-lg cursor-pointer transition-all ${processingMode === 'perRow' ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]' : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'}`}>
+            <label className={`flex items-start p-3 rounded-lg cursor-pointer transition-all ${
+              processingMode === 'perRow' 
+                ? 'bg-[var(--accent-primary)]/5 border border-[var(--accent-primary)]' 
+                : 'bg-[var(--bg-tertiary)] border border-transparent hover:border-[var(--border-light)]'
+            }`}>
               <input
                 type="radio"
                 name="processingMode"
                 value="perRow"
                 checked={processingMode === 'perRow'}
                 onChange={() => onProcessingModeChange('perRow')}
-                className="mt-0.5 mr-3"
+                className="mt-0.5 mr-3 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
               />
               <div>
-                <span className="font-medium text-xs text-[var(--text-primary)]">Per Row (Filter)</span>
+                <span className="font-medium text-sm text-[var(--text-primary)]">Per Row (Filter)</span>
                 <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
                   Evaluate condition for each row. Matching rows go to TRUE, others to FALSE.
                 </p>
               </div>
             </label>
-            <label className={`flex items-start p-2.5 border rounded-lg cursor-pointer transition-all ${processingMode === 'batch' ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]' : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'}`}>
+            <label className={`flex items-start p-3 rounded-lg cursor-pointer transition-all ${
+              processingMode === 'batch' 
+                ? 'bg-[var(--accent-primary)]/5 border border-[var(--accent-primary)]' 
+                : 'bg-[var(--bg-tertiary)] border border-transparent hover:border-[var(--border-light)]'
+            }`}>
               <input
                 type="radio"
                 name="processingMode"
                 value="batch"
                 checked={processingMode === 'batch'}
                 onChange={() => onProcessingModeChange('batch')}
-                className="mt-0.5 mr-3"
+                className="mt-0.5 mr-3 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
               />
               <div>
-                <span className="font-medium text-xs text-[var(--text-primary)]">Batch (All or Nothing)</span>
+                <span className="font-medium text-sm text-[var(--text-primary)]">Batch (All or Nothing)</span>
                 <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
                   Check if ANY row matches. All data goes to TRUE or FALSE branch.
                 </p>
@@ -139,14 +146,14 @@ export const ConditionConfigModal: React.FC<ConditionConfigModalProps> = ({
 
         {/* Field Selection */}
         <div>
-          <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">
             Field to Check
           </label>
           {availableFields.length > 0 ? (
             <select
               value={conditionField}
               onChange={(e) => onConditionFieldChange(e.target.value)}
-              className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] bg-[var(--bg-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
+              className="w-full px-3 py-2.5 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
             >
               <option value="">Select a field...</option>
               {availableFields.map(field => (
@@ -160,24 +167,27 @@ export const ConditionConfigModal: React.FC<ConditionConfigModalProps> = ({
                 value={conditionField}
                 onChange={(e) => onConditionFieldChange(e.target.value)}
                 placeholder="e.g., status, type, amount"
-                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] bg-[var(--bg-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                className="w-full px-3 py-2.5 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)]"
               />
-              <p className="text-xs text-amber-600 mt-1.5">
-                ⚠️ Run the previous node first to see available fields
-              </p>
+              <div className="flex items-center gap-2 mt-2 p-2 bg-amber-500/10 rounded-lg">
+                <Warning size={14} className="text-amber-400 shrink-0" weight="fill" />
+                <p className="text-xs text-amber-400">
+                  Run the previous node first to see available fields
+                </p>
+              </div>
             </>
           )}
         </div>
 
         {/* Operator */}
         <div>
-          <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">
             Operator
           </label>
           <select
             value={conditionOperator}
             onChange={(e) => onConditionOperatorChange(e.target.value)}
-            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] bg-[var(--bg-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
+            className="w-full px-3 py-2.5 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
           >
             {OPERATORS.map(op => (
               <option key={op.value} value={op.value}>{op.label}</option>
@@ -188,7 +198,7 @@ export const ConditionConfigModal: React.FC<ConditionConfigModalProps> = ({
         {/* Value */}
         {needsValue && (
           <div>
-            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+            <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">
               Value
             </label>
             <input
@@ -196,22 +206,22 @@ export const ConditionConfigModal: React.FC<ConditionConfigModalProps> = ({
               value={conditionValue}
               onChange={(e) => onConditionValueChange(e.target.value)}
               placeholder="Enter value to compare..."
-              className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] bg-[var(--bg-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+              className="w-full px-3 py-2.5 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)]"
             />
           </div>
         )}
 
         {/* Preview */}
         {conditionField && (
-          <div className="p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
-            <p className="text-xs text-[var(--text-secondary)]">
-              <span className="font-medium">Condition:</span>{' '}
-              <code className="px-1 py-0.5 bg-[var(--bg-card)] rounded text-[var(--text-primary)]">
+          <div className="p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-light)]">
+            <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider mb-2">Preview</p>
+            <p className="text-sm text-[var(--text-secondary)]">
+              <code className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] rounded text-[var(--accent-primary)] font-mono">
                 {conditionField}
               </code>{' '}
-              {OPERATORS.find(o => o.value === conditionOperator)?.label}{' '}
+              <span className="text-[var(--text-tertiary)]">{OPERATORS.find(o => o.value === conditionOperator)?.label}</span>{' '}
               {needsValue && (
-                <code className="px-1 py-0.5 bg-[var(--bg-card)] rounded text-[var(--text-primary)]">
+                <code className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] rounded text-[var(--accent-primary)] font-mono">
                   {conditionValue || '(empty)'}
                 </code>
               )}

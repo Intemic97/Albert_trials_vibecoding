@@ -805,6 +805,250 @@ app.delete('/api/alert-configs/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// ==================== AUDIT LOG ENDPOINTS ====================
+
+// Helper function to log activities
+async function logActivity(db, {
+    organizationId,
+    userId,
+    userName,
+    userEmail,
+    action,
+    resourceType,
+    resourceId,
+    resourceName,
+    details,
+    ipAddress,
+    userAgent
+}) {
+    try {
+        const id = generateId();
+        await db.run(
+            `INSERT INTO audit_logs (id, organizationId, userId, userName, userEmail, action, resourceType, resourceId, resourceName, details, ipAddress, userAgent, createdAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, organizationId, userId, userName, userEmail, action, resourceType, resourceId, resourceName, 
+             details ? JSON.stringify(details) : null, ipAddress, userAgent, new Date().toISOString()]
+        );
+        return id;
+    } catch (error) {
+        console.error('Error logging activity:', error);
+        return null;
+    }
+}
+
+// Get audit logs for organization
+app.get('/api/audit-logs', authenticateToken, async (req, res) => {
+    try {
+        const { 
+            limit = 50, 
+            offset = 0, 
+            action, 
+            resourceType, 
+            userId,
+            startDate,
+            endDate,
+            search
+        } = req.query;
+
+        let query = `
+            SELECT * FROM audit_logs 
+            WHERE organizationId = ?
+        `;
+        const params = [req.user.orgId];
+
+        if (action) {
+            query += ' AND action = ?';
+            params.push(action);
+        }
+
+        if (resourceType) {
+            query += ' AND resourceType = ?';
+            params.push(resourceType);
+        }
+
+        if (userId) {
+            query += ' AND userId = ?';
+            params.push(userId);
+        }
+
+        if (startDate) {
+            query += ' AND createdAt >= ?';
+            params.push(startDate);
+        }
+
+        if (endDate) {
+            query += ' AND createdAt <= ?';
+            params.push(endDate);
+        }
+
+        if (search) {
+            query += ' AND (userName LIKE ? OR userEmail LIKE ? OR resourceName LIKE ? OR action LIKE ?)';
+            const searchTerm = `%${search}%`;
+            params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+        }
+
+        query += ' ORDER BY createdAt DESC LIMIT ? OFFSET ?';
+        params.push(parseInt(limit), parseInt(offset));
+
+        const logs = await db.all(query, params);
+
+        // Parse details JSON
+        const parsedLogs = logs.map(log => ({
+            ...log,
+            details: log.details ? JSON.parse(log.details) : null
+        }));
+
+        res.json(parsedLogs);
+    } catch (error) {
+        console.error('Get audit logs error:', error);
+        res.status(500).json({ error: 'Failed to get audit logs' });
+    }
+});
+
+// Get audit log stats/summary
+app.get('/api/audit-logs/stats', authenticateToken, async (req, res) => {
+    try {
+        const { days = 30 } = req.query;
+        const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+        // Get counts by action type
+        const actionCounts = await db.all(`
+            SELECT action, COUNT(*) as count
+            FROM audit_logs
+            WHERE organizationId = ? AND createdAt >= ?
+            GROUP BY action
+            ORDER BY count DESC
+        `, [req.user.orgId, startDate]);
+
+        // Get counts by resource type
+        const resourceCounts = await db.all(`
+            SELECT resourceType, COUNT(*) as count
+            FROM audit_logs
+            WHERE organizationId = ? AND createdAt >= ?
+            GROUP BY resourceType
+            ORDER BY count DESC
+        `, [req.user.orgId, startDate]);
+
+        // Get most active users
+        const activeUsers = await db.all(`
+            SELECT userId, userName, COUNT(*) as count
+            FROM audit_logs
+            WHERE organizationId = ? AND createdAt >= ? AND userId IS NOT NULL
+            GROUP BY userId
+            ORDER BY count DESC
+            LIMIT 10
+        `, [req.user.orgId, startDate]);
+
+        // Get activity by day
+        const dailyActivity = await db.all(`
+            SELECT DATE(createdAt) as date, COUNT(*) as count
+            FROM audit_logs
+            WHERE organizationId = ? AND createdAt >= ?
+            GROUP BY DATE(createdAt)
+            ORDER BY date ASC
+        `, [req.user.orgId, startDate]);
+
+        // Get total count
+        const total = await db.get(`
+            SELECT COUNT(*) as count
+            FROM audit_logs
+            WHERE organizationId = ? AND createdAt >= ?
+        `, [req.user.orgId, startDate]);
+
+        res.json({
+            total: total.count,
+            actionCounts,
+            resourceCounts,
+            activeUsers,
+            dailyActivity
+        });
+    } catch (error) {
+        console.error('Get audit log stats error:', error);
+        res.status(500).json({ error: 'Failed to get audit log stats' });
+    }
+});
+
+// Get unique action types and resource types for filters
+app.get('/api/audit-logs/filters', authenticateToken, async (req, res) => {
+    try {
+        const actions = await db.all(`
+            SELECT DISTINCT action FROM audit_logs WHERE organizationId = ? ORDER BY action
+        `, [req.user.orgId]);
+
+        const resourceTypes = await db.all(`
+            SELECT DISTINCT resourceType FROM audit_logs WHERE organizationId = ? ORDER BY resourceType
+        `, [req.user.orgId]);
+
+        const users = await db.all(`
+            SELECT DISTINCT userId, userName FROM audit_logs 
+            WHERE organizationId = ? AND userId IS NOT NULL 
+            ORDER BY userName
+        `, [req.user.orgId]);
+
+        res.json({
+            actions: actions.map(a => a.action),
+            resourceTypes: resourceTypes.map(r => r.resourceType),
+            users: users.map(u => ({ id: u.userId, name: u.userName }))
+        });
+    } catch (error) {
+        console.error('Get audit log filters error:', error);
+        res.status(500).json({ error: 'Failed to get filters' });
+    }
+});
+
+// Export audit logs as CSV
+app.get('/api/audit-logs/export', authenticateToken, async (req, res) => {
+    try {
+        const { startDate, endDate, action, resourceType } = req.query;
+
+        let query = `SELECT * FROM audit_logs WHERE organizationId = ?`;
+        const params = [req.user.orgId];
+
+        if (startDate) {
+            query += ' AND createdAt >= ?';
+            params.push(startDate);
+        }
+        if (endDate) {
+            query += ' AND createdAt <= ?';
+            params.push(endDate);
+        }
+        if (action) {
+            query += ' AND action = ?';
+            params.push(action);
+        }
+        if (resourceType) {
+            query += ' AND resourceType = ?';
+            params.push(resourceType);
+        }
+
+        query += ' ORDER BY createdAt DESC';
+
+        const logs = await db.all(query, params);
+
+        // Convert to CSV
+        const headers = ['Date', 'User', 'Email', 'Action', 'Resource Type', 'Resource Name', 'Details', 'IP Address'];
+        const rows = logs.map(log => [
+            log.createdAt,
+            log.userName || 'System',
+            log.userEmail || '',
+            log.action,
+            log.resourceType,
+            log.resourceName || '',
+            log.details || '',
+            log.ipAddress || ''
+        ]);
+
+        const csv = [headers.join(','), ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n');
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=audit-log-${new Date().toISOString().split('T')[0]}.csv`);
+        res.send(csv);
+    } catch (error) {
+        console.error('Export audit logs error:', error);
+        res.status(500).json({ error: 'Failed to export audit logs' });
+    }
+});
+
 // Admin Routes - Platform-wide admin panel
 app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
     try {
@@ -1393,6 +1637,21 @@ app.post('/api/entities', authenticateToken, async (req, res) => {
             }
         }
 
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: author || req.user.email,
+            userEmail: req.user.email,
+            action: 'create',
+            resourceType: 'entity',
+            resourceId: id,
+            resourceName: name,
+            details: { propertyCount: properties?.length || 0 },
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
         res.status(201).json({ message: 'Entity created' });
     } catch (error) {
         console.error(error);
@@ -1404,8 +1663,26 @@ app.post('/api/entities', authenticateToken, async (req, res) => {
 app.delete('/api/entities/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
+        // Get entity name before deleting
+        const entity = await db.get('SELECT name FROM entities WHERE id = ?', [id]);
+        
         await db.run('DELETE FROM entities WHERE id = ?', [id]);
         await db.run('DELETE FROM properties WHERE entityId = ?', [id]);
+
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'delete',
+            resourceType: 'entity',
+            resourceId: id,
+            resourceName: entity?.name || 'Unknown',
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
         res.json({ message: 'Entity deleted' });
     } catch (error) {
         console.error(error);
@@ -1701,7 +1978,7 @@ app.delete('/api/records/:id', authenticateToken, async (req, res) => {
 app.post('/api/database/ask', authenticateToken, async (req, res) => {
     console.log('[Database Assistant] Received question');
     try {
-        const { question, conversationHistory, chatId, instructions, allowedEntities } = req.body;
+        const { question, conversationHistory, chatId, instructions, allowedEntities, mentionedEntities } = req.body;
         const orgId = req.user.orgId;
 
         if (!question) {
@@ -1730,17 +2007,34 @@ app.post('/api/database/ask', authenticateToken, async (req, res) => {
             }
         }
 
-        // Fetch entities - filter by allowedEntities if specified
+        // Combine allowed entities with mentioned entities from the message
+        // mentionedEntities are entities explicitly cited in the user's message (via @ or # folder citations)
+        let effectiveEntities = chatAllowedEntities;
+        if (mentionedEntities && Array.isArray(mentionedEntities) && mentionedEntities.length > 0) {
+            if (effectiveEntities && Array.isArray(effectiveEntities) && effectiveEntities.length > 0) {
+                // Combine both lists, removing duplicates
+                effectiveEntities = [...new Set([...effectiveEntities, ...mentionedEntities])];
+            } else {
+                // No allowed entities restriction, but we have mentioned entities - prioritize them
+                effectiveEntities = mentionedEntities;
+            }
+        }
+
+        // Fetch entities - filter by effectiveEntities if specified
         let entitiesQuery = 'SELECT * FROM entities WHERE organizationId = ?';
         let entitiesParams = [orgId];
         
-        if (chatAllowedEntities && Array.isArray(chatAllowedEntities) && chatAllowedEntities.length > 0) {
-            const placeholders = chatAllowedEntities.map(() => '?').join(',');
+        console.log('[Database Assistant] Mentioned entities:', mentionedEntities);
+        console.log('[Database Assistant] Effective entities:', effectiveEntities);
+        
+        if (effectiveEntities && Array.isArray(effectiveEntities) && effectiveEntities.length > 0) {
+            const placeholders = effectiveEntities.map(() => '?').join(',');
             entitiesQuery += ` AND id IN (${placeholders})`;
-            entitiesParams = [orgId, ...chatAllowedEntities];
+            entitiesParams = [orgId, ...effectiveEntities];
         }
         
         const entities = await db.all(entitiesQuery, entitiesParams);
+        console.log('[Database Assistant] Loaded entities:', entities.map(e => ({ id: e.id, name: e.name })));
         
         const databaseContext = {};
         
@@ -1933,6 +2227,8 @@ app.get('/api/copilot/chats', authenticateToken, async (req, res) => {
                     messages: chat.messages ? JSON.parse(chat.messages) : [],
                     instructions: chat.instructions || null,
                     allowedEntities: chat.allowedEntities ? JSON.parse(chat.allowedEntities) : null,
+                    isFavorite: chat.isFavorite === 1,
+                    tags: chat.tags ? JSON.parse(chat.tags) : [],
                     createdAt: chat.createdAt ? new Date(chat.createdAt) : new Date(),
                     updatedAt: chat.updatedAt ? new Date(chat.updatedAt) : new Date()
                 };
@@ -1943,6 +2239,8 @@ app.get('/api/copilot/chats', authenticateToken, async (req, res) => {
                     messages: [],
                     instructions: chat.instructions || null,
                     allowedEntities: null,
+                    isFavorite: false,
+                    tags: [],
                     createdAt: chat.createdAt ? new Date(chat.createdAt) : new Date(),
                     updatedAt: chat.updatedAt ? new Date(chat.updatedAt) : new Date()
                 };
@@ -1964,11 +2262,11 @@ app.post('/api/copilot/chats', authenticateToken, async (req, res) => {
         const orgId = req.user.orgId;
         const { id, title, messages, createdAt, updatedAt } = req.body;
 
-        const { instructions, allowedEntities } = req.body;
+        const { instructions, allowedEntities, isFavorite, tags } = req.body;
         
         await db.run(
-            `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, instructions, allowedEntities, createdAt, updatedAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, instructions, allowedEntities, isFavorite, tags, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 id, 
                 userId, 
@@ -1977,10 +2275,26 @@ app.post('/api/copilot/chats', authenticateToken, async (req, res) => {
                 JSON.stringify(messages), 
                 instructions || null,
                 allowedEntities ? JSON.stringify(allowedEntities) : null,
+                isFavorite ? 1 : 0,
+                tags ? JSON.stringify(tags) : null,
                 createdAt, 
                 updatedAt
             ]
         );
+
+        // Log activity
+        await logActivity(db, {
+            organizationId: orgId,
+            userId: userId,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'create',
+            resourceType: 'copilot',
+            resourceId: id,
+            resourceName: title,
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
 
         res.json({ success: true, chatId: id });
     } catch (error) {
@@ -2003,14 +2317,14 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
             [chatId, userId, orgId]
         );
 
-        const { instructions, allowedEntities } = req.body;
+        const { instructions, allowedEntities, isFavorite, tags } = req.body;
         
         if (!chat) {
             // Chat doesn't exist, create it (upsert behavior)
             console.log('[Copilot] Chat not found, creating new chat:', chatId);
             await db.run(
-                `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, instructions, allowedEntities, createdAt, updatedAt)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, instructions, allowedEntities, isFavorite, tags, createdAt, updatedAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     chatId,
                     userId,
@@ -2019,6 +2333,8 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
                     JSON.stringify(messages),
                     instructions || null,
                     allowedEntities ? JSON.stringify(allowedEntities) : null,
+                    isFavorite ? 1 : 0,
+                    tags ? JSON.stringify(tags) : null,
                     createdAt || updatedAt || new Date().toISOString(),
                     updatedAt || new Date().toISOString()
                 ]
@@ -2026,12 +2342,14 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
         } else {
             // Chat exists, update it
             await db.run(
-                `UPDATE copilot_chats SET title = ?, messages = ?, instructions = ?, allowedEntities = ?, updatedAt = ? WHERE id = ?`,
+                `UPDATE copilot_chats SET title = ?, messages = ?, instructions = ?, allowedEntities = ?, isFavorite = ?, tags = ?, updatedAt = ? WHERE id = ?`,
                 [
                     title, 
                     JSON.stringify(messages), 
                     instructions || null,
                     allowedEntities ? JSON.stringify(allowedEntities) : null,
+                    isFavorite ? 1 : 0,
+                    tags ? JSON.stringify(tags) : null,
                     updatedAt, 
                     chatId
                 ]
@@ -3240,6 +3558,20 @@ app.post('/api/dashboards', authenticateToken, async (req, res) => {
             'INSERT INTO dashboards (id, organizationId, name, description, createdBy, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
             [id, req.user.orgId, name, description || '', req.user.id, now, now]
         );
+
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'create',
+            resourceType: 'dashboard',
+            resourceId: id,
+            resourceName: name,
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
         
         res.json({ id, name, description, createdAt: now, updatedAt: now });
     } catch (error) {
@@ -3257,6 +3589,20 @@ app.put('/api/dashboards/:id', authenticateToken, async (req, res) => {
             'UPDATE dashboards SET name = ?, description = ?, updatedAt = ? WHERE id = ? AND organizationId = ?',
             [name, description || '', now, req.params.id, req.user.orgId]
         );
+
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'update',
+            resourceType: 'dashboard',
+            resourceId: req.params.id,
+            resourceName: name,
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
         
         res.json({ success: true });
     } catch (error) {
@@ -3267,7 +3613,25 @@ app.put('/api/dashboards/:id', authenticateToken, async (req, res) => {
 
 app.delete('/api/dashboards/:id', authenticateToken, async (req, res) => {
     try {
+        // Get dashboard name before deleting
+        const dashboard = await db.get('SELECT name FROM dashboards WHERE id = ? AND organizationId = ?', [req.params.id, req.user.orgId]);
+        
         await db.run('DELETE FROM dashboards WHERE id = ? AND organizationId = ?', [req.params.id, req.user.orgId]);
+
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'delete',
+            resourceType: 'dashboard',
+            resourceId: req.params.id,
+            resourceName: dashboard?.name || 'Unknown',
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
         res.json({ success: true });
     } catch (error) {
         console.error('Error deleting dashboard:', error);
@@ -3281,10 +3645,28 @@ app.post('/api/dashboards/:id/share', authenticateToken, async (req, res) => {
         const shareToken = require('crypto').randomBytes(16).toString('hex');
         const now = new Date().toISOString();
         
+        // Get dashboard name for logging
+        const dashboard = await db.get('SELECT name FROM dashboards WHERE id = ? AND organizationId = ?', [req.params.id, req.user.orgId]);
+        
         await db.run(
             'UPDATE dashboards SET isPublic = 1, shareToken = ?, updatedAt = ? WHERE id = ? AND organizationId = ?',
             [shareToken, now, req.params.id, req.user.orgId]
         );
+
+        // Log share activity (important security event)
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'share',
+            resourceType: 'dashboard',
+            resourceId: req.params.id,
+            resourceName: dashboard?.name || 'Unknown',
+            details: { shareToken: shareToken.substring(0, 8) + '...' },
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
         
         res.json({ shareToken, shareUrl: `/shared/${shareToken}` });
     } catch (error) {
@@ -3298,10 +3680,27 @@ app.post('/api/dashboards/:id/unshare', authenticateToken, async (req, res) => {
     try {
         const now = new Date().toISOString();
         
+        // Get dashboard name for logging
+        const dashboard = await db.get('SELECT name FROM dashboards WHERE id = ? AND organizationId = ?', [req.params.id, req.user.orgId]);
+        
         await db.run(
             'UPDATE dashboards SET isPublic = 0, shareToken = NULL, updatedAt = ? WHERE id = ? AND organizationId = ?',
             [now, req.params.id, req.user.orgId]
         );
+
+        // Log unshare activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'unshare',
+            resourceType: 'dashboard',
+            resourceId: req.params.id,
+            resourceName: dashboard?.name || 'Unknown',
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
         
         res.json({ success: true });
     } catch (error) {
@@ -3399,6 +3798,391 @@ app.delete('/api/widgets/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Error deleting widget:', error);
         res.status(500).json({ error: 'Failed to delete widget' });
+    }
+});
+
+// ==================== SIMULATIONS ENDPOINTS ====================
+
+// Get all simulations for the organization
+app.get('/api/simulations', authenticateToken, async (req, res) => {
+    try {
+        const simulations = await db.all(
+            'SELECT * FROM simulations WHERE organizationId = ? ORDER BY updatedAt DESC',
+            [req.user.orgId]
+        );
+        
+        // Parse JSON fields - support both old and new schema
+        const parsed = simulations.map(sim => {
+            // Try to parse new schema
+            try {
+                const data = JSON.parse(sim.sourceEntities || '{}');
+                if (data.workflowId) {
+                    return {
+                        id: sim.id,
+                        name: sim.name,
+                        description: sim.description,
+                        workflowId: data.workflowId,
+                        workflowName: data.workflowName,
+                        parameters: data.parameters || [],
+                        visualizations: data.visualizations || [],
+                        savedScenarios: data.savedScenarios || [],
+                        runs: data.runs || [],
+                        createdAt: sim.createdAt,
+                        updatedAt: sim.updatedAt
+                    };
+                }
+            } catch (e) {}
+            
+            // Old schema fallback
+            return {
+                ...sim,
+                sourceEntities: JSON.parse(sim.sourceEntities || '[]'),
+                variables: JSON.parse(sim.variables || '[]'),
+                scenarios: JSON.parse(sim.scenariosData || '[]')
+            };
+        });
+        
+        res.json(parsed);
+    } catch (error) {
+        console.error('Error fetching simulations:', error);
+        res.status(500).json({ error: 'Failed to fetch simulations' });
+    }
+});
+
+// Get single simulation
+app.get('/api/simulations/:id', authenticateToken, async (req, res) => {
+    try {
+        const sim = await db.get(
+            'SELECT * FROM simulations WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!sim) {
+            return res.status(404).json({ error: 'Simulation not found' });
+        }
+        
+        // Try to parse new schema
+        try {
+            const data = JSON.parse(sim.sourceEntities || '{}');
+            if (data.workflowId) {
+                return res.json({
+                    id: sim.id,
+                    name: sim.name,
+                    description: sim.description,
+                    workflowId: data.workflowId,
+                    workflowName: data.workflowName,
+                    parameters: data.parameters || [],
+                    visualizations: data.visualizations || [],
+                    savedScenarios: data.savedScenarios || [],
+                    runs: data.runs || [],
+                    createdAt: sim.createdAt,
+                    updatedAt: sim.updatedAt
+                });
+            }
+        } catch (e) {}
+        
+        // Old schema fallback
+        res.json({
+            ...sim,
+            sourceEntities: JSON.parse(sim.sourceEntities || '[]'),
+            variables: JSON.parse(sim.variables || '[]'),
+            scenarios: JSON.parse(sim.scenariosData || '[]')
+        });
+    } catch (error) {
+        console.error('Error fetching simulation:', error);
+        res.status(500).json({ error: 'Failed to fetch simulation' });
+    }
+});
+
+// Create simulation
+app.post('/api/simulations', authenticateToken, async (req, res) => {
+    try {
+        const { 
+            id, name, description, 
+            // New schema fields
+            workflowId, workflowName, parameters, visualizations, savedScenarios, runs,
+            // Old schema fields (for backwards compatibility)
+            sourceEntities, variables, scenarios 
+        } = req.body;
+        const now = new Date().toISOString();
+        const simId = id || generateId();
+        
+        // Store new schema data in sourceEntities field as JSON
+        const dataToStore = workflowId ? {
+            workflowId,
+            workflowName,
+            parameters: parameters || [],
+            visualizations: visualizations || [],
+            savedScenarios: savedScenarios || [],
+            runs: runs || []
+        } : sourceEntities || [];
+        
+        await db.run(
+            `INSERT INTO simulations (id, organizationId, name, description, sourceEntities, variables, scenariosData, createdAt, updatedAt) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                simId,
+                req.user.orgId,
+                name,
+                description || '',
+                JSON.stringify(dataToStore),
+                JSON.stringify(variables || []),
+                JSON.stringify(scenarios || []),
+                now,
+                now
+            ]
+        );
+        
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'create',
+            resourceType: 'lab',
+            resourceId: simId,
+            resourceName: name,
+            details: { workflowId, workflowName },
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
+        // Return appropriate response based on schema
+        if (workflowId) {
+            res.json({
+                id: simId,
+                name,
+                description,
+                workflowId,
+                workflowName,
+                parameters: parameters || [],
+                visualizations: visualizations || [],
+                savedScenarios: savedScenarios || [],
+                runs: runs || [],
+                createdAt: now,
+                updatedAt: now
+            });
+        } else {
+            res.json({
+                id: simId,
+                name,
+                description,
+                sourceEntities: sourceEntities || [],
+                variables: variables || [],
+                scenarios: scenarios || [],
+                createdAt: now,
+                updatedAt: now
+            });
+        }
+    } catch (error) {
+        console.error('Error creating simulation:', error);
+        res.status(500).json({ error: 'Failed to create simulation' });
+    }
+});
+
+// Update simulation
+app.put('/api/simulations/:id', authenticateToken, async (req, res) => {
+    try {
+        const { 
+            name, description,
+            // New schema fields
+            workflowId, workflowName, parameters, visualizations, savedScenarios, runs,
+            // Old schema fields
+            sourceEntities, variables, scenarios 
+        } = req.body;
+        const now = new Date().toISOString();
+        
+        // Verify ownership
+        const existing = await db.get(
+            'SELECT id FROM simulations WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!existing) {
+            return res.status(404).json({ error: 'Simulation not found' });
+        }
+        
+        // Store new schema data in sourceEntities field as JSON
+        const dataToStore = workflowId ? {
+            workflowId,
+            workflowName,
+            parameters: parameters || [],
+            visualizations: visualizations || [],
+            savedScenarios: savedScenarios || [],
+            runs: runs || []
+        } : sourceEntities || [];
+        
+        await db.run(
+            `UPDATE simulations SET name = ?, description = ?, sourceEntities = ?, variables = ?, scenariosData = ?, updatedAt = ? 
+             WHERE id = ?`,
+            [
+                name,
+                description || '',
+                JSON.stringify(dataToStore),
+                JSON.stringify(variables || []),
+                JSON.stringify(scenarios || []),
+                now,
+                req.params.id
+            ]
+        );
+        
+        // Return appropriate response based on schema
+        if (workflowId) {
+            res.json({
+                id: req.params.id,
+                name,
+                description,
+                workflowId,
+                workflowName,
+                parameters: parameters || [],
+                visualizations: visualizations || [],
+                savedScenarios: savedScenarios || [],
+                runs: runs || [],
+                updatedAt: now
+            });
+        } else {
+            res.json({
+                id: req.params.id,
+                name,
+                description,
+                sourceEntities: sourceEntities || [],
+                variables: variables || [],
+                scenarios: scenarios || [],
+                updatedAt: now
+            });
+        }
+    } catch (error) {
+        console.error('Error updating simulation:', error);
+        res.status(500).json({ error: 'Failed to update simulation' });
+    }
+});
+
+// Delete simulation
+app.delete('/api/simulations/:id', authenticateToken, async (req, res) => {
+    try {
+        // Verify ownership
+        const existing = await db.get(
+            'SELECT id FROM simulations WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        
+        if (!existing) {
+            return res.status(404).json({ error: 'Simulation not found' });
+        }
+        
+        await db.run('DELETE FROM simulations WHERE id = ?', [req.params.id]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting simulation:', error);
+        res.status(500).json({ error: 'Failed to delete simulation' });
+    }
+});
+
+// Simulation Chat Assistant
+app.post('/api/simulations/chat', authenticateToken, async (req, res) => {
+    try {
+        const { simulationName, parameters, lastResult, userQuery } = req.body;
+        
+        // Build context for the AI
+        const parameterContext = parameters.map(p => 
+            `- ${p.name}: ${p.currentValue}${p.unit || ''} (rango: ${p.min ?? 'sin min'} - ${p.max ?? 'sin max'})`
+        ).join('\n');
+        
+        const resultContext = lastResult 
+            ? `Último resultado de la simulación:\n${JSON.stringify(lastResult, null, 2)}`
+            : 'No hay resultados previos de simulación.';
+        
+        const systemPrompt = `Eres un asistente de simulaciones interactivas. 
+Tu rol es ayudar al usuario a entender y ajustar los parámetros de la simulación "${simulationName}".
+
+Parámetros disponibles:
+${parameterContext}
+
+${resultContext}
+
+Puedes realizar las siguientes acciones:
+1. Ajustar parámetros: Responde con { "action": { "type": "set_parameter", "data": { "variable": "nombre_variable", "value": nuevo_valor } } }
+2. Ejecutar simulación: Responde con { "action": { "type": "run_simulation", "data": {} } }
+3. Simplemente responder preguntas sobre los resultados o sugerir cambios.
+
+Responde siempre en español y de forma concisa. Si el usuario pide cambiar un parámetro, incluye la acción correspondiente.`;
+
+        // Call OpenAI or return a simulated response
+        const openaiKey = process.env.OPENAI_API_KEY;
+        
+        if (openaiKey) {
+            const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${openaiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userQuery }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 500
+                })
+            });
+            
+            if (openaiRes.ok) {
+                const data = await openaiRes.json();
+                const content = data.choices[0]?.message?.content || '';
+                
+                // Try to extract action from response
+                let action = null;
+                try {
+                    const actionMatch = content.match(/\{[\s\S]*"action"[\s\S]*\}/);
+                    if (actionMatch) {
+                        const parsed = JSON.parse(actionMatch[0]);
+                        action = parsed.action;
+                    }
+                } catch (e) {}
+                
+                // Clean message (remove JSON if present)
+                const cleanMessage = content.replace(/\{[\s\S]*"action"[\s\S]*\}/g, '').trim();
+                
+                return res.json({
+                    message: cleanMessage || content,
+                    action
+                });
+            }
+        }
+        
+        // Fallback: Simple pattern matching for common queries
+        const query = userQuery.toLowerCase();
+        let message = '';
+        let action = null;
+        
+        if (query.includes('ejecuta') || query.includes('corre') || query.includes('run')) {
+            message = 'Ejecutando la simulación con los parámetros actuales...';
+            action = { type: 'run_simulation', data: {} };
+        } else if (query.includes('sube') || query.includes('aumenta')) {
+            const param = parameters[0];
+            if (param) {
+                const newValue = Math.min(param.currentValue * 1.2, param.max || param.currentValue * 2);
+                message = `Aumentando ${param.name} a ${newValue.toLocaleString()}${param.unit || ''}.`;
+                action = { type: 'set_parameter', data: { variable: param.variable, value: newValue } };
+            }
+        } else if (query.includes('baja') || query.includes('reduce')) {
+            const param = parameters[0];
+            if (param) {
+                const newValue = Math.max(param.currentValue * 0.8, param.min || 0);
+                message = `Reduciendo ${param.name} a ${newValue.toLocaleString()}${param.unit || ''}.`;
+                action = { type: 'set_parameter', data: { variable: param.variable, value: newValue } };
+            }
+        } else {
+            message = `Actualmente tienes ${parameters.length} parámetros configurados. Puedes pedirme que ajuste cualquier valor o que ejecute la simulación para ver los resultados.`;
+        }
+        
+        res.json({ message, action });
+    } catch (error) {
+        console.error('Error in simulation chat:', error);
+        res.status(500).json({ error: 'Failed to process chat message' });
     }
 });
 
@@ -3572,6 +4356,38 @@ app.post('/api/knowledge/documents', authenticateToken, knowledgeUpload.single('
             ]
         );
         
+        // If folderId is provided, add document to folder
+        const { folderId } = req.body;
+        if (folderId) {
+            const folder = await db.get(
+                'SELECT documentIds FROM knowledge_folders WHERE id = ? AND organizationId = ?',
+                [folderId, req.user.orgId]
+            );
+            if (folder) {
+                const docIds = folder.documentIds ? JSON.parse(folder.documentIds) : [];
+                docIds.push(id);
+                await db.run(
+                    'UPDATE knowledge_folders SET documentIds = ?, updatedAt = ? WHERE id = ?',
+                    [JSON.stringify(docIds), now, folderId]
+                );
+            }
+        }
+        
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'create',
+            resourceType: 'document',
+            resourceId: id,
+            resourceName: name || req.file.originalname,
+            details: { fileSize: req.file.size, mimeType: req.file.mimetype },
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
         res.json({
             id,
             name: name || req.file.originalname,
@@ -3579,6 +4395,7 @@ app.post('/api/knowledge/documents', authenticateToken, knowledgeUpload.single('
             source: 'upload',
             fileSize: req.file.size,
             summary,
+            folderId: folderId || null,
             createdAt: now
         });
     } catch (error) {
@@ -3591,7 +4408,7 @@ app.post('/api/knowledge/documents', authenticateToken, knowledgeUpload.single('
 app.delete('/api/knowledge/documents/:id', authenticateToken, async (req, res) => {
     try {
         const doc = await db.get(
-            'SELECT filePath FROM knowledge_documents WHERE id = ? AND organizationId = ?',
+            'SELECT filePath, name FROM knowledge_documents WHERE id = ? AND organizationId = ?',
             [req.params.id, req.user.orgId]
         );
         
@@ -3605,6 +4422,21 @@ app.delete('/api/knowledge/documents/:id', authenticateToken, async (req, res) =
         }
         
         await db.run('DELETE FROM knowledge_documents WHERE id = ?', [req.params.id]);
+
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'delete',
+            resourceType: 'document',
+            resourceId: req.params.id,
+            resourceName: doc.name || 'Unknown',
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
         res.json({ success: true });
     } catch (error) {
         console.error('Error deleting document:', error);
@@ -4511,6 +5343,20 @@ app.post('/api/workflows', authenticateToken, async (req, res) => {
             [id, req.user.orgId, name, JSON.stringify(data), tags ? JSON.stringify(tags) : null, now, now, req.user.sub, createdByName || 'Unknown']
         );
 
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: createdByName || req.user.email,
+            userEmail: req.user.email,
+            action: 'create',
+            resourceType: 'workflow',
+            resourceId: id,
+            resourceName: name,
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
         res.json({ id, name, tags: tags || [], createdAt: now, updatedAt: now, createdBy: req.user.sub, createdByName: createdByName || 'Unknown' });
     } catch (error) {
         console.error('Error saving workflow:', error);
@@ -4529,6 +5375,20 @@ app.put('/api/workflows/:id', authenticateToken, async (req, res) => {
             [name, JSON.stringify(data), tags ? JSON.stringify(tags) : null, now, req.user.sub, lastEditedByName || 'Unknown', id, req.user.orgId]
         );
 
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: lastEditedByName || req.user.email,
+            userEmail: req.user.email,
+            action: 'update',
+            resourceType: 'workflow',
+            resourceId: id,
+            resourceName: name,
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
         res.json({ message: 'Workflow updated' });
     } catch (error) {
         console.error('Error updating workflow:', error);
@@ -4539,7 +5399,26 @@ app.put('/api/workflows/:id', authenticateToken, async (req, res) => {
 app.delete('/api/workflows/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
+        
+        // Get workflow name before deleting
+        const workflow = await db.get('SELECT name FROM workflows WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
+        
         await db.run('DELETE FROM workflows WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
+
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'delete',
+            resourceType: 'workflow',
+            resourceId: id,
+            resourceName: workflow?.name || 'Unknown',
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
         res.json({ message: 'Workflow deleted' });
     } catch (error) {
         console.error('Error deleting workflow:', error);
@@ -4793,6 +5672,24 @@ app.post('/api/workflow/:id/execute', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
         const { inputs, usePrefect } = req.body;
+
+        // Get workflow name for logging
+        const workflow = await db.get('SELECT name FROM workflows WHERE id = ?', [id]);
+
+        // Log workflow execution
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'execute',
+            resourceType: 'workflow',
+            resourceId: id,
+            resourceName: workflow?.name || 'Unknown',
+            details: { inputCount: Object.keys(inputs || {}).length },
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
 
         // Check if we should use Prefect service (background execution)
         const shouldUsePrefect = usePrefect !== false; // Default to true
@@ -5757,6 +6654,21 @@ app.post('/api/report-templates', authenticateToken, async (req, res) => {
             'SELECT * FROM template_sections WHERE templateId = ? ORDER BY sortOrder ASC',
             [id]
         );
+
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'create',
+            resourceType: 'template',
+            resourceId: id,
+            resourceName: name,
+            details: { sectionCount: sections?.length || 0 },
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
         
         res.json(createdTemplate);
     } catch (error) {
@@ -6081,6 +6993,20 @@ app.post('/api/reports', authenticateToken, async (req, res) => {
                 VALUES (?, ?, ?, 'empty')
             `, [sectionId, id, section.id]);
         }
+
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'create',
+            resourceType: 'report',
+            resourceId: id,
+            resourceName: name,
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
         
         res.json({ id, message: 'Report created' });
     } catch (error) {

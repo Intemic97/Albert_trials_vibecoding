@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { User, Envelope, Plus, X, Check, Lightning, Crown, Sparkle, CreditCard, ArrowSquareOut, SpinnerGap, LinkSimple, LinkBreak, Copy, CheckCircle, WarningCircle, Sun, Moon, Monitor } from '@phosphor-icons/react';
+import { User, Envelope, Plus, X, Check, Lightning, Crown, Sparkle, CreditCard, ArrowSquareOut, SpinnerGap, LinkSimple, LinkBreak, Copy, CheckCircle, WarningCircle, Sun, Moon, Monitor, Shield } from '@phosphor-icons/react';
 import { UserAvatar } from './ProfileMenu';
 import { PageHeader } from './PageHeader';
 import { API_BASE } from '../config';
 import { useTheme } from '../context/ThemeContext';
+import { ActivityLog } from './ActivityLog';
 
 // Slack icon component
 const SlackIcon = () => (
@@ -53,7 +54,7 @@ interface OrgUser {
 
 export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial }) => {
     const { mode, setMode, isDark } = useTheme();
-    const [activeTab, setActiveTab] = useState<'general' | 'team' | 'billing' | 'integrations'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'team' | 'integrations' | 'activity'>('general');
     const [users, setUsers] = useState<OrgUser[]>([]);
     const [isInviting, setIsInviting] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
@@ -514,16 +515,22 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-5xl mx-auto">
                     <div className="flex gap-0.5 bg-[var(--bg-tertiary)] p-0.5 rounded-lg w-fit mb-6 border border-[var(--border-light)]">
-                        {['General', 'Team', 'Billing', 'Integrations'].map((tab) => (
+                        {[
+                            { id: 'general', label: 'General' },
+                            { id: 'team', label: 'Team' },
+                            { id: 'integrations', label: 'Integrations' },
+                            { id: 'activity', label: 'Activity Log', icon: Shield }
+                        ].map((tab) => (
                             <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab.toLowerCase() as any)}
-                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === tab.toLowerCase()
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id as any)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === tab.id
                                     ? 'bg-[var(--bg-card)] text-[var(--text-primary)]'
                                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                     }`}
                             >
-                                {tab}
+                                {tab.icon && <tab.icon size={14} />}
+                                {tab.label}
                             </button>
                         ))}
                     </div>
@@ -1211,6 +1218,12 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                     We're working on integrations with more tools. Stay tuned!
                                 </p>
                             </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'activity' && (
+                        <div className="-m-8">
+                            <ActivityLog />
                         </div>
                     )}
                 </div>

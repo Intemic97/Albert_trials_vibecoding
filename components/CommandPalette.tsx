@@ -167,12 +167,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
                 keywords: ['automation', 'flows', 'pipelines']
             },
             {
-                id: 'nav-simulations',
-                title: 'Go to Simulations',
+                id: 'nav-lab',
+                title: 'Go to Lab',
                 category: 'navigation',
                 icon: <ChartBar size={18} weight="light" />,
-                action: () => navigateTo('/simulations'),
-                keywords: ['what-if', 'scenarios', 'analysis']
+                action: () => navigateTo('/lab'),
+                keywords: ['what-if', 'scenarios', 'analysis', 'experiments']
             },
             {
                 id: 'nav-reports',

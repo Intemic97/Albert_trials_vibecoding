@@ -618,12 +618,6 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
             
             if (res.ok) {
                 const data = await res.json();
-                console.log('[AI Assistant] Response received:', { 
-                    hasResponse: !!data.response, 
-                    hasSuggestion: !!data.suggestion, 
-                    activeTab,
-                    shouldApplyToContent 
-                });
                 
                 const messageId = `msg-${Date.now()}-response`;
                 const assistantMessage: AIMessage = {
@@ -643,9 +637,6 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 
                 // If there's a suggestion AND we're in Generate tab, show it in the content area
                 if (data.suggestion && activeTab === 'generate') {
-                    console.log('[AI Assistant] Setting pending suggestion for Generate tab');
-                    console.log('[AI Assistant] Suggestion data:', data.suggestion);
-                    
                     setPendingSuggestion({
                         messageId,
                         sectionId: data.suggestion.sectionId,
@@ -709,8 +700,6 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
             });
             
             if (res.ok) {
-                console.log('[Accept] Content saved successfully');
-                
                 // Update the message suggestion status
                 setAiMessages(prev => prev.map(m => 
                     m.id === messageId 
@@ -759,8 +748,6 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
     const handleGenerate = async (prompt: string, mentionedEntityIds: string[]) => {
         if (!report || !selectedSectionId || !prompt.trim()) return;
         
-        console.log('[Generate] Starting generation:', { reportId: report.id, sectionId: selectedSectionId, prompt: prompt.slice(0, 50) });
-        
         setIsGenerating(true);
         try {
             const res = await fetch(`${API_BASE}/reports/${report.id}/sections/${selectedSectionId}/generate`, {
@@ -770,11 +757,8 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 credentials: 'include'
             });
             
-            console.log('[Generate] Response status:', res.status);
-            
             if (res.ok) {
                 const { content, generatedAt } = await res.json();
-                console.log('[Generate] Content received, length:', content?.length);
                 setEditingContent(content);
                 
                 // Update the section in state

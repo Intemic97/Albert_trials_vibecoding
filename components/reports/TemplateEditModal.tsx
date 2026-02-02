@@ -187,23 +187,35 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
 
         {/* Usage Warning */}
         {usage?.inUse && (
-          <div className="px-6 py-3 bg-amber-50 border-b border-amber-100">
+          <div className="mx-6 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
             <div className="flex items-start gap-3">
-              <Warning className="text-amber-500 shrink-0 mt-0.5" size={20} weight="light" />
-              <div>
+              <div className="p-1.5 bg-amber-100 rounded-lg">
+                <Warning className="text-amber-600" size={18} weight="fill" />
+              </div>
+              <div className="flex-1">
                 <p className="text-sm font-medium text-amber-800">
-                  This template is used in {usage.reportCount} document{usage.reportCount !== 1 ? 's' : ''}
+                  Template in use
                 </p>
-                <p className="text-xs text-amber-600 mt-1">
-                  Modifying sections may affect existing documents.
+                <p className="text-xs text-amber-600 mt-0.5">
+                  This template is used in {usage.reportCount} document{usage.reportCount !== 1 ? 's' : ''}. Changes to sections may affect existing documents.
                 </p>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {usage.reports.slice(0, 5).map((report) => (
-                    <span key={report.id} className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
-                      {report.name}
-                    </span>
-                  ))}
-                </div>
+                {usage.reports.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-[10px] uppercase tracking-wider text-amber-500 font-medium mb-1.5">Affected documents</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {usage.reports.slice(0, 5).map((report) => (
+                        <span key={report.id} className="px-2 py-1 bg-white border border-amber-200 text-amber-700 rounded-md text-xs font-medium shadow-sm">
+                          {report.name}
+                        </span>
+                      ))}
+                      {usage.reports.length > 5 && (
+                        <span className="px-2 py-1 bg-amber-100 text-amber-600 rounded-md text-xs">
+                          +{usage.reports.length - 5} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -212,31 +224,32 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Basic Info */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-[1fr,auto] gap-6">
             <div>
-              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Template Name *</label>
+              <label className="block text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">Template Name <span className="text-red-400">*</span></label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-[var(--bg-input)] text-[var(--text-primary)]"
+                placeholder="e.g. Monthly Report, Analysis Template..."
+                className="w-full px-3 py-2.5 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Icon</label>
-              <div className="flex gap-2">
+              <label className="block text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">Icon</label>
+              <div className="flex gap-1.5">
                 {ICON_OPTIONS.map(({ value, label, Icon }) => (
                   <button
                     key={value}
                     onClick={() => setIcon(value)}
-                    className={`p-2 rounded-lg border-2 transition-all ${
+                    className={`p-2.5 rounded-lg border-2 transition-all ${
                       icon === value
                         ? 'border-teal-500 bg-teal-50 text-teal-600'
-                        : 'border-[var(--border-light)] hover:border-[var(--border-medium)] text-[var(--text-secondary)]'
+                        : 'border-[var(--border-light)] hover:border-[var(--border-medium)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
                     title={label}
                   >
-                    <Icon size={20} weight="light" />
+                    <Icon size={18} weight={icon === value ? 'fill' : 'light'} />
                   </button>
                 ))}
               </div>
@@ -244,126 +257,137 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Description</label>
-            <input
-              type="text"
+            <label className="block text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">Description</label>
+            <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-[var(--bg-input)] text-[var(--text-primary)]"
+              placeholder="Brief description of what this template is for..."
+              rows={2}
+              className="w-full px-3 py-2.5 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none"
             />
           </div>
 
           {/* Sections */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-medium text-[var(--text-primary)]">Sections</label>
-              <button onClick={addSection} className="flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700 font-medium">
-                <Plus size={16} weight="light" />
+              <div>
+                <label className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Sections</label>
+                <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Define the structure of your template</p>
+              </div>
+              <button onClick={addSection} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-lg font-medium transition-colors">
+                <Plus size={16} weight="bold" />
                 Add Section
               </button>
             </div>
 
             <div className="space-y-4">
               {sections.map((section, sIdx) => (
-                <div key={sIdx} className="border border-[var(--border-light)] rounded-lg overflow-hidden">
+                <div key={sIdx} className="border border-[var(--border-light)] rounded-xl overflow-hidden bg-[var(--bg-card)]">
                   {/* Section Header */}
-                  <div className="bg-[var(--bg-tertiary)] px-4 py-3 flex items-center gap-3">
-                    <button onClick={() => toggleSection(sIdx)} className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]">
-                      {section.isExpanded ? <CaretDown size={18} weight="light" /> : <CaretRight size={18} weight="light" />}
+                  <div className="bg-[var(--bg-tertiary)] px-4 py-3 flex items-center gap-3 border-b border-[var(--border-light)]">
+                    <button onClick={() => toggleSection(sIdx)} className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded transition-colors">
+                      {section.isExpanded ? <CaretDown size={16} weight="bold" /> : <CaretRight size={16} weight="bold" />}
                     </button>
-                    <span className="text-sm text-[var(--text-secondary)] font-medium">Section {sIdx + 1} Title</span>
+                    <span className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider shrink-0">Section {sIdx + 1}</span>
                     <input
                       type="text"
                       value={section.title}
                       onChange={(e) => updateSection(sIdx, { title: e.target.value })}
-                      className="flex-1 px-2 py-1 border border-[var(--border-light)] rounded focus:ring-1 focus:ring-teal-500 outline-none text-sm bg-[var(--bg-input)] text-[var(--text-primary)]"
+                      placeholder="Section title..."
+                      className="flex-1 px-3 py-1.5 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                     />
-                    <button onClick={() => addItem(sIdx)} className="p-1 text-teal-600 hover:bg-teal-50 rounded" title="Add item">
-                      <Plus size={18} weight="light" />
+                    <button onClick={() => addItem(sIdx)} className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors" title="Add item">
+                      <Plus size={16} weight="bold" />
                     </button>
-                    <button onClick={() => removeSection(sIdx)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Remove section">
-                      <Trash size={18} weight="light" />
+                    <button onClick={() => removeSection(sIdx)} className="p-1.5 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Remove section">
+                      <Trash size={16} weight="light" />
                     </button>
                   </div>
 
                   {/* Section Content */}
                   {section.isExpanded && (
-                    <div className="p-4 space-y-3">
+                    <div className="p-4 space-y-4">
                       {/* Section Content and Generation Rules */}
-                      <div className="bg-[var(--bg-card)] rounded-lg p-3 border border-[var(--border-light)] space-y-3 mb-4">
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="text-xs text-[var(--text-secondary)] font-medium">Content</label>
+                          <label className="text-xs text-[var(--text-secondary)] font-medium mb-1.5 block">Section Content</label>
                           <textarea
                             value={section.content || ''}
                             onChange={(e) => updateSection(sIdx, { content: e.target.value })}
-                            placeholder="Description of what this section should contain..."
-                            className="w-full px-2 py-1.5 border border-[var(--border-light)] rounded focus:ring-1 focus:ring-teal-500 outline-none text-sm resize-none bg-[var(--bg-input)] text-[var(--text-primary)]"
-                            rows={2}
+                            placeholder="What should this section contain..."
+                            className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm resize-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                            rows={3}
                           />
                         </div>
                         <div>
-                          <label className="text-xs text-[var(--text-secondary)] font-medium">Generation Rules (optional)</label>
+                          <label className="text-xs text-[var(--text-secondary)] font-medium mb-1.5 block">
+                            AI Generation Rules <span className="text-[var(--text-tertiary)] font-normal">(optional)</span>
+                          </label>
                           <textarea
                             value={section.generationRules || ''}
                             onChange={(e) => updateSection(sIdx, { generationRules: e.target.value })}
-                            placeholder="Special instructions for AI generation..."
-                            className="w-full px-2 py-1.5 border border-[var(--border-light)] rounded focus:ring-1 focus:ring-teal-500 outline-none text-sm resize-none bg-[var(--bg-input)] text-[var(--text-primary)]"
-                            rows={2}
+                            placeholder="Special instructions for AI..."
+                            className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm resize-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                            rows={3}
                           />
                         </div>
                       </div>
 
                       {/* Section Items */}
-                      {section.items.length > 0 ? (
-                        <div className="space-y-3">
-                          {section.items.map((item, iIdx) => (
-                            <div key={iIdx} className="bg-[var(--bg-tertiary)] rounded-lg p-3 border border-[var(--border-light)]">
-                              <div className="flex items-start gap-2 mb-2">
-                                <DotsSixVertical size={16} weight="light" className="text-[var(--text-tertiary)] mt-2 shrink-0" />
-                                <div className="flex-1 space-y-2">
-                                  <div>
-                                    <label className="text-xs text-[var(--text-secondary)]">Item Title</label>
-                                    <input
-                                      type="text"
-                                      value={item.title}
-                                      onChange={(e) => updateItem(sIdx, iIdx, { title: e.target.value })}
-                                      className="w-full px-2 py-1.5 border border-[var(--border-light)] rounded focus:ring-1 focus:ring-teal-500 outline-none text-sm bg-[var(--bg-input)] text-[var(--text-primary)]"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-[var(--text-secondary)]">Content</label>
-                                    <textarea
-                                      value={item.content}
-                                      onChange={(e) => updateItem(sIdx, iIdx, { content: e.target.value })}
-                                      rows={2}
-                                      className="w-full px-2 py-1.5 border border-[var(--border-light)] rounded focus:ring-1 focus:ring-teal-500 outline-none text-sm resize-none bg-[var(--bg-input)] text-[var(--text-primary)]"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-[var(--text-secondary)]">Generation Rules <span className="text-[var(--text-tertiary)]">(optional)</span></label>
-                                    <textarea
-                                      value={item.generationRules}
-                                      onChange={(e) => updateItem(sIdx, iIdx, { generationRules: e.target.value })}
-                                      rows={2}
-                                      className="w-full px-2 py-1.5 border border-[var(--border-light)] rounded focus:ring-1 focus:ring-teal-500 outline-none text-sm resize-none bg-[var(--bg-input)] text-[var(--text-primary)]"
-                                    />
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-xs text-[var(--text-secondary)] font-medium">Items</label>
+                          <span className="text-[10px] text-[var(--text-tertiary)]">{section.items.length} item{section.items.length !== 1 ? 's' : ''}</span>
+                        </div>
+                        {section.items.length > 0 ? (
+                          <div className="space-y-2">
+                            {section.items.map((item, iIdx) => (
+                              <div key={iIdx} className="bg-[var(--bg-tertiary)] rounded-lg p-3 border border-[var(--border-light)]">
+                                <div className="flex items-start gap-2">
+                                  <DotsSixVertical size={16} weight="light" className="text-[var(--text-tertiary)] mt-2.5 shrink-0 cursor-grab" />
+                                  <div className="flex-1 space-y-2">
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="text"
+                                        value={item.title}
+                                        onChange={(e) => updateItem(sIdx, iIdx, { title: e.target.value })}
+                                        placeholder="Item title..."
+                                        className="flex-1 px-3 py-1.5 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                                      />
+                                      <button onClick={() => removeItem(sIdx, iIdx)} className="p-1.5 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-lg shrink-0 transition-colors" title="Remove item">
+                                        <Trash size={14} weight="light" />
+                                      </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <textarea
+                                        value={item.content}
+                                        onChange={(e) => updateItem(sIdx, iIdx, { content: e.target.value })}
+                                        placeholder="Item content..."
+                                        rows={2}
+                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-xs resize-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                                      />
+                                      <textarea
+                                        value={item.generationRules}
+                                        onChange={(e) => updateItem(sIdx, iIdx, { generationRules: e.target.value })}
+                                        placeholder="AI rules (optional)..."
+                                        rows={2}
+                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-xs resize-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                                      />
+                                    </div>
                                   </div>
                                 </div>
-                                <button onClick={() => removeItem(sIdx, iIdx)} className="p-1 text-red-400 hover:bg-red-50 rounded shrink-0" title="Remove item">
-                                  <Trash size={16} weight="light" />
-                                </button>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-4 border-2 border-dashed border-[var(--border-light)] rounded-lg">
-                          <p className="text-sm text-[var(--text-tertiary)]">No items in this section</p>
-                          <button onClick={() => addItem(sIdx)} className="mt-2 text-sm text-teal-600 hover:text-teal-700 font-medium">
-                            + Add item
-                          </button>
-                        </div>
-                      )}
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-6 border-2 border-dashed border-[var(--border-light)] rounded-lg bg-[var(--bg-tertiary)]/50">
+                            <p className="text-sm text-[var(--text-tertiary)]">No items in this section</p>
+                            <button onClick={() => addItem(sIdx)} className="mt-2 text-sm text-teal-600 hover:text-teal-700 font-medium">
+                              + Add item
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -373,18 +397,23 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-[var(--border-light)] flex justify-end gap-3 shrink-0">
-          <button onClick={onClose} className="px-4 py-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg font-medium transition-colors">
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isSaving}
-            className="px-3 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 flex items-center gap-2"
-          >
-            {isSaving ? <SpinnerGap size={16} weight="light" className="animate-spin" /> : <FloppyDisk size={16} weight="light" />}
-            Save Changes
-          </button>
+        <div className="px-6 py-4 border-t border-[var(--border-light)] flex items-center justify-between shrink-0 bg-[var(--bg-tertiary)]/50">
+          <p className="text-xs text-[var(--text-tertiary)]">
+            {sections.filter(s => s.title.trim()).length} section{sections.filter(s => s.title.trim()).length !== 1 ? 's' : ''} · {sections.reduce((acc, s) => acc + s.items.filter(i => i.title.trim()).length, 0)} items
+          </p>
+          <div className="flex gap-3">
+            <button onClick={onClose} className="px-4 py-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg font-medium transition-colors">
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={isSaving || !name.trim()}
+              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isSaving ? <SpinnerGap size={16} weight="light" className="animate-spin" /> : <FloppyDisk size={16} weight="light" />}
+              Save Changes
+            </button>
+          </div>
         </div>
       </div>
     </div>
