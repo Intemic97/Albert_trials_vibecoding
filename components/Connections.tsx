@@ -406,6 +406,8 @@ export const Connections: React.FC = () => {
     const [categoryFilter, setCategoryFilter] = useState<string>('all');
     const [logoErrors, setLogoErrors] = useState<Set<string>>(new Set());
     const [otAlertCount, setOtAlertCount] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 12;
 
     // Fetch OT alert count
     useEffect(() => {
@@ -558,40 +560,31 @@ export const Connections: React.FC = () => {
         }
     };
 
-    const getCategoryColor = (category: string) => {
-        switch (category) {
-            case 'database': return 'text-blue-500';
-            case 'cloud': return 'text-purple-500';
-            case 'erp': return 'text-emerald-500';
-            case 'crm': return 'text-orange-500';
-            case 'analytics': return 'text-cyan-500';
-            case 'productivity': return 'text-pink-500';
-            case 'communication': return 'text-amber-500';
-            case 'ot': return 'text-indigo-500';
-            default: return 'text-[var(--text-secondary)]';
-        }
+    const getCategoryColor = () => {
+        return 'text-[var(--text-secondary)]';
     };
     
-    const getCategoryBg = (category: string) => {
-        switch (category) {
-            case 'database': return 'bg-blue-500/10 border-blue-500/20';
-            case 'cloud': return 'bg-purple-500/10 border-purple-500/20';
-            case 'erp': return 'bg-emerald-500/10 border-emerald-500/20';
-            case 'crm': return 'bg-orange-500/10 border-orange-500/20';
-            case 'analytics': return 'bg-cyan-500/10 border-cyan-500/20';
-            case 'productivity': return 'bg-pink-500/10 border-pink-500/20';
-            case 'communication': return 'bg-amber-500/10 border-amber-500/20';
-            case 'ot': return 'bg-indigo-500/10 border-indigo-500/20';
-            default: return 'bg-[var(--bg-tertiary)] border-[var(--border-light)]';
-        }
+    const getCategoryBg = () => {
+        return 'bg-[var(--bg-tertiary)] border-[var(--border-light)]';
     };
 
-    const filteredConnections = connections.filter(conn => {
+    const allFilteredConnections = connections.filter(conn => {
         const matchesSearch = conn.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                              conn.description.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesCategory = categoryFilter === 'all' || conn.category === categoryFilter;
         return matchesSearch && matchesCategory;
     });
+
+    const totalPages = Math.ceil(allFilteredConnections.length / ITEMS_PER_PAGE);
+    const filteredConnections = allFilteredConnections.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
+
+    // Reset page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, categoryFilter]);
 
     const categories = [
         { id: 'all', label: 'All', count: connections.filter(c => !c.comingSoon).length },
@@ -614,33 +607,21 @@ export const Connections: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-7xl mx-auto space-y-8">
 
-                    {/* OT Monitoring Banner */}
+                    {/* OT Monitoring Link */}
                     <button
                         onClick={() => navigate('/industrial')}
-                        className="w-full bg-gradient-to-r from-[var(--bg-card)] to-[var(--bg-tertiary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 rounded-xl p-4 transition-all group flex items-center justify-between"
+                        className="w-full bg-[var(--bg-card)] border border-[var(--border-light)] hover:border-[var(--border-medium)] rounded-lg p-3 transition-all group flex items-center justify-between"
                     >
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-cyan-500/10 rounded-xl group-hover:scale-105 transition-transform">
-                                <Gauge size={24} className="text-cyan-500" />
-                            </div>
-                            <div className="text-left">
-                                <h3 className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[#419CAF] transition-colors">
-                                    OT Monitoring Dashboard
-                                </h3>
-                                <p className="text-xs text-[var(--text-tertiary)]">
-                                    Real-time monitoring of industrial connections (OPC UA, MQTT, Modbus, SCADA)
-                                </p>
-                            </div>
-                        </div>
                         <div className="flex items-center gap-3">
+                            <Gauge size={18} className="text-[var(--text-secondary)]" />
+                            <span className="text-sm text-[var(--text-primary)]">OT Monitoring</span>
                             {otAlertCount > 0 && (
-                                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 border border-red-500/20 rounded-lg">
-                                    <Warning size={14} className="text-red-500" />
-                                    <span className="text-xs font-medium text-red-500">{otAlertCount} alerts</span>
-                                </div>
+                                <span className="px-1.5 py-0.5 bg-red-500/10 text-red-500 text-[10px] font-medium rounded">
+                                    {otAlertCount}
+                                </span>
                             )}
-                            <ArrowRight size={18} className="text-[var(--text-tertiary)] group-hover:text-[#419CAF] group-hover:translate-x-1 transition-all" />
                         </div>
+                        <ArrowRight size={16} className="text-[var(--text-tertiary)] group-hover:translate-x-0.5 transition-transform" />
                     </button>
                     
                     {/* Filters */}
@@ -695,7 +676,7 @@ export const Connections: React.FC = () => {
                             </button>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             {filteredConnections.map((connection) => {
                             const Icon = connection.icon || Database;
                             const hasLogoError = logoErrors.has(connection.id);
@@ -703,55 +684,50 @@ export const Connections: React.FC = () => {
                             return (
                                 <div
                                     key={connection.id}
-                                    className={`bg-[var(--bg-card)] border rounded-xl p-5 transition-all duration-200 group ${
+                                    className={`bg-[var(--bg-card)] border rounded-lg p-4 transition-all group ${
                                         connection.comingSoon 
-                                            ? 'border-[var(--border-light)] opacity-70' 
-                                            : 'border-[var(--border-light)] hover:border-[#419CAF]/50 hover:shadow-lg'
+                                            ? 'border-[var(--border-light)] opacity-60' 
+                                            : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'
                                     }`}
                                 >
-                                    <div className="flex items-start justify-between mb-3">
+                                    <div className="flex items-start justify-between mb-2">
                                         <div className="flex items-center gap-3">
-                                            <div className={`p-2.5 rounded-xl ${getCategoryBg(connection.category)} border flex items-center justify-center min-w-[44px] min-h-[44px] group-hover:scale-105 transition-transform`}>
+                                            <div className={`p-2 rounded-lg ${getCategoryBg()} border flex items-center justify-center min-w-[36px] min-h-[36px]`}>
                                                 {connection.logoUrl && !hasLogoError ? (
                                                     <img 
                                                         src={connection.logoUrl} 
                                                         alt={`${connection.name} logo`}
-                                                        className="h-6 w-auto object-contain max-w-[36px]"
+                                                        className="h-5 w-auto object-contain max-w-[28px]"
                                                         onError={() => {
                                                             setLogoErrors(prev => new Set(prev).add(connection.id));
                                                         }}
                                                     />
                                                 ) : (
-                                                    <Icon size={22} className={getCategoryColor(connection.category)} weight="light" />
+                                                    <Icon size={18} className={getCategoryColor()} weight="light" />
                                                 )}
                                             </div>
                                             <div>
-                                                <div className="flex items-center gap-2">
-                                                    <h3 className="text-sm font-medium text-[var(--text-primary)]">
-                                                        {connection.name}
-                                                    </h3>
-                                                    {connection.popular && !connection.comingSoon && (
-                                                        <Star size={12} className="text-amber-500" weight="fill" />
-                                                    )}
-                                                </div>
-                                                <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-medium mt-1 ${getCategoryBg(connection.category)} ${getCategoryColor(connection.category)}`}>
+                                                <h3 className="text-sm font-medium text-[var(--text-primary)]">
+                                                    {connection.name}
+                                                </h3>
+                                                <span className="text-[10px] text-[var(--text-tertiary)]">
                                                     {connection.type}
                                                 </span>
                                             </div>
                                         </div>
                                         {connection.comingSoon ? (
-                                            <span className="px-2 py-1 rounded-md bg-purple-500/10 text-purple-500 text-[10px] font-medium">
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] text-[var(--text-tertiary)] bg-[var(--bg-tertiary)]">
                                                 Soon
                                             </span>
                                         ) : connection.connected || connection.status === 'active' ? (
-                                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10">
-                                                <CheckCircle size={14} className="text-emerald-500" weight="fill" />
-                                                <span className="text-[10px] font-medium text-emerald-500">Active</span>
+                                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10">
+                                                <CheckCircle size={12} className="text-emerald-500" weight="fill" />
+                                                <span className="text-[10px] text-emerald-600">Active</span>
                                             </div>
                                         ) : connection.status === 'inactive' ? (
-                                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-red-500/10">
-                                                <XCircle size={14} className="text-red-500" weight="fill" />
-                                                <span className="text-[10px] font-medium text-red-500">Inactive</span>
+                                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-500/10">
+                                                <XCircle size={12} className="text-red-500" weight="fill" />
+                                                <span className="text-[10px] text-red-500">Error</span>
                                             </div>
                                         ) : null}
                                     </div>
@@ -813,17 +789,54 @@ export const Connections: React.FC = () => {
                                         ) : (
                                             <button
                                                 onClick={() => handleConnect(connection)}
-                                                className="flex-1 px-3 py-2 bg-[#419CAF] hover:bg-[#3a8a9d] text-white rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 group-hover:shadow-md"
+                                                className="flex-1 px-3 py-1.5 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] border border-[var(--border-light)] rounded text-xs font-medium transition-all flex items-center justify-center gap-1.5"
                                             >
                                                 <Plus size={14} weight="light" />
                                                 Connect
-                                                <ArrowRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" weight="light" />
                                             </button>
                                         )}
                                     </div>
                                 </div>
                             );
                         })}
+                        </div>
+                    )}
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-between pt-4">
+                            <span className="text-xs text-[var(--text-tertiary)]">
+                                Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, allFilteredConnections.length)} of {allFilteredConnections.length}
+                            </span>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-2 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    Prev
+                                </button>
+                                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                                    <button
+                                        key={page}
+                                        onClick={() => setCurrentPage(page)}
+                                        className={`w-7 h-7 text-xs rounded ${
+                                            currentPage === page
+                                                ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] font-medium'
+                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                        }`}
+                                    >
+                                        {page}
+                                    </button>
+                                ))}
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className="px-2 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    Next
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
