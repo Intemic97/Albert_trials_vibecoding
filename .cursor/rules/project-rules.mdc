@@ -206,13 +206,16 @@ Sistema completo para integración con sistemas industriales (OT - Operational T
 | `components/workflows/modals/OpcUaConfigModal.tsx` | Configuración de conexiones OPC-UA |
 | `components/workflows/modals/ModbusConfigModal.tsx` | Configuración de conexiones Modbus TCP/RTU |
 | `components/workflows/modals/MqttConfigModal.tsx` | Configuración de conexiones MQTT |
+| `components/IndustrialWidget.tsx` | Widget compacto de estado OT para Overview |
+| `components/OTNotificationSettings.tsx` | Configuración de notificaciones por email |
 
 ### Backend OT
 
 | Archivo | Descripción |
 |---------|-------------|
 | `server/utils/otAlerts.js` | Gestor de alertas OT con persistencia, detección de valores fuera de rango y broadcast WebSocket |
-| `server/utils/otConnections.js` | Gestor de conexiones OT (OPC-UA, Modbus, MQTT) con prueba de conexión y CRUD |
+| `server/utils/otConnections.js` | Gestor de conexiones OT (OPC-UA, Modbus, MQTT) con prueba de conexión, CRUD y auto health-check |
+| `server/utils/otNotifications.js` | Servicio de notificaciones por email para alertas OT |
 
 ### Arquitectura WebSocket para Alertas
 
@@ -235,6 +238,10 @@ broadcastToOrganization(orgId, { type: 'ot_alert', alert: alertData });
 | POST | `/api/data-connections/:id/test` | Probar conexión |
 | GET | `/api/ot-alerts` | Lista alertas OT activas |
 | POST | `/api/ot-alerts/:id/acknowledge` | Reconocer alerta |
+| GET | `/api/ot-notification-settings` | Obtener configuración de notificaciones |
+| POST | `/api/ot-notification-settings` | Guardar configuración de notificaciones |
+| POST | `/api/ot-notification-settings/test` | Enviar email de prueba |
+| GET | `/api/ot-metrics/history` | Obtener métricas históricas |
 
 ### Navegación
 
@@ -260,3 +267,7 @@ El dashboard industrial está disponible en `/industrial` y se accede desde el S
 | 2026-01-31 | Sistema OT/Industrial | Integración con OPC-UA, Modbus, MQTT |
 | 2026-01-31 | Alertas WebSocket | Notificaciones en tiempo real por organización |
 | 2026-01-31 | IndustrialDashboard | Monitoreo centralizado de sistemas OT |
+| 2026-01-31 | Email Notifications | Alertas por email con SMTP configurable |
+| 2026-01-31 | Auto Health-Check | Verificación automática de conexiones cada 5 min |
+| 2026-01-31 | Industrial Widget | Widget compacto en Overview con estado OT |
+| 2026-01-31 | Sidebar Alert Badge | Indicador de alertas activas en navegación |
