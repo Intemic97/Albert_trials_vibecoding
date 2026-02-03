@@ -690,7 +690,7 @@ export const Connections: React.FC = () => {
                                                     <img 
                                                         src={connection.logoUrl} 
                                                         alt={`${connection.name} logo`}
-                                                        className="h-5 w-auto object-contain max-w-[28px]"
+                                                        className="h-5 w-auto object-contain max-w-[28px] dark:invert"
                                                         onError={() => {
                                                             setLogoErrors(prev => new Set(prev).add(connection.id));
                                                         }}
