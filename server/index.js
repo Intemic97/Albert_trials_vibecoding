@@ -6449,7 +6449,7 @@ app.get('/api/overview/stats', authenticateToken, async (req, res) => {
         
         res.json({
             activeWorkflows: workflowCount?.count || 0,
-            eventsTriggered: executionsCount?.count || 0,
+            eventsTriggered: recentExecutions?.count || 0,
             eventsChange: parseFloat(eventsChange) || 0,
             dailyExecutions: (dailyExecutions || []).map(row => ({
                 date: row.date,
