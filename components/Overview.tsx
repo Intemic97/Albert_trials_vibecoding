@@ -270,45 +270,6 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                         </div>
                     </section>
 
-                    {/* Quick Actions */}
-                    <section>
-                        <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-sm font-medium text-[var(--text-primary)]">Quick Actions</h3>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <button 
-                                    onClick={() => navigate('/workflows')}
-                                    className="flex items-center gap-2 p-3 border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors text-left"
-                                >
-                                    <FlowArrow size={18} className="text-blue-500" />
-                                    <span className="text-sm text-[var(--text-primary)]">New Workflow</span>
-                                </button>
-                                <button 
-                                    onClick={() => navigate('/copilots')}
-                                    className="flex items-center gap-2 p-3 border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors text-left"
-                                >
-                                    <Sparkle size={18} className="text-purple-500" />
-                                    <span className="text-sm text-[var(--text-primary)]">New Copilot</span>
-                                </button>
-                                <button 
-                                    onClick={() => navigate('/database')}
-                                    className="flex items-center gap-2 p-3 border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors text-left"
-                                >
-                                    <Database size={18} className="text-green-500" />
-                                    <span className="text-sm text-[var(--text-primary)]">Add Entity</span>
-                                </button>
-                                <button 
-                                    onClick={() => navigate('/connections')}
-                                    className="flex items-center gap-2 p-3 border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors text-left"
-                                >
-                                    <Pulse size={18} className="text-amber-500" />
-                                    <span className="text-sm text-[var(--text-primary)]">Connections</span>
-                                </button>
-                            </div>
-                        </div>
-                    </section>
-
                     {/* Chart and Copilots */}
                     <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl overflow-hidden">
