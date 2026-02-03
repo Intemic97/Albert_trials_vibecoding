@@ -372,16 +372,37 @@ export const Documentation: React.FC = () => {
                                         <li><strong>Integration Complexity</strong> — Connect to SAP, Oracle, databases, and cloud services easily</li>
                                     </ul>
 
-                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Core Capabilities</h3>
+                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Platform Structure</h3>
+                                    <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
+                                        Intemic is organized into three main areas:
+                                    </p>
+                                    
+                                    <h4 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wide mt-4 mb-2">Build</h4>
                                     <Table 
                                         headers={['Module', 'Description']}
                                         rows={[
+                                            ['Workflows', 'Visual editor for creating automated data pipelines'],
                                             ['Knowledge Base', 'Model your data with entities, properties, and relationships'],
-                                            ['Workflows', 'Build automated pipelines with drag-and-drop visual editor'],
-                                            ['Copilots', 'Create AI assistants with custom instructions and data access'],
-                                            ['Dashboards', 'Visualize KPIs and metrics with configurable widgets'],
-                                            ['Connections', 'Integrate with external databases and services'],
-                                            ['Lab', 'Run experiments and scenario analysis']
+                                            ['Connections', 'Connect to databases, APIs, cloud services, and industrial systems']
+                                        ]}
+                                    />
+                                    
+                                    <h4 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wide mt-6 mb-2">Analyze</h4>
+                                    <Table 
+                                        headers={['Module', 'Description']}
+                                        rows={[
+                                            ['Dashboards', 'Create interactive visualizations with charts and KPIs'],
+                                            ['Lab', 'Run simulations and scenario analysis using workflows'],
+                                            ['Copilots', 'AI assistants that understand your data and answer questions']
+                                        ]}
+                                    />
+                                    
+                                    <h4 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wide mt-6 mb-2">Reports</h4>
+                                    <Table 
+                                        headers={['Module', 'Description']}
+                                        rows={[
+                                            ['Templates', 'Create reusable document templates'],
+                                            ['Documents', 'Generate professional reports from your data']
                                         ]}
                                     />
                                 </div>
