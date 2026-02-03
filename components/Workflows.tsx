@@ -711,32 +711,54 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
         setIsSaving(true);
         try {
-            // Strip runtime execution data from nodes to reduce payload size
-            // This prevents 413 "Request Entity Too Large" errors
+            // Limit data size while preserving execution state for UX
+            // This prevents 413 "Request Entity Too Large" errors while keeping useful info
+            const MAX_RECORDS_TO_SAVE = 50; // Limit records to prevent large payloads
+            
             const cleanedNodes = nodes.map(node => {
-                const { 
-                    outputData, 
-                    inputData, 
-                    inputDataA, 
-                    inputDataB, 
-                    status, 
-                    executionResult, 
-                    conditionResult,
-                    data: nodeData,
-                    ...cleanNode 
-                } = node;
+                // Helper to limit array data
+                const limitData = (data: any) => {
+                    if (!data) return undefined;
+                    if (Array.isArray(data)) {
+                        return data.slice(0, MAX_RECORDS_TO_SAVE);
+                    }
+                    // For objects with trueRecords/falseRecords (condition nodes)
+                    if (data.trueRecords || data.falseRecords) {
+                        return {
+                            ...data,
+                            trueRecords: data.trueRecords?.slice(0, MAX_RECORDS_TO_SAVE),
+                            falseRecords: data.falseRecords?.slice(0, MAX_RECORDS_TO_SAVE)
+                        };
+                    }
+                    return data;
+                };
+                
+                // Keep status and executionResult (small, needed for UI state)
+                // Limit data arrays to prevent large payloads
+                const cleanedNode = {
+                    ...node,
+                    outputData: limitData(node.outputData),
+                    inputData: limitData(node.inputData),
+                    inputDataA: limitData(node.inputDataA),
+                    inputDataB: limitData(node.inputDataB),
+                    data: limitData(node.data),
+                    // Keep status and executionResult for showing green/red states
+                    status: node.status,
+                    executionResult: node.executionResult,
+                    conditionResult: node.conditionResult
+                };
                 
                 // For excelInput nodes with GCS storage, keep only essential config
                 // (previewData is limited, full data is in GCS)
-                if (cleanNode.config?.parsedData && !cleanNode.config?.useGCS) {
+                if (cleanedNode.config?.parsedData && !cleanedNode.config?.useGCS) {
                     // For inline data, limit to first 100 rows to prevent large payloads
-                    cleanNode.config = {
-                        ...cleanNode.config,
-                        parsedData: cleanNode.config.parsedData.slice(0, 100)
+                    cleanedNode.config = {
+                        ...cleanedNode.config,
+                        parsedData: cleanedNode.config.parsedData.slice(0, 100)
                     };
                 }
                 
-                return cleanNode;
+                return cleanedNode;
             });
             
             const data = { nodes: cleanedNodes, connections };
