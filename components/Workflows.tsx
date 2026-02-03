@@ -51,7 +51,7 @@ import {
   // Hooks
   useWorkflowHistory,
 } from './workflows/index';
-import { OpcUaConfigModal, MqttConfigModal, ModbusConfigModal, ScadaConfigModal, MesConfigModal, DataHistorianConfigModal, TimeSeriesAggregatorConfigModal } from './workflows/modals';
+import { OpcUaConfigModal, MqttConfigModal, ModbusConfigModal, ScadaConfigModal, MesConfigModal, DataHistorianConfigModal, TimeSeriesAggregatorConfigModal, SaveRecordsConfigModal } from './workflows/modals';
 
 // Use imported DRAGGABLE_ITEMS from workflows module
 const DRAGGABLE_ITEMS = WORKFLOW_DRAGGABLE_ITEMS;
@@ -210,6 +210,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [addFieldValue, setAddFieldValue] = useState<string>('');
     const [configuringSaveNodeId, setConfiguringSaveNodeId] = useState<string | null>(null);
     const [saveEntityId, setSaveEntityId] = useState<string>('');
+    const [saveMode, setSaveMode] = useState<'insert' | 'upsert' | 'update'>('insert');
 
     // Sidebar State
     const [searchQuery, setSearchQuery] = useState('');
@@ -1475,33 +1476,144 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (node && node.type === 'saveRecords') {
             setConfiguringSaveNodeId(nodeId);
             setSaveEntityId(node.config?.entityId || '');
-            setNodeCustomTitle(node.config?.customName || '');
+            setSaveMode(node.config?.saveMode || 'insert');
         }
     };
 
-    const saveSaveRecordsConfig = () => {
-        if (!configuringSaveNodeId || !saveEntityId) return;
+    const saveSaveRecordsConfig = async (config: {
+        entityId: string;
+        saveMode: 'insert' | 'upsert' | 'update';
+        autoCreateEntity?: boolean;
+        entityName?: string;
+    }) => {
+        if (!configuringSaveNodeId) return;
 
-        const entity = entities.find(e => e.id === saveEntityId);
-        const defaultLabel = `Save to ${entity?.name || 'Database'}`;
-        const finalLabel = nodeCustomTitle.trim() || defaultLabel;
+        let finalEntityId = config.entityId;
+        let finalEntityName = '';
+
+        // If auto-create entity is requested
+        if (config.autoCreateEntity && config.entityName) {
+            try {
+                // Get preview data from previous node to generate schema
+                const currentNode = nodes.find(n => n.id === configuringSaveNodeId);
+                const previousNodes = connections
+                    .filter(c => c.toNodeId === configuringSaveNodeId)
+                    .map(c => nodes.find(n => n.id === c.fromNodeId))
+                    .filter(Boolean);
+                
+                // Try to get data preview from previous node
+                let dataPreview = null;
+                if (previousNodes.length > 0 && previousNodes[0]?.outputData) {
+                    dataPreview = previousNodes[0].outputData;
+                }
+
+                // Generate entity ID
+                const newEntityId = `entity-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                
+                // Create properties based on data preview if available
+                const properties = [];
+                if (dataPreview) {
+                    const sample = Array.isArray(dataPreview) ? dataPreview[0] : dataPreview;
+                    if (sample) {
+                        // Add timestamp property for time-series
+                        properties.push({
+                            id: `prop-${Date.now()}-timestamp`,
+                            name: 'timestamp',
+                            type: 'TEXT',
+                            defaultValue: ''
+                        });
+
+                        // Add other properties
+                        Object.keys(sample).forEach((key, idx) => {
+                            if (key !== 'id' && key !== 'createdAt' && key !== 'metadata' && key !== 'raw') {
+                                const value = sample[key];
+                                let propType = 'TEXT';
+                                if (typeof value === 'number') {
+                                    propType = 'NUMBER';
+                                } else if (typeof value === 'boolean') {
+                                    propType = 'TEXT';
+                                }
+                                
+                                properties.push({
+                                    id: `prop-${Date.now()}-${idx}`,
+                                    name: key,
+                                    type: propType,
+                                    defaultValue: ''
+                                });
+                            }
+                        });
+                    }
+                } else {
+                    // Default properties if no preview
+                    properties.push(
+                        { id: `prop-${Date.now()}-0`, name: 'timestamp', type: 'TEXT', defaultValue: '' },
+                        { id: `prop-${Date.now()}-1`, name: 'value', type: 'NUMBER', defaultValue: '' }
+                    );
+                }
+
+                // Create entity
+                const newEntity = {
+                    id: newEntityId,
+                    name: config.entityName,
+                    description: 'Auto-created for time-series data storage',
+                    properties: properties,
+                    author: user?.name || user?.email?.split('@')[0] || 'System',
+                    lastEdited: 'Just now'
+                };
+
+                const createRes = await fetch(`${API_BASE}/entities`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(newEntity)
+                });
+
+                if (!createRes.ok) {
+                    throw new Error('Failed to create entity');
+                }
+
+                finalEntityId = newEntityId;
+                finalEntityName = config.entityName;
+                
+                // Refresh entities list
+                if (onViewChange) {
+                    // Trigger entity refresh
+                    setTimeout(() => {
+                        window.dispatchEvent(new Event('entities-updated'));
+                    }, 500);
+                }
+            } catch (error) {
+                console.error('Error creating entity:', error);
+                showToast('Failed to create entity: ' + (error as Error).message, 'error');
+                return;
+            }
+        } else {
+            const entity = entities.find(e => e.id === config.entityId);
+            finalEntityName = entity?.name || '';
+        }
+
+        const defaultLabel = `Save to ${finalEntityName || 'Database'}`;
         
         setNodes(prev => prev.map(n =>
             n.id === configuringSaveNodeId
                 ? { 
                     ...n, 
-                    label: finalLabel,
+                    label: defaultLabel,
                     config: { 
-                        entityId: saveEntityId, 
-                        entityName: entity?.name || '',
-                        customName: nodeCustomTitle.trim() || undefined
+                        entityId: finalEntityId, 
+                        entityName: finalEntityName,
+                        saveMode: config.saveMode
                     } 
                 }
                 : n
         ));
         setConfiguringSaveNodeId(null);
         setSaveEntityId('');
-        setNodeCustomTitle('');
+        setSaveMode('insert');
+        
+        if (config.autoCreateEntity) {
+            showToast(`Entity "${finalEntityName}" created successfully`, 'success');
+        }
     };
 
     const openEquipmentConfig = async (nodeId: string) => {
@@ -9444,49 +9556,31 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         )}
 
                         {/* Save Records Configuration Modal */}
-                        {configuringSaveNodeId && (
-                            <NodeConfigSidePanel
-                                isOpen={!!configuringSaveNodeId}
-                                onClose={() => setConfiguringSaveNodeId(null)}
-                                title="Save to Database"
-                                icon={Database}
-                                footer={
-                                    <>
-                                        <button
-                                            onClick={() => setConfiguringSaveNodeId(null)}
-                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={saveSaveRecordsConfig}
-                                            disabled={!saveEntityId}
-                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            Save
-                                        </button>
-                                    </>
-                                }
-                            >
-                                <div className="space-y-6">
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
-                                            Select Entity
-                                        </label>
-                                        <select
-                                            value={saveEntityId}
-                                            onChange={(e) => setSaveEntityId(e.target.value)}
-                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
-                                        >
-                                            <option value="">Choose entity...</option>
-                                            {entities.map(entity => (
-                                                <option key={entity.id} value={entity.id}>{entity.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-                            </NodeConfigSidePanel>
-                        )}
+                        {configuringSaveNodeId && (() => {
+                            // Get preview data from previous node
+                            const currentNode = nodes.find(n => n.id === configuringSaveNodeId);
+                            const previousConnections = connections.filter(c => c.toNodeId === configuringSaveNodeId);
+                            const previousNode = previousConnections.length > 0 
+                                ? nodes.find(n => n.id === previousConnections[0].fromNodeId)
+                                : null;
+                            const inputDataPreview = previousNode?.outputData || previousNode?.data || null;
+
+                            return (
+                                <SaveRecordsConfigModal
+                                    isOpen={!!configuringSaveNodeId}
+                                    entityId={saveEntityId}
+                                    saveMode={saveMode}
+                                    availableEntities={entities}
+                                    inputDataPreview={inputDataPreview}
+                                    onSave={saveSaveRecordsConfig}
+                                    onClose={() => {
+                                        setConfiguringSaveNodeId(null);
+                                        setSaveEntityId('');
+                                        setSaveMode('insert');
+                                    }}
+                                />
+                            );
+                        })()}
                     </div>
 
                     {/* LLM Config Modal */}

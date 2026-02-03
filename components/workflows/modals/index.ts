@@ -19,6 +19,7 @@ export { ScadaConfigModal } from './ScadaConfigModal';
 export { MesConfigModal } from './MesConfigModal';
 export { DataHistorianConfigModal } from './DataHistorianConfigModal';
 export { TimeSeriesAggregatorConfigModal } from './TimeSeriesAggregatorConfigModal';
+export { SaveRecordsConfigModal } from './SaveRecordsConfigModal';
 
 // AI/Code modals
 export { LLMConfigModal } from './LLMConfigModal';
