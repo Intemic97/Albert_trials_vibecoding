@@ -268,61 +268,96 @@ const timeRangeToDateRange = (timeRange: TimeRange): { start: string; end: strin
 // Grid Widget Card Component (for use in GridLayout)
 const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void; dateRange?: { start: string; end: string } }> = React.memo(({ widget, onRemove, dateRange }) => {
     const [showExplanation, setShowExplanation] = useState(false);
+    const cardRef = useRef<HTMLDivElement>(null);
     
     return (
-        <div 
-            className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-sm flex flex-col relative" 
-            style={{ height: '100%', width: '100%', overflow: 'hidden' }}
-        >
-            {/* Drag Handle - Entire header is draggable */}
-            <div className="drag-handle cursor-move px-3 py-2 border-b border-[var(--border-light)] flex items-center justify-between group hover:bg-[var(--bg-hover)] transition-all select-none flex-shrink-0 rounded-t-lg" style={{ pointerEvents: 'auto', touchAction: 'none' }}>
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <div className="flex items-center justify-center w-5 h-5 rounded bg-[var(--bg-tertiary)] group-hover:bg-[var(--border-light)] transition-colors">
-                        <DotsSixVertical size={12} weight="bold" className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] transition-colors" />
+        <>
+            <div 
+                ref={cardRef}
+                className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-sm flex flex-col relative group/card" 
+                style={{ height: '100%', width: '100%', overflow: 'hidden' }}
+            >
+                {/* Drag Handle - Entire header is draggable */}
+                <div className="drag-handle cursor-move px-3 py-2 border-b border-[var(--border-light)] flex items-center justify-between group hover:bg-[var(--bg-hover)] transition-all select-none flex-shrink-0 rounded-t-lg" style={{ pointerEvents: 'auto', touchAction: 'none' }}>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className="flex items-center justify-center w-5 h-5 rounded bg-[var(--bg-tertiary)] group-hover:bg-[var(--border-light)] transition-colors">
+                            <DotsSixVertical size={12} weight="bold" className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] transition-colors" />
+                        </div>
+                        <h3 className="text-sm font-medium text-[var(--text-primary)] truncate">{widget.title}</h3>
                     </div>
-                    <h3 className="text-sm font-medium text-[var(--text-primary)] truncate">{widget.title}</h3>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onRemove();
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        className="p-1.5 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0 z-10"
+                        title="Delete Widget"
+                    >
+                        <X size={14} weight="light" />
+                    </button>
                 </div>
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        onRemove();
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    className="p-1.5 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0 z-10"
-                    title="Delete Widget"
-                >
-                    <X size={14} weight="light" />
-                </button>
-            </div>
-            {/* Chart container - takes all remaining space */}
-            <div className="flex-1 flex flex-col min-h-0" style={{ overflow: 'hidden' }}>
-                {widget.description && (
-                    <div className="px-3 pt-2 pb-1 flex-shrink-0">
-                        <p className="text-xs text-[var(--text-secondary)]">{widget.description}</p>
+                {/* Chart container - takes all remaining space */}
+                <div className="flex-1 flex flex-col min-h-0" style={{ overflow: 'hidden' }}>
+                    {widget.description && (
+                        <div className="px-3 pt-2 pb-1 flex-shrink-0">
+                            <p className="text-xs text-[var(--text-secondary)]">{widget.description}</p>
+                        </div>
+                    )}
+                    <div className="flex-1 p-3" style={{ minHeight: 0 }}>
+                        <DynamicChart config={widget} dateRange={dateRange} />
                     </div>
-                )}
-                <div className="flex-1 p-3" style={{ minHeight: 0 }}>
-                    <DynamicChart config={widget} dateRange={dateRange} />
                 </div>
+                
+                {/* Explanation button - positioned absolutely at bottom to always be clickable */}
                 {widget.explanation && (
-                    <div className="px-3 pb-2 pt-1 border-t border-[var(--border-light)] flex-shrink-0">
-                        <button
-                            onClick={() => setShowExplanation(!showExplanation)}
-                            className="flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-slate-800 font-medium"
-                        >
-                            <Info size={12} weight="light" />
-                            How did I prepare this?
-                        </button>
-                        {showExplanation && (
-                            <div className="mt-2 p-2 bg-[var(--bg-tertiary)] rounded-lg text-xs text-[var(--text-primary)] leading-relaxed">
-                                {widget.explanation}
-                            </div>
-                        )}
-                    </div>
+                    <button
+                        onClick={() => setShowExplanation(true)}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        className="absolute bottom-0 left-0 right-0 px-3 py-2 bg-gradient-to-t from-[var(--bg-card)] via-[var(--bg-card)] to-transparent flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium border-t border-[var(--border-light)] z-20 cursor-pointer"
+                        style={{ pointerEvents: 'auto' }}
+                    >
+                        <Info size={12} weight="light" />
+                        How was this prepared?
+                    </button>
                 )}
             </div>
-        </div>
+            
+            {/* Explanation Modal - renders outside the clipped container */}
+            {showExplanation && widget.explanation && (
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                    onClick={() => setShowExplanation(false)}
+                >
+                    <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
+                    <div 
+                        className="relative bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl max-w-lg w-full max-h-[80vh] overflow-auto animate-in fade-in zoom-in-95"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="sticky top-0 bg-[var(--bg-card)] px-4 py-3 border-b border-[var(--border-light)] flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Info size={14} className="text-[var(--text-secondary)]" weight="light" />
+                                <h3 className="text-xs font-medium text-[var(--text-primary)]">How was this prepared?</h3>
+                            </div>
+                            <button
+                                onClick={() => setShowExplanation(false)}
+                                className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+                            >
+                                <X size={14} weight="light" />
+                            </button>
+                        </div>
+                        <div className="p-4">
+                            <div className="p-4 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
+                                <p className="text-xs text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap">
+                                    {widget.explanation}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     );
 }, (prevProps, nextProps) => {
     // Custom comparison for memo - only re-render if widget data, onRemove, or dateRange changes
@@ -1551,8 +1586,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                                 </label>
                                                 <PromptInput
                                                     entities={entities}
-                                                    onGenerate={(prompt, mentionedEntityIds) => {
-                                                        handleGenerateWidget(prompt, mentionedEntityIds, selectedVisualizationType);
+                                                    onGenerate={async (prompt, mentionedEntityIds) => {
+                                                        await handleGenerateWidget(prompt, mentionedEntityIds, selectedVisualizationType);
                                                         setShowAddWidgetModal(false);
                                                         setSelectedVisualizationType('');
                                                     }}
@@ -1562,29 +1597,47 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                                 />
                                             </div>
 
-                                            {/* Tips Section */}
-                                            <div className="p-4 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
-                                                <div className="flex items-start gap-3">
-                                                    <Info size={16} weight="light" className="text-[var(--text-secondary)] mt-0.5 flex-shrink-0" />
-                                                    <div className="text-xs text-[var(--text-secondary)]">
-                                                        <p className="font-medium text-[var(--text-primary)] mb-2">Quick Tips</p>
-                                                        <ul className="space-y-1.5">
-                                                            <li className="flex items-center gap-2">
-                                                                <kbd className="px-1.5 py-0.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-[10px] font-mono">@</kbd>
-                                                                <span>Mention entities (e.g., @Customers)</span>
-                                                            </li>
-                                                            <li className="flex items-center gap-2">
-                                                                <kbd className="px-1.5 py-0.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-[10px] font-mono">.</kbd>
-                                                                <span>Access attributes (e.g., @Customers.totalOrders)</span>
-                                                            </li>
-                                                            <li className="flex items-center gap-2">
-                                                                <span className="w-5 h-5 flex items-center justify-center bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-[10px]">↵</span>
-                                                                <span>Press Enter or click button to generate</span>
-                                                            </li>
-                                                        </ul>
+                                            {/* Loading State */}
+                                            {isGenerating && (
+                                                <div className="flex flex-col items-center justify-center py-8 px-4 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
+                                                    <div className="relative mb-4">
+                                                        <div className="w-12 h-12 border-3 border-[var(--border-light)] border-t-[var(--accent-primary)] rounded-full animate-spin" />
+                                                        <Sparkle size={20} weight="fill" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[var(--accent-primary)]" />
+                                                    </div>
+                                                    <p className="text-sm font-medium text-[var(--text-primary)] mb-1">
+                                                        Generating your visualization...
+                                                    </p>
+                                                    <p className="text-xs text-[var(--text-tertiary)] text-center">
+                                                        AI is analyzing your data and creating the perfect chart
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {/* Tips Section - hide when generating */}
+                                            {!isGenerating && (
+                                                <div className="p-4 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
+                                                    <div className="flex items-start gap-3">
+                                                        <Info size={16} weight="light" className="text-[var(--text-secondary)] mt-0.5 flex-shrink-0" />
+                                                        <div className="text-xs text-[var(--text-secondary)]">
+                                                            <p className="font-medium text-[var(--text-primary)] mb-2">Quick Tips</p>
+                                                            <ul className="space-y-1.5">
+                                                                <li className="flex items-center gap-2">
+                                                                    <kbd className="px-1.5 py-0.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-[10px] font-mono">@</kbd>
+                                                                    <span>Mention entities (e.g., @Customers)</span>
+                                                                </li>
+                                                                <li className="flex items-center gap-2">
+                                                                    <kbd className="px-1.5 py-0.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-[10px] font-mono">.</kbd>
+                                                                    <span>Access attributes (e.g., @Customers.totalOrders)</span>
+                                                                </li>
+                                                                <li className="flex items-center gap-2">
+                                                                    <span className="w-5 h-5 flex items-center justify-center bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-[10px]">↵</span>
+                                                                    <span>Press Enter or click button to generate</span>
+                                                                </li>
+                                                            </ul>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
