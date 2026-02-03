@@ -3,7 +3,7 @@
  * Displays active OT alerts and allows acknowledgment
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
     Warning, 
     CheckCircle, 
@@ -12,7 +12,11 @@ import {
     SpinnerGap,
     Funnel,
     X,
-    ArrowClockwise
+    ArrowClockwise,
+    Download,
+    CheckSquare,
+    Bell,
+    BellSlash
 } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
@@ -285,6 +289,56 @@ export const OTAlertsPanel: React.FC<OTAlertsPanelProps> = ({
     const unacknowledgedCount = alerts.filter(a => !a.acknowledgedAt).length;
     const errorCount = alerts.filter(a => a.severity === 'error' && !a.acknowledgedAt).length;
 
+    // Export alerts to CSV
+    const handleExportCSV = useCallback(() => {
+        if (filteredAlerts.length === 0) return;
+        
+        const exportData = filteredAlerts.map(alert => ({
+            ID: alert.id,
+            Severity: alert.severity,
+            'Node Type': alert.nodeType,
+            Field: alert.fieldName,
+            Value: alert.value,
+            Message: alert.message,
+            'Created At': new Date(alert.createdAt).toLocaleString(),
+            Acknowledged: alert.acknowledgedAt ? 'Yes' : 'No',
+            'Acknowledged At': alert.acknowledgedAt ? new Date(alert.acknowledgedAt).toLocaleString() : ''
+        }));
+        
+        const headers = Object.keys(exportData[0]);
+        const csvContent = [
+            headers.join(','),
+            ...exportData.map(row => 
+                headers.map(h => {
+                    const value = row[h as keyof typeof row];
+                    if (typeof value === 'string' && value.includes(',')) {
+                        return `"${value}"`;
+                    }
+                    return value ?? '';
+                }).join(',')
+            )
+        ].join('\n');
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `ot_alerts_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+    }, [filteredAlerts]);
+
+    // Acknowledge all unacknowledged alerts
+    const handleAcknowledgeAll = async () => {
+        const unacknowledged = filteredAlerts.filter(a => !a.acknowledgedAt);
+        if (unacknowledged.length === 0) return;
+        
+        const confirmMsg = `Are you sure you want to acknowledge ${unacknowledged.length} alerts?`;
+        if (!window.confirm(confirmMsg)) return;
+        
+        for (const alert of unacknowledged) {
+            await handleAcknowledge(alert.id);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
             <div 
@@ -307,6 +361,24 @@ export const OTAlertsPanel: React.FC<OTAlertsPanelProps> = ({
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        {unacknowledgedCount > 0 && (
+                            <button
+                                onClick={handleAcknowledgeAll}
+                                className="px-3 py-1.5 text-xs font-medium bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors flex items-center gap-1"
+                                title="Acknowledge all visible alerts"
+                            >
+                                <CheckSquare size={14} />
+                                Ack All ({unacknowledgedCount})
+                            </button>
+                        )}
+                        <button
+                            onClick={handleExportCSV}
+                            disabled={filteredAlerts.length === 0}
+                            className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors disabled:opacity-50"
+                            title="Export to CSV"
+                        >
+                            <Download size={18} />
+                        </button>
                         <button
                             onClick={fetchAlerts}
                             disabled={isLoading}
@@ -450,9 +522,25 @@ export const OTAlertsPanel: React.FC<OTAlertsPanelProps> = ({
                         <span>
                             Showing {filteredAlerts.length} of {alerts.length} alerts
                         </span>
-                        <span>
-                            {wsRef.current?.readyState === WebSocket.OPEN ? '🟢 Real-time' : 'Auto-refresh: 30s'}
-                        </span>
+                        <div className="flex items-center gap-4">
+                            <span className={`flex items-center gap-1 ${
+                                notificationPermissionRef.current === 'granted' ? 'text-green-500' : 'text-gray-500'
+                            }`}>
+                                {notificationPermissionRef.current === 'granted' ? (
+                                    <><Bell size={12} /> Notifications on</>
+                                ) : (
+                                    <><BellSlash size={12} /> Notifications off</>
+                                )}
+                            </span>
+                            <span className={`flex items-center gap-1 ${
+                                wsRef.current?.readyState === WebSocket.OPEN ? 'text-green-500' : 'text-gray-500'
+                            }`}>
+                                <span className={`w-2 h-2 rounded-full ${
+                                    wsRef.current?.readyState === WebSocket.OPEN ? 'bg-green-500' : 'bg-gray-500'
+                                }`} />
+                                {wsRef.current?.readyState === WebSocket.OPEN ? 'Real-time' : 'Polling'}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>

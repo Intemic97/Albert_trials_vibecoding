@@ -122,6 +122,28 @@ wss.on('connection', (ws) => {
                     break;
                 }
                 
+                case 'subscribe_ot_metrics': {
+                    // Subscribe to OT metrics for the organization (same connection pool as alerts)
+                    const { orgId } = message;
+                    
+                    if (!orgId) {
+                        ws.send(JSON.stringify({ type: 'error', message: 'Missing orgId' }));
+                        return;
+                    }
+                    
+                    // Reuse organization connections for metrics
+                    if (!organizationConnections.has(orgId)) {
+                        organizationConnections.set(orgId, new Set());
+                    }
+                    organizationConnections.get(orgId).add(ws);
+                    
+                    ws.send(JSON.stringify({ 
+                        type: 'ot_metrics_subscribed',
+                        orgId 
+                    }));
+                    break;
+                }
+                
                 case 'join': {
                     // User joins a workflow canvas
                     const { workflowId: rawWorkflowId, orgId, user } = message;
