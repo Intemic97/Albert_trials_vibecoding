@@ -2741,8 +2741,29 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                             if (response.ok) {
                                 const data = await response.json();
-                                nodeData = data.result;
-                                result = 'Python code executed successfully';
+                                
+                                // Check if result contains an error from Python
+                                if (data.result && typeof data.result === 'object' && data.result.error) {
+                                    throw new Error(data.result.error);
+                                }
+                                
+                                // Validate that we got meaningful data
+                                if (data.result === null || data.result === undefined) {
+                                    console.warn('[Python] Execution returned null/undefined result');
+                                    nodeData = [];
+                                    result = 'Warning: Python returned no data (null). Make sure your process() function returns a value.';
+                                    // Mark as error since no data was produced
+                                    setNodes(prev => prev.map(n => 
+                                        n.id === node.id ? { ...n, status: 'error' as const } : n
+                                    ));
+                                } else if (Array.isArray(data.result) && data.result.length === 0) {
+                                    nodeData = [];
+                                    result = 'Python executed - returned empty array';
+                                } else {
+                                    nodeData = data.result;
+                                    const recordCount = Array.isArray(data.result) ? data.result.length : 1;
+                                    result = `Python executed successfully (${recordCount} ${recordCount === 1 ? 'record' : 'records'})`;
+                                }
                             } else {
                                 const errorData = await response.json();
                                 throw new Error(errorData.error || 'Python execution failed');

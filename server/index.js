@@ -2640,10 +2640,22 @@ app.post('/api/python/execute', authenticateToken, async (req, res) => {
             const result = await executePythonInLambda(code, inputData);
             
             if (result.success) {
+                // Log result details for debugging
+                const resultType = result.result === null ? 'null' : 
+                                   result.result === undefined ? 'undefined' :
+                                   Array.isArray(result.result) ? `array[${result.result.length}]` :
+                                   typeof result.result;
+                console.log(`[Python Lambda] Result type: ${resultType}`);
+                
+                if (result.result === null || result.result === undefined) {
+                    console.warn('[Python Lambda] Warning: process() returned null/undefined');
+                }
+                
                 res.json({
                     success: true,
                     output: result.output || '',
-                    result: result.result
+                    result: result.result,
+                    resultType: resultType // Include type info for debugging
                 });
             } else {
                 res.json({
