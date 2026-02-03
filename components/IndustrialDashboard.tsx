@@ -469,6 +469,19 @@ export const IndustrialDashboard: React.FC = () => {
                     
                     if (message.type === 'ot_alert') {
                         fetchAlertSummary();
+                    } else if (message.type === 'connection_status_change' && message.connection) {
+                        // Update connection status in real-time
+                        setConnections(prev => prev.map(conn =>
+                            conn.id === message.connection.id
+                                ? { 
+                                    ...conn, 
+                                    status: message.connection.status,
+                                    latencyMs: message.connection.latencyMs,
+                                    lastTestedAt: message.connection.lastTestedAt,
+                                    lastError: message.connection.lastError
+                                }
+                                : conn
+                        ));
                     } else if (message.type === 'ot_metric' && message.metric) {
                         // Update latency history
                         setLatencyHistory(prev => {

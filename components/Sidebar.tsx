@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
@@ -73,7 +73,77 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
     const saved = localStorage.getItem('sidebar-collapsed');
     return saved === 'true';
   });
+  const [otAlertCount, setOtAlertCount] = useState(0);
+  const wsRef = useRef<WebSocket | null>(null);
   const currentOrg = organizations.find(org => org.id === user?.orgId);
+
+  // Fetch OT alert count
+  const fetchOtAlertCount = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/ot-alerts?acknowledged=false&limit=100`, {
+        credentials: 'include'
+      });
+      if (res.ok) {
+        const alerts = await res.json();
+        setOtAlertCount(Array.isArray(alerts) ? alerts.length : 0);
+      }
+    } catch (error) {
+      // Silently fail - OT alerts might not be configured
+    }
+  }, []);
+
+  // Subscribe to OT alerts via WebSocket
+  useEffect(() => {
+    if (!user?.orgId) return;
+
+    fetchOtAlertCount();
+    
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchOtAlertCount, 30000);
+
+    // WebSocket for real-time updates
+    const wsUrl = window.location.protocol === 'https:'
+      ? `wss://${window.location.hostname}${window.location.port ? `:${window.location.port}` : ''}/ws`
+      : `ws://${window.location.hostname}:3001/ws`;
+
+    try {
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          type: 'subscribe_ot_alerts',
+          orgId: user.orgId,
+          user: { id: user.id, name: user.name || 'User', email: user.email }
+        }));
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'ot_alert') {
+            // New alert received, refresh count
+            fetchOtAlertCount();
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      };
+
+      ws.onerror = () => {};
+      ws.onclose = () => {};
+    } catch (e) {
+      // WebSocket not available
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [user?.orgId, user?.id, user?.name, user?.email, fetchOtAlertCount]);
 
   // Persist collapsed state
   useEffect(() => {
@@ -147,7 +217,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
     };
   }, [searchQuery]);
 
-  const NavItem = ({ icon: Icon, label, view, active = false, onClick, onNavigate: onNavCb }: { icon: any, label: string, view?: string, active?: boolean, onClick?: () => void, onNavigate?: () => void }) => {
+  const NavItem = ({ icon: Icon, label, view, active = false, onClick, onNavigate: onNavCb, badge }: { icon: any, label: string, view?: string, active?: boolean, onClick?: () => void, onNavigate?: () => void, badge?: number }) => {
     const route = view ? viewToRoute[view] || `/${view}` : '#';
     
     const baseClasses = `flex items-center ${isCollapsed ? 'justify-center px-2' : 'px-3'} py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out w-full text-left group relative`;
@@ -161,6 +231,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
     const tooltip = isCollapsed ? (
       <span className="absolute left-full ml-2 px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md text-xs text-[var(--text-primary)] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
         {label}
+        {badge !== undefined && badge > 0 && ` (${badge})`}
+      </span>
+    ) : null;
+    
+    // Badge element
+    const badgeElement = badge !== undefined && badge > 0 ? (
+      <span className={`${isCollapsed ? 'absolute -top-1 -right-1' : 'ml-auto'} min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-medium rounded-full ${
+        badge > 0 ? 'bg-red-500 text-white' : 'bg-gray-500 text-white'
+      }`}>
+        {badge > 99 ? '99+' : badge}
       </span>
     ) : null;
     
@@ -173,6 +253,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         >
           <Icon size={isCollapsed ? 18 : 16} weight="light" className={iconClasses} />
           {!isCollapsed && <span className="transition-colors duration-200 ease-in-out">{label}</span>}
+          {!isCollapsed && badgeElement}
+          {isCollapsed && badgeElement}
           {tooltip}
         </button>
       );
@@ -183,6 +265,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         <div className={`${baseClasses} ${activeClasses}`} title={isCollapsed ? label : undefined}>
           <Icon size={isCollapsed ? 18 : 16} weight="light" className={iconClasses} />
           {!isCollapsed && <span className="transition-colors duration-200 ease-in-out">{label}</span>}
+          {!isCollapsed && badgeElement}
+          {isCollapsed && badgeElement}
           {tooltip}
         </div>
       );
@@ -204,6 +288,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
       >
         <Icon size={isCollapsed ? 18 : 16} weight="light" className={iconClasses} />
         {!isCollapsed && <span className="transition-colors duration-200 ease-in-out">{label}</span>}
+        {!isCollapsed && badgeElement}
+        {isCollapsed && badgeElement}
         {tooltip}
       </Link>
     );
@@ -397,7 +483,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
           <SectionLabel label="Operations" />
           <div className="space-y-0.5">
             <NavItem icon={Plug} label="Connections" view="connections" active={activeView === 'connections'} />
-            <NavItem icon={Factory} label="Industrial" view="industrial" active={activeView === 'industrial'} />
+            <NavItem icon={Factory} label="Industrial" view="industrial" active={activeView === 'industrial'} badge={otAlertCount} />
           </div>
 
         </nav>

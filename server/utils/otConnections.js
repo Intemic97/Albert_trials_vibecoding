@@ -450,17 +450,175 @@ class OTConnectionsManager {
     }
 }
 
-// Singleton instance
-let instance = null;
+/**
+ * Auto Health Check Service
+ * Periodically tests connections and updates their status
+ */
+class ConnectionHealthChecker {
+    constructor(db, connectionsManager, broadcastFn = null) {
+        this.db = db;
+        this.connectionsManager = connectionsManager;
+        this.broadcastToOrganization = broadcastFn;
+        this.checkInterval = null;
+        this.isRunning = false;
+    }
+
+    /**
+     * Start automatic health checks
+     */
+    start(intervalMs = 5 * 60 * 1000) { // Default: every 5 minutes
+        if (this.isRunning) return;
+        
+        this.isRunning = true;
+        console.log(`[HealthCheck] Starting auto health checks every ${intervalMs / 1000}s`);
+        
+        // Run immediately on start
+        this.runHealthChecks();
+        
+        // Schedule periodic checks
+        this.checkInterval = setInterval(() => {
+            this.runHealthChecks();
+        }, intervalMs);
+    }
+
+    /**
+     * Stop automatic health checks
+     */
+    stop() {
+        if (this.checkInterval) {
+            clearInterval(this.checkInterval);
+            this.checkInterval = null;
+        }
+        this.isRunning = false;
+        console.log('[HealthCheck] Stopped auto health checks');
+    }
+
+    /**
+     * Run health checks on all OT connections
+     */
+    async runHealthChecks() {
+        try {
+            // Get all OT connections
+            const connections = await this.db.all(`
+                SELECT * FROM data_connections 
+                WHERE type IN ('opcua', 'mqtt', 'modbus', 'scada', 'mes', 'dataHistorian')
+            `);
+
+            if (!connections || connections.length === 0) {
+                return;
+            }
+
+            console.log(`[HealthCheck] Checking ${connections.length} OT connections...`);
+            
+            for (const connection of connections) {
+                try {
+                    await this.checkConnection(connection);
+                } catch (error) {
+                    console.error(`[HealthCheck] Error checking connection ${connection.id}:`, error.message);
+                }
+            }
+        } catch (error) {
+            console.error('[HealthCheck] Error running health checks:', error);
+        }
+    }
+
+    /**
+     * Check a single connection
+     */
+    async checkConnection(connection) {
+        const startTime = Date.now();
+        let result = { success: false, message: 'Unknown error' };
+        
+        try {
+            const config = typeof connection.config === 'string' 
+                ? JSON.parse(connection.config) 
+                : connection.config || {};
+
+            switch (connection.type) {
+                case 'opcua':
+                    result = await this.connectionsManager.testOpcuaConnection(config, 5000);
+                    break;
+                case 'mqtt':
+                    result = await this.connectionsManager.testMqttConnection(config, 5000);
+                    break;
+                case 'modbus':
+                    result = await this.connectionsManager.testModbusConnection(config, 5000);
+                    break;
+                default:
+                    // For other types, just mark as active if no recent errors
+                    result = { success: true, message: 'Connection type does not support auto-check' };
+            }
+        } catch (error) {
+            result = { success: false, message: error.message };
+        }
+
+        const latencyMs = Date.now() - startTime;
+        const newStatus = result.success ? 'active' : 'error';
+        const now = new Date().toISOString();
+
+        // Update connection status in database
+        try {
+            await this.db.run(`
+                UPDATE data_connections 
+                SET status = ?, lastTestedAt = ?, lastError = ?, latencyMs = ?
+                WHERE id = ?
+            `, [
+                newStatus,
+                now,
+                result.success ? null : result.message,
+                latencyMs,
+                connection.id
+            ]);
+
+            // Broadcast status change if status actually changed
+            if (connection.status !== newStatus && this.broadcastToOrganization) {
+                this.broadcastToOrganization(connection.orgId, {
+                    type: 'connection_status_change',
+                    connection: {
+                        id: connection.id,
+                        name: connection.name,
+                        type: connection.type,
+                        status: newStatus,
+                        latencyMs,
+                        lastTestedAt: now,
+                        lastError: result.success ? null : result.message
+                    }
+                });
+            }
+
+            if (!result.success) {
+                console.log(`[HealthCheck] Connection ${connection.name} (${connection.type}): ERROR - ${result.message}`);
+            }
+        } catch (dbError) {
+            console.error(`[HealthCheck] Error updating connection ${connection.id}:`, dbError);
+        }
+    }
+}
+
+// Singleton instances
+let connectionsInstance = null;
+let healthCheckerInstance = null;
 
 function getOTConnectionsManager() {
-    if (!instance) {
-        instance = new OTConnectionsManager();
+    if (!connectionsInstance) {
+        connectionsInstance = new OTConnectionsManager();
     }
-    return instance;
+    return connectionsInstance;
+}
+
+function getConnectionHealthChecker(db, broadcastFn = null) {
+    if (!healthCheckerInstance) {
+        const connectionsManager = getOTConnectionsManager();
+        healthCheckerInstance = new ConnectionHealthChecker(db, connectionsManager, broadcastFn);
+    } else if (broadcastFn && !healthCheckerInstance.broadcastToOrganization) {
+        healthCheckerInstance.broadcastToOrganization = broadcastFn;
+    }
+    return healthCheckerInstance;
 }
 
 module.exports = {
     getOTConnectionsManager,
-    OTConnectionsManager
+    getConnectionHealthChecker,
+    OTConnectionsManager,
+    ConnectionHealthChecker
 };

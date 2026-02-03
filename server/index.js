@@ -11,6 +11,7 @@ const { initDb, openDb } = require('./db');
 const { WorkflowExecutor, setBroadcastToOrganization } = require('./workflowExecutor');
 const { gcsService } = require('./gcsService');
 const { prefectClient } = require('./prefectClient');
+const { getConnectionHealthChecker } = require('./utils/otConnections');
 // Load environment variables - Try multiple methods to ensure it loads
 const envPath = path.join(__dirname, '.env');
 console.log('[ENV] Attempting to load .env from:', envPath);
@@ -632,6 +633,15 @@ initDb().then(database => {
     server.listen(PORT, () => {
         console.log(`Server running on http://localhost:${PORT}`);
         console.log(`WebSocket server running on ws://localhost:${PORT}/ws`);
+        
+        // Start OT connection health checker (every 5 minutes)
+        try {
+            const healthChecker = getConnectionHealthChecker(db, broadcastToOrganization);
+            healthChecker.start(5 * 60 * 1000); // 5 minutes
+            console.log('[OT] Connection health checker started');
+        } catch (error) {
+            console.error('[OT] Failed to start health checker:', error);
+        }
     });
 }).catch(err => {
     console.error('Failed to initialize database:', err);
