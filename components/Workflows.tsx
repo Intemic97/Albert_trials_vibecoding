@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { FlowArrow as Workflow, Lightning as Zap, Play, CheckCircle, WarningCircle as AlertCircle, ArrowRight, ArrowLeft, X, FloppyDisk as Save, FolderOpen, Trash, PlayCircle, Check, XCircle, Database, Wrench, MagnifyingGlass as Search, CaretDoubleLeft as ChevronsLeft, CaretDoubleRight as ChevronsRight, Sparkle as Sparkles, Code, PencilSimple as Edit, SignOut as LogOut, ChatCircle as MessageSquare, Globe, Leaf, Share as Share2, UserCheck, GitMerge, FileXls as FileSpreadsheet, FileText, UploadSimple as Upload, Columns, DotsSixVertical as GripVertical, Users, Envelope as Mail, BookOpen, Copy, Eye, Clock, ClockCounterClockwise as History, ArrowsOut as Maximize2, MagnifyingGlassPlus as ZoomIn, MagnifyingGlassMinus as ZoomOut, Robot as Bot, DeviceMobile as Smartphone, ChartBar as BarChart3, User, Calendar, CaretRight as ChevronRight, CaretDown as ChevronDown, CaretUp as ChevronUp, Plus, Folder, ShieldCheck as Shield, Terminal, Tag, DotsThreeVertical as MoreVertical, WebhooksLogo as Webhook, Flask as FlaskConical, TrendUp, Bell, FilePdf } from '@phosphor-icons/react';
+import { FlowArrow as Workflow, Lightning as Zap, Play, CheckCircle, WarningCircle as AlertCircle, ArrowRight, ArrowLeft, X, FloppyDisk as Save, FolderOpen, Trash, PlayCircle, Check, XCircle, Database, Wrench, MagnifyingGlass as Search, CaretDoubleLeft as ChevronsLeft, CaretDoubleRight as ChevronsRight, Sparkle as Sparkles, Code, PencilSimple as Edit, SignOut as LogOut, ChatCircle as MessageSquare, Globe, Leaf, Share as Share2, UserCheck, GitMerge, FileXls as FileSpreadsheet, FileText, UploadSimple as Upload, Columns, DotsSixVertical as GripVertical, Users, Envelope as Mail, BookOpen, Copy, Eye, Clock, ClockCounterClockwise as History, ArrowsOut as Maximize2, MagnifyingGlassPlus as ZoomIn, MagnifyingGlassMinus as ZoomOut, Robot as Bot, DeviceMobile as Smartphone, ChartBar as BarChart3, User, Calendar, CaretRight as ChevronRight, CaretDown as ChevronDown, CaretUp as ChevronUp, Plus, Folder, ShieldCheck as Shield, Terminal, Tag, DotsThreeVertical as MoreVertical, WebhooksLogo as Webhook, Flask as FlaskConical, TrendUp, Bell, FilePdf, Bug } from '@phosphor-icons/react';
 import { NodeConfigSidePanel } from './NodeConfigSidePanel';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { PromptInput } from './PromptInput';
@@ -230,6 +230,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [pythonCode, setPythonCode] = useState<string>('def process(data):\n    # Modify data here\n    return data');
     const [pythonAiPrompt, setPythonAiPrompt] = useState<string>('');
     const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+    const [isDebuggingPython, setIsDebuggingPython] = useState(false);
+    const [debugSuggestion, setDebugSuggestion] = useState<string | null>(null);
 
     // Join Node State
     const [configuringJoinNodeId, setConfiguringJoinNodeId] = useState<string | null>(null);
@@ -1555,6 +1557,49 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             setPythonAiPrompt(node.config?.pythonAiPrompt || '');
             setNodeCustomTitle(node.config?.customName || '');
             setConfiguringPythonNodeId(nodeId);
+            setDebugSuggestion(null); // Clear any previous debug suggestion
+        }
+    };
+
+    // Debug Python node with AI - analyzes error and suggests fix
+    const handleDebugPythonNode = async (node: WorkflowNode) => {
+        if (!node.config?.pythonCode || !node.executionResult) return;
+        
+        // First, open the Python config panel
+        setPythonCode(node.config.pythonCode);
+        setPythonAiPrompt('');
+        setNodeCustomTitle(node.config?.customName || '');
+        setConfiguringPythonNodeId(node.id);
+        setIsDebuggingPython(true);
+        setDebugSuggestion(null);
+        
+        try {
+            // Call OpenAI to analyze the error and suggest a fix
+            const response = await fetch(`${API_BASE}/debug-python-code`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code: node.config.pythonCode,
+                    error: node.executionResult,
+                    inputDataSample: node.inputData?.slice(0, 3) // Send sample of input data for context
+                }),
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.fixedCode) {
+                    setDebugSuggestion(data.fixedCode);
+                    // Show explanation in a toast or in the panel
+                    if (data.explanation) {
+                        console.log('[Debug AI] Explanation:', data.explanation);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error debugging Python code:', error);
+        } finally {
+            setIsDebuggingPython(false);
         }
     };
 
@@ -2824,6 +2869,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             if (response.ok) {
                                 const data = await response.json();
                                 
+                                // Check if Lambda returned success: false with error details
+                                if (data.success === false) {
+                                    const error: any = new Error(data.error || 'Python execution failed');
+                                    error.traceback = data.traceback;
+                                    throw error;
+                                }
+                                
                                 // Check if result contains an error from Python
                                 if (data.result && typeof data.result === 'object' && data.result.error) {
                                     throw new Error(data.result.error);
@@ -2835,9 +2887,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     nodeData = [];
                                     result = 'Warning: Python returned no data (null). Make sure your process() function returns a value.';
                                     // Mark as error since no data was produced
-                                    setNodes(prev => prev.map(n => 
-                                        n.id === node.id ? { ...n, status: 'error' as const } : n
-                                    ));
+                                    updateNodeAndBroadcast(nodeId, { 
+                                        status: 'error' as const, 
+                                        executionResult: result,
+                                        outputData: []
+                                    });
+                                    return;
                                 } else if (Array.isArray(data.result) && data.result.length === 0) {
                                     nodeData = [];
                                     result = 'Python executed - returned empty array';
@@ -2848,12 +2903,22 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 }
                             } else {
                                 const errorData = await response.json();
-                                throw new Error(errorData.error || 'Python execution failed');
+                                const error: any = new Error(errorData.error || 'Python execution failed');
+                                error.traceback = errorData.traceback;
+                                throw error;
                             }
                         } catch (error) {
                             console.error('Python execution error:', error);
-                            result = `Error: ${error.message || 'Failed to execute'}`;
-                            nodeData = [{ error: error.message }];
+                            const errorMessage = error.message || 'Failed to execute';
+                            // Extract traceback if available
+                            const traceback = error.traceback || '';
+                            result = `Error: ${errorMessage}${traceback ? '\n' + traceback : ''}`;
+                            updateNodeAndBroadcast(nodeId, { 
+                                status: 'error' as const, 
+                                executionResult: result,
+                                outputData: [{ error: errorMessage }]
+                            });
+                            return;
                         }
                     } else {
                         result = 'Code not configured';
@@ -6110,6 +6175,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             <p className={`text-xs font-medium break-words leading-relaxed ${textColor} text-left`}>
                                                                 {message}
                                                             </p>
+                                                            {/* Debug button for Python nodes with errors */}
+                                                            {isError && node.type === 'python' && node.config?.pythonCode && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDebugPythonNode(node);
+                                                                    }}
+                                                                    className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium bg-white border border-red-300 text-red-700 rounded-md hover:bg-red-50 transition-colors"
+                                                                >
+                                                                    <Bug size={14} />
+                                                                    Debug with AI
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     );
                                                 })()}
@@ -9755,6 +9833,56 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             }
                         >
                                 <div className="space-y-5">
+                                    {/* AI Debug Suggestion - shown when debugging */}
+                                    {(isDebuggingPython || debugSuggestion) && (
+                                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Bug size={16} className="text-amber-600" />
+                                                <span className="text-sm font-medium text-amber-800">AI Debug Assistant</span>
+                                            </div>
+                                            {isDebuggingPython ? (
+                                                <div className="flex items-center gap-2 text-sm text-amber-700">
+                                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-amber-600 border-t-transparent" />
+                                                    Analyzing error and generating fix...
+                                                </div>
+                                            ) : debugSuggestion ? (
+                                                <div className="space-y-3">
+                                                    <p className="text-xs text-amber-700">
+                                                        AI has analyzed the error and suggests a fix. Review and apply if it looks correct.
+                                                    </p>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => {
+                                                                setPythonCode(debugSuggestion);
+                                                                setDebugSuggestion(null);
+                                                            }}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded-md hover:bg-amber-700 transition-colors"
+                                                        >
+                                                            <Check size={14} />
+                                                            Apply Fix
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setDebugSuggestion(null)}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-amber-300 text-amber-700 text-xs font-medium rounded-md hover:bg-amber-50 transition-colors"
+                                                        >
+                                                            <X size={14} />
+                                                            Dismiss
+                                                        </button>
+                                                    </div>
+                                                    {/* Preview of the fix */}
+                                                    <details className="mt-2">
+                                                        <summary className="text-xs text-amber-600 cursor-pointer hover:text-amber-800">
+                                                            Preview suggested code
+                                                        </summary>
+                                                        <pre className="mt-2 p-2 bg-slate-800 text-slate-100 text-xs rounded overflow-x-auto max-h-40">
+                                                            {debugSuggestion}
+                                                        </pre>
+                                                    </details>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    )}
+
                                     {/* AI Assistant Section */}
                                     <AIPromptSection
                                         label="Ask AI to write code"

@@ -2953,6 +2953,79 @@ finally:
     }
 });
 
+// Python Debug Endpoint - AI analyzes error and suggests fix
+app.post('/api/debug-python-code', authenticateToken, async (req, res) => {
+    const { code, error, inputDataSample } = req.body;
+
+    if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ error: 'OpenAI API Key not configured' });
+    }
+
+    if (!code || !error) {
+        return res.status(400).json({ error: 'Code and error are required' });
+    }
+
+    try {
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        // Build context about input data if available
+        let inputContext = '';
+        if (inputDataSample && inputDataSample.length > 0) {
+            inputContext = `\n\nSample input data (first ${inputDataSample.length} records):\n${JSON.stringify(inputDataSample, null, 2)}`;
+        }
+
+        const completion = await openai.chat.completions.create({
+            messages: [
+                {
+                    role: "system",
+                    content: `You are a Python debugging expert. Analyze the code and error, then provide a fixed version.
+
+Your response MUST be valid JSON with this structure:
+{
+    "explanation": "Brief explanation of what was wrong and how you fixed it",
+    "fixedCode": "The complete fixed Python code"
+}
+
+RULES:
+1. The code must define a function called "process" that takes "data" as parameter
+2. The function must return the processed data (array of objects or single object)
+3. Keep the same general logic but fix the error
+4. If using numpy/pandas/scipy, make sure imports are correct
+5. Return ONLY the JSON, no markdown formatting`
+                },
+                {
+                    role: "user",
+                    content: `Please fix this Python code:
+
+=== ORIGINAL CODE ===
+${code}
+
+=== ERROR MESSAGE ===
+${error}
+${inputContext}
+
+Analyze the error and provide the fixed code.`
+                }
+            ],
+            model: "gpt-4o-mini",
+            response_format: { type: "json_object" }
+        });
+
+        const result = JSON.parse(completion.choices[0].message.content);
+        console.log('[Python Debug] AI suggestion:', result.explanation);
+        
+        res.json({
+            fixedCode: result.fixedCode,
+            explanation: result.explanation
+        });
+
+    } catch (error) {
+        console.error('Error debugging Python code:', error);
+        res.status(500).json({ error: 'Failed to debug code' });
+    }
+});
+
 // Python Code Generation Endpoint
 app.post('/api/python/generate', authenticateToken, async (req, res) => {
     const { prompt, inputDataSchema } = req.body;
