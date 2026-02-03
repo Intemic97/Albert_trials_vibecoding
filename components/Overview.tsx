@@ -107,23 +107,26 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
 
     // Generate chart data from daily executions - always show last 7 days
     const getChartData = () => {
-        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const shortDayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         
-        // Generate last 7 days
+        // Generate last 7 days ending with today
         const last7Days: { date: string; dateKey: string; executions: number }[] = [];
         for (let i = 6; i >= 0; i--) {
             const d = new Date();
             d.setDate(d.getDate() - i);
             const dateKey = d.toISOString().split('T')[0]; // YYYY-MM-DD
+            // Format as "28 Jan" or just "28" if same month
+            const dayNum = d.getDate();
+            const isToday = i === 0;
+            const label = isToday ? `${dayNum} (today)` : `${dayNum}`;
             last7Days.push({
-                date: shortDayNames[d.getDay()],
+                date: label,
                 dateKey,
                 executions: 0
             });
         }
         
-        // Fill in actual data
+        // Fill in actual data from backend
         if (overviewStats?.dailyExecutions?.length) {
             overviewStats.dailyExecutions.forEach(row => {
                 const dateKey = row.date.split('T')[0];
