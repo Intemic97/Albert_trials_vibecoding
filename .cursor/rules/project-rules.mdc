@@ -191,6 +191,64 @@ cd server/prefect-worker && python start_service.py
 
 ---
 
+## Funcionalidad OT/Industrial (rama feature/ot-industrial-nodes)
+
+### Descripción
+Sistema completo para integración con sistemas industriales (OT - Operational Technology) incluyendo protocolos OPC-UA, Modbus y MQTT.
+
+### Nuevos Componentes
+
+| Archivo | Descripción |
+|---------|-------------|
+| `components/IndustrialDashboard.tsx` | Dashboard de monitoreo industrial con métricas en tiempo real, gráficos de estado de conexiones y distribución de alertas |
+| `components/OTAlertsPanel.tsx` | Panel lateral para gestión de alertas OT con notificaciones WebSocket en tiempo real y notificaciones del navegador |
+| `components/workflows/modals/AlertConfigSection.tsx` | Sección reutilizable para configurar umbrales de alertas en nodos OT |
+| `components/workflows/modals/OpcUaConfigModal.tsx` | Configuración de conexiones OPC-UA |
+| `components/workflows/modals/ModbusConfigModal.tsx` | Configuración de conexiones Modbus TCP/RTU |
+| `components/workflows/modals/MqttConfigModal.tsx` | Configuración de conexiones MQTT |
+
+### Backend OT
+
+| Archivo | Descripción |
+|---------|-------------|
+| `server/utils/otAlerts.js` | Gestor de alertas OT con persistencia, detección de valores fuera de rango y broadcast WebSocket |
+| `server/utils/otConnections.js` | Gestor de conexiones OT (OPC-UA, Modbus, MQTT) con prueba de conexión y CRUD |
+
+### Arquitectura WebSocket para Alertas
+
+```javascript
+// Cliente se suscribe a alertas de su organización
+ws.send(JSON.stringify({ type: 'subscribe_ot_alerts', orgId: user.organization_id }));
+
+// Servidor broadcast cuando detecta nueva alerta
+broadcastToOrganization(orgId, { type: 'ot_alert', alert: alertData });
+```
+
+### Rutas API OT
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/data-connections` | Lista conexiones de datos (incluye OT) |
+| POST | `/api/data-connections` | Crear nueva conexión |
+| PUT | `/api/data-connections/:id` | Actualizar conexión |
+| DELETE | `/api/data-connections/:id` | Eliminar conexión |
+| POST | `/api/data-connections/:id/test` | Probar conexión |
+| GET | `/api/ot-alerts` | Lista alertas OT activas |
+| POST | `/api/ot-alerts/:id/acknowledge` | Reconocer alerta |
+
+### Navegación
+
+El dashboard industrial está disponible en `/industrial` y se accede desde el Sidebar con el ícono `Factory`.
+
+### Patrones Importantes
+
+1. **Fragmentos React en ternarios**: Cuando un ternario JSX devuelve múltiples elementos, envolverlos en `<>...</>`
+2. **Iconos Phosphor**: Usar `@phosphor-icons/react`. Verificar que el icono existe antes de usar (ej: usar `Pulse` en lugar de `Activity`)
+3. **WebSocket en componentes**: Suscribirse en `useEffect` y limpiar en el return del effect
+4. **Lazy loading**: Los componentes se cargan con `React.lazy()` usando el patrón `.then(m => ({ default: m.ComponentName }))`
+
+---
+
 ## Historial de Decisiones de Diseño
 
 | Fecha | Decisión | Razón |
@@ -199,3 +257,6 @@ cd server/prefect-worker && python start_service.py
 | 2026-01-30 | Textos text-slate-700 | Más suave que negro puro |
 | 2026-01-30 | Sidebar bg-slate-50 | Mantiene contraste con fondo principal |
 | 2026-01-30 | font-normal en títulos | Estilo Helvetica Neue limpio |
+| 2026-01-31 | Sistema OT/Industrial | Integración con OPC-UA, Modbus, MQTT |
+| 2026-01-31 | Alertas WebSocket | Notificaciones en tiempo real por organización |
+| 2026-01-31 | IndustrialDashboard | Monitoreo centralizado de sistemas OT |

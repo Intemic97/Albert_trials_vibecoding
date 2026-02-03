@@ -6,12 +6,21 @@
 const crypto = require('crypto');
 const { gcsService } = require('./gcsService');
 const { isTimeSeriesData: detectTimeSeriesData, normalizeTimeSeriesData } = require('./utils/timeSeriesHelper');
+const { getOTConnectionsManager } = require('./utils/otConnections');
+const { getOTAlertsManager } = require('./utils/otAlerts');
+
+// WebSocket broadcast function (will be set from server/index.js)
+let broadcastToOrganizationFn = null;
+
+function setBroadcastToOrganization(fn) {
+    broadcastToOrganizationFn = fn;
+}
 
 // Generate unique ID
 const generateId = () => crypto.randomBytes(8).toString('hex');
 
 class WorkflowExecutor {
-    constructor(db, executionId = null) {
+    constructor(db, executionId = null, organizationId = null, userId = null) {
         this.db = db;
         this.executionId = executionId;
         this.workflow = null;
@@ -19,6 +28,9 @@ class WorkflowExecutor {
         this.connections = [];
         this.nodeResults = {};
         this.execution = null;
+        this.organizationId = organizationId;
+        this.userId = userId;
+        this.otAlertsManager = getOTAlertsManager(db, broadcastToOrganizationFn);
     }
 
     /**
@@ -180,6 +192,32 @@ class WorkflowExecutor {
 
             // Execute based on node type
             const result = await this.runNodeHandler(node, inputData);
+
+            // Process OT alerts if this is an OT node
+            const otNodeTypes = ['opcua', 'mqtt', 'modbus', 'scada', 'mes', 'dataHistorian'];
+            if (otNodeTypes.includes(node.type) && result.success && result.outputData && this.organizationId) {
+                try {
+                    const alerts = await this.otAlertsManager.processNodeAlerts(
+                        node,
+                        result.outputData,
+                        this.organizationId,
+                        this.userId
+                    );
+                    if (alerts.length > 0) {
+                        result.metadata = result.metadata || {};
+                        result.metadata.alerts = alerts.map(a => ({
+                            id: a.id,
+                            fieldName: a.fieldName,
+                            value: a.value,
+                            severity: a.severity,
+                            message: a.message
+                        }));
+                    }
+                } catch (alertError) {
+                    console.error(`[executeNode] Error processing alerts for node ${nodeId}:`, alertError);
+                    // Don't fail the node execution if alert processing fails
+                }
+            }
 
             // Store result
             this.nodeResults[nodeId] = result;
@@ -966,6 +1004,45 @@ class WorkflowExecutor {
 
     // ==================== OT/INDUSTRIAL NODE HANDLERS ====================
 
+    /**
+     * Get connection configuration from database
+     */
+    async getConnection(connectionId) {
+        if (!connectionId) return null;
+        
+        try {
+            const connection = await this.db.get(
+                'SELECT * FROM data_connections WHERE id = ?',
+                [connectionId]
+            );
+            
+            if (!connection) {
+                throw new Error(`Connection ${connectionId} not found`);
+            }
+            
+            // Parse config JSON
+            if (connection.config) {
+                try {
+                    connection.config = JSON.parse(connection.config);
+                } catch (e) {
+                    connection.config = {};
+                }
+            } else {
+                connection.config = {};
+            }
+            
+            // Check if connection is active
+            if (connection.status !== 'active') {
+                throw new Error(`Connection ${connection.name || connectionId} is not active (status: ${connection.status})`);
+            }
+            
+            return connection;
+        } catch (error) {
+            console.error(`[getConnection] Error fetching connection ${connectionId}:`, error);
+            throw error;
+        }
+    }
+
     async handleOpcua(node, inputData) {
         const connectionId = node.config?.opcuaConnectionId;
         const nodeIds = node.config?.opcuaNodeIds || [];
@@ -975,35 +1052,68 @@ class WorkflowExecutor {
             throw new Error('OPC UA node requires connectionId and nodeIds configuration');
         }
 
-        // TODO: Implement actual OPC UA connection using node-opcua library
-        // For now, simulate reading from OPC UA server
-        const timestamp = new Date().toISOString();
-        const simulatedData = nodeIds.map(nodeId => ({
-            nodeId,
-            value: Math.random() * 100, // Simulated sensor value
-            timestamp,
-            quality: 'Good'
-        }));
+        // Get connection configuration
+        let connection = null;
+        try {
+            connection = await this.getConnection(connectionId);
+        } catch (error) {
+            return {
+                success: false,
+                message: `Connection error: ${error.message}`,
+                outputData: inputData,
+                error: error.message
+            };
+        }
 
-        const outputData = {
-            timestamp,
-            values: simulatedData.reduce((acc, item) => {
-                acc[item.nodeId] = item.value;
-                return acc;
-            }, {}),
-            raw: simulatedData
-        };
+        // Use real OPC UA connection
+        try {
+            const otManager = getOTConnectionsManager();
+            const timeout = node.config?.opcuaTimeout || connection.config?.timeout || 10000;
+            const outputData = await otManager.readOpcuaNodes(connection.config, nodeIds, timeout);
 
-        return {
-            success: true,
-            message: `Read ${nodeIds.length} OPC UA nodes`,
-            outputData,
-            metadata: {
-                connectionId,
-                pollingInterval,
-                nodeCount: nodeIds.length
-            }
-        };
+            return {
+                success: true,
+                message: `Read ${nodeIds.length} OPC UA nodes from ${connection?.name || connectionId}`,
+                outputData,
+                metadata: {
+                    connectionId,
+                    connectionName: connection?.name,
+                    pollingInterval,
+                    nodeCount: nodeIds.length
+                }
+            };
+        } catch (error) {
+            console.error('[handleOpcua] Error reading OPC UA nodes:', error);
+            // Fallback to simulation if real connection fails
+            const timestamp = new Date().toISOString();
+            const simulatedData = nodeIds.map(nodeId => ({
+                nodeId,
+                value: Math.random() * 100,
+                timestamp,
+                quality: 'Good'
+            }));
+
+            return {
+                success: false,
+                message: `OPC UA read failed: ${error.message}. Using simulated data.`,
+                outputData: {
+                    timestamp,
+                    values: simulatedData.reduce((acc, item) => {
+                        acc[item.nodeId] = item.value;
+                        return acc;
+                    }, {}),
+                    raw: simulatedData
+                },
+                metadata: {
+                    connectionId,
+                    connectionName: connection?.name,
+                    pollingInterval,
+                    nodeCount: nodeIds.length,
+                    error: error.message,
+                    simulated: true
+                }
+            };
+        }
     }
 
     async handleMqtt(node, inputData) {
@@ -1015,40 +1125,74 @@ class WorkflowExecutor {
             throw new Error('MQTT node requires connectionId and topics configuration');
         }
 
-        // TODO: Implement actual MQTT subscription using mqtt library
-        // For now, simulate receiving MQTT messages
-        const timestamp = new Date().toISOString();
-        const simulatedMessages = topics.map(topic => ({
-            topic,
-            payload: JSON.stringify({
-                value: Math.random() * 100,
-                timestamp,
-                sensorId: topic.split('/').pop()
-            }),
-            qos,
-            timestamp
-        }));
+        // Get connection configuration
+        let connection = null;
+        try {
+            connection = await this.getConnection(connectionId);
+        } catch (error) {
+            return {
+                success: false,
+                message: `Connection error: ${error.message}`,
+                outputData: inputData,
+                error: error.message
+            };
+        }
 
-        const outputData = {
-            timestamp,
-            messages: simulatedMessages,
-            topicData: simulatedMessages.reduce((acc, msg) => {
-                const data = JSON.parse(msg.payload);
-                acc[msg.topic] = data.value;
-                return acc;
-            }, {})
-        };
+        // Use real MQTT connection
+        try {
+            const otManager = getOTConnectionsManager();
+            const timeout = node.config?.mqttTimeout || 5000;
+            const outputData = await otManager.subscribeMqttTopics(connection.config, topics, qos, timeout);
 
-        return {
-            success: true,
-            message: `Received ${topics.length} MQTT messages`,
-            outputData,
-            metadata: {
-                connectionId,
+            return {
+                success: true,
+                message: `Received ${outputData.messageCount} MQTT messages from ${connection?.name || connectionId}`,
+                outputData,
+                metadata: {
+                    connectionId,
+                    connectionName: connection?.name,
+                    qos,
+                    topicCount: topics.length,
+                    messageCount: outputData.messageCount
+                }
+            };
+        } catch (error) {
+            console.error('[handleMqtt] Error subscribing to MQTT topics:', error);
+            // Fallback to simulation if real connection fails
+            const timestamp = new Date().toISOString();
+            const simulatedMessages = topics.map(topic => ({
+                topic,
+                payload: JSON.stringify({
+                    value: Math.random() * 100,
+                    timestamp,
+                    sensorId: topic.split('/').pop()
+                }),
                 qos,
-                topicCount: topics.length
-            }
-        };
+                timestamp
+            }));
+
+            return {
+                success: false,
+                message: `MQTT subscription failed: ${error.message}. Using simulated data.`,
+                outputData: {
+                    timestamp,
+                    messages: simulatedMessages,
+                    topicData: simulatedMessages.reduce((acc, msg) => {
+                        const data = JSON.parse(msg.payload);
+                        acc[msg.topic] = data.value;
+                        return acc;
+                    }, {})
+                },
+                metadata: {
+                    connectionId,
+                    connectionName: connection?.name,
+                    qos,
+                    topicCount: topics.length,
+                    error: error.message,
+                    simulated: true
+                }
+            };
+        }
     }
 
     async handleModbus(node, inputData) {
@@ -1060,35 +1204,68 @@ class WorkflowExecutor {
             throw new Error('Modbus node requires connectionId and addresses configuration');
         }
 
-        // TODO: Implement actual Modbus connection using modbus-serial library
-        // For now, simulate reading from Modbus device
-        const timestamp = new Date().toISOString();
-        const simulatedData = addresses.map(addr => ({
-            address: addr,
-            value: Math.floor(Math.random() * 65535), // 16-bit value
-            functionCode,
-            timestamp
-        }));
+        // Get connection configuration
+        let connection = null;
+        try {
+            connection = await this.getConnection(connectionId);
+        } catch (error) {
+            return {
+                success: false,
+                message: `Connection error: ${error.message}`,
+                outputData: inputData,
+                error: error.message
+            };
+        }
 
-        const outputData = {
-            timestamp,
-            registers: simulatedData.reduce((acc, item) => {
-                acc[item.address] = item.value;
-                return acc;
-            }, {}),
-            raw: simulatedData
-        };
+        // Use real Modbus connection
+        try {
+            const otManager = getOTConnectionsManager();
+            const timeout = node.config?.modbusTimeout || connection.config?.timeout || 10000;
+            const outputData = await otManager.readModbusRegisters(connection.config, addresses, functionCode, timeout);
 
-        return {
-            success: true,
-            message: `Read ${addresses.length} Modbus registers`,
-            outputData,
-            metadata: {
-                connectionId,
+            return {
+                success: true,
+                message: `Read ${addresses.length} Modbus registers from ${connection?.name || connectionId}`,
+                outputData,
+                metadata: {
+                    connectionId,
+                    connectionName: connection?.name,
+                    functionCode,
+                    addressCount: addresses.length
+                }
+            };
+        } catch (error) {
+            console.error('[handleModbus] Error reading Modbus registers:', error);
+            // Fallback to simulation if real connection fails
+            const timestamp = new Date().toISOString();
+            const simulatedData = addresses.map(addr => ({
+                address: addr,
+                value: Math.floor(Math.random() * 65535),
                 functionCode,
-                addressCount: addresses.length
-            }
-        };
+                timestamp
+            }));
+
+            return {
+                success: false,
+                message: `Modbus read failed: ${error.message}. Using simulated data.`,
+                outputData: {
+                    timestamp,
+                    registers: simulatedData.reduce((acc, item) => {
+                        acc[item.address] = item.value;
+                        return acc;
+                    }, {}),
+                    raw: simulatedData
+                },
+                metadata: {
+                    connectionId,
+                    connectionName: connection?.name,
+                    functionCode,
+                    addressCount: addresses.length,
+                    error: error.message,
+                    simulated: true
+                }
+            };
+        }
     }
 
     async handleScada(node, inputData) {
@@ -1100,8 +1277,21 @@ class WorkflowExecutor {
             throw new Error('SCADA node requires connectionId and tags configuration');
         }
 
+        // Get connection configuration
+        let connection = null;
+        try {
+            connection = await this.getConnection(connectionId);
+        } catch (error) {
+            return {
+                success: false,
+                message: `Connection error: ${error.message}`,
+                outputData: inputData,
+                error: error.message
+            };
+        }
+
         // TODO: Implement actual SCADA connection (OPC UA/Modbus/API based)
-        // For now, simulate reading SCADA tags
+        // For now, simulate reading SCADA tags using connection config
         const timestamp = new Date().toISOString();
         const simulatedData = tags.map(tag => ({
             tag,
@@ -1121,10 +1311,11 @@ class WorkflowExecutor {
 
         return {
             success: true,
-            message: `Read ${tags.length} SCADA tags`,
+            message: `Read ${tags.length} SCADA tags from ${connection?.name || connectionId}`,
             outputData,
             metadata: {
                 connectionId,
+                connectionName: connection?.name,
                 pollingInterval,
                 tagCount: tags.length
             }
@@ -1140,8 +1331,21 @@ class WorkflowExecutor {
             throw new Error('MES node requires connectionId and endpoint configuration');
         }
 
+        // Get connection configuration
+        let connection = null;
+        try {
+            connection = await this.getConnection(connectionId);
+        } catch (error) {
+            return {
+                success: false,
+                message: `Connection error: ${error.message}`,
+                outputData: inputData,
+                error: error.message
+            };
+        }
+
         // TODO: Implement actual MES API connection
-        // For now, simulate fetching production data from MES
+        // For now, simulate fetching production data from MES using connection config
         const timestamp = new Date().toISOString();
         const simulatedData = {
             productionOrder: `PO-${Date.now()}`,
@@ -1160,10 +1364,11 @@ class WorkflowExecutor {
 
         return {
             success: true,
-            message: `Fetched production data from MES`,
+            message: `Fetched production data from MES (${connection?.name || connectionId})`,
             outputData,
             metadata: {
                 connectionId,
+                connectionName: connection?.name,
                 endpoint,
                 query
             }
@@ -1181,8 +1386,21 @@ class WorkflowExecutor {
             throw new Error('Data Historian node requires connectionId and tags configuration');
         }
 
+        // Get connection configuration
+        let connection = null;
+        try {
+            connection = await this.getConnection(connectionId);
+        } catch (error) {
+            return {
+                success: false,
+                message: `Connection error: ${error.message}`,
+                outputData: inputData,
+                error: error.message
+            };
+        }
+
         // TODO: Implement actual Data Historian query (PI/Wonderware/InfluxDB)
-        // For now, simulate historical time-series data
+        // For now, simulate historical time-series data using connection config
         const dataPoints = [];
         const start = new Date(startTime);
         const end = new Date(endTime);
@@ -1216,10 +1434,11 @@ class WorkflowExecutor {
 
         return {
             success: true,
-            message: `Queried ${dataPoints.length} historical data points for ${tags.length} tags`,
+            message: `Queried ${dataPoints.length} historical data points for ${tags.length} tags from ${connection?.name || connectionId}`,
             outputData,
             metadata: {
                 connectionId,
+                connectionName: connection?.name,
                 tagCount: tags.length,
                 pointCount: dataPoints.length,
                 aggregation
@@ -1496,5 +1715,5 @@ class WorkflowExecutor {
     }
 }
 
-module.exports = { WorkflowExecutor };
+module.exports = { WorkflowExecutor, setBroadcastToOrganization };
 

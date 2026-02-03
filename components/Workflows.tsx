@@ -52,6 +52,7 @@ import {
   useWorkflowHistory,
 } from './workflows/index';
 import { OpcUaConfigModal, MqttConfigModal, ModbusConfigModal, ScadaConfigModal, MesConfigModal, DataHistorianConfigModal, TimeSeriesAggregatorConfigModal, SaveRecordsConfigModal } from './workflows/modals';
+import { OTAlertsPanel } from './OTAlertsPanel';
 
 // Use imported DRAGGABLE_ITEMS from workflows module
 const DRAGGABLE_ITEMS = WORKFLOW_DRAGGABLE_ITEMS;
@@ -307,6 +308,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [twilioAccountSid, setTwilioAccountSid] = useState<string>('');
     const [twilioAuthToken, setTwilioAuthToken] = useState<string>('');
     const [twilioFromNumber, setTwilioFromNumber] = useState<string>('');
+
+    // OT Alerts Panel State
+    const [showOTAlertsPanel, setShowOTAlertsPanel] = useState(false);
     const [showSMSTwilioSettings, setShowSMSTwilioSettings] = useState<boolean>(false);
 
     // Data Visualization Node State
@@ -662,7 +666,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     useEffect(() => {
         const fetchConnections = async () => {
             try {
-                const res = await fetch(`${API_BASE}/connections`, { credentials: 'include' });
+                const res = await fetch(`${API_BASE}/data-connections`, { credentials: 'include' });
                 if (res.ok) {
                     const data = await res.json();
                     if (Array.isArray(data)) {
@@ -1885,7 +1889,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         ...n.config,
                         opcuaConnectionId: config.opcuaConnectionId,
                         opcuaNodeIds: config.opcuaNodeIds,
-                        opcuaPollingInterval: config.opcuaPollingInterval
+                        opcuaPollingInterval: config.opcuaPollingInterval,
+                        alerts: config.alerts
                     }
                 }
                 : n
@@ -1924,7 +1929,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         ...n.config,
                         mqttConnectionId: config.mqttConnectionId,
                         mqttTopics: config.mqttTopics,
-                        mqttQos: config.mqttQos
+                        mqttQos: config.mqttQos,
+                        alerts: config.alerts
                     }
                 }
                 : n
@@ -1952,7 +1958,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         ...n.config,
                         modbusConnectionId: config.modbusConnectionId,
                         modbusAddresses: config.modbusAddresses,
-                        modbusFunctionCode: config.modbusFunctionCode
+                        modbusFunctionCode: config.modbusFunctionCode,
+                        alerts: config.alerts
                     }
                 }
                 : n
@@ -5455,6 +5462,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 title="History"
                             >
                                 <History size={18} className="text-[var(--text-secondary)]" weight="light" />
+                            </button>
+                            <button
+                                onClick={() => setShowOTAlertsPanel(true)}
+                                className="relative p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+                                title="OT Alerts"
+                            >
+                                <AlertCircle size={18} className="text-[var(--text-secondary)]" weight="light" />
                             </button>
                             <button
                                 onClick={runWorkflow}
@@ -11344,6 +11358,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 connectionId={nodes.find(n => n.id === configuringOpcuaNodeId)?.config?.opcuaConnectionId}
                 nodeIds={nodes.find(n => n.id === configuringOpcuaNodeId)?.config?.opcuaNodeIds || []}
                 pollingInterval={nodes.find(n => n.id === configuringOpcuaNodeId)?.config?.opcuaPollingInterval || 5000}
+                alerts={nodes.find(n => n.id === configuringOpcuaNodeId)?.config?.alerts}
                 availableConnections={availableConnections.filter(c => c.type === 'opcua' || c.type === 'OPC UA')}
                 onSave={saveOpcuaConfig}
                 onClose={() => setConfiguringOpcuaNodeId(null)}
@@ -11355,6 +11370,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 connectionId={nodes.find(n => n.id === configuringMqttNodeId)?.config?.mqttConnectionId}
                 topics={nodes.find(n => n.id === configuringMqttNodeId)?.config?.mqttTopics || []}
                 qos={nodes.find(n => n.id === configuringMqttNodeId)?.config?.mqttQos || 0}
+                alerts={nodes.find(n => n.id === configuringMqttNodeId)?.config?.alerts}
                 availableConnections={availableConnections.filter(c => c.type === 'mqtt' || c.type === 'MQTT')}
                 onSave={saveMqttConfig}
                 onClose={() => setConfiguringMqttNodeId(null)}
@@ -11366,6 +11382,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 connectionId={nodes.find(n => n.id === configuringModbusNodeId)?.config?.modbusConnectionId}
                 addresses={nodes.find(n => n.id === configuringModbusNodeId)?.config?.modbusAddresses || []}
                 functionCode={nodes.find(n => n.id === configuringModbusNodeId)?.config?.modbusFunctionCode || 3}
+                alerts={nodes.find(n => n.id === configuringModbusNodeId)?.config?.alerts}
                 availableConnections={availableConnections.filter(c => c.type === 'modbus' || c.type === 'Modbus')}
                 onSave={saveModbusConfig}
                 onClose={() => setConfiguringModbusNodeId(null)}
@@ -11415,6 +11432,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 availableFields={[]} // Could be populated from input node data
                 onSave={saveTimeSeriesAggregatorConfig}
                 onClose={() => setConfiguringTimeSeriesAggregatorNodeId(null)}
+            />
+
+            {/* OT Alerts Panel */}
+            <OTAlertsPanel
+                isOpen={showOTAlertsPanel}
+                onClose={() => setShowOTAlertsPanel(false)}
+                workflowId={currentWorkflowId || undefined}
             />
         </div>
 

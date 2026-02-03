@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { NodeConfigSidePanel } from '../../NodeConfigSidePanel';
 import { X } from '@phosphor-icons/react';
+import { AlertConfigSection } from './AlertConfigSection';
 
 interface OpcUaConfigModalProps {
   isOpen: boolean;
@@ -13,10 +14,20 @@ interface OpcUaConfigModalProps {
   nodeIds?: string[];
   pollingInterval?: number;
   availableConnections?: Array<{ id: string; name: string }>;
+  alerts?: {
+    enabled: boolean;
+    cooldown?: number;
+    thresholds?: Record<string, any>;
+  };
   onSave: (config: {
     opcuaConnectionId: string;
     opcuaNodeIds: string[];
     opcuaPollingInterval: number;
+    alerts?: {
+      enabled: boolean;
+      cooldown?: number;
+      thresholds?: Record<string, any>;
+    };
   }) => void;
   onClose: () => void;
 }
@@ -27,6 +38,7 @@ export const OpcUaConfigModal: React.FC<OpcUaConfigModalProps> = ({
   nodeIds = [],
   pollingInterval = 5000,
   availableConnections = [],
+  alerts,
   onSave,
   onClose,
 }) => {
@@ -34,14 +46,16 @@ export const OpcUaConfigModal: React.FC<OpcUaConfigModalProps> = ({
   const [nodeIdInput, setNodeIdInput] = useState('');
   const [nodeIdsList, setNodeIdsList] = useState<string[]>(nodeIds);
   const [pollInterval, setPollInterval] = useState(pollingInterval);
+  const [alertConfig, setAlertConfig] = useState(alerts || { enabled: false });
 
   useEffect(() => {
     if (isOpen) {
       setSelectedConnectionId(connectionId || '');
       setNodeIdsList(nodeIds || []);
       setPollInterval(pollingInterval || 5000);
+      setAlertConfig(alerts || { enabled: false });
     }
-  }, [isOpen, connectionId, nodeIds, pollingInterval]);
+  }, [isOpen, connectionId, nodeIds, pollingInterval, alerts]);
 
   const handleAddNodeId = () => {
     if (nodeIdInput.trim() && !nodeIdsList.includes(nodeIdInput.trim())) {
@@ -60,6 +74,7 @@ export const OpcUaConfigModal: React.FC<OpcUaConfigModalProps> = ({
         opcuaConnectionId: selectedConnectionId,
         opcuaNodeIds: nodeIdsList,
         opcuaPollingInterval: pollInterval,
+        alerts: alertConfig.enabled ? alertConfig : undefined,
       });
     }
   };
@@ -182,6 +197,12 @@ export const OpcUaConfigModal: React.FC<OpcUaConfigModalProps> = ({
             and read the specified node IDs at the configured interval. Data will be output as time-series records.
           </p>
         </div>
+
+        <AlertConfigSection
+          config={alertConfig}
+          availableFields={nodeIdsList}
+          onChange={(config) => setAlertConfig(config)}
+        />
       </div>
     </NodeConfigSidePanel>
   );

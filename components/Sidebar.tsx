@@ -25,7 +25,8 @@ import {
   ClipboardText,
   Flask,
   MagnifyingGlass,
-  ChatCircle
+  ChatCircle,
+  Factory
 } from '@phosphor-icons/react';
 
 interface SidebarProps {
@@ -47,6 +48,7 @@ const viewToRoute: Record<string, string> = {
   'copilots': '/copilots',
   'logs': '/logs',
   'connections': '/connections',
+  'industrial': '/industrial',
   'documentation': '/documentation',
   'settings': '/settings',
   'admin': '/admin',
@@ -395,6 +397,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
           <SectionLabel label="Operations" />
           <div className="space-y-0.5">
             <NavItem icon={Plug} label="Connections" view="connections" active={activeView === 'connections'} />
+            <NavItem icon={Factory} label="Industrial" view="industrial" active={activeView === 'industrial'} />
           </div>
 
         </nav>

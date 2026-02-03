@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { NodeConfigSidePanel } from '../../NodeConfigSidePanel';
 import { X } from '@phosphor-icons/react';
+import { AlertConfigSection } from './AlertConfigSection';
 
 interface MqttConfigModalProps {
   isOpen: boolean;
@@ -13,10 +14,20 @@ interface MqttConfigModalProps {
   topics?: string[];
   qos?: number;
   availableConnections?: Array<{ id: string; name: string }>;
+  alerts?: {
+    enabled: boolean;
+    cooldown?: number;
+    thresholds?: Record<string, any>;
+  };
   onSave: (config: {
     mqttConnectionId: string;
     mqttTopics: string[];
     mqttQos: number;
+    alerts?: {
+      enabled: boolean;
+      cooldown?: number;
+      thresholds?: Record<string, any>;
+    };
   }) => void;
   onClose: () => void;
 }
@@ -27,6 +38,7 @@ export const MqttConfigModal: React.FC<MqttConfigModalProps> = ({
   topics = [],
   qos = 0,
   availableConnections = [],
+  alerts,
   onSave,
   onClose,
 }) => {
@@ -34,14 +46,16 @@ export const MqttConfigModal: React.FC<MqttConfigModalProps> = ({
   const [topicInput, setTopicInput] = useState('');
   const [topicsList, setTopicsList] = useState<string[]>(topics);
   const [qosLevel, setQosLevel] = useState(qos);
+  const [alertConfig, setAlertConfig] = useState(alerts || { enabled: false });
 
   useEffect(() => {
     if (isOpen) {
       setSelectedConnectionId(connectionId || '');
       setTopicsList(topics || []);
       setQosLevel(qos || 0);
+      setAlertConfig(alerts || { enabled: false });
     }
-  }, [isOpen, connectionId, topics, qos]);
+  }, [isOpen, connectionId, topics, qos, alerts]);
 
   const handleAddTopic = () => {
     if (topicInput.trim() && !topicsList.includes(topicInput.trim())) {
@@ -60,6 +74,7 @@ export const MqttConfigModal: React.FC<MqttConfigModalProps> = ({
         mqttConnectionId: selectedConnectionId,
         mqttTopics: topicsList,
         mqttQos: qosLevel,
+        alerts: alertConfig.enabled ? alertConfig : undefined,
       });
     }
   };
@@ -182,6 +197,12 @@ export const MqttConfigModal: React.FC<MqttConfigModalProps> = ({
             and output messages as they arrive. Use wildcards (# for multi-level, + for single-level) for flexible subscriptions.
           </p>
         </div>
+
+        <AlertConfigSection
+          config={alertConfig}
+          availableFields={topicsList}
+          onChange={(config) => setAlertConfig(config)}
+        />
       </div>
     </NodeConfigSidePanel>
   );

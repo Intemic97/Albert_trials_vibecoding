@@ -37,6 +37,7 @@ const Documentation = React.lazy(() => import('./components/Documentation').then
 const SharedDashboard = React.lazy(() => import('./components/SharedDashboard').then(m => ({ default: m.SharedDashboard })));
 const PublicWorkflowForm = React.lazy(() => import('./components/PublicWorkflowForm').then(m => ({ default: m.PublicWorkflowForm })));
 const InteractiveTutorial = React.lazy(() => import('./components/InteractiveTutorial').then(m => ({ default: m.InteractiveTutorial })));
+const IndustrialDashboard = React.lazy(() => import('./components/IndustrialDashboard').then(m => ({ default: m.IndustrialDashboard })));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -1309,6 +1310,9 @@ function AuthenticatedApp() {
                     } />
                     <Route path="/connections" element={
                         <Connections />
+                    } />
+                    <Route path="/industrial" element={
+                        <Suspense fallback={<PageLoader />}><IndustrialDashboard /></Suspense>
                     } />
                     <Route path="/documentation" element={
                         <Documentation />

@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { NodeConfigSidePanel } from '../../NodeConfigSidePanel';
 import { X } from '@phosphor-icons/react';
+import { AlertConfigSection } from './AlertConfigSection';
 
 interface ModbusConfigModalProps {
   isOpen: boolean;
@@ -13,10 +14,20 @@ interface ModbusConfigModalProps {
   addresses?: string[];
   functionCode?: number;
   availableConnections?: Array<{ id: string; name: string }>;
+  alerts?: {
+    enabled: boolean;
+    cooldown?: number;
+    thresholds?: Record<string, any>;
+  };
   onSave: (config: {
     modbusConnectionId: string;
     modbusAddresses: string[];
     modbusFunctionCode: number;
+    alerts?: {
+      enabled: boolean;
+      cooldown?: number;
+      thresholds?: Record<string, any>;
+    };
   }) => void;
   onClose: () => void;
 }
@@ -27,6 +38,7 @@ export const ModbusConfigModal: React.FC<ModbusConfigModalProps> = ({
   addresses = [],
   functionCode = 3,
   availableConnections = [],
+  alerts,
   onSave,
   onClose,
 }) => {
@@ -34,14 +46,16 @@ export const ModbusConfigModal: React.FC<ModbusConfigModalProps> = ({
   const [addressInput, setAddressInput] = useState('');
   const [addressesList, setAddressesList] = useState<string[]>(addresses);
   const [funcCode, setFuncCode] = useState(functionCode);
+  const [alertConfig, setAlertConfig] = useState(alerts || { enabled: false });
 
   useEffect(() => {
     if (isOpen) {
       setSelectedConnectionId(connectionId || '');
       setAddressesList(addresses || []);
       setFuncCode(functionCode || 3);
+      setAlertConfig(alerts || { enabled: false });
     }
-  }, [isOpen, connectionId, addresses, functionCode]);
+  }, [isOpen, connectionId, addresses, functionCode, alerts]);
 
   const handleAddAddress = () => {
     if (addressInput.trim() && !addressesList.includes(addressInput.trim())) {
@@ -60,6 +74,7 @@ export const ModbusConfigModal: React.FC<ModbusConfigModalProps> = ({
         modbusConnectionId: selectedConnectionId,
         modbusAddresses: addressesList,
         modbusFunctionCode: funcCode,
+        alerts: alertConfig.enabled ? alertConfig : undefined,
       });
     }
   };

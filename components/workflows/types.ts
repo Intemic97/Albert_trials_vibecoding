@@ -184,6 +184,16 @@ export interface NodeConfig {
   timeSeriesAggregationType?: 'avg' | 'min' | 'max' | 'sum' | 'count';
   timeSeriesInterval?: string; // e.g., "5m", "1h", "1d"
   timeSeriesFields?: string[];
+  // Alert configuration
+  alerts?: {
+    enabled: boolean;
+    cooldown?: number; // milliseconds
+    thresholds?: Record<string, {
+      min?: number;
+      max?: number;
+      operator: 'gt' | 'lt' | 'range' | 'warning_gt' | 'warning_lt';
+    }>;
+  };
 }
 
 export interface WorkflowNode {

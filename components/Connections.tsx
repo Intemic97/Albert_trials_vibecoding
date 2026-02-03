@@ -393,9 +393,11 @@ const CONNECTIONS: Connection[] = [
 
 export const Connections: React.FC = () => {
     const [connections, setConnections] = useState<Connection[]>(CONNECTIONS);
+    const [savedConnections, setSavedConnections] = useState<any[]>([]);
     const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
     const [showConfigModal, setShowConfigModal] = useState(false);
     const [isConnecting, setIsConnecting] = useState(false);
+    const [testingConnectionId, setTestingConnectionId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<string>('all');
     const [logoErrors, setLogoErrors] = useState<Set<string>>(new Set());
@@ -406,15 +408,27 @@ export const Connections: React.FC = () => {
 
     const loadConnections = async () => {
         try {
-            const res = await fetch(`${API_BASE}/connections`, {
+            // Load saved connections from backend
+            const res = await fetch(`${API_BASE}/data-connections`, {
                 credentials: 'include'
             });
             if (res.ok) {
                 const data = await res.json();
-                // Update connections with server data
+                setSavedConnections(data || []);
+                
+                // Update connections with server data (status, lastTestedAt, etc.)
                 setConnections(prev => prev.map(conn => {
-                    const serverConn = data.connections?.find((c: any) => c.id === conn.id);
-                    return serverConn ? { ...conn, ...serverConn } : conn;
+                    const serverConn = data.find((c: any) => c.type === conn.id || c.name.toLowerCase() === conn.name.toLowerCase());
+                    if (serverConn) {
+                        return { 
+                            ...conn, 
+                            connected: serverConn.status === 'active',
+                            status: serverConn.status,
+                            lastTestedAt: serverConn.lastTestedAt,
+                            lastError: serverConn.lastError
+                        };
+                    }
+                    return conn;
                 }));
             }
         } catch (error) {
@@ -431,11 +445,18 @@ export const Connections: React.FC = () => {
         if (!confirm('Are you sure you want to disconnect this connection?')) return;
         
         try {
-            const res = await fetch(`${API_BASE}/connections/${connectionId}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-            if (res.ok) {
+            // Find saved connection by type or name
+            const savedConn = savedConnections.find(c => c.type === connectionId || c.name.toLowerCase() === connectionId.toLowerCase());
+            if (savedConn) {
+                const res = await fetch(`${API_BASE}/data-connections/${savedConn.id}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                if (res.ok) {
+                    await loadConnections();
+                }
+            } else {
+                // If not found, just update local state
                 setConnections(prev => prev.map(conn => 
                     conn.id === connectionId ? { ...conn, connected: false } : conn
                 ));
@@ -445,31 +466,72 @@ export const Connections: React.FC = () => {
         }
     };
 
+    const handleTestConnection = async (connectionId: string) => {
+        const savedConn = savedConnections.find(c => c.type === connectionId || c.name.toLowerCase() === connectionId.toLowerCase());
+        if (!savedConn) {
+            alert('Please configure the connection first before testing.');
+            return;
+        }
+
+        setTestingConnectionId(savedConn.id);
+        try {
+            const res = await fetch(`${API_BASE}/data-connections/${savedConn.id}/test`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+            const result = await res.json();
+            
+            if (result.success) {
+                alert(`Connection test successful: ${result.message}`);
+            } else {
+                alert(`Connection test failed: ${result.message}`);
+            }
+            
+            // Reload connections to update status
+            await loadConnections();
+        } catch (error: any) {
+            alert(`Error testing connection: ${error.message}`);
+        } finally {
+            setTestingConnectionId(null);
+        }
+    };
+
     const handleSaveConnection = async (config: any) => {
         if (!selectedConnection) return;
         
         setIsConnecting(true);
         try {
-            const res = await fetch(`${API_BASE}/connections`, {
-                method: 'POST',
+            // Check if connection already exists
+            const existingConn = savedConnections.find(c => c.type === selectedConnection.id);
+            const connectionId = existingConn?.id || `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            const payload = {
+                id: connectionId,
+                name: config.name || selectedConnection.name,
+                type: selectedConnection.id,
+                description: config.description || selectedConnection.description,
+                config: config,
+                status: 'inactive' // Will be set to active after successful test
+            };
+
+            const res = await fetch(`${API_BASE}/data-connections${existingConn ? `/${existingConn.id}` : ''}`, {
+                method: existingConn ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({
-                    connectionId: selectedConnection.id,
-                    ...config
-                })
+                body: JSON.stringify(payload)
             });
+            
             if (res.ok) {
-                setConnections(prev => prev.map(conn => 
-                    conn.id === selectedConnection.id 
-                        ? { ...conn, connected: true, config } 
-                        : conn
-                ));
+                await loadConnections();
                 setShowConfigModal(false);
                 setSelectedConnection(null);
+            } else {
+                const error = await res.json();
+                alert(`Error saving connection: ${error.error || 'Unknown error'}`);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error connecting:', error);
+            alert(`Error connecting: ${error.message}`);
         } finally {
             setIsConnecting(false);
         }
@@ -631,10 +693,15 @@ export const Connections: React.FC = () => {
                                             <span className="px-2 py-1 rounded-md bg-purple-500/10 text-purple-500 text-[10px] font-medium">
                                                 Soon
                                             </span>
-                                        ) : connection.connected ? (
+                                        ) : connection.connected || connection.status === 'active' ? (
                                             <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10">
                                                 <CheckCircle size={14} className="text-emerald-500" weight="fill" />
                                                 <span className="text-[10px] font-medium text-emerald-500">Active</span>
+                                            </div>
+                                        ) : connection.status === 'inactive' ? (
+                                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-red-500/10">
+                                                <XCircle size={14} className="text-red-500" weight="fill" />
+                                                <span className="text-[10px] font-medium text-red-500">Inactive</span>
                                             </div>
                                         ) : null}
                                     </div>
@@ -643,10 +710,15 @@ export const Connections: React.FC = () => {
                                         {connection.description}
                                     </p>
 
-                                    {connection.connected && connection.lastSync && (
+                                    {(connection.connected || connection.status === 'active') && connection.lastTestedAt && (
                                         <p className="text-[10px] text-[var(--text-tertiary)] mb-3 flex items-center gap-1">
                                             <Clock size={10} weight="light" />
-                                            Last sync: {new Date(connection.lastSync).toLocaleDateString()}
+                                            Last tested: {new Date(connection.lastTestedAt).toLocaleDateString()}
+                                        </p>
+                                    )}
+                                    {connection.lastError && (
+                                        <p className="text-[10px] text-red-500 mb-3 line-clamp-2">
+                                            Error: {connection.lastError}
                                         </p>
                                     )}
 
@@ -658,8 +730,20 @@ export const Connections: React.FC = () => {
                                             >
                                                 Coming Soon
                                             </button>
-                                        ) : connection.connected ? (
+                                        ) : connection.connected || connection.status === 'active' ? (
                                             <>
+                                                <button
+                                                    onClick={() => handleTestConnection(connection.id)}
+                                                    disabled={testingConnectionId !== null}
+                                                    className="px-3 py-2 border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                                >
+                                                    {testingConnectionId ? (
+                                                        <SpinnerGap size={14} className="animate-spin" weight="light" />
+                                                    ) : (
+                                                        <CheckCircle size={14} weight="light" />
+                                                    )}
+                                                    Test
+                                                </button>
                                                 <button
                                                     onClick={() => handleDisconnect(connection.id)}
                                                     className="flex-1 px-3 py-2 border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
