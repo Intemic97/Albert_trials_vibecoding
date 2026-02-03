@@ -4603,11 +4603,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             'Data Operations': { bg: 'bg-[var(--bg-primary)]', hover: 'hover:bg-[var(--bg-hover)]' },
             'Control Flow': { bg: 'bg-[var(--bg-primary)]', hover: 'hover:bg-[var(--bg-hover)]' },
             'Models': { bg: 'bg-[var(--bg-primary)]', hover: 'hover:bg-[var(--bg-hover)]' },
-            'Agents': { bg: 'bg-[var(--bg-primary)]', hover: 'hover:bg-[var(--bg-hover)]' },
             'Code': { bg: 'bg-[var(--bg-primary)]', hover: 'hover:bg-[var(--bg-hover)]' },
             'Output & Logging': { bg: 'bg-[var(--bg-tertiary)]', hover: 'hover:bg-[var(--bg-hover)]' },
             'Notifications': { bg: 'bg-[var(--bg-tertiary)]', hover: 'hover:bg-[var(--bg-hover)]' },
-            'Advanced': { bg: 'bg-[var(--bg-tertiary)]', hover: 'hover:bg-[var(--bg-hover)]' },
+            'Utils': { bg: 'bg-[var(--bg-tertiary)]', hover: 'hover:bg-[var(--bg-hover)]' },
         };
         return colorMap[categoryName] || { bg: 'bg-[var(--bg-tertiary)]', hover: 'hover:bg-[var(--bg-hover)]' };
     };
@@ -4937,15 +4936,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         const folderStructure: { [key: string]: { icon: React.ElementType, items: DraggableItem[] } } = {
                                             'Recents': { icon: Clock, items: [] },
                                             'Triggers': { icon: Play, items: DRAGGABLE_ITEMS.filter(i => ['trigger', 'webhook'].includes(i.type)) },
-                                            'Data Sources': { icon: Database, items: DRAGGABLE_ITEMS.filter(i => ['fetchData', 'excelInput', 'pdfInput', 'http', 'mysql', 'sapFetch', 'limsFetch', 'opcua', 'mqtt', 'esios', 'climatiq'].includes(i.type)) },
-                                            'Data Operations': { icon: GitMerge, items: DRAGGABLE_ITEMS.filter(i => ['saveRecords', 'manualInput', 'join', 'splitColumns', 'addField'].includes(i.type)) },
-                                            'Control Flow': { icon: AlertCircle, items: DRAGGABLE_ITEMS.filter(i => ['condition', 'humanApproval', 'alertAgent'].includes(i.type)) },
-                                            'Models': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['llm', 'dataVisualization', 'statisticalAnalysis'].includes(i.type)) },
-                                            'Agents': { icon: Bot, items: DRAGGABLE_ITEMS.filter(i => ['agent'].includes(i.type)) },
+                                            'Data Sources': { icon: Database, items: DRAGGABLE_ITEMS.filter(i => ['fetchData', 'excelInput', 'pdfInput', 'http', 'mysql', 'sapFetch', 'limsFetch', 'opcua', 'mqtt', 'esios', 'climatiq', 'manualInput'].includes(i.type)) },
+                                            'Data Operations': { icon: GitMerge, items: DRAGGABLE_ITEMS.filter(i => ['join', 'splitColumns', 'addField', 'action'].includes(i.type)) },
+                                            'Control Flow': { icon: AlertCircle, items: DRAGGABLE_ITEMS.filter(i => ['condition', 'humanApproval', 'alertAgent', 'dataVisualization'].includes(i.type)) },
+                                            'Models': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['llm', 'statisticalAnalysis'].includes(i.type)) },
                                             'Code': { icon: Code, items: DRAGGABLE_ITEMS.filter(i => ['python'].includes(i.type)) },
-                                            'Output & Logging': { icon: LogOut, items: DRAGGABLE_ITEMS.filter(i => ['output', 'comment'].includes(i.type)) },
+                                            'Output & Logging': { icon: LogOut, items: DRAGGABLE_ITEMS.filter(i => ['output', 'saveRecords'].includes(i.type)) },
                                             'Notifications': { icon: Mail, items: DRAGGABLE_ITEMS.filter(i => ['sendEmail', 'sendSMS', 'pdfReport'].includes(i.type)) },
-                                            'Advanced': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['action'].includes(i.type)) },
+                                            'Utils': { icon: Wrench, items: DRAGGABLE_ITEMS.filter(i => ['comment'].includes(i.type)) },
                                         };
 
                                         // Add recently used items to Recents (empty for now, can be populated dynamically)
@@ -4973,12 +4971,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         });
 
                                         return visibleFolders.map(([folderName, folder]) => {
-                                            const isExpanded = expandedFolders.has(folderName);
                                             const filteredFolderItems = folder.items.filter(item => {
                                                 if (searchQuery === '') return true;
                                                 return item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                                     item.description.toLowerCase().includes(searchQuery.toLowerCase());
                                             });
+                                            
+                                            // Auto-expand folders when searching and they have matching items
+                                            const isExpanded = expandedFolders.has(folderName) || (searchQuery !== '' && filteredFolderItems.length > 0);
 
                                             // Don't show folder if it has no items (except Recents)
                                             if (folderName !== 'Recents' && filteredFolderItems.length === 0 && searchQuery === '') return null;

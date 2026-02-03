@@ -2208,15 +2208,16 @@ IMPORTANT:
 
 // ==================== COPILOT CHAT MANAGEMENT ====================
 
-// Get all chats for the current user
+// Get all chats for the organization (shared across all org members)
 app.get('/api/copilot/chats', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.sub;
         const orgId = req.user.orgId;
 
+        // Get all chats from the organization - shared across all members
         const chats = await db.all(
-            'SELECT * FROM copilot_chats WHERE userId = ? AND organizationId = ? ORDER BY updatedAt DESC',
-            [userId, orgId]
+            'SELECT * FROM copilot_chats WHERE organizationId = ? ORDER BY updatedAt DESC',
+            [orgId]
         );
 
         // Parse messages JSON for each chat
@@ -2304,6 +2305,7 @@ app.post('/api/copilot/chats', authenticateToken, async (req, res) => {
 });
 
 // Update a chat (or create if it doesn't exist - upsert)
+// Any organization member can update chats in their organization
 app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.sub;
@@ -2311,10 +2313,10 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
         const { chatId } = req.params;
         const { title, messages, updatedAt, createdAt } = req.body;
 
-        // Check if chat exists
+        // Check if chat exists in the organization (any member can update)
         const chat = await db.get(
-            'SELECT * FROM copilot_chats WHERE id = ? AND userId = ? AND organizationId = ?',
-            [chatId, userId, orgId]
+            'SELECT * FROM copilot_chats WHERE id = ? AND organizationId = ?',
+            [chatId, orgId]
         );
 
         const { instructions, allowedEntities, isFavorite, tags } = req.body;
@@ -2364,16 +2366,17 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
 });
 
 // Delete a chat
+// Any organization member can delete chats in their organization
 app.delete('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.sub;
         const orgId = req.user.orgId;
         const { chatId } = req.params;
 
-        // Verify ownership
+        // Verify the chat belongs to the organization (any member can delete)
         const chat = await db.get(
-            'SELECT * FROM copilot_chats WHERE id = ? AND userId = ? AND organizationId = ?',
-            [chatId, userId, orgId]
+            'SELECT * FROM copilot_chats WHERE id = ? AND organizationId = ?',
+            [chatId, orgId]
         );
 
         if (!chat) {

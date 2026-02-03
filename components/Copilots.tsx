@@ -1318,124 +1318,127 @@ export const Copilots: React.FC = () => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-normal truncate text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>{chat.title}</p>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                        <span className="text-xs text-[var(--text-secondary)]">
-                                            {chat.messages.length} {chat.messages.length === 1 ? 'msg' : 'msgs'}
-                                        </span>
-                                        {chat.tags && chat.tags.length > 0 && (
-                                            <div className="flex items-center gap-1">
-                                                {chat.tags.slice(0, 2).map(tag => (
-                                                    <span 
-                                                        key={tag} 
-                                                        className="px-1.5 py-0.5 rounded text-[10px] text-white"
-                                                        style={{ backgroundColor: TAG_COLORS[tag] || TAG_COLORS.default }}
-                                                    >
-                                                        {tag}
-                                                    </span>
-                                                ))}
-                                                {chat.tags.length > 2 && (
-                                                    <span className="text-[10px] text-[var(--text-tertiary)]">+{chat.tags.length - 2}</span>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleFavorite(chat.id);
-                                        }}
-                                        className={`p-1.5 rounded transition-all ${chat.isFavorite ? 'text-amber-500' : 'hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)]'}`}
-                                        title={chat.isFavorite ? "Remove from favorites" : "Add to favorites"}
-                                    >
-                                        <Star size={14} weight={chat.isFavorite ? "fill" : "regular"} />
-                                    </button>
-                                    <div className="relative">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setShowTagMenu(showTagMenu === chat.id ? null : chat.id);
-                                            }}
-                                            className="p-1.5 hover:bg-[var(--bg-hover)] rounded transition-all"
-                                            title="Add tag"
-                                        >
-                                            <Tag size={14} className="text-[var(--text-tertiary)]" />
-                                        </button>
-                                        {showTagMenu === chat.id && (
-                                            <>
-                                                <div className="fixed inset-0 z-40" onClick={() => setShowTagMenu(null)} />
-                                                <div className="absolute right-0 top-8 w-40 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl z-50 p-2">
-                                                    <input
-                                                        type="text"
-                                                        value={newTagInput}
-                                                        onChange={(e) => setNewTagInput(e.target.value)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') {
-                                                                addTagToChat(chat.id, newTagInput);
-                                                            }
-                                                        }}
-                                                        placeholder="New tag..."
-                                                        className="w-full px-2 py-1 text-xs bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mb-2"
-                                                        autoFocus
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    />
-                                                    {allTags.filter(t => !chat.tags?.includes(t)).slice(0, 5).map(tag => (
-                                                        <button
-                                                            key={tag}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                addTagToChat(chat.id, tag);
-                                                                setShowTagMenu(null);
-                                                            }}
-                                                            className="w-full text-left px-2 py-1 text-xs hover:bg-[var(--bg-tertiary)] rounded flex items-center gap-2"
+                                    <div className="flex items-center justify-between gap-2 mt-0.5">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-[var(--text-secondary)]">
+                                                {chat.messages.length} {chat.messages.length === 1 ? 'msg' : 'msgs'}
+                                            </span>
+                                            {chat.tags && chat.tags.length > 0 && (
+                                                <div className="flex items-center gap-1">
+                                                    {chat.tags.slice(0, 2).map(tag => (
+                                                        <span 
+                                                            key={tag} 
+                                                            className="px-1.5 py-0.5 rounded text-[10px] text-white"
+                                                            style={{ backgroundColor: TAG_COLORS[tag] || TAG_COLORS.default }}
                                                         >
-                                                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: TAG_COLORS[tag] || TAG_COLORS.default }} />
                                                             {tag}
-                                                        </button>
+                                                        </span>
                                                     ))}
-                                                    {chat.tags && chat.tags.length > 0 && (
-                                                        <>
-                                                            <div className="border-t border-[var(--border-light)] my-1" />
-                                                            <p className="text-[10px] text-[var(--text-tertiary)] px-2 mb-1">Remove:</p>
-                                                            {chat.tags.map(tag => (
+                                                    {chat.tags.length > 2 && (
+                                                        <span className="text-[10px] text-[var(--text-tertiary)]">+{chat.tags.length - 2}</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {/* Hover action buttons - now inline with message count */}
+                                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleFavorite(chat.id);
+                                                }}
+                                                className={`p-1 rounded transition-all ${chat.isFavorite ? 'text-amber-500' : 'hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)]'}`}
+                                                title={chat.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                                            >
+                                                <Star size={12} weight={chat.isFavorite ? "fill" : "regular"} />
+                                            </button>
+                                            <div className="relative">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setShowTagMenu(showTagMenu === chat.id ? null : chat.id);
+                                                    }}
+                                                    className="p-1 hover:bg-[var(--bg-hover)] rounded transition-all"
+                                                    title="Add tag"
+                                                >
+                                                    <Tag size={12} className="text-[var(--text-tertiary)]" />
+                                                </button>
+                                                {showTagMenu === chat.id && (
+                                                    <>
+                                                        <div className="fixed inset-0 z-40" onClick={() => setShowTagMenu(null)} />
+                                                        <div className="absolute right-0 top-6 w-40 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl z-50 p-2">
+                                                            <input
+                                                                type="text"
+                                                                value={newTagInput}
+                                                                onChange={(e) => setNewTagInput(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        addTagToChat(chat.id, newTagInput);
+                                                                    }
+                                                                }}
+                                                                placeholder="New tag..."
+                                                                className="w-full px-2 py-1 text-xs bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mb-2"
+                                                                autoFocus
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            />
+                                                            {allTags.filter(t => !chat.tags?.includes(t)).slice(0, 5).map(tag => (
                                                                 <button
                                                                     key={tag}
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        removeTagFromChat(chat.id, tag);
+                                                                        addTagToChat(chat.id, tag);
+                                                                        setShowTagMenu(null);
                                                                     }}
-                                                                    className="w-full text-left px-2 py-1 text-xs hover:bg-red-50 text-red-500 rounded flex items-center gap-2"
+                                                                    className="w-full text-left px-2 py-1 text-xs hover:bg-[var(--bg-tertiary)] rounded flex items-center gap-2"
                                                                 >
-                                                                    <X size={10} />
+                                                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: TAG_COLORS[tag] || TAG_COLORS.default }} />
                                                                     {tag}
                                                                 </button>
                                                             ))}
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </>
-                                        )}
+                                                            {chat.tags && chat.tags.length > 0 && (
+                                                                <>
+                                                                    <div className="border-t border-[var(--border-light)] my-1" />
+                                                                    <p className="text-[10px] text-[var(--text-tertiary)] px-2 mb-1">Remove:</p>
+                                                                    {chat.tags.map(tag => (
+                                                                        <button
+                                                                            key={tag}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                removeTagFromChat(chat.id, tag);
+                                                                            }}
+                                                                            className="w-full text-left px-2 py-1 text-xs hover:bg-red-50 text-red-500 rounded flex items-center gap-2"
+                                                                        >
+                                                                            <X size={10} />
+                                                                            {tag}
+                                                                        </button>
+                                                                    ))}
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    openEditModal(chat.id);
+                                                }}
+                                                className="p-1 hover:bg-[var(--bg-hover)] rounded transition-all"
+                                                title="Edit configuration"
+                                            >
+                                                <GearSix size={12} className="text-[var(--text-tertiary)]" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteChat(chat.id);
+                                                }}
+                                                className="p-1 hover:bg-red-50 rounded transition-all"
+                                            >
+                                                <Trash size={12} className="text-red-500" />
+                                            </button>
+                                        </div>
                                     </div>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            openEditModal(chat.id);
-                                        }}
-                                        className="p-1.5 hover:bg-[var(--bg-hover)] rounded transition-all"
-                                        title="Edit configuration"
-                                    >
-                                        <GearSix size={14} className="text-[var(--text-tertiary)]" />
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            deleteChat(chat.id);
-                                        }}
-                                        className="p-1.5 hover:bg-red-50 rounded transition-all"
-                                    >
-                                        <Trash size={14} className="text-red-500" />
-                                    </button>
                                 </div>
                             </div>
                         ))}
