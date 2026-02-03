@@ -16,7 +16,6 @@ import {
 import { Entity } from '../types';
 import { API_BASE } from '../config';
 import { DynamicChart } from './DynamicChart';
-import { IndustrialWidget } from './IndustrialWidget';
 
 interface OverviewProps {
     entities: Entity[];
@@ -271,12 +270,9 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                         </div>
                     </section>
 
-                    {/* Industrial Status Widget */}
-                    <section className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                        <div className="lg:col-span-1">
-                            <IndustrialWidget showLink={true} />
-                        </div>
-                        <div className="lg:col-span-3 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-4">
+                    {/* Quick Actions */}
+                    <section>
+                        <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-4">
                             <div className="flex items-center justify-between mb-3">
                                 <h3 className="text-sm font-medium text-[var(--text-primary)]">Quick Actions</h3>
                             </div>
