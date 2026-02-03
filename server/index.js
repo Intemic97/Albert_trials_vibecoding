@@ -894,6 +894,120 @@ app.post('/api/ot-alerts/:id/acknowledge', authenticateToken, async (req, res) =
     }
 });
 
+// ==================== OT NOTIFICATION SETTINGS ====================
+const { getOTNotificationsService } = require('./utils/otNotifications');
+
+// Get OT notification settings
+app.get('/api/ot-notification-settings', authenticateToken, async (req, res) => {
+    try {
+        const notificationsService = getOTNotificationsService(db);
+        const settings = await notificationsService.getNotificationSettings(req.user.orgId);
+        
+        // Don't send password back to client
+        if (settings) {
+            settings.smtpPass = settings.smtpPass ? '********' : '';
+        }
+        
+        res.json(settings || {
+            smtpEnabled: false,
+            smtpHost: '',
+            smtpPort: '587',
+            smtpUser: '',
+            emailRecipients: [],
+            alertSeverities: ['error'],
+            emailEnabled: true,
+            browserEnabled: true,
+            cooldownMinutes: 5
+        });
+    } catch (error) {
+        console.error('Get OT notification settings error:', error);
+        res.status(500).json({ error: 'Failed to get notification settings' });
+    }
+});
+
+// Save OT notification settings
+app.post('/api/ot-notification-settings', authenticateToken, async (req, res) => {
+    try {
+        const notificationsService = getOTNotificationsService(db);
+        const settings = req.body;
+        
+        // If password is masked, get the existing one
+        if (settings.smtpPass === '********') {
+            const existingSettings = await notificationsService.getNotificationSettings(req.user.orgId);
+            if (existingSettings) {
+                settings.smtpPass = existingSettings.smtpPass;
+            }
+        }
+        
+        await notificationsService.saveNotificationSettings(req.user.orgId, settings);
+        res.json({ success: true, message: 'Notification settings saved' });
+    } catch (error) {
+        console.error('Save OT notification settings error:', error);
+        res.status(500).json({ error: 'Failed to save notification settings' });
+    }
+});
+
+// Send test email
+app.post('/api/ot-notification-settings/test', authenticateToken, async (req, res) => {
+    try {
+        const { testEmail } = req.body;
+        
+        if (!testEmail) {
+            return res.status(400).json({ error: 'Test email address required' });
+        }
+        
+        const notificationsService = getOTNotificationsService(db);
+        const result = await notificationsService.sendTestEmail(req.user.orgId, testEmail);
+        
+        res.json(result);
+    } catch (error) {
+        console.error('Test email error:', error);
+        res.status(500).json({ error: 'Failed to send test email' });
+    }
+});
+
+// Get OT metrics history (for charts)
+app.get('/api/ot-metrics/history', authenticateToken, async (req, res) => {
+    try {
+        const { connectionId, timeRange = '24h', metric = 'latency' } = req.query;
+        
+        // Calculate time range
+        const rangeMs = {
+            '1h': 60 * 60 * 1000,
+            '6h': 6 * 60 * 60 * 1000,
+            '24h': 24 * 60 * 60 * 1000,
+            '7d': 7 * 24 * 60 * 60 * 1000
+        }[timeRange] || 24 * 60 * 60 * 1000;
+        
+        const since = new Date(Date.now() - rangeMs).toISOString();
+        
+        // For now, generate simulated data (in production, this would come from a metrics table)
+        const points = 24;
+        const interval = rangeMs / points;
+        const data = [];
+        
+        for (let i = 0; i < points; i++) {
+            const timestamp = new Date(Date.now() - rangeMs + (i * interval)).toISOString();
+            data.push({
+                timestamp,
+                value: metric === 'latency' 
+                    ? Math.random() * 50 + 20  // 20-70ms
+                    : Math.floor(Math.random() * 100)  // 0-100 messages
+            });
+        }
+        
+        res.json({
+            metric,
+            timeRange,
+            connectionId: connectionId || 'all',
+            data
+        });
+    } catch (error) {
+        console.error('Get OT metrics history error:', error);
+        res.status(500).json({ error: 'Failed to get metrics history' });
+    }
+});
+
 // Get alert configurations
 app.get('/api/alert-configs', authenticateToken, async (req, res) => {
     try {

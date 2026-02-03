@@ -4,12 +4,14 @@
  */
 
 const crypto = require('crypto');
+const { getOTNotificationsService } = require('./otNotifications');
 
 class OTAlertsManager {
     constructor(db, broadcastToOrganizationFn = null) {
         this.db = db;
         this.alertHistory = new Map(); // Track recent alerts to avoid spam
         this.broadcastToOrganization = broadcastToOrganizationFn; // WebSocket broadcast function
+        this.notificationsService = getOTNotificationsService(db); // Email notifications
     }
 
     /**
@@ -323,6 +325,14 @@ class OTAlertsManager {
                         console.error('[OTAlerts] Error broadcasting alert via WebSocket:', wsError);
                         // Don't fail if WebSocket broadcast fails
                     }
+                }
+                
+                // Send email notification for critical alerts
+                try {
+                    await this.notificationsService.sendAlertEmail(alert, organizationId);
+                } catch (emailError) {
+                    console.error('[OTAlerts] Error sending email notification:', emailError);
+                    // Don't fail if email fails
                 }
             } catch (error) {
                 console.error(`[OTAlerts] Error processing alert ${alert.id}:`, error);

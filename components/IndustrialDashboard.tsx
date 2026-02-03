@@ -35,12 +35,14 @@ import {
     WifiHigh,
     WifiSlash,
     Timer,
-    ChartLine
+    ChartLine,
+    BellRinging
 } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { DynamicChart } from './DynamicChart';
 import { OTAlertsPanel } from './OTAlertsPanel';
+import { OTNotificationSettings } from './OTNotificationSettings';
 
 // ============ Types ============
 interface OTConnection {
@@ -327,6 +329,7 @@ export const IndustrialDashboard: React.FC = () => {
     });
     const [isLoading, setIsLoading] = useState(true);
     const [showAlertsPanel, setShowAlertsPanel] = useState(false);
+    const [showNotificationSettings, setShowNotificationSettings] = useState(false);
     const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>('24h');
     const [filterType, setFilterType] = useState<FilterType>('all');
     const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
@@ -637,6 +640,13 @@ export const IndustrialDashboard: React.FC = () => {
                             <option value="7d">Last 7 Days</option>
                         </select>
                         <button
+                            onClick={() => setShowNotificationSettings(true)}
+                            className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                            title="Notification Settings"
+                        >
+                            <BellRinging size={18} />
+                        </button>
+                        <button
                             onClick={handleExportConnections}
                             className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
                             title="Export CSV"
@@ -865,6 +875,14 @@ export const IndustrialDashboard: React.FC = () => {
                 isOpen={showAlertsPanel}
                 onClose={() => setShowAlertsPanel(false)}
             />
+
+            {/* Notification Settings Modal */}
+            {showNotificationSettings && (
+                <OTNotificationSettings
+                    isModal={true}
+                    onClose={() => setShowNotificationSettings(false)}
+                />
+            )}
         </div>
     );
 };
