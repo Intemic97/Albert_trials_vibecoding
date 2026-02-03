@@ -51,7 +51,7 @@ import {
   // Hooks
   useWorkflowHistory,
 } from './workflows/index';
-import { OpcUaConfigModal, MqttConfigModal, ModbusConfigModal, ScadaConfigModal, MesConfigModal, DataHistorianConfigModal } from './workflows/modals';
+import { OpcUaConfigModal, MqttConfigModal, ModbusConfigModal, ScadaConfigModal, MesConfigModal, DataHistorianConfigModal, TimeSeriesAggregatorConfigModal } from './workflows/modals';
 
 // Use imported DRAGGABLE_ITEMS from workflows module
 const DRAGGABLE_ITEMS = WORKFLOW_DRAGGABLE_ITEMS;
@@ -357,6 +357,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     
     // Data Historian Node State
     const [configuringDataHistorianNodeId, setConfiguringDataHistorianNodeId] = useState<string | null>(null);
+
+    // Time-Series Aggregator Node State
+    const [configuringTimeSeriesAggregatorNodeId, setConfiguringTimeSeriesAggregatorNodeId] = useState<string | null>(null);
 
     // Available connections for OT nodes
     const [availableConnections, setAvailableConnections] = useState<Array<{ id: string; name: string; type: string }>>([]);
@@ -1931,6 +1934,34 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 : n
         ));
         setConfiguringDataHistorianNodeId(null);
+    };
+
+    const openTimeSeriesAggregatorConfig = (nodeId: string) => {
+        setConfiguringTimeSeriesAggregatorNodeId(nodeId);
+    };
+
+    const saveTimeSeriesAggregatorConfig = (config: {
+        timeSeriesAggregationType: 'avg' | 'min' | 'max' | 'sum' | 'count';
+        timeSeriesInterval: string;
+        timeSeriesFields?: string[];
+    }) => {
+        if (!configuringTimeSeriesAggregatorNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringTimeSeriesAggregatorNodeId
+                ? {
+                    ...n,
+                    label: `Aggregate: ${config.timeSeriesAggregationType} (${config.timeSeriesInterval})`,
+                    config: {
+                        ...n.config,
+                        timeSeriesAggregationType: config.timeSeriesAggregationType,
+                        timeSeriesInterval: config.timeSeriesInterval,
+                        timeSeriesFields: config.timeSeriesFields
+                    }
+                }
+                : n
+        ));
+        setConfiguringTimeSeriesAggregatorNodeId(null);
     };
 
     const openEmailConfig = (nodeId: string) => {
@@ -4680,6 +4711,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'scada':
             case 'mes':
             case 'dataHistorian':
+            case 'timeSeriesAggregator':
                 return true; // Estos tipos siempre están configurados
             default:
                 return false;
@@ -4766,6 +4798,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'scada': return 'text-indigo-600';
             case 'mes': return 'text-indigo-600';
             case 'dataHistorian': return 'text-indigo-600';
+            case 'timeSeriesAggregator': return 'text-indigo-600';
             default: return 'text-[var(--text-secondary)]';
         }
     };
@@ -5770,6 +5803,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openMesConfig(node.id);
                                             } else if (node.type === 'dataHistorian') {
                                                 openDataHistorianConfig(node.id);
+                                            } else if (node.type === 'timeSeriesAggregator') {
+                                                openTimeSeriesAggregatorConfig(node.id);
                                             }
                                         }}
                                         onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
@@ -10966,6 +11001,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 availableConnections={availableConnections.filter(c => c.type === 'data-historian' || c.type === 'Data Historian')}
                 onSave={saveDataHistorianConfig}
                 onClose={() => setConfiguringDataHistorianNodeId(null)}
+            />
+
+            {/* Time-Series Aggregator Configuration Modal */}
+            <TimeSeriesAggregatorConfigModal
+                isOpen={configuringTimeSeriesAggregatorNodeId !== null}
+                aggregationType={nodes.find(n => n.id === configuringTimeSeriesAggregatorNodeId)?.config?.timeSeriesAggregationType || 'avg'}
+                interval={nodes.find(n => n.id === configuringTimeSeriesAggregatorNodeId)?.config?.timeSeriesInterval || '5m'}
+                fields={nodes.find(n => n.id === configuringTimeSeriesAggregatorNodeId)?.config?.timeSeriesFields || []}
+                availableFields={[]} // Could be populated from input node data
+                onSave={saveTimeSeriesAggregatorConfig}
+                onClose={() => setConfiguringTimeSeriesAggregatorNodeId(null)}
             />
         </div>
 
