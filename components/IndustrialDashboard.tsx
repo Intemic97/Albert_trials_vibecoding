@@ -37,7 +37,10 @@ import {
     Timer,
     ChartLine,
     BellRinging,
-    ClockCounterClockwise
+    ClockCounterClockwise,
+    Question,
+    Command,
+    Keyboard
 } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
@@ -143,29 +146,45 @@ interface MetricCardProps {
     trendValue?: string;
     onClick?: () => void;
     highlight?: 'success' | 'warning' | 'error' | 'neutral';
+    tooltip?: string;
+    pulse?: boolean;
 }
 
 const MetricCard: React.FC<MetricCardProps> = ({
-    title, value, subtitle, icon, trend, trendValue, onClick, highlight = 'neutral'
+    title, value, subtitle, icon, trend, trendValue, onClick, highlight = 'neutral', tooltip, pulse = false
 }) => {
     const highlightClasses = {
-        success: 'border-green-500/30 hover:border-green-500/50',
-        warning: 'border-amber-500/30 hover:border-amber-500/50',
-        error: 'border-red-500/30 hover:border-red-500/50',
+        success: 'border-green-500/30 hover:border-green-500/50 hover:shadow-green-500/10',
+        warning: 'border-amber-500/30 hover:border-amber-500/50 hover:shadow-amber-500/10',
+        error: 'border-red-500/30 hover:border-red-500/50 hover:shadow-red-500/10',
         neutral: 'border-[var(--border-light)] hover:border-[var(--accent-primary)]'
     };
 
+    const pulseClass = pulse ? 'animate-pulse' : '';
+
     return (
         <div 
-            className={`bg-[var(--bg-card)] border rounded-lg p-4 transition-all ${highlightClasses[highlight]} ${onClick ? 'cursor-pointer' : ''}`}
+            className={`bg-[var(--bg-card)] border rounded-lg p-4 transition-all hover:shadow-lg ${highlightClasses[highlight]} ${onClick ? 'cursor-pointer' : ''} group relative`}
             onClick={onClick}
+            title={tooltip}
         >
+            {/* Status indicator dot for non-neutral states */}
+            {highlight !== 'neutral' && (
+                <div className={`absolute top-2 right-2 w-2 h-2 rounded-full ${
+                    highlight === 'success' ? 'bg-green-500' : 
+                    highlight === 'warning' ? 'bg-amber-500' : 
+                    'bg-red-500'
+                } ${pulseClass}`} />
+            )}
+            
             <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-[var(--text-tertiary)]">{title}</span>
-                {icon}
+                <span className="text-sm text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] transition-colors">{title}</span>
+                <div className={`transition-transform group-hover:scale-110 ${pulseClass}`}>
+                    {icon}
+                </div>
             </div>
             <div className="flex items-end gap-2">
-                <div className="text-2xl font-bold text-[var(--text-primary)]">{value}</div>
+                <div className={`text-2xl font-bold text-[var(--text-primary)] ${pulseClass}`}>{value}</div>
                 {trend && trendValue && (
                     <div className={`flex items-center text-xs ${
                         trend === 'up' ? 'text-green-500' : trend === 'down' ? 'text-red-500' : 'text-gray-500'
@@ -177,6 +196,13 @@ const MetricCard: React.FC<MetricCardProps> = ({
             </div>
             {subtitle && (
                 <div className="text-xs text-[var(--text-tertiary)] mt-1">{subtitle}</div>
+            )}
+            
+            {/* Click indicator for interactive cards */}
+            {onClick && (
+                <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <CaretRight size={12} className="text-[var(--text-tertiary)]" />
+                </div>
             )}
         </div>
     );
@@ -333,6 +359,7 @@ export const IndustrialDashboard: React.FC = () => {
     const [showAlertsPanel, setShowAlertsPanel] = useState(false);
     const [showNotificationSettings, setShowNotificationSettings] = useState(false);
     const [showActivityLog, setShowActivityLog] = useState(false);
+    const [showHelp, setShowHelp] = useState(false);
     const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>('24h');
     const [filterType, setFilterType] = useState<FilterType>('all');
     const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
@@ -576,11 +603,17 @@ export const IndustrialDashboard: React.FC = () => {
                 e.preventDefault();
                 handleRefresh();
             }
+            // ? = Show Help
+            if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+                e.preventDefault();
+                setShowHelp(true);
+            }
             // Escape = Close all modals
             if (e.key === 'Escape') {
                 setShowAlertsPanel(false);
                 setShowNotificationSettings(false);
                 setShowActivityLog(false);
+                setShowHelp(false);
             }
         };
 
@@ -717,9 +750,16 @@ export const IndustrialDashboard: React.FC = () => {
                         <button
                             onClick={handleRefresh}
                             className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
-                            title="Refresh"
+                            title="Refresh (R)"
                         >
                             <ArrowClockwise size={18} className={isLoading ? 'animate-spin' : ''} />
+                        </button>
+                        <button
+                            onClick={() => setShowHelp(true)}
+                            className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                            title="Help (?)"
+                        >
+                            <Question size={18} />
                         </button>
                     </div>
                 </div>
@@ -740,6 +780,7 @@ export const IndustrialDashboard: React.FC = () => {
                                 value={stats.total}
                                 subtitle={`${stats.active} active`}
                                 icon={<PlugsConnected size={20} className="text-blue-500" />}
+                                tooltip="Total number of configured OT connections"
                             />
                             <MetricCard
                                 title="Active Alerts"
@@ -748,6 +789,8 @@ export const IndustrialDashboard: React.FC = () => {
                                 icon={<Warning size={20} className="text-amber-500" />}
                                 onClick={() => setShowAlertsPanel(true)}
                                 highlight={alertSummary.errors > 0 ? 'error' : alertSummary.warnings > 0 ? 'warning' : 'neutral'}
+                                tooltip="Click to view and manage alerts (⌘A)"
+                                pulse={alertSummary.errors > 0}
                             />
                             <MetricCard
                                 title="System Health"
@@ -755,18 +798,21 @@ export const IndustrialDashboard: React.FC = () => {
                                 subtitle={`${stats.active} of ${stats.total} healthy`}
                                 icon={<Pulse size={20} className={stats.healthPercentage >= 80 ? 'text-green-500' : stats.healthPercentage >= 50 ? 'text-amber-500' : 'text-red-500'} />}
                                 highlight={stats.healthPercentage >= 80 ? 'success' : stats.healthPercentage >= 50 ? 'warning' : 'error'}
+                                tooltip="Percentage of connections in active state"
                             />
                             <MetricCard
                                 title="Avg Latency"
                                 value={formatLatency(stats.avgLatency)}
                                 subtitle="across all connections"
                                 icon={<Timer size={20} className="text-purple-500" />}
+                                tooltip="Average response time across all OT connections"
                             />
                             <MetricCard
                                 title="Throughput"
                                 value={`${stats.totalThroughput}`}
                                 subtitle="messages/second"
                                 icon={<ChartLine size={20} className="text-cyan-500" />}
+                                tooltip="Total messages processed per second"
                             />
                         </div>
 
@@ -950,6 +996,60 @@ export const IndustrialDashboard: React.FC = () => {
                 isOpen={showActivityLog}
                 onClose={() => setShowActivityLog(false)}
             />
+
+            {/* Help Modal */}
+            {showHelp && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowHelp(false)}>
+                    <div 
+                        className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-xl w-full max-w-md"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between p-5 border-b border-[var(--border-light)]">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-500/10 rounded-lg">
+                                    <Keyboard size={20} className="text-blue-500" />
+                                </div>
+                                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Keyboard Shortcuts</h2>
+                            </div>
+                            <button
+                                onClick={() => setShowHelp(false)}
+                                className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                            >
+                                <XCircle size={18} />
+                            </button>
+                        </div>
+                        <div className="p-5 space-y-3">
+                            {[
+                                { keys: ['⌘', 'A'], description: 'Open Alerts Panel' },
+                                { keys: ['⌘', 'L'], description: 'Open Activity Log' },
+                                { keys: ['⌘', 'N'], description: 'Open Notification Settings' },
+                                { keys: ['R'], description: 'Refresh data' },
+                                { keys: ['?'], description: 'Show this help' },
+                                { keys: ['Esc'], description: 'Close modals' },
+                            ].map((shortcut, i) => (
+                                <div key={i} className="flex items-center justify-between">
+                                    <span className="text-sm text-[var(--text-secondary)]">{shortcut.description}</span>
+                                    <div className="flex items-center gap-1">
+                                        {shortcut.keys.map((key, j) => (
+                                            <React.Fragment key={j}>
+                                                <kbd className="px-2 py-1 text-xs font-mono bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded">
+                                                    {key}
+                                                </kbd>
+                                                {j < shortcut.keys.length - 1 && <span className="text-[var(--text-tertiary)]">+</span>}
+                                            </React.Fragment>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="p-4 border-t border-[var(--border-light)] bg-[var(--bg-tertiary)] rounded-b-xl">
+                            <p className="text-xs text-[var(--text-tertiary)] text-center">
+                                Press <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-[var(--bg-primary)] border border-[var(--border-light)] rounded">Esc</kbd> to close
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
