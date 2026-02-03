@@ -326,6 +326,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [scheduleEnabled, setScheduleEnabled] = useState<boolean>(true);
     const [scheduleType, setScheduleType] = useState<'interval' | 'specific'>('interval');
     const [scheduleTime, setScheduleTime] = useState<string>('09:00');
+    const [showScheduleUpgradeModal, setShowScheduleUpgradeModal] = useState<boolean>(false);
+    const [showScheduleContactInfo, setShowScheduleContactInfo] = useState<boolean>(false);
     const [scheduleRepeat, setScheduleRepeat] = useState<'daily' | 'weekly' | 'none'>('daily');
 
     // OPC UA Node State
@@ -2041,13 +2043,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         const node = nodes.find(n => n.id === nodeId);
         // Check if it's a schedule node (either by label or by having schedule config)
         if (node && node.type === 'trigger' && (node.label === 'Schedule' || node.label.startsWith('Schedule:') || node.config?.scheduleInterval)) {
-            setConfiguringScheduleNodeId(nodeId);
-            setScheduleIntervalValue(node.config?.scheduleIntervalValue || '5');
-            setScheduleIntervalUnit(node.config?.scheduleIntervalUnit || 'minutes');
-            setScheduleEnabled(node.config?.scheduleEnabled ?? true);
-            setScheduleType(node.config?.scheduleType || 'interval');
-            setScheduleTime(node.config?.scheduleTime || '09:00');
-            setScheduleRepeat(node.config?.scheduleRepeat || 'daily');
+            // Show upgrade modal instead of config
+            setShowScheduleUpgradeModal(true);
+            setShowScheduleContactInfo(false);
         }
     };
 
@@ -11184,6 +11182,57 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             >
                                 Save
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Schedule Upgrade Modal */}
+            {showScheduleUpgradeModal && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => { setShowScheduleUpgradeModal(false); setShowScheduleContactInfo(false); }}>
+                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl p-6 w-[400px] max-w-[90vw]" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-base font-medium text-[var(--text-primary)]">
+                                Schedule Workflows
+                            </h3>
+                            <button
+                                onClick={() => { setShowScheduleUpgradeModal(false); setShowScheduleContactInfo(false); }}
+                                className="p-1 hover:bg-[var(--bg-tertiary)] rounded-md transition-colors"
+                            >
+                                <X size={18} className="text-[var(--text-tertiary)]" weight="light" />
+                            </button>
+                        </div>
+
+                        <div className="py-4 text-center">
+                            <h4 className="text-lg font-medium text-[var(--text-primary)] mb-2">
+                                Upgrade to create schedules for workflows
+                            </h4>
+                            <p className="text-sm text-[var(--text-secondary)] mb-5 max-w-sm mx-auto">
+                                Automate your workflows by scheduling them to run at specific times or intervals with our Business or Enterprise plan.
+                            </p>
+                            <div className="flex flex-col gap-3 items-center">
+                                <button
+                                    onClick={() => setShowScheduleContactInfo(true)}
+                                    className="px-6 py-2.5 bg-[#2D3748] hover:bg-[#1A202C] text-white rounded-lg text-sm font-medium transition-all shadow-md hover:shadow-lg"
+                                >
+                                    Contact Sales
+                                </button>
+                                <button
+                                    onClick={() => { setShowScheduleUpgradeModal(false); setShowScheduleContactInfo(false); }}
+                                    className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                                >
+                                    Maybe later
+                                </button>
+                            </div>
+                            
+                            {/* Contact Info Popup */}
+                            {showScheduleContactInfo && (
+                                <div className="mt-4 p-4 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-left">
+                                    <p className="text-sm text-[var(--text-secondary)]">
+                                        Write us at <a href="mailto:info@intemic.com" className="text-[#419CAF] hover:underline font-medium">info@intemic.com</a> about your requirements and we will provide a personalized proposal.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

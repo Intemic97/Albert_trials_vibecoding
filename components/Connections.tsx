@@ -5,7 +5,6 @@ import {
     XCircle, 
     Plus, 
     GearSix,
-    SpinnerGap,
     MagnifyingGlass,
     X,
     Star,
@@ -172,11 +171,11 @@ const CONNECTIONS: Connection[] = [
         popular: true
     },
     {
-        id: 'excel',
-        name: 'Microsoft Excel',
-        type: 'Spreadsheet',
-        logoUrl: 'https://cdn.simpleicons.org/microsoftexcel',
-        description: 'Connect to Excel files and OneDrive for spreadsheet data',
+        id: 'sharepoint',
+        name: 'Microsoft SharePoint',
+        type: 'Collaboration',
+        logoUrl: 'https://cdn.simpleicons.org/microsoftsharepoint',
+        description: 'Connect to SharePoint for document management and collaboration',
         category: 'productivity',
         connected: false
     },
@@ -310,6 +309,7 @@ export const Connections: React.FC = () => {
     const [connections, setConnections] = useState<Connection[]>(CONNECTIONS);
     const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
     const [showConfigModal, setShowConfigModal] = useState(false);
+    const [showContactInfo, setShowContactInfo] = useState(false);
     const [isConnecting, setIsConnecting] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -340,6 +340,22 @@ export const Connections: React.FC = () => {
     const handleConnect = async (connection: Connection) => {
         setSelectedConnection(connection);
         setShowConfigModal(true);
+        
+        // Log connection attempt to Node Feedback for tracking
+        try {
+            await fetch(`${API_BASE}/node-feedback`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nodeType: 'connection',
+                    nodeLabel: connection.name,
+                    feedbackText: `Attempted to connect to ${connection.name} (${connection.type})`
+                }),
+                credentials: 'include'
+            });
+        } catch (e) {
+            // Silent fail - don't block the modal from opening
+        }
     };
 
     const handleDisconnect = async (connectionId: string) => {
@@ -609,7 +625,7 @@ export const Connections: React.FC = () => {
 
             {/* Connection Configuration Modal */}
             {showConfigModal && selectedConnection && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowConfigModal(false)}>
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => { setShowConfigModal(false); setShowContactInfo(false); }}>
                     <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl p-6 w-[500px] max-w-[90vw]" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-6">
                             <div>
@@ -621,428 +637,45 @@ export const Connections: React.FC = () => {
                                 </p>
                             </div>
                             <button
-                                onClick={() => setShowConfigModal(false)}
+                                onClick={() => { setShowConfigModal(false); setShowContactInfo(false); }}
                                 className="p-1 hover:bg-[var(--bg-tertiary)] rounded-md transition-colors"
                             >
                                 <X size={18} className="text-[var(--text-tertiary)]" weight="light" />
                             </button>
                         </div>
 
-                        <form onSubmit={(e) => {
-                            e.preventDefault();
-                            const formData = new FormData(e.target as HTMLFormElement);
-                            const config: any = {};
-                            formData.forEach((value, key) => {
-                                config[key] = value;
-                            });
-                            handleSaveConnection(config);
-                        }} className="space-y-4">
-                            {/* SAP Configuration */}
-                            {selectedConnection.id === 'sap' && (
-                                <>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Server URL <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="serverUrl"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                            placeholder="https://your-sap-server.com"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Client ID <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="clientId"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                            placeholder="100"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Username <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="username"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Password <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="password"
-                                            name="password"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            System Number
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="systemNumber"
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                            placeholder="00"
-                                        />
-                                    </div>
-                                </>
-                            )}
-
-                            {/* Oracle Configuration */}
-                            {selectedConnection.id === 'oracle' && (
-                                <>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Host <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="host"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                            placeholder="localhost"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Port
-                                        </label>
-                                        <input
-                                            type="number"
-                                            name="port"
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                            placeholder="1521"
-                                            defaultValue="1521"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Service Name / SID <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="serviceName"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Username <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="username"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Password <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="password"
-                                            name="password"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                </>
-                            )}
-
-                            {/* PostgreSQL Configuration */}
-                            {selectedConnection.id === 'postgresql' && (
-                                <>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Host <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="host"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                            placeholder="localhost"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Port
-                                        </label>
-                                        <input
-                                            type="number"
-                                            name="port"
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                            placeholder="5432"
-                                            defaultValue="5432"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Database <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="database"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                            placeholder="database_name"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Username <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="username"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Password <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="password"
-                                            name="password"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            SSL Mode
-                                        </label>
-                                        <select
-                                            name="sslMode"
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] appearance-none cursor-pointer"
-                                            defaultValue="prefer"
-                                        >
-                                            <option value="disable">Disable</option>
-                                            <option value="allow">Allow</option>
-                                            <option value="prefer">Prefer</option>
-                                            <option value="require">Require</option>
-                                        </select>
-                                    </div>
-                                </>
-                            )}
-
-                            {/* MongoDB Configuration */}
-                            {selectedConnection.id === 'mongodb' && (
-                                <>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Connection String <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="connectionString"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                            placeholder="mongodb://username:password@host:port/database"
-                                        />
-                                    </div>
-                                    <p className="text-xs text-[var(--text-secondary)]">
-                                        Enter your MongoDB connection string. Example: mongodb://user:pass@localhost:27017/mydb
-                                    </p>
-                                </>
-                            )}
-
-                            {/* Snowflake Configuration */}
-                            {selectedConnection.id === 'snowflake' && (
-                                <>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Account Identifier <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="account"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                            placeholder="xy12345"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Username <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="username"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Password <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="password"
-                                            name="password"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Warehouse
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="warehouse"
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Database
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="database"
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Schema
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="schema"
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                </>
-                            )}
-
-                            {/* AWS S3 Configuration */}
-                            {selectedConnection.id === 'aws-s3' && (
-                                <>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Access Key ID <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="accessKeyId"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Secret Access Key <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="password"
-                                            name="secretAccessKey"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Region <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="region"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                            placeholder="us-east-1"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Bucket Name
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="bucket"
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                </>
-                            )}
-
-                            {/* Azure Configuration */}
-                            {selectedConnection.id === 'azure' && (
-                                <>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Connection String <span className="text-red-500">*</span>
-                                        </label>
-                                        <textarea
-                                            name="connectionString"
-                                            required
-                                            rows={3}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)] resize-none"
-                                            placeholder="DefaultEndpointsProtocol=https;AccountName=..."
-                                        />
-                                    </div>
-                                    <p className="text-xs text-[var(--text-secondary)]">
-                                        Enter your Azure Storage connection string from the Azure Portal.
-                                    </p>
-                                </>
-                            )}
-
-                            {/* Slack Configuration */}
-                            {selectedConnection.id === 'slack' && (
-                                <>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
-                                            Bot Token <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="password"
-                                            name="botToken"
-                                            required
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                            placeholder="xoxb-..."
-                                        />
-                                    </div>
-                                    <p className="text-xs text-[var(--text-secondary)]">
-                                        Create a Slack app at api.slack.com/apps and install it to your workspace. Copy the Bot User OAuth Token (starts with xoxb-) from OAuth & Permissions.
-                                    </p>
-                                </>
-                            )}
-
-                            <div className="flex gap-2 justify-end pt-4 border-t border-[var(--border-light)]">
+                        {/* Upgrade Plan Message - shown for ALL connections */}
+                        <div className="py-6 text-center">
+                            <h4 className="text-lg font-medium text-[var(--text-primary)] mb-2">
+                                Upgrade plan to connect to your applications
+                            </h4>
+                            <p className="text-sm text-[var(--text-secondary)] mb-5 max-w-sm mx-auto">
+                                Connect to {selectedConnection.name} and other enterprise applications with our Business or Enterprise plan.
+                            </p>
+                            <div className="flex flex-col gap-3 items-center">
                                 <button
-                                    type="button"
-                                    onClick={() => setShowConfigModal(false)}
-                                    className="px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                    onClick={() => setShowContactInfo(true)}
+                                    className="px-6 py-2.5 bg-[#2D3748] hover:bg-[#1A202C] text-white rounded-lg text-sm font-medium transition-all shadow-md hover:shadow-lg"
                                 >
-                                    Cancel
+                                    Contact Sales
                                 </button>
                                 <button
-                                    type="submit"
-                                    disabled={isConnecting}
-                                    className="px-4 py-2 bg-[var(--bg-selected)] text-white rounded-lg text-sm font-medium hover:bg-[#555555] transition-colors disabled:opacity-50 flex items-center gap-2"
+                                    onClick={() => { setShowConfigModal(false); setShowContactInfo(false); }}
+                                    className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                                 >
-                                    {isConnecting && <SpinnerGap size={16} className="animate-spin" weight="light" />}
-                                    Connect
+                                    Maybe later
                                 </button>
                             </div>
-                        </form>
+                            
+                            {/* Contact Info Popup */}
+                            {showContactInfo && (
+                                <div className="mt-4 p-4 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-left">
+                                    <p className="text-sm text-[var(--text-secondary)]">
+                                        Write us at <a href="mailto:info@intemic.com" className="text-[#419CAF] hover:underline font-medium">info@intemic.com</a> about your requirements and we will provide a personalized proposal.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

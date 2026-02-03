@@ -512,11 +512,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                                                         ? 'bg-orange-100 text-orange-700'
                                                         : feedback.nodeType === 'workflow_assistant_prompt'
                                                         ? 'bg-slate-700 text-white'
+                                                        : feedback.nodeType === 'connection'
+                                                        ? 'bg-blue-100 text-blue-700'
                                                         : 'bg-teal-100 text-teal-700'
                                                 }`}>
                                                     {feedback.nodeType === 'report_prompt' ? '📊 Report Prompt'
                                                         : feedback.nodeType === 'dashboard_prompt' ? '📈 Dashboard Prompt'
                                                         : feedback.nodeType === 'workflow_assistant_prompt' ? '🤖 AI Assistant Prompt'
+                                                        : feedback.nodeType === 'connection' ? `🔗 Connection: ${feedback.nodeLabel}`
                                                         : `🔧 ${feedback.nodeLabel || feedback.nodeType}`}
                                                 </span>
                                                 {feedback.workflowName && (
