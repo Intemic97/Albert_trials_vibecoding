@@ -5,6 +5,7 @@
 
 const crypto = require('crypto');
 const { gcsService } = require('./gcsService');
+const { isTimeSeriesData: detectTimeSeriesData, normalizeTimeSeriesData } = require('./utils/timeSeriesHelper');
 
 // Generate unique ID
 const generateId = () => crypto.randomBytes(8).toString('hex');
@@ -377,11 +378,20 @@ class WorkflowExecutor {
     }
 
     async handleSaveRecords(node, inputData) {
+        const entityId = node.config?.entityId;
         const tableName = node.config?.tableName || node.config?.entityName || 'saved_records';
         const mode = node.config?.saveMode || 'insert'; // insert, upsert, update
         
+        // Detect if this is time-series data from OT nodes
+        const isTimeSeriesData = this.detectTimeSeriesData(inputData);
+        
         try {
-            // Ensure table exists
+            // If entityId is provided, use the entities API endpoint
+            if (entityId) {
+                return await this.saveToEntity(entityId, inputData, isTimeSeriesData);
+            }
+
+            // Fallback to generic table storage
             await this.db.run(`
                 CREATE TABLE IF NOT EXISTS ${tableName} (
                     id TEXT PRIMARY KEY,
@@ -389,7 +399,7 @@ class WorkflowExecutor {
                     workflowId TEXT,
                     executionId TEXT,
                     createdAt TEXT,
-                    updatedAt TEXT
+                    updatedAt TEXT${isTimeSeriesData ? ', timestamp TEXT' : ''}
                 )
             `);
 
@@ -400,6 +410,7 @@ class WorkflowExecutor {
             for (const record of records) {
                 const recordId = record.id || generateId();
                 const now = new Date().toISOString();
+                const timestamp = record.timestamp || record.createdAt || now;
                 
                 if (mode === 'upsert' && record.id) {
                     // Check if exists
@@ -409,21 +420,33 @@ class WorkflowExecutor {
                     );
                     
                     if (existing) {
-                        await this.db.run(
-                            `UPDATE ${tableName} SET data = ?, updatedAt = ? WHERE id = ?`,
-                            [JSON.stringify(record), now, record.id]
-                        );
+                        const updateQuery = isTimeSeriesData
+                            ? `UPDATE ${tableName} SET data = ?, updatedAt = ?, timestamp = ? WHERE id = ?`
+                            : `UPDATE ${tableName} SET data = ?, updatedAt = ? WHERE id = ?`;
+                        const updateParams = isTimeSeriesData
+                            ? [JSON.stringify(record), now, timestamp, record.id]
+                            : [JSON.stringify(record), now, record.id];
+                        
+                        await this.db.run(updateQuery, updateParams);
                     } else {
-                        await this.db.run(
-                            `INSERT INTO ${tableName} (id, data, workflowId, executionId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
-                            [recordId, JSON.stringify(record), this.workflow?.id, this.executionId, now, now]
-                        );
+                        const insertQuery = isTimeSeriesData
+                            ? `INSERT INTO ${tableName} (id, data, workflowId, executionId, createdAt, updatedAt, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)`
+                            : `INSERT INTO ${tableName} (id, data, workflowId, executionId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`;
+                        const insertParams = isTimeSeriesData
+                            ? [recordId, JSON.stringify(record), this.workflow?.id, this.executionId, now, now, timestamp]
+                            : [recordId, JSON.stringify(record), this.workflow?.id, this.executionId, now, now];
+                        
+                        await this.db.run(insertQuery, insertParams);
                     }
                 } else {
-                    await this.db.run(
-                        `INSERT INTO ${tableName} (id, data, workflowId, executionId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
-                        [recordId, JSON.stringify(record), this.workflow?.id, this.executionId, now, now]
-                    );
+                    const insertQuery = isTimeSeriesData
+                        ? `INSERT INTO ${tableName} (id, data, workflowId, executionId, createdAt, updatedAt, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)`
+                        : `INSERT INTO ${tableName} (id, data, workflowId, executionId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`;
+                    const insertParams = isTimeSeriesData
+                        ? [recordId, JSON.stringify(record), this.workflow?.id, this.executionId, now, now, timestamp]
+                        : [recordId, JSON.stringify(record), this.workflow?.id, this.executionId, now, now];
+                    
+                    await this.db.run(insertQuery, insertParams);
                 }
                 
                 savedIds.push(recordId);
@@ -432,10 +455,11 @@ class WorkflowExecutor {
 
             return {
                 success: true,
-                message: `Saved ${savedCount} record(s) to '${tableName}'`,
+                message: `Saved ${savedCount} record(s) to '${tableName}'${isTimeSeriesData ? ' (time-series optimized)' : ''}`,
                 outputData: inputData,
                 savedIds,
-                tableName
+                tableName,
+                isTimeSeries: isTimeSeriesData
             };
         } catch (error) {
             console.error('[SaveRecords] Error:', error);
@@ -445,6 +469,104 @@ class WorkflowExecutor {
                 outputData: inputData,
                 error: error.message
             };
+        }
+    }
+
+    /**
+     * Detect if input data is time-series data from OT nodes
+     * Uses the timeSeriesHelper utility
+     */
+    detectTimeSeriesData(inputData) {
+        return detectTimeSeriesData(inputData);
+    }
+
+    /**
+     * Save records to entity using the entities API structure
+     */
+    async saveToEntity(entityId, inputData, isTimeSeriesData) {
+        try {
+            // Normalize data for entity storage
+            let normalizedRecords;
+            if (isTimeSeriesData) {
+                normalizedRecords = normalizeTimeSeriesData(inputData);
+            } else {
+                const records = Array.isArray(inputData) ? inputData : [inputData];
+                normalizedRecords = records.map(record => {
+                    const { metadata, raw, ...rest } = record;
+                    return rest;
+                });
+            }
+
+            // Save each record (in a real implementation, this would call the API)
+            // For now, we'll use the database directly
+            let savedCount = 0;
+            const savedIds = [];
+
+            for (const record of normalizedRecords) {
+                // Get entity properties
+                const properties = await this.db.all(
+                    'SELECT id, name, type FROM properties WHERE entityId = ?',
+                    [entityId]
+                );
+
+                // Create property name mapping
+                const propertyMap = {};
+                properties.forEach(prop => {
+                    propertyMap[prop.name.toLowerCase()] = prop;
+                });
+
+                // Create record
+                const recordId = generateId();
+                const createdAt = record.timestamp || record.createdAt || new Date().toISOString();
+
+                await this.db.run(
+                    'INSERT INTO records (id, entityId, createdAt) VALUES (?, ?, ?)',
+                    [recordId, entityId, createdAt]
+                );
+
+                // Save property values
+                for (const [key, val] of Object.entries(record)) {
+                    if (key === 'id' || key === 'createdAt' || key === 'entityId' || key === 'timestamp') {
+                        // Handle timestamp specially if needed
+                        if (key === 'timestamp') {
+                            const timestampProp = propertyMap['timestamp'] || propertyMap['time'] || propertyMap['createdat'];
+                            if (timestampProp) {
+                                const valueId = generateId();
+                                await this.db.run(
+                                    'INSERT INTO record_values (id, recordId, propertyId, value) VALUES (?, ?, ?, ?)',
+                                    [valueId, recordId, timestampProp.id, String(val)]
+                                );
+                            }
+                        }
+                        continue;
+                    }
+
+                    const prop = propertyMap[key.toLowerCase()];
+                    if (prop) {
+                        const valueId = generateId();
+                        const value = typeof val === 'object' ? JSON.stringify(val) : String(val);
+                        await this.db.run(
+                            'INSERT INTO record_values (id, recordId, propertyId, value) VALUES (?, ?, ?, ?)',
+                            [valueId, recordId, prop.id, value]
+                        );
+                    }
+                }
+
+                savedIds.push(recordId);
+                savedCount++;
+            }
+
+            return {
+                success: true,
+                message: `Saved ${savedCount} record(s) to entity '${entityId}'${isTimeSeriesData ? ' (time-series optimized)' : ''}`,
+                outputData: inputData,
+                savedIds,
+                entityId,
+                isTimeSeries: isTimeSeriesData
+            };
+        } catch (error) {
+            console.error('[SaveToEntity] Error:', error);
+            throw error;
         }
     }
 
