@@ -314,7 +314,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                         </defs>
                         <CartesianGrid strokeDasharray="4 4" stroke={gridColor} vertical={false} strokeOpacity={0.5} />
                         <XAxis dataKey={xAxisKey} {...axisProps} tickMargin={8} />
-                        <YAxis {...axisProps} tickMargin={8} />
+                        <YAxis {...axisProps} tickMargin={8} allowDecimals={false} />
                         <Tooltip content={<CustomTooltip isDarkMode={isDarkMode} />} cursor={{ fill: isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }} />
                         {Array.isArray(dataKey) && dataKey.length > 1 && (
                             <Legend content={<CustomLegend isDarkMode={isDarkMode} />} />
@@ -358,7 +358,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                         </defs>
                         <CartesianGrid strokeDasharray="4 4" stroke={gridColor} vertical={false} strokeOpacity={0.5} />
                         <XAxis dataKey={xAxisKey} {...axisProps} tickMargin={8} />
-                        <YAxis {...axisProps} tickMargin={8} />
+                        <YAxis {...axisProps} tickMargin={8} allowDecimals={false} />
                         <Tooltip content={<CustomTooltip isDarkMode={isDarkMode} />} />
                         {Array.isArray(dataKey) && dataKey.length > 1 && (
                             <Legend content={<CustomLegend isDarkMode={isDarkMode} />} />
@@ -408,7 +408,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                         </defs>
                         <CartesianGrid strokeDasharray="4 4" stroke={gridColor} vertical={false} strokeOpacity={0.5} />
                         <XAxis dataKey={xAxisKey} {...axisProps} tickMargin={8} />
-                        <YAxis {...axisProps} tickMargin={8} />
+                        <YAxis {...axisProps} tickMargin={8} allowDecimals={false} />
                         <Tooltip content={<CustomTooltip isDarkMode={isDarkMode} />} />
                         {Array.isArray(dataKey) && dataKey.length > 1 && (
                             <Legend content={<CustomLegend isDarkMode={isDarkMode} />} />
