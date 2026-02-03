@@ -43,7 +43,7 @@ const CONNECTIONS: Connection[] = [
         id: 'salesforce',
         name: 'Salesforce',
         type: 'CRM',
-        logoUrl: 'https://cdn.simpleicons.org/salesforce',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/salesforce.svg',
         description: 'Connect to Salesforce CRM for sales, leads, and customer data integration',
         category: 'crm',
         connected: false,
@@ -53,7 +53,7 @@ const CONNECTIONS: Connection[] = [
         id: 'dynamics365',
         name: 'Dynamics 365',
         type: 'ERP & CRM',
-        logoUrl: 'https://cdn.simpleicons.org/dynamics365',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/dynamics365.svg',
         description: 'Connect to Microsoft Dynamics 365 for business operations and CRM',
         category: 'erp',
         connected: false,
@@ -64,7 +64,7 @@ const CONNECTIONS: Connection[] = [
         id: 'sap',
         name: 'SAP',
         type: 'ERP',
-        logoUrl: 'https://cdn.simpleicons.org/sap',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/sap.svg',
         description: 'Connect to SAP S/4HANA and ECC for enterprise data integration',
         category: 'erp',
         connected: false,
@@ -74,7 +74,7 @@ const CONNECTIONS: Connection[] = [
         id: 'oracle-erp',
         name: 'Oracle ERP Cloud',
         type: 'ERP',
-        logoUrl: 'https://cdn.simpleicons.org/oracle',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/oracle.svg',
         description: 'Integrate with Oracle ERP Cloud for financial and operational data',
         category: 'erp',
         connected: false
@@ -83,17 +83,16 @@ const CONNECTIONS: Connection[] = [
         id: 'netsuite',
         name: 'NetSuite',
         type: 'ERP',
-        logoUrl: 'https://cdn.simpleicons.org/oracle',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/oracle.svg',
         description: 'Connect to Oracle NetSuite for unified business management',
         category: 'erp',
         connected: false
     },
-    // OT Systems & Industrial
+    // OT Systems & Industrial (no brand logos - use default icons)
     {
         id: 'scada',
         name: 'SCADA',
         type: 'OT System',
-        logoUrl: 'https://cdn.simpleicons.org/opcua',
         description: 'Connect to SCADA systems via OPC UA or Modbus for real-time process data',
         category: 'ot',
         connected: false,
@@ -103,7 +102,6 @@ const CONNECTIONS: Connection[] = [
         id: 'dcs',
         name: 'DCS',
         type: 'OT System',
-        logoUrl: 'https://cdn.simpleicons.org/opcua',
         description: 'Connect to Distributed Control Systems for plant-wide control data',
         category: 'ot',
         connected: false
@@ -112,7 +110,6 @@ const CONNECTIONS: Connection[] = [
         id: 'mes',
         name: 'MES',
         type: 'Manufacturing System',
-        logoUrl: 'https://cdn.simpleicons.org/microsoftazure',
         description: 'Connect to Manufacturing Execution Systems for production tracking',
         category: 'ot',
         connected: false,
@@ -122,7 +119,6 @@ const CONNECTIONS: Connection[] = [
         id: 'lims',
         name: 'LIMS',
         type: 'Laboratory System',
-        logoUrl: 'https://cdn.simpleicons.org/microsoftazure',
         description: 'Connect to Laboratory Information Management Systems for lab data',
         category: 'ot',
         connected: false
@@ -131,8 +127,8 @@ const CONNECTIONS: Connection[] = [
         id: 'data-historian',
         name: 'Data Historian',
         type: 'Time-Series Database',
-        logoUrl: 'https://cdn.simpleicons.org/influxdb',
-        description: 'Connect to Data Historian systems (OSIsoft PI, Wonderware, etc.) for historical time-series data',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/influxdb.svg',
+        description: 'Connect to Data Historian systems (OSIsoft PI, Wonderware, etc.)',
         category: 'ot',
         connected: false,
         popular: true
@@ -141,7 +137,6 @@ const CONNECTIONS: Connection[] = [
         id: 'opcua',
         name: 'OPC UA',
         type: 'Industrial Protocol',
-        logoUrl: 'https://cdn.simpleicons.org/opcua',
         description: 'Connect via OPC UA protocol to PLCs, sensors, and industrial equipment',
         category: 'ot',
         connected: false
@@ -150,7 +145,6 @@ const CONNECTIONS: Connection[] = [
         id: 'modbus',
         name: 'Modbus',
         type: 'Industrial Protocol',
-        logoUrl: 'https://cdn.simpleicons.org/opcua',
         description: 'Connect via Modbus TCP/RTU to industrial devices and PLCs',
         category: 'ot',
         connected: false
@@ -159,7 +153,7 @@ const CONNECTIONS: Connection[] = [
         id: 'mqtt',
         name: 'MQTT',
         type: 'IoT Protocol',
-        logoUrl: 'https://cdn.simpleicons.org/eclipsemosquitto',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/mqtt.svg',
         description: 'Connect to MQTT brokers for IoT sensor data and device telemetry',
         category: 'ot',
         connected: false
@@ -168,7 +162,6 @@ const CONNECTIONS: Connection[] = [
         id: 'plc',
         name: 'PLC',
         type: 'Industrial Controller',
-        logoUrl: 'https://cdn.simpleicons.org/opcua',
         description: 'Direct connection to Programmable Logic Controllers for real-time control data',
         category: 'ot',
         connected: false
@@ -178,7 +171,7 @@ const CONNECTIONS: Connection[] = [
         id: 'postgresql',
         name: 'PostgreSQL',
         type: 'Database',
-        logoUrl: 'https://cdn.simpleicons.org/postgresql',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/postgresql.svg',
         description: 'Connect to PostgreSQL for real-time data queries and analytics',
         category: 'database',
         connected: false
@@ -187,7 +180,7 @@ const CONNECTIONS: Connection[] = [
         id: 'mysql',
         name: 'MySQL',
         type: 'Database',
-        logoUrl: 'https://cdn.simpleicons.org/mysql',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/mysql.svg',
         description: 'Connect to MySQL databases for data access and synchronization',
         category: 'database',
         connected: false
@@ -196,7 +189,7 @@ const CONNECTIONS: Connection[] = [
         id: 'mongodb',
         name: 'MongoDB',
         type: 'NoSQL Database',
-        logoUrl: 'https://cdn.simpleicons.org/mongodb',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/mongodb.svg',
         description: 'Connect to MongoDB for document-based data access',
         category: 'database',
         connected: false
@@ -205,7 +198,7 @@ const CONNECTIONS: Connection[] = [
         id: 'sqlserver',
         name: 'SQL Server',
         type: 'Database',
-        logoUrl: 'https://cdn.simpleicons.org/microsoftsqlserver',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/microsoftsqlserver.svg',
         description: 'Connect to Microsoft SQL Server for enterprise data',
         category: 'database',
         connected: false
@@ -215,7 +208,7 @@ const CONNECTIONS: Connection[] = [
         id: 'powerbi',
         name: 'Power BI',
         type: 'Business Intelligence',
-        logoUrl: 'https://cdn.simpleicons.org/powerbi',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/powerbi.svg',
         description: 'Connect to Power BI for advanced analytics and reporting',
         category: 'analytics',
         connected: false,
@@ -225,7 +218,7 @@ const CONNECTIONS: Connection[] = [
         id: 'tableau',
         name: 'Tableau',
         type: 'Analytics',
-        logoUrl: 'https://cdn.simpleicons.org/tableau',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/tableau.svg',
         description: 'Integrate with Tableau for data visualization and dashboards',
         category: 'analytics',
         connected: false
@@ -234,7 +227,7 @@ const CONNECTIONS: Connection[] = [
         id: 'snowflake',
         name: 'Snowflake',
         type: 'Data Warehouse',
-        logoUrl: 'https://cdn.simpleicons.org/snowflake',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/snowflake.svg',
         description: 'Connect to Snowflake data cloud for analytics and data sharing',
         category: 'cloud',
         connected: false
@@ -243,7 +236,7 @@ const CONNECTIONS: Connection[] = [
         id: 'bigquery',
         name: 'BigQuery',
         type: 'Data Warehouse',
-        logoUrl: 'https://cdn.simpleicons.org/googlebigquery',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/googlebigquery.svg',
         description: 'Connect to Google BigQuery for serverless data analytics',
         category: 'cloud',
         connected: false
@@ -253,7 +246,7 @@ const CONNECTIONS: Connection[] = [
         id: 'google-sheets',
         name: 'Google Sheets',
         type: 'Spreadsheet',
-        logoUrl: 'https://cdn.simpleicons.org/googlesheets',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/googlesheets.svg',
         description: 'Sync data with Google Sheets for easy collaboration',
         category: 'productivity',
         connected: false,
@@ -263,7 +256,7 @@ const CONNECTIONS: Connection[] = [
         id: 'excel',
         name: 'Microsoft Excel',
         type: 'Spreadsheet',
-        logoUrl: 'https://cdn.simpleicons.org/microsoftexcel',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/microsoftexcel.svg',
         description: 'Connect to Excel files and OneDrive for spreadsheet data',
         category: 'productivity',
         connected: false
@@ -272,7 +265,7 @@ const CONNECTIONS: Connection[] = [
         id: 'airtable',
         name: 'Airtable',
         type: 'Database',
-        logoUrl: 'https://cdn.simpleicons.org/airtable',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/airtable.svg',
         description: 'Integrate with Airtable for flexible data management',
         category: 'productivity',
         connected: false
@@ -281,7 +274,7 @@ const CONNECTIONS: Connection[] = [
         id: 'notion',
         name: 'Notion',
         type: 'Workspace',
-        logoUrl: 'https://cdn.simpleicons.org/notion',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/notion.svg',
         description: 'Connect to Notion databases and pages for content sync',
         category: 'productivity',
         connected: false
@@ -291,7 +284,7 @@ const CONNECTIONS: Connection[] = [
         id: 'aws-s3',
         name: 'AWS S3',
         type: 'Cloud Storage',
-        logoUrl: 'https://cdn.simpleicons.org/amazons3',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/amazons3.svg',
         description: 'Connect to Amazon S3 for file storage and data lakes',
         category: 'cloud',
         connected: false
@@ -300,7 +293,7 @@ const CONNECTIONS: Connection[] = [
         id: 'azure-blob',
         name: 'Azure Blob',
         type: 'Cloud Storage',
-        logoUrl: 'https://cdn.simpleicons.org/microsoftazure',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/microsoftazure.svg',
         description: 'Connect to Azure Blob Storage for cloud file management',
         category: 'cloud',
         connected: false
@@ -309,7 +302,7 @@ const CONNECTIONS: Connection[] = [
         id: 'google-drive',
         name: 'Google Drive',
         type: 'Cloud Storage',
-        logoUrl: 'https://cdn.simpleicons.org/googledrive',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/googledrive.svg',
         description: 'Sync files and folders from Google Drive',
         category: 'cloud',
         connected: false
@@ -319,7 +312,7 @@ const CONNECTIONS: Connection[] = [
         id: 'teams',
         name: 'Microsoft Teams',
         type: 'Communication',
-        logoUrl: 'https://cdn.simpleicons.org/microsoftteams',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/microsoftteams.svg',
         description: 'Send notifications and updates to Microsoft Teams channels',
         category: 'communication',
         connected: false,
@@ -329,7 +322,7 @@ const CONNECTIONS: Connection[] = [
         id: 'slack',
         name: 'Slack',
         type: 'Communication',
-        logoUrl: 'https://cdn.simpleicons.org/slack',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/slack.svg',
         description: 'Connect to Slack for notifications and workflow integration',
         category: 'communication',
         connected: false
@@ -338,7 +331,7 @@ const CONNECTIONS: Connection[] = [
         id: 'jira',
         name: 'Jira',
         type: 'Project Management',
-        logoUrl: 'https://cdn.simpleicons.org/jira',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/jira.svg',
         description: 'Integrate with Jira for project tracking and issue management',
         category: 'productivity',
         connected: false
@@ -347,7 +340,7 @@ const CONNECTIONS: Connection[] = [
         id: 'asana',
         name: 'Asana',
         type: 'Project Management',
-        logoUrl: 'https://cdn.simpleicons.org/asana',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/asana.svg',
         description: 'Connect to Asana for task and project synchronization',
         category: 'productivity',
         connected: false
@@ -357,7 +350,7 @@ const CONNECTIONS: Connection[] = [
         id: 'rest-api',
         name: 'REST API',
         type: 'Custom API',
-        logoUrl: 'https://cdn.simpleicons.org/openapiinitiative',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/openapiinitiative.svg',
         description: 'Connect to any REST API with custom configuration',
         category: 'cloud',
         connected: false
@@ -366,7 +359,7 @@ const CONNECTIONS: Connection[] = [
         id: 'graphql',
         name: 'GraphQL',
         type: 'Custom API',
-        logoUrl: 'https://cdn.simpleicons.org/graphql',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/graphql.svg',
         description: 'Connect to GraphQL endpoints for flexible data queries',
         category: 'cloud',
         connected: false
@@ -376,7 +369,7 @@ const CONNECTIONS: Connection[] = [
         id: 'linkedin',
         name: 'LinkedIn',
         type: 'Social',
-        logoUrl: 'https://cdn.simpleicons.org/linkedin',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/linkedin.svg',
         description: 'Import contacts and company data from LinkedIn Sales Navigator',
         category: 'crm',
         connected: false,
@@ -386,7 +379,7 @@ const CONNECTIONS: Connection[] = [
         id: 'zendesk',
         name: 'Zendesk',
         type: 'Support',
-        logoUrl: 'https://cdn.simpleicons.org/zendesk',
+        logoUrl: 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/zendesk.svg',
         description: 'Integrate with Zendesk for customer support data',
         category: 'crm',
         connected: false,
