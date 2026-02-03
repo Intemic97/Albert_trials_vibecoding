@@ -40,6 +40,14 @@ export type NodeType =
 
 export type NodeStatus = 'idle' | 'running' | 'completed' | 'error' | 'waiting';
 
+// Condition rule for multiple conditions support
+export interface ConditionRule {
+  id: string;
+  field: string;
+  operator: string;
+  value: string;
+}
+
 export interface NodeConfig {
   entityId?: string;
   entityName?: string;
@@ -47,6 +55,9 @@ export interface NodeConfig {
   conditionField?: string;
   conditionOperator?: string;
   conditionValue?: string;
+  // Multiple conditions support:
+  additionalConditions?: ConditionRule[];
+  logicalOperator?: 'AND' | 'OR';
   recordId?: string;
   recordName?: string;
   llmPrompt?: string;

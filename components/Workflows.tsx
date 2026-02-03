@@ -200,9 +200,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [viewingDataNodeId, setViewingDataNodeId] = useState<string | null>(null);
     const [configuringConditionNodeId, setConfiguringConditionNodeId] = useState<string | null>(null);
     const [conditionField, setConditionField] = useState<string>('');
-    const [conditionOperator, setConditionOperator] = useState<string>('isText');
+    const [conditionOperator, setConditionOperator] = useState<string>('equals');
     const [conditionValue, setConditionValue] = useState<string>('');
     const [conditionProcessingMode, setConditionProcessingMode] = useState<'batch' | 'perRow'>('batch');
+    const [additionalConditions, setAdditionalConditions] = useState<Array<{id: string; field: string; operator: string; value: string}>>([]);
+    const [conditionLogicalOperator, setConditionLogicalOperator] = useState<'AND' | 'OR'>('AND');
     const [connectingFromType, setConnectingFromType] = useState<'true' | 'false' | 'A' | 'B' | null>(null);
     const [configuringAddFieldNodeId, setConfiguringAddFieldNodeId] = useState<string | null>(null);
     const [addFieldName, setAddFieldName] = useState<string>('');
@@ -1049,9 +1051,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (node && node.type === 'condition') {
             setConfiguringConditionNodeId(nodeId);
             setConditionField(node.config?.conditionField || '');
-            setConditionOperator(node.config?.conditionOperator || 'isText');
+            setConditionOperator(node.config?.conditionOperator || 'equals');
             setConditionValue(node.config?.conditionValue || '');
             setConditionProcessingMode(node.config?.processingMode || 'batch');
+            setAdditionalConditions(node.config?.additionalConditions || []);
+            setConditionLogicalOperator(node.config?.logicalOperator || 'AND');
             setNodeCustomTitle(node.config?.customName || '');
         }
     };
@@ -1072,6 +1076,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         conditionOperator,
                         conditionValue,
                         processingMode: conditionProcessingMode,
+                        additionalConditions: additionalConditions,
+                        logicalOperator: conditionLogicalOperator,
                         customName: nodeCustomTitle.trim() || undefined
                     }
                 }
@@ -1079,9 +1085,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         ));
         setConfiguringConditionNodeId(null);
         setConditionField('');
-        setConditionOperator('isText');
+        setConditionOperator('equals');
         setConditionValue('');
         setConditionProcessingMode('batch');
+        setAdditionalConditions([]);
+        setConditionLogicalOperator('AND');
         setNodeCustomTitle('');
     };
 
@@ -2655,23 +2663,67 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     result = 'Action executed!';
                     break;
                 case 'condition':
-                    // Evaluate condition
+                    // Evaluate condition (supports multiple conditions with AND/OR)
                     if (node.config?.conditionField && node.config?.conditionOperator) {
                         const dataToEval = inputData;
                         const processingMode = node.config.processingMode || 'batch';
+                        const additionalConds = node.config.additionalConditions || [];
+                        const logicalOp = node.config.logicalOperator || 'AND';
 
                         if (dataToEval && Array.isArray(dataToEval) && dataToEval.length > 0) {
-                            const evaluateRecord = (record: any): boolean => {
-                                const fieldValue = record[node.config!.conditionField!];
-                                switch (node.config!.conditionOperator) {
+                            // Helper to evaluate a single condition
+                            const evaluateSingleCondition = (record: any, field: string, operator: string, value: string): boolean => {
+                                const fieldValue = record[field];
+                                switch (operator) {
                                     case 'isText': return typeof fieldValue === 'string';
                                     case 'isNumber': return !isNaN(Number(fieldValue));
-                                    case 'equals': return String(fieldValue) === node.config!.conditionValue;
-                                    case 'notEquals': return String(fieldValue) !== node.config!.conditionValue;
-                                    case 'contains': return String(fieldValue).includes(node.config!.conditionValue || '');
-                                    case 'greaterThan': return Number(fieldValue) > Number(node.config!.conditionValue);
-                                    case 'lessThan': return Number(fieldValue) < Number(node.config!.conditionValue);
+                                    case 'equals': return String(fieldValue) === value;
+                                    case 'not_equals':
+                                    case 'notEquals': return String(fieldValue) !== value;
+                                    case 'contains': return String(fieldValue).toLowerCase().includes((value || '').toLowerCase());
+                                    case 'not_contains': return !String(fieldValue).toLowerCase().includes((value || '').toLowerCase());
+                                    case 'greater_than':
+                                    case 'greaterThan': return Number(fieldValue) > Number(value);
+                                    case 'less_than':
+                                    case 'lessThan': return Number(fieldValue) < Number(value);
+                                    case 'greater_or_equal': return Number(fieldValue) >= Number(value);
+                                    case 'less_or_equal': return Number(fieldValue) <= Number(value);
+                                    case 'starts_with': return String(fieldValue).toLowerCase().startsWith((value || '').toLowerCase());
+                                    case 'ends_with': return String(fieldValue).toLowerCase().endsWith((value || '').toLowerCase());
+                                    case 'is_empty': return fieldValue === null || fieldValue === undefined || fieldValue === '';
+                                    case 'is_not_empty': return fieldValue !== null && fieldValue !== undefined && fieldValue !== '';
                                     default: return false;
+                                }
+                            };
+
+                            // Evaluate all conditions for a record (with AND/OR logic)
+                            const evaluateRecord = (record: any): boolean => {
+                                // Primary condition
+                                const primaryResult = evaluateSingleCondition(
+                                    record, 
+                                    node.config!.conditionField!, 
+                                    node.config!.conditionOperator!, 
+                                    node.config!.conditionValue || ''
+                                );
+                                
+                                // If no additional conditions, return primary result
+                                if (!additionalConds || additionalConds.length === 0) {
+                                    return primaryResult;
+                                }
+                                
+                                // Evaluate additional conditions
+                                const allResults = [primaryResult];
+                                for (const cond of additionalConds) {
+                                    if (cond.field) {
+                                        allResults.push(evaluateSingleCondition(record, cond.field, cond.operator, cond.value));
+                                    }
+                                }
+                                
+                                // Combine with AND/OR
+                                if (logicalOp === 'AND') {
+                                    return allResults.every(r => r);
+                                } else {
+                                    return allResults.some(r => r);
                                 }
                             };
 
@@ -2683,13 +2735,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 // Store both filtered arrays for routing
                                 nodeData = { trueRecords, falseRecords };
                                 conditionResult = trueRecords.length > 0; // For visual indication
-                                result = `Filtered: ${trueRecords.length} TRUE, ${falseRecords.length} FALSE`;
+                                const condCount = 1 + additionalConds.length;
+                                result = `${condCount} condition${condCount > 1 ? 's' : ''} (${logicalOp}): ${trueRecords.length} TRUE, ${falseRecords.length} FALSE`;
                             } else {
                                 // Batch mode: evaluate first record, route ALL data
                                 const condResult = evaluateRecord(dataToEval[0]);
                                 nodeData = dataToEval;
                                 conditionResult = condResult;
-                                result = `${node.config.conditionField} ${node.config.conditionOperator} → ${condResult ? '✓ All to TRUE' : '✗ All to FALSE'}`;
+                                const condCount = 1 + additionalConds.length;
+                                result = `${condCount} condition${condCount > 1 ? 's' : ''} (${logicalOp}) → ${condResult ? '✓ All to TRUE' : '✗ All to FALSE'}`;
                             }
                         } else {
                             result = 'No data to evaluate';
@@ -3723,6 +3777,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
         const node = nodes.find(n => n.id === nodeId);
         
+        // Reset node status to ensure 'running' state is visible
+        // This forces React to re-render and show the running indicator
+        setNodes(prev => prev.map(n => 
+            n.id === nodeId ? { ...n, status: undefined, executionResult: undefined } : n
+        ));
+        // Small delay to ensure the reset is rendered before setting to 'running'
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
         // Special handling for join nodes
         if (node?.type === 'join') {
             // Use the stored inputDataA and inputDataB
@@ -4560,6 +4622,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     // Función para obtener el tag que se muestra arriba del nodo
     // Solo se muestra si NO hay información en la sección de feedback (executionResult o not configured)
     const getNodeTopTag = (node: WorkflowNode): { label: string; color: string; icon: React.ElementType } | null => {
+        // PRIORITY: Always show "Running" status when node is actively running
+        // This ensures the badge appears on subsequent runs, not just the first
+        if (node.status === 'running') {
+            return { label: 'Running', color: 'bg-yellow-50 border-yellow-200 text-yellow-700', icon: Play };
+        }
+        
         // Si hay executionResult o no está configurado, NO mostrar el tag arriba (se muestra abajo en feedback)
         const hasFeedback = node.executionResult || !isNodeConfigured(node);
         if (hasFeedback) {
@@ -4577,7 +4645,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             if (isNodeConfigured(node)) {
                 const statusMap: { [key: string]: { label: string; color: string; icon: React.ElementType } } = {
                     'completed': { label: 'Completed', color: 'bg-green-50 border-green-200 text-green-700', icon: CheckCircle },
-                    'running': { label: 'Running', color: 'bg-yellow-50 border-yellow-200 text-yellow-700', icon: Play },
                     'waiting': { label: 'Waiting', color: 'bg-orange-50 border-orange-200 text-orange-700', icon: Clock }
                 };
                 return statusMap[node.status] || null;
@@ -8484,7 +8551,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             // Handle splitColumns parent node - get the correct output based on connection type
                             let parentOutputData: any[] = [];
                             if (parentNode?.type === 'splitColumns' && parentNode.outputData) {
-                                // Get the correct output based on the connection's outputType
                                 if (parentConnection?.outputType === 'B') {
                                     parentOutputData = parentNode.outputData.outputB || [];
                                 } else {
@@ -8508,6 +8574,166 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             }
                             
                             const hasAvailableFields = availableFields.length > 0;
+                            
+                            const OPERATORS = [
+                                { value: 'equals', label: 'Equals' },
+                                { value: 'not_equals', label: 'Not Equals' },
+                                { value: 'contains', label: 'Contains' },
+                                { value: 'not_contains', label: 'Does Not Contain' },
+                                { value: 'greater_than', label: 'Greater Than' },
+                                { value: 'less_than', label: 'Less Than' },
+                                { value: 'greater_or_equal', label: 'Greater or Equal' },
+                                { value: 'less_or_equal', label: 'Less or Equal' },
+                                { value: 'starts_with', label: 'Starts With' },
+                                { value: 'ends_with', label: 'Ends With' },
+                                { value: 'is_empty', label: 'Is Empty' },
+                                { value: 'is_not_empty', label: 'Is Not Empty' },
+                            ];
+                            
+                            const needsValue = (op: string) => !['is_empty', 'is_not_empty', 'isText', 'isNumber'].includes(op);
+                            
+                            const addCondition = () => {
+                                const newCondition = {
+                                    id: Math.random().toString(36).substr(2, 9),
+                                    field: availableFields[0] || '',
+                                    operator: 'equals',
+                                    value: ''
+                                };
+                                setAdditionalConditions([...additionalConditions, newCondition]);
+                            };
+                            
+                            const removeCondition = (id: string) => {
+                                setAdditionalConditions(additionalConditions.filter(c => c.id !== id));
+                            };
+                            
+                            const updateCondition = (id: string, field: string, value: any) => {
+                                setAdditionalConditions(additionalConditions.map(c => 
+                                    c.id === id ? { ...c, [field]: value } : c
+                                ));
+                            };
+                            
+                            // Build preview string
+                            const buildPreview = () => {
+                                const conditions: string[] = [];
+                                if (conditionField) {
+                                    const op = OPERATORS.find(o => o.value === conditionOperator)?.label || conditionOperator;
+                                    const val = needsValue(conditionOperator) ? ` "${conditionValue || '...'}"` : '';
+                                    conditions.push(`${conditionField} ${op}${val}`);
+                                }
+                                additionalConditions.forEach(c => {
+                                    if (c.field) {
+                                        const op = OPERATORS.find(o => o.value === c.operator)?.label || c.operator;
+                                        const val = needsValue(c.operator) ? ` "${c.value || '...'}"` : '';
+                                        conditions.push(`${c.field} ${op}${val}`);
+                                    }
+                                });
+                                return conditions.join(` ${conditionLogicalOperator} `);
+                            };
+                            
+                            // Render a condition row
+                            const renderConditionRow = (
+                                field: string,
+                                operator: string,
+                                value: string,
+                                onFieldChange: (v: string) => void,
+                                onOperatorChange: (v: string) => void,
+                                onValueChange: (v: string) => void,
+                                onRemove?: () => void,
+                                isFirst: boolean = false
+                            ) => (
+                                <div className="relative">
+                                    {/* AND/OR connector */}
+                                    {!isFirst && (
+                                        <div className="flex items-center justify-center mb-3">
+                                            <div className="flex-1 h-px bg-[var(--border-light)]" />
+                                            <button
+                                                onClick={() => setConditionLogicalOperator(conditionLogicalOperator === 'AND' ? 'OR' : 'AND')}
+                                                className={`mx-3 px-3 py-1 text-xs font-semibold rounded-full transition-all cursor-pointer ${
+                                                    conditionLogicalOperator === 'AND'
+                                                        ? 'bg-blue-500/10 text-blue-500 hover:bg-blue-500/20'
+                                                        : 'bg-orange-500/10 text-orange-500 hover:bg-orange-500/20'
+                                                }`}
+                                            >
+                                                {conditionLogicalOperator}
+                                            </button>
+                                            <div className="flex-1 h-px bg-[var(--border-light)]" />
+                                        </div>
+                                    )}
+                                    
+                                    <div className="p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)] relative">
+                                        {onRemove && (
+                                            <button
+                                                onClick={onRemove}
+                                                className="absolute top-2 right-2 p-1.5 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-500/10 rounded transition-all"
+                                                title="Remove condition"
+                                            >
+                                                <Trash size={14} />
+                                            </button>
+                                        )}
+                                        
+                                        <div className="space-y-2.5">
+                                            {/* Field */}
+                                            <div>
+                                                <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1 uppercase tracking-wider">
+                                                    Field
+                                                </label>
+                                                {hasAvailableFields ? (
+                                                    <select
+                                                        value={field}
+                                                        onChange={(e) => onFieldChange(e.target.value)}
+                                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+                                                    >
+                                                        <option value="">Select field...</option>
+                                                        {availableFields.map(f => (
+                                                            <option key={f} value={f}>{f}</option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        value={field}
+                                                        onChange={(e) => onFieldChange(e.target.value)}
+                                                        placeholder="Field name"
+                                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)]"
+                                                    />
+                                                )}
+                                            </div>
+                                            
+                                            {/* Operator */}
+                                            <div>
+                                                <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1 uppercase tracking-wider">
+                                                    Operator
+                                                </label>
+                                                <select
+                                                    value={operator}
+                                                    onChange={(e) => onOperatorChange(e.target.value)}
+                                                    className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+                                                >
+                                                    {OPERATORS.map(op => (
+                                                        <option key={op.value} value={op.value}>{op.label}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            
+                                            {/* Value */}
+                                            {needsValue(operator) && (
+                                                <div>
+                                                    <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1 uppercase tracking-wider">
+                                                        Value
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={value}
+                                                        onChange={(e) => onValueChange(e.target.value)}
+                                                        placeholder="Enter value..."
+                                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)]"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
                             
                             return (
                                 <NodeConfigSidePanel
@@ -8533,115 +8759,113 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </>
                                     }
                                 >
-                                    <div className="space-y-5">
-                                            <div>
-                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
-                                                    Field Name
-                                                </label>
-                                                {hasAvailableFields ? (
-                                                    <>
-                                                        <select
-                                                            value={conditionField}
-                                                            onChange={(e) => setConditionField(e.target.value)}
-                                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
-                                                        >
-                                                            <option value="">Select a field...</option>
-                                                            {availableFields.map(field => (
-                                                                <option key={field} value={field}>{field}</option>
-                                                            ))}
-                                                        </select>
-                                                        <p className="text-xs text-[var(--text-secondary)] mt-1">
-                                                            Fields from {parentNode?.label || 'previous node'}
-                                                        </p>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <input
-                                                            type="text"
-                                                            value={conditionField}
-                                                            onChange={(e) => setConditionField(e.target.value)}
-                                                            placeholder="e.g., status, price, name"
-                                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                                        />
-                                                        <p className="text-xs text-amber-600 mt-1">
-                                                            ⚠️ Run the previous node first to see available fields
-                                                        </p>
-                                                    </>
+                                    <div className="space-y-4">
+                                        {/* No fields warning */}
+                                        {!hasAvailableFields && (
+                                            <div className="flex items-center gap-2 p-2.5 bg-amber-500/10 rounded-lg">
+                                                <AlertCircle size={14} className="text-amber-500 shrink-0" weight="fill" />
+                                                <p className="text-xs text-amber-500">
+                                                    Run the previous node first to see available fields
+                                                </p>
+                                            </div>
+                                        )}
+                                        
+                                        {hasAvailableFields && parentNode?.config?.fileName && (
+                                            <p className="text-xs text-[var(--text-tertiary)]">
+                                                Fields from {parentNode.config.fileName}
+                                            </p>
+                                        )}
+                                        
+                                        {/* Primary Condition */}
+                                        {renderConditionRow(
+                                            conditionField,
+                                            conditionOperator,
+                                            conditionValue,
+                                            setConditionField,
+                                            setConditionOperator,
+                                            setConditionValue,
+                                            undefined,
+                                            true
+                                        )}
+                                        
+                                        {/* Additional Conditions */}
+                                        {additionalConditions.map((condition) => (
+                                            <div key={condition.id}>
+                                                {renderConditionRow(
+                                                    condition.field,
+                                                    condition.operator,
+                                                    condition.value,
+                                                    (v) => updateCondition(condition.id, 'field', v),
+                                                    (v) => updateCondition(condition.id, 'operator', v),
+                                                    (v) => updateCondition(condition.id, 'value', v),
+                                                    () => removeCondition(condition.id),
+                                                    false
                                                 )}
                                             </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
-                                                    Operator
-                                                </label>
-                                                <select
-                                                    value={conditionOperator}
-                                                    onChange={(e) => setConditionOperator(e.target.value)}
-                                                    className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
-                                                >
-                                                    <option value="equals">Equals</option>
-                                                    <option value="notEquals">Not Equals</option>
-                                                    <option value="contains">Contains</option>
-                                                    <option value="greaterThan">Greater Than</option>
-                                                    <option value="lessThan">Less Than</option>
-                                                    <option value="isText">Is Text</option>
-                                                    <option value="isNumber">Is Number</option>
-                                                </select>
-                                            </div>
-                                            {['equals', 'notEquals', 'contains', 'greaterThan', 'lessThan'].includes(conditionOperator) && (
-                                                <div>
-                                                    <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
-                                                        Value
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        value={conditionValue}
-                                                        onChange={(e) => setConditionValue(e.target.value)}
-                                                        placeholder="Comparison value"
-                                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-                                                    />
-                                                </div>
-                                            )}
+                                        ))}
+                                        
+                                        {/* Add Condition Button */}
+                                        <button
+                                            onClick={addCondition}
+                                            className="w-full flex items-center justify-center gap-2 px-3 py-2 border-2 border-dashed border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] hover:text-[var(--accent-primary)] hover:border-[var(--accent-primary)] transition-all"
+                                        >
+                                            <Plus size={14} weight="bold" />
+                                            Add Condition
+                                        </button>
 
-                                            {/* Processing Mode */}
-                                            <div className="pt-2 border-t border-[var(--border-light)]">
-                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
-                                                    Processing Mode
+                                        {/* Processing Mode */}
+                                        <div className="pt-3 border-t border-[var(--border-light)]">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Processing Mode
+                                            </label>
+                                            <div className="space-y-2">
+                                                <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${conditionProcessingMode === 'batch' ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/5' : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'}`}>
+                                                    <input
+                                                        type="radio"
+                                                        name="processingMode"
+                                                        value="batch"
+                                                        checked={conditionProcessingMode === 'batch'}
+                                                        onChange={() => setConditionProcessingMode('batch')}
+                                                        className="mt-0.5 mr-3"
+                                                    />
+                                                    <div>
+                                                        <span className="font-medium text-sm text-[var(--text-primary)]">Batch (all rows)</span>
+                                                        <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                                                            Evaluate first row → route ALL data to TRUE or FALSE
+                                                        </p>
+                                                    </div>
                                                 </label>
-                                                <div className="space-y-2">
-                                                    <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${conditionProcessingMode === 'batch' ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]' : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'}`}>
-                                                        <input
-                                                            type="radio"
-                                                            name="processingMode"
-                                                            value="batch"
-                                                            checked={conditionProcessingMode === 'batch'}
-                                                            onChange={() => setConditionProcessingMode('batch')}
-                                                            className="mt-0.5 mr-3"
-                                                        />
-                                                        <div>
-                                                            <span className="font-medium text-sm">Batch (all rows)</span>
-                                                            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                                                                Evaluate first row → route ALL data to TRUE or FALSE
-                                                            </p>
-                                                        </div>
-                                                    </label>
-                                                    <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${conditionProcessingMode === 'perRow' ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]' : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'}`}>
-                                                        <input
-                                                            type="radio"
-                                                            name="processingMode"
-                                                            value="perRow"
-                                                            checked={conditionProcessingMode === 'perRow'}
-                                                            onChange={() => setConditionProcessingMode('perRow')}
-                                                            className="mt-0.5 mr-3"
-                                                        />
-                                                        <div>
-                                                            <span className="font-medium text-sm">Per Row (filter)</span>
-                                                            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                                                                Evaluate each row → matching to TRUE, non-matching to FALSE
-                                                            </p>
-                                                        </div>
-                                                    </label>
-                                                </div>
+                                                <label className={`flex items-start p-3 border rounded-lg cursor-pointer transition-all ${conditionProcessingMode === 'perRow' ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/5' : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'}`}>
+                                                    <input
+                                                        type="radio"
+                                                        name="processingMode"
+                                                        value="perRow"
+                                                        checked={conditionProcessingMode === 'perRow'}
+                                                        onChange={() => setConditionProcessingMode('perRow')}
+                                                        className="mt-0.5 mr-3"
+                                                    />
+                                                    <div>
+                                                        <span className="font-medium text-sm text-[var(--text-primary)]">Per Row (filter)</span>
+                                                        <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                                                            Evaluate each row → matching to TRUE, non-matching to FALSE
+                                                        </p>
+                                                    </div>
+                                                </label>
                                             </div>
+                                        </div>
+                                        
+                                        {/* Preview */}
+                                        {conditionField && (
+                                            <div className="p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-light)]">
+                                                <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider mb-2 font-medium">
+                                                    Condition Preview
+                                                </p>
+                                                <code className="text-xs text-[var(--accent-primary)] font-mono break-all leading-relaxed">
+                                                    {buildPreview()}
+                                                </code>
+                                            </div>
+                                        )}
+                                        
                                         {/* Feedback Link */}
                                         <div className="pt-3 border-t border-[var(--border-light)]">
                                             <button
