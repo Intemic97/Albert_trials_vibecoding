@@ -3030,17 +3030,27 @@ def process(data):
 app.post('/api/generate-widget', authenticateToken, async (req, res) => {
     console.log('Received widget generation request');
     try {
-        const { prompt, mentionedEntityIds } = req.body;
+        const { prompt, mentionedEntityIds, entityContext, forceRealData } = req.body;
         console.log('Widget Prompt:', prompt);
+        console.log('Entity IDs:', mentionedEntityIds?.length || 0, 'entities');
 
         if (!process.env.OPENAI_API_KEY) {
             return res.status(500).json({ error: 'OpenAI API Key not configured' });
         }
 
+        // If no entities provided, fetch ALL entities from the organization
+        let entityIdsToUse = mentionedEntityIds || [];
+        if (entityIdsToUse.length === 0) {
+            console.log('No entities mentioned, fetching all organization entities...');
+            const allEntities = await db.all('SELECT id FROM entities WHERE organizationId = ?', [req.user.orgId]);
+            entityIdsToUse = allEntities.map(e => e.id);
+            console.log('Found', entityIdsToUse.length, 'entities in organization');
+        }
+
         // 1. Fetch data context (Reuse logic - ideally refactor into function)
         let contextData = {};
-        if (mentionedEntityIds && mentionedEntityIds.length > 0) {
-            const entityPromises = mentionedEntityIds.map(async (entityId) => {
+        if (entityIdsToUse && entityIdsToUse.length > 0) {
+            const entityPromises = entityIdsToUse.map(async (entityId) => {
                 const entity = await db.get('SELECT * FROM entities WHERE id = ? AND organizationId = ?', [entityId, req.user.orgId]);
                 if (!entity) return null;
                 const properties = await db.all('SELECT * FROM properties WHERE entityId = ?', [entityId]);
@@ -3095,7 +3105,7 @@ app.post('/api/generate-widget', authenticateToken, async (req, res) => {
             // Fetch related entities (both outgoing and incoming relations)
             const relatedEntityIds = new Set();
             
-            for (const entityId of mentionedEntityIds) {
+            for (const entityId of entityIdsToUse) {
                 const relationProps = await db.all(
                     'SELECT relatedEntityId FROM properties WHERE entityId = ? AND type = ? AND relatedEntityId IS NOT NULL',
                     [entityId, 'relation']
@@ -3103,7 +3113,7 @@ app.post('/api/generate-widget', authenticateToken, async (req, res) => {
                 relationProps.forEach(p => relatedEntityIds.add(p.relatedEntityId));
             }
 
-            for (const entityId of mentionedEntityIds) {
+            for (const entityId of entityIdsToUse) {
                 const incomingProps = await db.all(
                     'SELECT DISTINCT entityId FROM properties WHERE type = ? AND relatedEntityId = ?',
                     ['relation', entityId]
@@ -3111,7 +3121,7 @@ app.post('/api/generate-widget', authenticateToken, async (req, res) => {
                 incomingProps.forEach(p => relatedEntityIds.add(p.entityId));
             }
 
-            mentionedEntityIds.forEach(id => relatedEntityIds.delete(id));
+            entityIdsToUse.forEach(id => relatedEntityIds.delete(id));
 
             if (relatedEntityIds.size > 0) {
                 const relatedPromises = Array.from(relatedEntityIds).map(async (entityId) => {
@@ -3157,28 +3167,46 @@ app.post('/api/generate-widget', authenticateToken, async (req, res) => {
         const OpenAI = require('openai');
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+        // Check if we have real data to work with
+        const hasRealData = Object.keys(contextData).length > 0;
+        if (!hasRealData) {
+            console.warn('No data context available for widget generation');
+            return res.status(400).json({ 
+                error: 'No data available. Please ensure you have entities with records in your database.' 
+            });
+        }
+
         const completion = await openai.chat.completions.create({
             messages: [
                 {
                     role: "system",
-                    content: `You are a data visualization expert.
-            You have access to the following data context: ${JSON.stringify(contextData)}.
-            Based on the user's prompt, generate a JSON configuration for a chart.
-            
-            The JSON structure MUST be:
-            {
-                "type": "bar" | "line" | "pie" | "area",
-                "title": "Chart Title",
-                "description": "Brief description",
-                "explanation": "A detailed explanation of how this chart was prepared. Structure it as two paragraphs separated by a double newline (\\n\\n). First paragraph: A natural language description of the logic. Second paragraph: Start with 'I executed the following technical query:' followed by pseudo-code steps. IMPORTANT: In the Technical Query, you MUST use the EXACT names of the Entities and Properties from the provided context (e.g., 'Filter @Equipment where Status=Active'). Do not use generic terms.",
-                "data": [ { "name": "Label", "value": 123, ... } ],
-                "xAxisKey": "name",
-                "dataKey": "value" (or array of keys for multiple lines/areas),
-                "colors": ["#hex", ...] (optional custom colors)
-            }
-            
-            Ensure the data is aggregated or formatted correctly for the chosen chart type.
-            Return ONLY the valid JSON string, no markdown formatting.`
+                    content: `You are a data visualization expert. You MUST ONLY use data from the provided context - NEVER invent, fabricate, or estimate data.
+
+CRITICAL RULES:
+1. ONLY use the actual data provided in the context below. Do NOT make up any values.
+2. If the data doesn't contain what the user is asking for, explain what data IS available.
+3. All values in your output MUST come directly from the provided records.
+4. Do NOT extrapolate, estimate, or create fictional data points.
+
+DATA CONTEXT (USE ONLY THIS DATA):
+${JSON.stringify(contextData, null, 2)}
+
+Based on the user's prompt and ONLY the data above, generate a JSON configuration for a chart.
+
+The JSON structure MUST be:
+{
+    "type": "bar" | "line" | "pie" | "area",
+    "title": "Chart Title",
+    "description": "Brief description",
+    "explanation": "A detailed explanation of how this chart was prepared. Structure it as two paragraphs separated by a double newline (\\n\\n). First paragraph: A natural language description of the logic. Second paragraph: Start with 'I executed the following technical query:' followed by pseudo-code steps. IMPORTANT: In the Technical Query, you MUST use the EXACT names of the Entities and Properties from the provided context (e.g., 'Filter @Equipment where Status=Active'). Do not use generic terms.",
+    "data": [ { "name": "Label", "value": 123, ... } ],
+    "xAxisKey": "name",
+    "dataKey": "value" (or array of keys for multiple lines/areas),
+    "colors": ["#hex", ...] (optional custom colors)
+}
+
+REMEMBER: Every data point must come from the actual records in the context. Never invent data.
+Return ONLY the valid JSON string, no markdown formatting.`
                 },
                 { role: "user", content: prompt }
             ],

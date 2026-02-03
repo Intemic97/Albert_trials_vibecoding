@@ -901,6 +901,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             enhancedPrompt = `${visualizationType} of ${prompt}`;
         }
 
+        // IMPORTANT: Always include entities so AI uses real data
+        // If user mentioned specific entities, use those; otherwise, include ALL entities
+        const entityIdsToUse = mentionedEntityIds.length > 0 
+            ? mentionedEntityIds 
+            : entities.map(e => e.id);
+        
+        // Build entity context for the AI - include schema info so it knows what data is available
+        const entityContext = entities
+            .filter(e => entityIdsToUse.includes(e.id))
+            .map(e => ({
+                id: e.id,
+                name: e.name,
+                properties: e.properties?.map((p: any) => ({ name: p.name, type: p.type })) || []
+            }));
+
         // Save prompt as feedback for analytics
         try {
             await fetch(`${API_BASE}/node-feedback`, {
@@ -923,7 +938,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     prompt: enhancedPrompt,
-                    mentionedEntityIds
+                    mentionedEntityIds: entityIdsToUse,
+                    entityContext, // Include entity schemas so AI knows what data is available
+                    forceRealData: true // Signal to backend to always use real entity data
                 }),
                 credentials: 'include'
             });
