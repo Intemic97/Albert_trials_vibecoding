@@ -3791,6 +3791,258 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         result = 'No input data';
                     }
                     break;
+                // OT/Industrial Nodes
+                case 'opcua':
+                    if (node.config?.opcuaConnectionId && node.config?.opcuaNodeIds && node.config.opcuaNodeIds.length > 0) {
+                        // Simulate OPC UA data
+                        const timestamp = new Date().toISOString();
+                        const values: Record<string, number> = {};
+                        node.config.opcuaNodeIds.forEach((nodeId: string) => {
+                            values[nodeId] = Math.random() * 100;
+                        });
+                        
+                        nodeData = [{
+                            timestamp,
+                            values,
+                            raw: node.config.opcuaNodeIds.map((nodeId: string) => ({
+                                nodeId,
+                                value: values[nodeId],
+                                timestamp,
+                                quality: 'Good'
+                            })),
+                            metadata: {
+                                connectionId: node.config.opcuaConnectionId,
+                                nodeCount: node.config.opcuaNodeIds.length
+                            }
+                        }];
+                        result = `Read ${node.config.opcuaNodeIds.length} OPC UA node(s)`;
+                    } else {
+                        result = 'Not configured - please configure OPC UA connection and node IDs';
+                        nodeData = [];
+                    }
+                    break;
+                case 'mqtt':
+                    if (node.config?.mqttConnectionId && node.config?.mqttTopics && node.config.mqttTopics.length > 0) {
+                        // Simulate MQTT messages
+                        const timestamp = new Date().toISOString();
+                        const messages = node.config.mqttTopics.map((topic: string) => ({
+                            topic,
+                            payload: JSON.stringify({
+                                value: Math.random() * 100,
+                                timestamp,
+                                sensorId: topic.split('/').pop()
+                            }),
+                            qos: node.config.mqttQos || 0,
+                            timestamp
+                        }));
+                        
+                        const topicData: Record<string, number> = {};
+                        messages.forEach(msg => {
+                            try {
+                                const payload = JSON.parse(msg.payload);
+                                topicData[msg.topic] = payload.value;
+                            } catch (e) {
+                                // Skip invalid JSON
+                            }
+                        });
+                        
+                        nodeData = [{
+                            timestamp,
+                            messages,
+                            topicData,
+                            metadata: {
+                                connectionId: node.config.mqttConnectionId,
+                                topicCount: node.config.mqttTopics.length
+                            }
+                        }];
+                        result = `Received ${messages.length} MQTT message(s)`;
+                    } else {
+                        result = 'Not configured - please configure MQTT connection and topics';
+                        nodeData = [];
+                    }
+                    break;
+                case 'modbus':
+                    if (node.config?.modbusConnectionId && node.config?.modbusAddresses && node.config.modbusAddresses.length > 0) {
+                        // Simulate Modbus data
+                        const timestamp = new Date().toISOString();
+                        const registers: Record<string, number> = {};
+                        node.config.modbusAddresses.forEach((addr: string) => {
+                            registers[addr] = Math.floor(Math.random() * 65535);
+                        });
+                        
+                        nodeData = [{
+                            timestamp,
+                            registers,
+                            raw: node.config.modbusAddresses.map((addr: string) => ({
+                                address: addr,
+                                value: registers[addr],
+                                functionCode: node.config.modbusFunctionCode || 3,
+                                timestamp
+                            })),
+                            metadata: {
+                                connectionId: node.config.modbusConnectionId,
+                                addressCount: node.config.modbusAddresses.length
+                            }
+                        }];
+                        result = `Read ${node.config.modbusAddresses.length} Modbus register(s)`;
+                    } else {
+                        result = 'Not configured - please configure Modbus connection and addresses';
+                        nodeData = [];
+                    }
+                    break;
+                case 'scada':
+                    if (node.config?.scadaConnectionId && node.config?.scadaTags && node.config.scadaTags.length > 0) {
+                        // Simulate SCADA data
+                        const timestamp = new Date().toISOString();
+                        const tags: Record<string, number> = {};
+                        node.config.scadaTags.forEach((tag: string) => {
+                            tags[tag] = Math.random() * 100;
+                        });
+                        
+                        nodeData = [{
+                            timestamp,
+                            tags,
+                            raw: node.config.scadaTags.map((tag: string) => ({
+                                tag,
+                                value: tags[tag],
+                                timestamp,
+                                quality: 'Good'
+                            })),
+                            metadata: {
+                                connectionId: node.config.scadaConnectionId,
+                                tagCount: node.config.scadaTags.length
+                            }
+                        }];
+                        result = `Read ${node.config.scadaTags.length} SCADA tag(s)`;
+                    } else {
+                        result = 'Not configured - please configure SCADA connection and tags';
+                        nodeData = [];
+                    }
+                    break;
+                case 'mes':
+                    if (node.config?.mesConnectionId && node.config?.mesEndpoint) {
+                        // Simulate MES data
+                        const timestamp = new Date().toISOString();
+                        nodeData = [{
+                            timestamp,
+                            productionOrder: `PO-${Date.now()}`,
+                            quantity: Math.floor(Math.random() * 1000),
+                            status: 'In Progress',
+                            startTime: timestamp,
+                            equipment: 'Line-01',
+                            operator: 'Operator-123',
+                            query: node.config.mesQuery || 'production-status',
+                            metadata: {
+                                connectionId: node.config.mesConnectionId,
+                                endpoint: node.config.mesEndpoint
+                            }
+                        }];
+                        result = `Fetched production data from MES`;
+                    } else {
+                        result = 'Not configured - please configure MES connection and endpoint';
+                        nodeData = [];
+                    }
+                    break;
+                case 'dataHistorian':
+                    if (node.config?.dataHistorianConnectionId && node.config?.dataHistorianTags && node.config.dataHistorianTags.length > 0) {
+                        // Simulate historical data
+                        const startTime = node.config.dataHistorianStartTime || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+                        const endTime = node.config.dataHistorianEndTime || new Date().toISOString();
+                        const dataPoints: any[] = [];
+                        
+                        // Generate sample data points
+                        const start = new Date(startTime);
+                        const end = new Date(endTime);
+                        const interval = 60000; // 1 minute intervals
+                        let current = new Date(start);
+                        
+                        while (current <= end && dataPoints.length < 100) {
+                            node.config.dataHistorianTags.forEach((tag: string) => {
+                                dataPoints.push({
+                                    tag,
+                                    timestamp: current.toISOString(),
+                                    value: Math.random() * 100
+                                });
+                            });
+                            current = new Date(current.getTime() + interval);
+                        }
+                        
+                        const tagsData: Record<string, any[]> = {};
+                        node.config.dataHistorianTags.forEach((tag: string) => {
+                            tagsData[tag] = dataPoints.filter(dp => dp.tag === tag).map(dp => ({
+                                timestamp: dp.timestamp,
+                                value: dp.value
+                            }));
+                        });
+                        
+                        nodeData = [{
+                            startTime,
+                            endTime,
+                            aggregation: node.config.dataHistorianAggregation || 'raw',
+                            dataPoints: dataPoints.slice(0, 50), // Limit preview
+                            tags: tagsData,
+                            metadata: {
+                                connectionId: node.config.dataHistorianConnectionId,
+                                pointCount: dataPoints.length,
+                                tagCount: node.config.dataHistorianTags.length
+                            }
+                        }];
+                        result = `Queried ${dataPoints.length} historical data points for ${node.config.dataHistorianTags.length} tag(s)`;
+                    } else {
+                        result = 'Not configured - please configure Data Historian connection and tags';
+                        nodeData = [];
+                    }
+                    break;
+                case 'timeSeriesAggregator':
+                    if (inputData) {
+                        // Simulate aggregation
+                        const dataArray = Array.isArray(inputData) ? inputData : [inputData];
+                        const aggType = node.config?.timeSeriesAggregationType || 'avg';
+                        const interval = node.config?.timeSeriesInterval || '5m';
+                        
+                        if (dataArray.length > 0) {
+                            const sample = dataArray[0];
+                            const aggregated: Record<string, any> = {
+                                timestamp: sample.timestamp || sample.createdAt || new Date().toISOString(),
+                                interval
+                            };
+                            
+                            // Aggregate numeric fields
+                            const fields = node.config?.timeSeriesFields || Object.keys(sample).filter(k => k !== 'timestamp' && k !== 'createdAt');
+                            fields.forEach((field: string) => {
+                                const values = dataArray.map((r: any) => Number(r[field])).filter(v => !isNaN(v));
+                                if (values.length > 0) {
+                                    switch (aggType) {
+                                        case 'avg':
+                                            aggregated[field] = values.reduce((a, b) => a + b, 0) / values.length;
+                                            break;
+                                        case 'min':
+                                            aggregated[field] = Math.min(...values);
+                                            break;
+                                        case 'max':
+                                            aggregated[field] = Math.max(...values);
+                                            break;
+                                        case 'sum':
+                                            aggregated[field] = values.reduce((a, b) => a + b, 0);
+                                            break;
+                                        case 'count':
+                                            aggregated[field] = values.length;
+                                            break;
+                                    }
+                                }
+                            });
+                            
+                            nodeData = [aggregated];
+                            result = `Aggregated ${dataArray.length} data point(s) using ${aggType} (${interval})`;
+                        } else {
+                            result = 'No data to aggregate';
+                            nodeData = [];
+                        }
+                    } else {
+                        result = 'Waiting for input data...';
+                        nodeData = [];
+                    }
+                    break;
                 case 'humanApproval':
                     // Human approval node - wait for user acceptance
                     if (!node.config?.assignedUserId) {
@@ -8640,8 +8892,65 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     
                                                     const allKeys = getAllKeys(flattenedData);
                                                     
+                                                    // Check if this is OT/time-series data
+                                                    const isOTData = displayData.length > 0 && (
+                                                        displayData[0].values || 
+                                                        displayData[0].tags || 
+                                                        displayData[0].registers || 
+                                                        displayData[0].topicData ||
+                                                        displayData[0].metadata?.connectionId
+                                                    );
+                                                    
                                                     return displayData && displayData.length > 0 && allKeys.length > 0 ? (
                                                         <>
+                                                            {/* OT/Time-Series Data Info Banner */}
+                                                            {isOTData && displayData[0] && (
+                                                                <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4 mb-4 shrink-0">
+                                                                    <div className="flex items-start gap-3">
+                                                                        <Clock size={20} className="text-indigo-600 dark:text-indigo-400 mt-0.5 flex-shrink-0" />
+                                                                        <div className="flex-1">
+                                                                            <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100 mb-2">
+                                                                                Time-Series Data
+                                                                            </p>
+                                                                            {displayData[0].timestamp && (
+                                                                                <p className="text-xs text-indigo-700 dark:text-indigo-300 mb-2">
+                                                                                    Timestamp: {new Date(displayData[0].timestamp).toLocaleString()}
+                                                                                </p>
+                                                                            )}
+                                                                            {displayData[0].metadata && (
+                                                                                <div className="flex flex-wrap gap-2 mt-2">
+                                                                                    {displayData[0].metadata.nodeCount && (
+                                                                                        <span className="px-2 py-1 text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded">
+                                                                                            {displayData[0].metadata.nodeCount} node(s)
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {displayData[0].metadata.tagCount && (
+                                                                                        <span className="px-2 py-1 text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded">
+                                                                                            {displayData[0].metadata.tagCount} tag(s)
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {displayData[0].metadata.addressCount && (
+                                                                                        <span className="px-2 py-1 text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded">
+                                                                                            {displayData[0].metadata.addressCount} address(es)
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {displayData[0].metadata.topicCount && (
+                                                                                        <span className="px-2 py-1 text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded">
+                                                                                            {displayData[0].metadata.topicCount} topic(s)
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {displayData[0].metadata.pointCount && (
+                                                                                        <span className="px-2 py-1 text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded">
+                                                                                            {displayData[0].metadata.pointCount} data point(s)
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            
                                                             {isLimited && (
                                                                 <div className="bg-[var(--bg-tertiary)] border border-[var(--border-light)] text-[var(--text-secondary)] px-4 py-2.5 rounded-lg mb-4 text-sm flex items-center gap-2 shrink-0">
                                                                     <AlertCircle size={16} />
