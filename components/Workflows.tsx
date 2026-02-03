@@ -707,7 +707,35 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
         setIsSaving(true);
         try {
-            const data = { nodes, connections };
+            // Strip runtime execution data from nodes to reduce payload size
+            // This prevents 413 "Request Entity Too Large" errors
+            const cleanedNodes = nodes.map(node => {
+                const { 
+                    outputData, 
+                    inputData, 
+                    inputDataA, 
+                    inputDataB, 
+                    status, 
+                    executionResult, 
+                    conditionResult,
+                    data: nodeData,
+                    ...cleanNode 
+                } = node;
+                
+                // For excelInput nodes with GCS storage, keep only essential config
+                // (previewData is limited, full data is in GCS)
+                if (cleanNode.config?.parsedData && !cleanNode.config?.useGCS) {
+                    // For inline data, limit to first 100 rows to prevent large payloads
+                    cleanNode.config = {
+                        ...cleanNode.config,
+                        parsedData: cleanNode.config.parsedData.slice(0, 100)
+                    };
+                }
+                
+                return cleanNode;
+            });
+            
+            const data = { nodes: cleanedNodes, connections };
 
             if (currentWorkflowId) {
                 // Update existing
@@ -8086,6 +8114,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             // Special handling for splitColumns node
                             const isSplitColumnsNode = node.type === 'splitColumns';
                             
+                            // Special handling for condition node with trueRecords/falseRecords
+                            const isConditionWithBranches = node.type === 'condition' && 
+                                node.outputData && 
+                                typeof node.outputData === 'object' &&
+                                (node.outputData.trueRecords !== undefined || node.outputData.falseRecords !== undefined);
+                            
                             // Get data from various possible locations
                             // Input data should only come from explicit inputData (from previous nodes)
                             // Output data can come from outputData or fallback to node.data
@@ -8099,11 +8133,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             const nodeOutputData = normalizeToArray(rawOutputData);
                             
                             const hasInput = rawInputData !== undefined && rawInputData !== null && Array.isArray(nodeInputData) && nodeInputData.length > 0;
-                            const hasOutput = !isSplitColumnsNode && rawOutputData !== undefined && rawOutputData !== null && Array.isArray(nodeOutputData) && nodeOutputData.length > 0;
+                            const hasOutput = !isSplitColumnsNode && !isConditionWithBranches && rawOutputData !== undefined && rawOutputData !== null && Array.isArray(nodeOutputData) && nodeOutputData.length > 0;
                             const hasOutputA = isSplitColumnsNode && nodeOutputData?.outputA?.length > 0;
                             const hasOutputB = isSplitColumnsNode && nodeOutputData?.outputB?.length > 0;
+                            
+                            // For condition nodes with branches
+                            const hasTrueRecords = isConditionWithBranches && Array.isArray(rawOutputData?.trueRecords) && rawOutputData.trueRecords.length > 0;
+                            const hasFalseRecords = isConditionWithBranches && Array.isArray(rawOutputData?.falseRecords) && rawOutputData.falseRecords.length > 0;
 
-                            if (!hasInput && !hasOutput && !hasOutputA && !hasOutputB) return null;
+                            if (!hasInput && !hasOutput && !hasOutputA && !hasOutputB && !hasTrueRecords && !hasFalseRecords) return null;
                             
                             // Determine the correct active tab based on available data
                             // Use output if available and selected, otherwise use input if available
@@ -8141,7 +8179,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                                         {/* Content with tabs */}
                                         <div className="flex-1 overflow-hidden flex flex-col px-6 py-4">
-                                            {/* Tabs - different for splitColumns */}
+                                            {/* Tabs - different for splitColumns and condition nodes */}
                                             {isSplitColumnsNode ? (
                                                 <div className="flex gap-1 bg-[var(--bg-tertiary)] p-1 rounded-lg border border-[var(--border-light)] mb-4 shrink-0">
                                                     {hasInput && (
@@ -8180,6 +8218,49 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             <span className="flex items-center justify-center gap-1.5">
                                                                 <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
                                                                 Output B ({nodeOutputData?.outputB?.length || 0})
+                                                            </span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ) : isConditionWithBranches ? (
+                                                // Condition node with trueRecords/falseRecords
+                                                <div className="flex gap-1 bg-[var(--bg-tertiary)] p-1 rounded-lg border border-[var(--border-light)] mb-4 shrink-0">
+                                                    {hasInput && (
+                                                        <button
+                                                            onClick={() => setSplitViewTab('input')}
+                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${splitViewTab === 'input'
+                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                                                }`}
+                                                        >
+                                                            Input ({Array.isArray(nodeInputData) ? nodeInputData.length : 0})
+                                                        </button>
+                                                    )}
+                                                    {hasTrueRecords && (
+                                                        <button
+                                                            onClick={() => setSplitViewTab('outputA')}
+                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${splitViewTab === 'outputA'
+                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                                                }`}
+                                                        >
+                                                            <span className="flex items-center justify-center gap-1.5">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                                                True ({rawOutputData?.trueRecords?.length || 0})
+                                                            </span>
+                                                        </button>
+                                                    )}
+                                                    {hasFalseRecords && (
+                                                        <button
+                                                            onClick={() => setSplitViewTab('outputB')}
+                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${splitViewTab === 'outputB'
+                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                                                }`}
+                                                        >
+                                                            <span className="flex items-center justify-center gap-1.5">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                                                                False ({rawOutputData?.falseRecords?.length || 0})
                                                             </span>
                                                         </button>
                                                     )}
@@ -8227,6 +8308,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             : splitViewTab === 'outputA' 
                                                                 ? nodeOutputData?.outputA 
                                                                 : nodeOutputData?.outputB;
+                                                    } else if (isConditionWithBranches) {
+                                                        // Condition node with trueRecords/falseRecords
+                                                        displayData = splitViewTab === 'input' 
+                                                            ? nodeInputData 
+                                                            : splitViewTab === 'outputA' 
+                                                                ? rawOutputData?.trueRecords 
+                                                                : rawOutputData?.falseRecords;
                                                     } else {
                                                         // Use effectiveTab to determine which data to display
                                                         displayData = effectiveTab === 'input' ? nodeInputData : nodeOutputData;
