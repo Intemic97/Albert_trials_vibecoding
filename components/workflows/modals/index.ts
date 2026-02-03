@@ -14,6 +14,10 @@ export { HttpConfigModal } from './HttpConfigModal';
 // OT/Industrial modals
 export { OpcUaConfigModal } from './OpcUaConfigModal';
 export { MqttConfigModal } from './MqttConfigModal';
+export { ModbusConfigModal } from './ModbusConfigModal';
+export { ScadaConfigModal } from './ScadaConfigModal';
+export { MesConfigModal } from './MesConfigModal';
+export { DataHistorianConfigModal } from './DataHistorianConfigModal';
 
 // AI/Code modals
 export { LLMConfigModal } from './LLMConfigModal';

@@ -51,7 +51,7 @@ import {
   // Hooks
   useWorkflowHistory,
 } from './workflows/index';
-import { OpcUaConfigModal, MqttConfigModal } from './workflows/modals';
+import { OpcUaConfigModal, MqttConfigModal, ModbusConfigModal, ScadaConfigModal, MesConfigModal, DataHistorianConfigModal } from './workflows/modals';
 
 // Use imported DRAGGABLE_ITEMS from workflows module
 const DRAGGABLE_ITEMS = WORKFLOW_DRAGGABLE_ITEMS;
@@ -345,6 +345,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [mqttClientId, setMqttClientId] = useState<string>('');
     const [mqttQos, setMqttQos] = useState<'0' | '1' | '2'>('0');
     const [mqttCleanSession, setMqttCleanSession] = useState<boolean>(true);
+
+    // Modbus Node State
+    const [configuringModbusNodeId, setConfiguringModbusNodeId] = useState<string | null>(null);
+    
+    // SCADA Node State
+    const [configuringScadaNodeId, setConfiguringScadaNodeId] = useState<string | null>(null);
+    
+    // MES Node State
+    const [configuringMesNodeId, setConfiguringMesNodeId] = useState<string | null>(null);
+    
+    // Data Historian Node State
+    const [configuringDataHistorianNodeId, setConfiguringDataHistorianNodeId] = useState<string | null>(null);
 
     // Available connections for OT nodes
     const [availableConnections, setAvailableConnections] = useState<Array<{ id: string; name: string; type: string }>>([]);
@@ -1803,6 +1815,122 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 : n
         ));
         setConfiguringMqttNodeId(null);
+    };
+
+    const openModbusConfig = (nodeId: string) => {
+        setConfiguringModbusNodeId(nodeId);
+    };
+
+    const saveModbusConfig = (config: {
+        modbusConnectionId: string;
+        modbusAddresses: string[];
+        modbusFunctionCode: number;
+    }) => {
+        if (!configuringModbusNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringModbusNodeId
+                ? {
+                    ...n,
+                    label: config.modbusAddresses.length > 0 ? `Modbus: ${config.modbusAddresses[0]}${config.modbusAddresses.length > 1 ? ` (+${config.modbusAddresses.length - 1})` : ''}` : 'Modbus',
+                    config: {
+                        ...n.config,
+                        modbusConnectionId: config.modbusConnectionId,
+                        modbusAddresses: config.modbusAddresses,
+                        modbusFunctionCode: config.modbusFunctionCode
+                    }
+                }
+                : n
+        ));
+        setConfiguringModbusNodeId(null);
+    };
+
+    const openScadaConfig = (nodeId: string) => {
+        setConfiguringScadaNodeId(nodeId);
+    };
+
+    const saveScadaConfig = (config: {
+        scadaConnectionId: string;
+        scadaTags: string[];
+        scadaPollingInterval: number;
+    }) => {
+        if (!configuringScadaNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringScadaNodeId
+                ? {
+                    ...n,
+                    label: config.scadaTags.length > 0 ? `SCADA: ${config.scadaTags[0]}${config.scadaTags.length > 1 ? ` (+${config.scadaTags.length - 1})` : ''}` : 'SCADA',
+                    config: {
+                        ...n.config,
+                        scadaConnectionId: config.scadaConnectionId,
+                        scadaTags: config.scadaTags,
+                        scadaPollingInterval: config.scadaPollingInterval
+                    }
+                }
+                : n
+        ));
+        setConfiguringScadaNodeId(null);
+    };
+
+    const openMesConfig = (nodeId: string) => {
+        setConfiguringMesNodeId(nodeId);
+    };
+
+    const saveMesConfig = (config: {
+        mesConnectionId: string;
+        mesEndpoint: string;
+        mesQuery?: string;
+    }) => {
+        if (!configuringMesNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringMesNodeId
+                ? {
+                    ...n,
+                    label: config.mesEndpoint ? `MES: ${config.mesEndpoint.split('/').pop()}` : 'MES',
+                    config: {
+                        ...n.config,
+                        mesConnectionId: config.mesConnectionId,
+                        mesEndpoint: config.mesEndpoint,
+                        mesQuery: config.mesQuery
+                    }
+                }
+                : n
+        ));
+        setConfiguringMesNodeId(null);
+    };
+
+    const openDataHistorianConfig = (nodeId: string) => {
+        setConfiguringDataHistorianNodeId(nodeId);
+    };
+
+    const saveDataHistorianConfig = (config: {
+        dataHistorianConnectionId: string;
+        dataHistorianTags: string[];
+        dataHistorianStartTime: string;
+        dataHistorianEndTime: string;
+        dataHistorianAggregation: string;
+    }) => {
+        if (!configuringDataHistorianNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringDataHistorianNodeId
+                ? {
+                    ...n,
+                    label: config.dataHistorianTags.length > 0 ? `Data Historian: ${config.dataHistorianTags[0]}${config.dataHistorianTags.length > 1 ? ` (+${config.dataHistorianTags.length - 1})` : ''}` : 'Data Historian',
+                    config: {
+                        ...n.config,
+                        dataHistorianConnectionId: config.dataHistorianConnectionId,
+                        dataHistorianTags: config.dataHistorianTags,
+                        dataHistorianStartTime: config.dataHistorianStartTime,
+                        dataHistorianEndTime: config.dataHistorianEndTime,
+                        dataHistorianAggregation: config.dataHistorianAggregation
+                    }
+                }
+                : n
+        ));
+        setConfiguringDataHistorianNodeId(null);
     };
 
     const openEmailConfig = (nodeId: string) => {
@@ -4548,6 +4676,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'agent':
             case 'opcua':
             case 'mqtt':
+            case 'modbus':
+            case 'scada':
+            case 'mes':
+            case 'dataHistorian':
                 return true; // Estos tipos siempre están configurados
             default:
                 return false;
@@ -4630,6 +4762,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'agent': return 'text-purple-600';
             case 'opcua': return 'text-indigo-600';
             case 'mqtt': return 'text-cyan-600';
+            case 'modbus': return 'text-indigo-600';
+            case 'scada': return 'text-indigo-600';
+            case 'mes': return 'text-indigo-600';
+            case 'dataHistorian': return 'text-indigo-600';
             default: return 'text-[var(--text-secondary)]';
         }
     };
@@ -5622,6 +5758,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openPdfConfig(node.id);
                                             } else if (node.type === 'trigger' && (node.label === 'Schedule' || node.label.startsWith('Schedule:') || node.config?.scheduleInterval)) {
                                                 openScheduleConfig(node.id);
+                                            } else if (node.type === 'opcua') {
+                                                openOpcuaConfig(node.id);
+                                            } else if (node.type === 'mqtt') {
+                                                openMqttConfig(node.id);
+                                            } else if (node.type === 'modbus') {
+                                                openModbusConfig(node.id);
+                                            } else if (node.type === 'scada') {
+                                                openScadaConfig(node.id);
+                                            } else if (node.type === 'mes') {
+                                                openMesConfig(node.id);
+                                            } else if (node.type === 'dataHistorian') {
+                                                openDataHistorianConfig(node.id);
                                             }
                                         }}
                                         onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
@@ -10772,6 +10920,52 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 availableConnections={availableConnections.filter(c => c.type === 'mqtt' || c.type === 'MQTT')}
                 onSave={saveMqttConfig}
                 onClose={() => setConfiguringMqttNodeId(null)}
+            />
+
+            {/* Modbus Configuration Modal */}
+            <ModbusConfigModal
+                isOpen={configuringModbusNodeId !== null}
+                connectionId={nodes.find(n => n.id === configuringModbusNodeId)?.config?.modbusConnectionId}
+                addresses={nodes.find(n => n.id === configuringModbusNodeId)?.config?.modbusAddresses || []}
+                functionCode={nodes.find(n => n.id === configuringModbusNodeId)?.config?.modbusFunctionCode || 3}
+                availableConnections={availableConnections.filter(c => c.type === 'modbus' || c.type === 'Modbus')}
+                onSave={saveModbusConfig}
+                onClose={() => setConfiguringModbusNodeId(null)}
+            />
+
+            {/* SCADA Configuration Modal */}
+            <ScadaConfigModal
+                isOpen={configuringScadaNodeId !== null}
+                connectionId={nodes.find(n => n.id === configuringScadaNodeId)?.config?.scadaConnectionId}
+                tags={nodes.find(n => n.id === configuringScadaNodeId)?.config?.scadaTags || []}
+                pollingInterval={nodes.find(n => n.id === configuringScadaNodeId)?.config?.scadaPollingInterval || 5000}
+                availableConnections={availableConnections.filter(c => c.type === 'scada' || c.type === 'SCADA')}
+                onSave={saveScadaConfig}
+                onClose={() => setConfiguringScadaNodeId(null)}
+            />
+
+            {/* MES Configuration Modal */}
+            <MesConfigModal
+                isOpen={configuringMesNodeId !== null}
+                connectionId={nodes.find(n => n.id === configuringMesNodeId)?.config?.mesConnectionId}
+                endpoint={nodes.find(n => n.id === configuringMesNodeId)?.config?.mesEndpoint}
+                query={nodes.find(n => n.id === configuringMesNodeId)?.config?.mesQuery}
+                availableConnections={availableConnections.filter(c => c.type === 'mes' || c.type === 'MES')}
+                onSave={saveMesConfig}
+                onClose={() => setConfiguringMesNodeId(null)}
+            />
+
+            {/* Data Historian Configuration Modal */}
+            <DataHistorianConfigModal
+                isOpen={configuringDataHistorianNodeId !== null}
+                connectionId={nodes.find(n => n.id === configuringDataHistorianNodeId)?.config?.dataHistorianConnectionId}
+                tags={nodes.find(n => n.id === configuringDataHistorianNodeId)?.config?.dataHistorianTags || []}
+                startTime={nodes.find(n => n.id === configuringDataHistorianNodeId)?.config?.dataHistorianStartTime}
+                endTime={nodes.find(n => n.id === configuringDataHistorianNodeId)?.config?.dataHistorianEndTime}
+                aggregation={nodes.find(n => n.id === configuringDataHistorianNodeId)?.config?.dataHistorianAggregation || 'raw'}
+                availableConnections={availableConnections.filter(c => c.type === 'data-historian' || c.type === 'Data Historian')}
+                onSave={saveDataHistorianConfig}
+                onClose={() => setConfiguringDataHistorianNodeId(null)}
             />
         </div>
 
