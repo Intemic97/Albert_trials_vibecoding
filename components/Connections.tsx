@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
     Database, 
     CheckCircle, 
@@ -10,7 +11,9 @@ import {
     X,
     Star,
     ArrowRight,
-    Clock
+    Clock,
+    Gauge,
+    Warning
 } from '@phosphor-icons/react';
 import { PageHeader } from './PageHeader';
 import { API_BASE } from '../config';
@@ -392,6 +395,7 @@ const CONNECTIONS: Connection[] = [
 ];
 
 export const Connections: React.FC = () => {
+    const navigate = useNavigate();
     const [connections, setConnections] = useState<Connection[]>(CONNECTIONS);
     const [savedConnections, setSavedConnections] = useState<any[]>([]);
     const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
@@ -401,6 +405,23 @@ export const Connections: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<string>('all');
     const [logoErrors, setLogoErrors] = useState<Set<string>>(new Set());
+    const [otAlertCount, setOtAlertCount] = useState(0);
+
+    // Fetch OT alert count
+    useEffect(() => {
+        const fetchOtAlerts = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/ot-alerts?acknowledged=false`, { credentials: 'include' });
+                if (res.ok) {
+                    const data = await res.json();
+                    setOtAlertCount(data.alerts?.length || 0);
+                }
+            } catch (e) { /* ignore */ }
+        };
+        fetchOtAlerts();
+        const interval = setInterval(fetchOtAlerts, 30000);
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         loadConnections();
@@ -592,6 +613,35 @@ export const Connections: React.FC = () => {
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-7xl mx-auto space-y-8">
+
+                    {/* OT Monitoring Banner */}
+                    <button
+                        onClick={() => navigate('/industrial')}
+                        className="w-full bg-gradient-to-r from-[var(--bg-card)] to-[var(--bg-tertiary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 rounded-xl p-4 transition-all group flex items-center justify-between"
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-cyan-500/10 rounded-xl group-hover:scale-105 transition-transform">
+                                <Gauge size={24} className="text-cyan-500" />
+                            </div>
+                            <div className="text-left">
+                                <h3 className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[#419CAF] transition-colors">
+                                    OT Monitoring Dashboard
+                                </h3>
+                                <p className="text-xs text-[var(--text-tertiary)]">
+                                    Real-time monitoring of industrial connections (OPC UA, MQTT, Modbus, SCADA)
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            {otAlertCount > 0 && (
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 border border-red-500/20 rounded-lg">
+                                    <Warning size={14} className="text-red-500" />
+                                    <span className="text-xs font-medium text-red-500">{otAlertCount} alerts</span>
+                                </div>
+                            )}
+                            <ArrowRight size={18} className="text-[var(--text-tertiary)] group-hover:text-[#419CAF] group-hover:translate-x-1 transition-all" />
+                        </div>
+                    </button>
                     
                     {/* Filters */}
                     <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">

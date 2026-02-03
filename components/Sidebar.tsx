@@ -460,30 +460,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <nav className="px-3 py-2">
-          <SectionLabel label="Company" />
-          <div className="space-y-0.5">
+          {/* Overview - standalone */}
+          <div className="space-y-0.5 mb-1">
             <NavItem icon={House} label="Overview" view="overview" active={activeView === 'overview'} />
-            <NavItem icon={SquaresFour} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
           </div>
 
-          <SectionLabel label="Data Modeling" />
+          <SectionLabel label="Build" />
           <div className="space-y-0.5">
             <NavItem icon={FlowArrow} label="Workflows" view="workflows" active={activeView === 'workflows'} />
             <NavItem icon={Database} label="Knowledge Base" view="database" active={activeView === 'database'} />
-            <NavItem icon={Sparkle} label="Copilots" view="copilots" active={activeView === 'copilots'} />
+            <NavItem icon={Plug} label="Connections" view="connections" active={activeView === 'connections'} badge={otAlertCount} />
+          </div>
+
+          <SectionLabel label="Analyze" />
+          <div className="space-y-0.5">
+            <NavItem icon={SquaresFour} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
             <NavItem icon={Flask} label="Lab" view="lab" active={activeView === 'lab'} />
+            <NavItem icon={Sparkle} label="Copilots" view="copilots" active={activeView === 'copilots'} />
           </div>
 
           <SectionLabel label="Reports" />
           <div className="space-y-0.5">
             <NavItem icon={FileText} label="Templates" view="templates" active={activeView === 'templates'} />
             <NavItem icon={Checks} label="Documents" view="documents" active={activeView === 'documents'} />
-          </div>
-
-          <SectionLabel label="Operations" />
-          <div className="space-y-0.5">
-            <NavItem icon={Plug} label="Connections" view="connections" active={activeView === 'connections'} />
-            <NavItem icon={Factory} label="Industrial" view="industrial" active={activeView === 'industrial'} badge={otAlertCount} />
           </div>
 
         </nav>

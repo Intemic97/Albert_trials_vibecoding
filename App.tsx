@@ -159,6 +159,7 @@ function AuthenticatedApp() {
         if (path.startsWith('/copilots')) return 'copilots';
         if (path.startsWith('/logs')) return 'logs';
         if (path.startsWith('/connections')) return 'connections';
+        if (path.startsWith('/industrial')) return 'industrial';
         if (path.startsWith('/documentation')) return 'documentation';
         if (path.startsWith('/settings')) return 'settings';
         if (path.startsWith('/admin')) return 'admin';
