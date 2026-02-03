@@ -11,6 +11,10 @@ export { ConditionConfigModal } from './ConditionConfigModal';
 // Input/API modals
 export { HttpConfigModal } from './HttpConfigModal';
 
+// OT/Industrial modals
+export { OpcUaConfigModal } from './OpcUaConfigModal';
+export { MqttConfigModal } from './MqttConfigModal';
+
 // AI/Code modals
 export { LLMConfigModal } from './LLMConfigModal';
 export { PythonConfigModal } from './PythonConfigModal';

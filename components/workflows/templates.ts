@@ -262,6 +262,94 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
       { id: 'c6-4', fromNodeId: 't6-condition', toNodeId: 't6-output', outputType: 'false' },
     ]
   },
+  // OT/Industrial Templates
+  {
+    id: 'template-ot-continuous-ingestion',
+    name: 'Ingesta Continua desde Shopfloor',
+    description: 'Captura continua de datos desde PLCs y sensores industriales (OPC UA/MQTT) y almacenamiento en time-series para análisis posterior.',
+    category: 'Process Optimization',
+    nodes: [
+      { id: 'ot1-trigger', type: 'trigger', label: 'Schedule Trigger', x: 100, y: 200 },
+      { id: 'ot1-opcua', type: 'opcua', label: 'OPC UA Input', x: 300, y: 200, config: { opcuaPollingInterval: 5000 } },
+      { id: 'ot1-aggregator', type: 'timeSeriesAggregator', label: 'Time-Series Aggregator', x: 500, y: 200, config: { timeSeriesAggregationType: 'avg', timeSeriesInterval: '5m' } },
+      { id: 'ot1-save', type: 'saveRecords', label: 'Save to Time-Series', x: 700, y: 200 },
+    ],
+    connections: [
+      { id: 'cot1-1', fromNodeId: 'ot1-trigger', toNodeId: 'ot1-opcua' },
+      { id: 'cot1-2', fromNodeId: 'ot1-opcua', toNodeId: 'ot1-aggregator' },
+      { id: 'cot1-3', fromNodeId: 'ot1-aggregator', toNodeId: 'ot1-save' },
+    ]
+  },
+  {
+    id: 'template-ot-mqtt-sensor-ingestion',
+    name: 'Ingesta de Sensores IoT via MQTT',
+    description: 'Suscripción a topics MQTT para capturar datos de sensores IoT y almacenarlos en time-series para monitoreo en tiempo real.',
+    category: 'Process Optimization',
+    nodes: [
+      { id: 'ot2-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
+      { id: 'ot2-mqtt', type: 'mqtt', label: 'MQTT Subscriber', x: 300, y: 200, config: { mqttQos: 1 } },
+      { id: 'ot2-save', type: 'saveRecords', label: 'Save Sensor Data', x: 500, y: 200 },
+    ],
+    connections: [
+      { id: 'cot2-1', fromNodeId: 'ot2-trigger', toNodeId: 'ot2-mqtt' },
+      { id: 'cot2-2', fromNodeId: 'ot2-mqtt', toNodeId: 'ot2-save' },
+    ]
+  },
+  {
+    id: 'template-ot-quality-monitoring',
+    name: 'Monitoreo de Calidad en Tiempo Real',
+    description: 'Lectura de datos desde SCADA/MES, análisis de calidad y generación de alertas cuando se detectan desviaciones.',
+    category: 'Quality Assurance',
+    nodes: [
+      { id: 'ot3-trigger', type: 'trigger', label: 'Schedule Trigger', x: 100, y: 200 },
+      { id: 'ot3-scada', type: 'scada', label: 'SCADA Data', x: 300, y: 200 },
+      { id: 'ot3-condition', type: 'condition', label: 'Check Quality Limits', x: 500, y: 200, config: { conditionField: 'quality', conditionOperator: 'greaterThan', conditionValue: 'threshold' } },
+      { id: 'ot3-alert', type: 'sendEmail', label: 'Send Alert', x: 700, y: 150 },
+      { id: 'ot3-save', type: 'saveRecords', label: 'Log Quality Data', x: 700, y: 250 },
+    ],
+    connections: [
+      { id: 'cot3-1', fromNodeId: 'ot3-trigger', toNodeId: 'ot3-scada' },
+      { id: 'cot3-2', fromNodeId: 'ot3-scada', toNodeId: 'ot3-condition' },
+      { id: 'cot3-3', fromNodeId: 'ot3-condition', toNodeId: 'ot3-alert', outputType: 'true' },
+      { id: 'cot3-4', fromNodeId: 'ot3-condition', toNodeId: 'ot3-save', outputType: 'false' },
+    ]
+  },
+  {
+    id: 'template-ot-production-analytics',
+    name: 'Análisis de Producción desde MES',
+    description: 'Extracción de datos de producción desde MES, agregación por turno/lote y generación de reportes de eficiencia.',
+    category: 'Reporting',
+    nodes: [
+      { id: 'ot4-trigger', type: 'trigger', label: 'Schedule Trigger', x: 100, y: 200 },
+      { id: 'ot4-mes', type: 'mes', label: 'MES Data', x: 300, y: 200 },
+      { id: 'ot4-aggregator', type: 'timeSeriesAggregator', label: 'Aggregate by Shift', x: 500, y: 200, config: { timeSeriesAggregationType: 'sum', timeSeriesInterval: '8h' } },
+      { id: 'ot4-visualization', type: 'dataVisualization', label: 'Production Dashboard', x: 700, y: 200 },
+      { id: 'ot4-save', type: 'saveRecords', label: 'Save Analytics', x: 900, y: 200 },
+    ],
+    connections: [
+      { id: 'cot4-1', fromNodeId: 'ot4-trigger', toNodeId: 'ot4-mes' },
+      { id: 'cot4-2', fromNodeId: 'ot4-mes', toNodeId: 'ot4-aggregator' },
+      { id: 'cot4-3', fromNodeId: 'ot4-aggregator', toNodeId: 'ot4-visualization' },
+      { id: 'cot4-4', fromNodeId: 'ot4-visualization', toNodeId: 'ot4-save' },
+    ]
+  },
+  {
+    id: 'template-ot-historical-analysis',
+    name: 'Análisis Histórico desde Data Historian',
+    description: 'Consulta de datos históricos desde Data Historian, análisis estadístico y comparación con lotes de referencia.',
+    category: 'Quality Assurance',
+    nodes: [
+      { id: 'ot5-trigger', type: 'trigger', label: 'Manual Trigger', x: 100, y: 200 },
+      { id: 'ot5-historian', type: 'dataHistorian', label: 'Data Historian Query', x: 300, y: 200 },
+      { id: 'ot5-statistical', type: 'statisticalAnalysis', label: 'Statistical Analysis', x: 500, y: 200, config: { statisticalMethod: 'spc' } },
+      { id: 'ot5-output', type: 'output', label: 'Analysis Results', x: 700, y: 200 },
+    ],
+    connections: [
+      { id: 'cot5-1', fromNodeId: 'ot5-trigger', toNodeId: 'ot5-historian' },
+      { id: 'cot5-2', fromNodeId: 'ot5-historian', toNodeId: 'ot5-statistical' },
+      { id: 'cot5-3', fromNodeId: 'ot5-statistical', toNodeId: 'ot5-output' },
+    ]
+  },
 ];
 
 /**

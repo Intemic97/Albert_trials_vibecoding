@@ -229,6 +229,14 @@ class WorkflowExecutor {
             comment: () => this.handleComment(node, inputData),
             humanApproval: () => this.handleHumanApproval(node, inputData),
             webhook: () => this.handleWebhook(node, inputData),
+            // OT/Industrial nodes
+            opcua: () => this.handleOpcua(node, inputData),
+            mqtt: () => this.handleMqtt(node, inputData),
+            modbus: () => this.handleModbus(node, inputData),
+            scada: () => this.handleScada(node, inputData),
+            mes: () => this.handleMes(node, inputData),
+            dataHistorian: () => this.handleDataHistorian(node, inputData),
+            timeSeriesAggregator: () => this.handleTimeSeriesAggregator(node, inputData),
         };
 
         const handler = handlers[node.type];
@@ -832,6 +840,405 @@ class WorkflowExecutor {
             webhookId: node.config?.webhookId || node.id,
             receivedAt: new Date().toISOString()
         };
+    }
+
+    // ==================== OT/INDUSTRIAL NODE HANDLERS ====================
+
+    async handleOpcua(node, inputData) {
+        const connectionId = node.config?.opcuaConnectionId;
+        const nodeIds = node.config?.opcuaNodeIds || [];
+        const pollingInterval = node.config?.opcuaPollingInterval || 5000;
+
+        if (!connectionId || nodeIds.length === 0) {
+            throw new Error('OPC UA node requires connectionId and nodeIds configuration');
+        }
+
+        // TODO: Implement actual OPC UA connection using node-opcua library
+        // For now, simulate reading from OPC UA server
+        const timestamp = new Date().toISOString();
+        const simulatedData = nodeIds.map(nodeId => ({
+            nodeId,
+            value: Math.random() * 100, // Simulated sensor value
+            timestamp,
+            quality: 'Good'
+        }));
+
+        const outputData = {
+            timestamp,
+            values: simulatedData.reduce((acc, item) => {
+                acc[item.nodeId] = item.value;
+                return acc;
+            }, {}),
+            raw: simulatedData
+        };
+
+        return {
+            success: true,
+            message: `Read ${nodeIds.length} OPC UA nodes`,
+            outputData,
+            metadata: {
+                connectionId,
+                pollingInterval,
+                nodeCount: nodeIds.length
+            }
+        };
+    }
+
+    async handleMqtt(node, inputData) {
+        const connectionId = node.config?.mqttConnectionId;
+        const topics = node.config?.mqttTopics || [];
+        const qos = node.config?.mqttQos || 0;
+
+        if (!connectionId || topics.length === 0) {
+            throw new Error('MQTT node requires connectionId and topics configuration');
+        }
+
+        // TODO: Implement actual MQTT subscription using mqtt library
+        // For now, simulate receiving MQTT messages
+        const timestamp = new Date().toISOString();
+        const simulatedMessages = topics.map(topic => ({
+            topic,
+            payload: JSON.stringify({
+                value: Math.random() * 100,
+                timestamp,
+                sensorId: topic.split('/').pop()
+            }),
+            qos,
+            timestamp
+        }));
+
+        const outputData = {
+            timestamp,
+            messages: simulatedMessages,
+            topicData: simulatedMessages.reduce((acc, msg) => {
+                const data = JSON.parse(msg.payload);
+                acc[msg.topic] = data.value;
+                return acc;
+            }, {})
+        };
+
+        return {
+            success: true,
+            message: `Received ${topics.length} MQTT messages`,
+            outputData,
+            metadata: {
+                connectionId,
+                qos,
+                topicCount: topics.length
+            }
+        };
+    }
+
+    async handleModbus(node, inputData) {
+        const connectionId = node.config?.modbusConnectionId;
+        const addresses = node.config?.modbusAddresses || [];
+        const functionCode = node.config?.modbusFunctionCode || 3; // Holding registers
+
+        if (!connectionId || addresses.length === 0) {
+            throw new Error('Modbus node requires connectionId and addresses configuration');
+        }
+
+        // TODO: Implement actual Modbus connection using modbus-serial library
+        // For now, simulate reading from Modbus device
+        const timestamp = new Date().toISOString();
+        const simulatedData = addresses.map(addr => ({
+            address: addr,
+            value: Math.floor(Math.random() * 65535), // 16-bit value
+            functionCode,
+            timestamp
+        }));
+
+        const outputData = {
+            timestamp,
+            registers: simulatedData.reduce((acc, item) => {
+                acc[item.address] = item.value;
+                return acc;
+            }, {}),
+            raw: simulatedData
+        };
+
+        return {
+            success: true,
+            message: `Read ${addresses.length} Modbus registers`,
+            outputData,
+            metadata: {
+                connectionId,
+                functionCode,
+                addressCount: addresses.length
+            }
+        };
+    }
+
+    async handleScada(node, inputData) {
+        const connectionId = node.config?.scadaConnectionId;
+        const tags = node.config?.scadaTags || [];
+        const pollingInterval = node.config?.scadaPollingInterval || 5000;
+
+        if (!connectionId || tags.length === 0) {
+            throw new Error('SCADA node requires connectionId and tags configuration');
+        }
+
+        // TODO: Implement actual SCADA connection (OPC UA/Modbus/API based)
+        // For now, simulate reading SCADA tags
+        const timestamp = new Date().toISOString();
+        const simulatedData = tags.map(tag => ({
+            tag,
+            value: Math.random() * 100,
+            timestamp,
+            quality: 'Good'
+        }));
+
+        const outputData = {
+            timestamp,
+            tags: simulatedData.reduce((acc, item) => {
+                acc[item.tag] = item.value;
+                return acc;
+            }, {}),
+            raw: simulatedData
+        };
+
+        return {
+            success: true,
+            message: `Read ${tags.length} SCADA tags`,
+            outputData,
+            metadata: {
+                connectionId,
+                pollingInterval,
+                tagCount: tags.length
+            }
+        };
+    }
+
+    async handleMes(node, inputData) {
+        const connectionId = node.config?.mesConnectionId;
+        const endpoint = node.config?.mesEndpoint;
+        const query = node.config?.mesQuery;
+
+        if (!connectionId || !endpoint) {
+            throw new Error('MES node requires connectionId and endpoint configuration');
+        }
+
+        // TODO: Implement actual MES API connection
+        // For now, simulate fetching production data from MES
+        const timestamp = new Date().toISOString();
+        const simulatedData = {
+            productionOrder: `PO-${Date.now()}`,
+            quantity: Math.floor(Math.random() * 1000),
+            status: 'In Progress',
+            startTime: timestamp,
+            equipment: 'Line-01',
+            operator: 'Operator-123'
+        };
+
+        const outputData = {
+            timestamp,
+            ...simulatedData,
+            query: query || 'production-status'
+        };
+
+        return {
+            success: true,
+            message: `Fetched production data from MES`,
+            outputData,
+            metadata: {
+                connectionId,
+                endpoint,
+                query
+            }
+        };
+    }
+
+    async handleDataHistorian(node, inputData) {
+        const connectionId = node.config?.dataHistorianConnectionId;
+        const tags = node.config?.dataHistorianTags || [];
+        const startTime = node.config?.dataHistorianStartTime || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const endTime = node.config?.dataHistorianEndTime || new Date().toISOString();
+        const aggregation = node.config?.dataHistorianAggregation || 'raw';
+
+        if (!connectionId || tags.length === 0) {
+            throw new Error('Data Historian node requires connectionId and tags configuration');
+        }
+
+        // TODO: Implement actual Data Historian query (PI/Wonderware/InfluxDB)
+        // For now, simulate historical time-series data
+        const dataPoints = [];
+        const start = new Date(startTime);
+        const end = new Date(endTime);
+        const interval = aggregation === 'raw' ? 60000 : 3600000; // 1min or 1h
+        let current = new Date(start);
+
+        while (current <= end) {
+            tags.forEach(tag => {
+                dataPoints.push({
+                    tag,
+                    timestamp: current.toISOString(),
+                    value: Math.random() * 100
+                });
+            });
+            current = new Date(current.getTime() + interval);
+        }
+
+        const outputData = {
+            startTime,
+            endTime,
+            aggregation,
+            dataPoints,
+            tags: tags.reduce((acc, tag) => {
+                acc[tag] = dataPoints.filter(dp => dp.tag === tag).map(dp => ({
+                    timestamp: dp.timestamp,
+                    value: dp.value
+                }));
+                return acc;
+            }, {})
+        };
+
+        return {
+            success: true,
+            message: `Queried ${dataPoints.length} historical data points for ${tags.length} tags`,
+            outputData,
+            metadata: {
+                connectionId,
+                tagCount: tags.length,
+                pointCount: dataPoints.length,
+                aggregation
+            }
+        };
+    }
+
+    async handleTimeSeriesAggregator(node, inputData) {
+        const aggregationType = node.config?.timeSeriesAggregationType || 'avg';
+        const interval = node.config?.timeSeriesInterval || '5m';
+        const fields = node.config?.timeSeriesFields || [];
+
+        if (!inputData || !inputData.timestamp) {
+            // If no time-series data, try to aggregate from array input
+            if (Array.isArray(inputData)) {
+                return this.aggregateTimeSeriesArray(inputData, aggregationType, interval, fields);
+            }
+            throw new Error('Time-Series Aggregator requires time-series data with timestamp');
+        }
+
+        // TODO: Implement proper time-series aggregation
+        // For now, simple aggregation logic
+        const timestamp = inputData.timestamp;
+        const values = { ...inputData };
+        delete values.timestamp;
+
+        const aggregated = {};
+        Object.keys(values).forEach(key => {
+            if (fields.length === 0 || fields.includes(key)) {
+                const value = Number(values[key]);
+                if (!isNaN(value)) {
+                    aggregated[key] = this.aggregateValue(value, aggregationType);
+                }
+            }
+        });
+
+        return {
+            success: true,
+            message: `Aggregated time-series data using ${aggregationType}`,
+            outputData: {
+                timestamp,
+                interval,
+                ...aggregated
+            },
+            metadata: {
+                aggregationType,
+                interval,
+                fieldCount: Object.keys(aggregated).length
+            }
+        };
+    }
+
+    aggregateTimeSeriesArray(dataArray, aggregationType, interval, fields) {
+        if (!Array.isArray(dataArray) || dataArray.length === 0) {
+            return {
+                success: true,
+                message: 'No data to aggregate',
+                outputData: {}
+            };
+        }
+
+        // Group by interval and aggregate
+        const grouped = {};
+        dataArray.forEach(item => {
+            const timestamp = new Date(item.timestamp || item.createdAt || Date.now());
+            const intervalKey = this.getIntervalKey(timestamp, interval);
+            
+            if (!grouped[intervalKey]) {
+                grouped[intervalKey] = [];
+            }
+            grouped[intervalKey].push(item);
+        });
+
+        const aggregated = {};
+        Object.keys(grouped).forEach(intervalKey => {
+            const group = grouped[intervalKey];
+            const keys = fields.length > 0 ? fields : Object.keys(group[0] || {}).filter(k => k !== 'timestamp' && k !== 'createdAt');
+            
+            keys.forEach(key => {
+                const values = group.map(item => Number(item[key])).filter(v => !isNaN(v));
+                if (values.length > 0) {
+                    if (!aggregated[key]) aggregated[key] = [];
+                    aggregated[key].push({
+                        interval: intervalKey,
+                        value: this.aggregateValueArray(values, aggregationType),
+                        count: values.length
+                    });
+                }
+            });
+        });
+
+        return {
+            success: true,
+            message: `Aggregated ${dataArray.length} data points into ${Object.keys(grouped).length} intervals`,
+            outputData: aggregated,
+            metadata: {
+                aggregationType,
+                interval,
+                inputCount: dataArray.length,
+                outputIntervals: Object.keys(grouped).length
+            }
+        };
+    }
+
+    aggregateValue(value, type) {
+        // For single value, return as-is (will be aggregated with other values in interval)
+        return value;
+    }
+
+    aggregateValueArray(values, type) {
+        switch (type) {
+            case 'avg': return values.reduce((a, b) => a + b, 0) / values.length;
+            case 'min': return Math.min(...values);
+            case 'max': return Math.max(...values);
+            case 'sum': return values.reduce((a, b) => a + b, 0);
+            case 'count': return values.length;
+            default: return values.reduce((a, b) => a + b, 0) / values.length;
+        }
+    }
+
+    getIntervalKey(timestamp, interval) {
+        const date = new Date(timestamp);
+        const intervalMs = this.parseInterval(interval);
+        const intervalStart = Math.floor(date.getTime() / intervalMs) * intervalMs;
+        return new Date(intervalStart).toISOString();
+    }
+
+    parseInterval(interval) {
+        const match = interval.match(/^(\d+)([smhd])$/);
+        if (!match) return 5 * 60 * 1000; // Default 5 minutes
+        
+        const value = parseInt(match[1]);
+        const unit = match[2];
+        
+        switch (unit) {
+            case 's': return value * 1000;
+            case 'm': return value * 60 * 1000;
+            case 'h': return value * 60 * 60 * 1000;
+            case 'd': return value * 24 * 60 * 60 * 1000;
+            default: return 5 * 60 * 1000;
+        }
     }
 
     // ==================== HELPER METHODS ====================

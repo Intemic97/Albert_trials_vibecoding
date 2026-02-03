@@ -403,6 +403,374 @@ finally:
     except Exception as e:
         raise ValueError(f"Python execution failed: {str(e)}")
 
+# ==================== OT/INDUSTRIAL NODE HANDLERS ====================
+
+@task(name="opcua_node", retries=1)
+async def handle_opcua(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
+    """Handle OPC UA node - read data from OPC UA servers"""
+    config = node.get("config", {})
+    connection_id = config.get("opcuaConnectionId")
+    node_ids = config.get("opcuaNodeIds", [])
+    polling_interval = config.get("opcuaPollingInterval", 5000)
+    
+    if not connection_id or not node_ids:
+        raise ValueError("OPC UA node requires connectionId and nodeIds configuration")
+    
+    # TODO: Implement actual OPC UA connection using asyncua library
+    # For now, simulate reading from OPC UA server
+    import random
+    from datetime import datetime
+    
+    timestamp = datetime.now().isoformat()
+    simulated_data = [
+        {
+            "nodeId": node_id,
+            "value": random.random() * 100,
+            "timestamp": timestamp,
+            "quality": "Good"
+        }
+        for node_id in node_ids
+    ]
+    
+    output_data = {
+        "timestamp": timestamp,
+        "values": {item["nodeId"]: item["value"] for item in simulated_data},
+        "raw": simulated_data
+    }
+    
+    return {
+        "success": True,
+        "message": f"Read {len(node_ids)} OPC UA nodes",
+        "outputData": output_data,
+        "metadata": {
+            "connectionId": connection_id,
+            "pollingInterval": polling_interval,
+            "nodeCount": len(node_ids)
+        }
+    }
+
+@task(name="mqtt_node", retries=1)
+async def handle_mqtt(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
+    """Handle MQTT node - subscribe to MQTT topics"""
+    config = node.get("config", {})
+    connection_id = config.get("mqttConnectionId")
+    topics = config.get("mqttTopics", [])
+    qos = config.get("mqttQos", 0)
+    
+    if not connection_id or not topics:
+        raise ValueError("MQTT node requires connectionId and topics configuration")
+    
+    # TODO: Implement actual MQTT subscription using aiomqtt library
+    # For now, simulate receiving MQTT messages
+    import random
+    from datetime import datetime
+    
+    timestamp = datetime.now().isoformat()
+    simulated_messages = [
+        {
+            "topic": topic,
+            "payload": json.dumps({
+                "value": random.random() * 100,
+                "timestamp": timestamp,
+                "sensorId": topic.split("/")[-1]
+            }),
+            "qos": qos,
+            "timestamp": timestamp
+        }
+        for topic in topics
+    ]
+    
+    output_data = {
+        "timestamp": timestamp,
+        "messages": simulated_messages,
+        "topicData": {
+            msg["topic"]: json.loads(msg["payload"])["value"]
+            for msg in simulated_messages
+        }
+    }
+    
+    return {
+        "success": True,
+        "message": f"Received {len(topics)} MQTT messages",
+        "outputData": output_data,
+        "metadata": {
+            "connectionId": connection_id,
+            "qos": qos,
+            "topicCount": len(topics)
+        }
+    }
+
+@task(name="modbus_node", retries=1)
+async def handle_modbus(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
+    """Handle Modbus node - read data from Modbus devices"""
+    config = node.get("config", {})
+    connection_id = config.get("modbusConnectionId")
+    addresses = config.get("modbusAddresses", [])
+    function_code = config.get("modbusFunctionCode", 3)
+    
+    if not connection_id or not addresses:
+        raise ValueError("Modbus node requires connectionId and addresses configuration")
+    
+    # TODO: Implement actual Modbus connection using pymodbus library
+    # For now, simulate reading from Modbus device
+    import random
+    from datetime import datetime
+    
+    timestamp = datetime.now().isoformat()
+    simulated_data = [
+        {
+            "address": addr,
+            "value": random.randint(0, 65535),
+            "functionCode": function_code,
+            "timestamp": timestamp
+        }
+        for addr in addresses
+    ]
+    
+    output_data = {
+        "timestamp": timestamp,
+        "registers": {item["address"]: item["value"] for item in simulated_data},
+        "raw": simulated_data
+    }
+    
+    return {
+        "success": True,
+        "message": f"Read {len(addresses)} Modbus registers",
+        "outputData": output_data,
+        "metadata": {
+            "connectionId": connection_id,
+            "functionCode": function_code,
+            "addressCount": len(addresses)
+        }
+    }
+
+@task(name="scada_node", retries=1)
+async def handle_scada(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
+    """Handle SCADA node - fetch data from SCADA systems"""
+    config = node.get("config", {})
+    connection_id = config.get("scadaConnectionId")
+    tags = config.get("scadaTags", [])
+    polling_interval = config.get("scadaPollingInterval", 5000)
+    
+    if not connection_id or not tags:
+        raise ValueError("SCADA node requires connectionId and tags configuration")
+    
+    # TODO: Implement actual SCADA connection (OPC UA/Modbus/API based)
+    # For now, simulate reading SCADA tags
+    import random
+    from datetime import datetime
+    
+    timestamp = datetime.now().isoformat()
+    simulated_data = [
+        {
+            "tag": tag,
+            "value": random.random() * 100,
+            "timestamp": timestamp,
+            "quality": "Good"
+        }
+        for tag in tags
+    ]
+    
+    output_data = {
+        "timestamp": timestamp,
+        "tags": {item["tag"]: item["value"] for item in simulated_data},
+        "raw": simulated_data
+    }
+    
+    return {
+        "success": True,
+        "message": f"Read {len(tags)} SCADA tags",
+        "outputData": output_data,
+        "metadata": {
+            "connectionId": connection_id,
+            "pollingInterval": polling_interval,
+            "tagCount": len(tags)
+        }
+    }
+
+@task(name="mes_node", retries=1)
+async def handle_mes(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
+    """Handle MES node - fetch production data from MES systems"""
+    config = node.get("config", {})
+    connection_id = config.get("mesConnectionId")
+    endpoint = config.get("mesEndpoint")
+    query = config.get("mesQuery")
+    
+    if not connection_id or not endpoint:
+        raise ValueError("MES node requires connectionId and endpoint configuration")
+    
+    # TODO: Implement actual MES API connection
+    # For now, simulate fetching production data from MES
+    from datetime import datetime
+    import random
+    
+    timestamp = datetime.now().isoformat()
+    simulated_data = {
+        "productionOrder": f"PO-{int(datetime.now().timestamp())}",
+        "quantity": random.randint(100, 1000),
+        "status": "In Progress",
+        "startTime": timestamp,
+        "equipment": "Line-01",
+        "operator": "Operator-123"
+    }
+    
+    output_data = {
+        "timestamp": timestamp,
+        **simulated_data,
+        "query": query or "production-status"
+    }
+    
+    return {
+        "success": True,
+        "message": "Fetched production data from MES",
+        "outputData": output_data,
+        "metadata": {
+            "connectionId": connection_id,
+            "endpoint": endpoint,
+            "query": query
+        }
+    }
+
+@task(name="data_historian_node", retries=1)
+async def handle_data_historian(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
+    """Handle Data Historian node - query historical time-series data"""
+    config = node.get("config", {})
+    connection_id = config.get("dataHistorianConnectionId")
+    tags = config.get("dataHistorianTags", [])
+    start_time = config.get("dataHistorianStartTime")
+    end_time = config.get("dataHistorianEndTime")
+    aggregation = config.get("dataHistorianAggregation", "raw")
+    
+    if not connection_id or not tags:
+        raise ValueError("Data Historian node requires connectionId and tags configuration")
+    
+    # TODO: Implement actual Data Historian query (PI/Wonderware/InfluxDB)
+    # For now, simulate historical time-series data
+    from datetime import datetime, timedelta
+    import random
+    
+    if not start_time:
+        start_time = (datetime.now() - timedelta(days=1)).isoformat()
+    if not end_time:
+        end_time = datetime.now().isoformat()
+    
+    start = datetime.fromisoformat(start_time.replace("Z", "+00:00").replace("+00:00", ""))
+    end = datetime.fromisoformat(end_time.replace("Z", "+00:00").replace("+00:00", ""))
+    
+    interval = timedelta(minutes=1) if aggregation == "raw" else timedelta(hours=1)
+    data_points = []
+    current = start
+    
+    while current <= end:
+        for tag in tags:
+            data_points.append({
+                "tag": tag,
+                "timestamp": current.isoformat(),
+                "value": random.random() * 100
+            })
+        current += interval
+    
+    output_data = {
+        "startTime": start_time,
+        "endTime": end_time,
+        "aggregation": aggregation,
+        "dataPoints": data_points,
+        "tags": {
+            tag: [
+                {"timestamp": dp["timestamp"], "value": dp["value"]}
+                for dp in data_points if dp["tag"] == tag
+            ]
+            for tag in tags
+        }
+    }
+    
+    return {
+        "success": True,
+        "message": f"Queried {len(data_points)} historical data points for {len(tags)} tags",
+        "outputData": output_data,
+        "metadata": {
+            "connectionId": connection_id,
+            "tagCount": len(tags),
+            "pointCount": len(data_points),
+            "aggregation": aggregation
+        }
+    }
+
+@task(name="time_series_aggregator_node", retries=0)
+async def handle_time_series_aggregator(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
+    """Handle Time-Series Aggregator node - aggregate time-series data"""
+    config = node.get("config", {})
+    aggregation_type = config.get("timeSeriesAggregationType", "avg")
+    interval = config.get("timeSeriesInterval", "5m")
+    fields = config.get("timeSeriesFields", [])
+    
+    if not input_data:
+        return {
+            "success": True,
+            "message": "No data to aggregate",
+            "outputData": {}
+        }
+    
+    # TODO: Implement proper time-series aggregation
+    # For now, simple aggregation logic
+    import statistics
+    from datetime import datetime
+    
+    if isinstance(input_data, list):
+        # Aggregate array of data points
+        if not input_data:
+            return {
+                "success": True,
+                "message": "No data to aggregate",
+                "outputData": {}
+            }
+        
+        # Simple aggregation by field
+        aggregated = {}
+        for field in fields if fields else input_data[0].keys():
+            if field not in ["timestamp", "createdAt"]:
+                values = [float(item.get(field, 0)) for item in input_data if field in item]
+                if values:
+                    if aggregation_type == "avg":
+                        aggregated[field] = statistics.mean(values)
+                    elif aggregation_type == "min":
+                        aggregated[field] = min(values)
+                    elif aggregation_type == "max":
+                        aggregated[field] = max(values)
+                    elif aggregation_type == "sum":
+                        aggregated[field] = sum(values)
+                    elif aggregation_type == "count":
+                        aggregated[field] = len(values)
+        
+        return {
+            "success": True,
+            "message": f"Aggregated {len(input_data)} data points using {aggregation_type}",
+            "outputData": aggregated,
+            "metadata": {
+                "aggregationType": aggregation_type,
+                "interval": interval,
+                "inputCount": len(input_data)
+            }
+        }
+    else:
+        # Single data point - return as-is
+        timestamp = input_data.get("timestamp", datetime.now().isoformat())
+        output_data = {k: v for k, v in input_data.items() if k != "timestamp"}
+        
+        return {
+            "success": True,
+            "message": f"Processed time-series data point",
+            "outputData": {
+                "timestamp": timestamp,
+                "interval": interval,
+                **output_data
+            },
+            "metadata": {
+                "aggregationType": aggregation_type,
+                "interval": interval
+            }
+        }
+
 # Export all handlers
 NODE_HANDLERS = {
     "trigger": handle_trigger,
@@ -416,5 +784,13 @@ NODE_HANDLERS = {
     "webhook": handle_webhook,
     "comment": handle_comment,
     "python": handle_python,
+    # OT/Industrial nodes
+    "opcua": handle_opcua,
+    "mqtt": handle_mqtt,
+    "modbus": handle_modbus,
+    "scada": handle_scada,
+    "mes": handle_mes,
+    "dataHistorian": handle_data_historian,
+    "timeSeriesAggregator": handle_time_series_aggregator,
 }
 

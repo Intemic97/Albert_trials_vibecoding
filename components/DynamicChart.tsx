@@ -15,7 +15,7 @@ import {
 } from './dashboard/AdvancedCharts';
 
 export interface WidgetConfig {
-    type: 'bar' | 'line' | 'pie' | 'area' | 'donut' | 'radial' | 'parallel' | 'heatmap' | 'scatter_matrix' | 'sankey' | 'bubble' | 'timeline' | 'multi_timeline';
+    type: 'bar' | 'line' | 'pie' | 'area' | 'donut' | 'radial' | 'gauge' | 'parallel' | 'heatmap' | 'scatter_matrix' | 'sankey' | 'bubble' | 'timeline' | 'multi_timeline';
     title: string;
     description: string;
     explanation?: string;
@@ -35,6 +35,9 @@ export interface WidgetConfig {
     events?: { start: string | Date; end?: string | Date; severity: string; label?: string }[];
     tracks?: { id: string; title: string; subtitle?: string; events: any[] }[];
     subtitle?: string;
+    // Gauge configs
+    min?: number;
+    max?: number;
 }
 
 export interface DateRange {
@@ -544,7 +547,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                 
             case 'sankey':
                 // Sankey Diagram
-                if (config.nodes && config.links) {
+                if (config.nodes && config.links && config.nodes.length > 0 && config.links.length > 0) {
                     return (
                         <SankeyChart
                             nodes={config.nodes}
@@ -555,14 +558,26 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                 }
                 // Auto-generate from data if no nodes/links provided
                 const sankeyNodes = Array.from(new Set([
-                    ...data.map(d => d.source || d.from),
-                    ...data.map(d => d.target || d.to)
-                ].filter(Boolean))).map(id => ({ id: id as string }));
+                    ...data.map(d => d.source || d.from || d[xAxisKey]),
+                    ...data.map(d => d.target || d.to || d[actualDataKey])
+                ].filter(Boolean))).map(id => ({ id: String(id) }));
                 const sankeyLinks = data.map(d => ({
-                    source: d.source || d.from,
-                    target: d.target || d.to,
-                    value: parseFloat(d[config.valueKey || 'value']) || 1
-                })).filter(l => l.source && l.target);
+                    source: String(d.source || d.from || d[xAxisKey] || ''),
+                    target: String(d.target || d.to || d[actualDataKey] || ''),
+                    value: parseFloat(d[config.valueKey || 'value'] || d[actualDataKey] || '1') || 1
+                })).filter(l => l.source && l.target && l.source !== l.target);
+                
+                if (sankeyNodes.length === 0 || sankeyLinks.length === 0) {
+                    return (
+                        <div className="flex items-center justify-center h-full text-[var(--text-tertiary)] text-sm">
+                            <div className="text-center">
+                                <p>Sankey chart requires data with source/target relationships</p>
+                                <p className="text-xs mt-1">Expected format: source, target, value</p>
+                            </div>
+                        </div>
+                    );
+                }
+                
                 return (
                     <SankeyChart
                         nodes={sankeyNodes}
@@ -634,6 +649,121 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                         tracks={autoTracks}
                         height={height}
                     />
+                );
+                
+            case 'radial':
+                // Radial Bar Chart
+                if (data.length === 0) {
+                    return (
+                        <div className="flex items-center justify-center h-full text-[var(--text-tertiary)] text-sm">
+                            No data available for radial chart
+                        </div>
+                    );
+                }
+                
+                const radialData = data.map((d, idx) => ({
+                    name: String(d[xAxisKey] || d.name || `Item ${idx + 1}`),
+                    value: parseFloat(d[actualDataKey]) || 0,
+                    fill: colors[idx % colors.length]
+                })).filter(d => d.value > 0); // Filter out zero values
+                
+                if (radialData.length === 0) {
+                    return (
+                        <div className="flex items-center justify-center h-full text-[var(--text-tertiary)] text-sm">
+                            No valid data values for radial chart
+                        </div>
+                    );
+                }
+                
+                return (
+                    <ResponsiveContainer width="100%" height={height}>
+                        <RadialBarChart
+                            cx="50%"
+                            cy="50%"
+                            innerRadius="20%"
+                            outerRadius="80%"
+                            data={radialData}
+                            startAngle={90}
+                            endAngle={-270}
+                        >
+                            <RadialBar
+                                dataKey="value"
+                                cornerRadius={4}
+                                fill="#419CAF"
+                            />
+                            <Tooltip content={<CustomTooltip isDarkMode={isDarkMode} />} />
+                            <Legend />
+                        </RadialBarChart>
+                    </ResponsiveContainer>
+                );
+                
+            case 'gauge':
+                // Gauge Chart (semicircular gauge)
+                if (data.length === 0) {
+                    return (
+                        <div className="flex items-center justify-center h-full text-[var(--text-tertiary)] text-sm">
+                            No data available for gauge chart
+                        </div>
+                    );
+                }
+                
+                // Get value from first data point or sum all values
+                let gaugeValue = 0;
+                if (Array.isArray(dataKey)) {
+                    gaugeValue = data.reduce((sum, d) => sum + (parseFloat(d[dataKey[0]]) || 0), 0);
+                } else {
+                    gaugeValue = parseFloat(data[0]?.[actualDataKey]) || 
+                                 data.reduce((sum, d) => sum + (parseFloat(d[actualDataKey]) || 0), 0);
+                }
+                
+                const gaugeMin = config.min ?? 0;
+                const gaugeMax = config.max ?? (gaugeValue > 0 ? gaugeValue * 1.2 : 100);
+                const gaugePercentage = Math.min(Math.max(((gaugeValue - gaugeMin) / (gaugeMax - gaugeMin)) * 100, 0), 100);
+                const gaugeColor = gaugePercentage >= 80 ? '#10b981' : gaugePercentage >= 50 ? '#f59e0b' : '#ef4444';
+                
+                // Create gauge data
+                const gaugeData = [
+                    { name: 'value', value: gaugePercentage, fill: gaugeColor },
+                    { name: 'remaining', value: 100 - gaugePercentage, fill: isDarkMode ? '#2a2a2a' : '#f3f4f6' }
+                ];
+                
+                return (
+                    <ResponsiveContainer width="100%" height={height}>
+                        <RadialBarChart
+                            cx="50%"
+                            cy="90%"
+                            innerRadius="40%"
+                            outerRadius="80%"
+                            data={gaugeData}
+                            startAngle={180}
+                            endAngle={0}
+                        >
+                            <RadialBar
+                                dataKey="value"
+                                cornerRadius={8}
+                                fill={gaugeColor}
+                            />
+                            <text
+                                x="50%"
+                                y="45%"
+                                textAnchor="middle"
+                                fill={isDarkMode ? '#e8e8e8' : '#1f2937'}
+                                fontSize={32}
+                                fontWeight="bold"
+                            >
+                                {gaugeValue.toFixed(1)}
+                            </text>
+                            <text
+                                x="50%"
+                                y="52%"
+                                textAnchor="middle"
+                                fill={isDarkMode ? '#9ca3af' : '#6b7280'}
+                                fontSize={14}
+                            >
+                                {config.subtitle || `${gaugeMin} - ${gaugeMax}`}
+                            </text>
+                        </RadialBarChart>
+                    </ResponsiveContainer>
                 );
                 
             default:

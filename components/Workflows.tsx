@@ -51,6 +51,7 @@ import {
   // Hooks
   useWorkflowHistory,
 } from './workflows/index';
+import { OpcUaConfigModal, MqttConfigModal } from './workflows/modals';
 
 // Use imported DRAGGABLE_ITEMS from workflows module
 const DRAGGABLE_ITEMS = WORKFLOW_DRAGGABLE_ITEMS;
@@ -345,6 +346,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [mqttQos, setMqttQos] = useState<'0' | '1' | '2'>('0');
     const [mqttCleanSession, setMqttCleanSession] = useState<boolean>(true);
 
+    // Available connections for OT nodes
+    const [availableConnections, setAvailableConnections] = useState<Array<{ id: string; name: string; type: string }>>([]);
+
     // Unsaved Changes Confirmation
     const [showExitConfirmation, setShowExitConfirmation] = useState<boolean>(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
@@ -637,6 +641,28 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             setSavedWorkflows([]);
         }
     };
+
+    // Fetch available connections for OT nodes
+    useEffect(() => {
+        const fetchConnections = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/connections`, { credentials: 'include' });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data)) {
+                        setAvailableConnections(data.map((conn: any) => ({
+                            id: conn.id,
+                            name: conn.name,
+                            type: conn.type
+                        })));
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching connections:', error);
+            }
+        };
+        fetchConnections();
+    }, []);
 
     const loadWorkflow = async (id: string, updateUrl = true) => {
         try {
@@ -1716,23 +1742,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         }
     };
 
-    const saveOpcuaConfig = () => {
-        if (!configuringOpcuaNodeId || !opcuaEndpointUrl.trim() || !opcuaNodeId.trim()) return;
+    const saveOpcuaConfig = (config: {
+        opcuaConnectionId: string;
+        opcuaNodeIds: string[];
+        opcuaPollingInterval: number;
+    }) => {
+        if (!configuringOpcuaNodeId) return;
 
         setNodes(prev => prev.map(n =>
             n.id === configuringOpcuaNodeId
                 ? {
                     ...n,
-                    label: opcuaNodeId ? `OPC UA: ${opcuaNodeId}` : 'OPC UA',
+                    label: config.opcuaNodeIds.length > 0 ? `OPC UA: ${config.opcuaNodeIds[0]}${config.opcuaNodeIds.length > 1 ? ` (+${config.opcuaNodeIds.length - 1})` : ''}` : 'OPC UA',
                     config: {
                         ...n.config,
-                        opcuaEndpointUrl,
-                        opcuaNodeId,
-                        opcuaUsername: opcuaUsername || undefined,
-                        opcuaPassword: opcuaPassword || undefined,
-                        opcuaSecurityMode,
-                        opcuaSecurityPolicy,
-                        opcuaPollInterval
+                        opcuaConnectionId: config.opcuaConnectionId,
+                        opcuaNodeIds: config.opcuaNodeIds,
+                        opcuaPollingInterval: config.opcuaPollingInterval
                     }
                 }
                 : n
@@ -1755,24 +1781,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         }
     };
 
-    const saveMqttConfig = () => {
-        if (!configuringMqttNodeId || !mqttBrokerUrl.trim() || !mqttTopic.trim()) return;
+    const saveMqttConfig = (config: {
+        mqttConnectionId: string;
+        mqttTopics: string[];
+        mqttQos: number;
+    }) => {
+        if (!configuringMqttNodeId) return;
 
         setNodes(prev => prev.map(n =>
             n.id === configuringMqttNodeId
                 ? {
                     ...n,
-                    label: mqttTopic ? `MQTT: ${mqttTopic}` : 'MQTT',
+                    label: config.mqttTopics.length > 0 ? `MQTT: ${config.mqttTopics[0]}${config.mqttTopics.length > 1 ? ` (+${config.mqttTopics.length - 1})` : ''}` : 'MQTT',
                     config: {
                         ...n.config,
-                        mqttBrokerUrl,
-                        mqttPort,
-                        mqttTopic,
-                        mqttUsername: mqttUsername || undefined,
-                        mqttPassword: mqttPassword || undefined,
-                        mqttClientId: mqttClientId || undefined,
-                        mqttQos,
-                        mqttCleanSession
+                        mqttConnectionId: config.mqttConnectionId,
+                        mqttTopics: config.mqttTopics,
+                        mqttQos: config.mqttQos
                     }
                 }
                 : n
@@ -10726,6 +10751,28 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     </div>
                 </div>
             )}
+
+            {/* OPC UA Configuration Modal */}
+            <OpcUaConfigModal
+                isOpen={configuringOpcuaNodeId !== null}
+                connectionId={nodes.find(n => n.id === configuringOpcuaNodeId)?.config?.opcuaConnectionId}
+                nodeIds={nodes.find(n => n.id === configuringOpcuaNodeId)?.config?.opcuaNodeIds || []}
+                pollingInterval={nodes.find(n => n.id === configuringOpcuaNodeId)?.config?.opcuaPollingInterval || 5000}
+                availableConnections={availableConnections.filter(c => c.type === 'opcua' || c.type === 'OPC UA')}
+                onSave={saveOpcuaConfig}
+                onClose={() => setConfiguringOpcuaNodeId(null)}
+            />
+
+            {/* MQTT Configuration Modal */}
+            <MqttConfigModal
+                isOpen={configuringMqttNodeId !== null}
+                connectionId={nodes.find(n => n.id === configuringMqttNodeId)?.config?.mqttConnectionId}
+                topics={nodes.find(n => n.id === configuringMqttNodeId)?.config?.mqttTopics || []}
+                qos={nodes.find(n => n.id === configuringMqttNodeId)?.config?.mqttQos || 0}
+                availableConnections={availableConnections.filter(c => c.type === 'mqtt' || c.type === 'MQTT')}
+                onSave={saveMqttConfig}
+                onClose={() => setConfiguringMqttNodeId(null)}
+            />
         </div>
 
     );

@@ -22,7 +22,7 @@ interface Connection {
     icon?: React.ComponentType<{ size?: number; className?: string }>;
     logoUrl?: string;
     description: string;
-    category: 'database' | 'cloud' | 'erp' | 'crm' | 'productivity' | 'analytics' | 'communication';
+    category: 'database' | 'cloud' | 'erp' | 'crm' | 'productivity' | 'analytics' | 'communication' | 'ot';
     connected: boolean;
     lastSync?: string;
     popular?: boolean;
@@ -83,6 +83,91 @@ const CONNECTIONS: Connection[] = [
         logoUrl: 'https://cdn.simpleicons.org/oracle',
         description: 'Connect to Oracle NetSuite for unified business management',
         category: 'erp',
+        connected: false
+    },
+    // OT Systems & Industrial
+    {
+        id: 'scada',
+        name: 'SCADA',
+        type: 'OT System',
+        logoUrl: 'https://cdn.simpleicons.org/opcua',
+        description: 'Connect to SCADA systems via OPC UA or Modbus for real-time process data',
+        category: 'ot',
+        connected: false,
+        popular: true
+    },
+    {
+        id: 'dcs',
+        name: 'DCS',
+        type: 'OT System',
+        logoUrl: 'https://cdn.simpleicons.org/opcua',
+        description: 'Connect to Distributed Control Systems for plant-wide control data',
+        category: 'ot',
+        connected: false
+    },
+    {
+        id: 'mes',
+        name: 'MES',
+        type: 'Manufacturing System',
+        logoUrl: 'https://cdn.simpleicons.org/microsoftazure',
+        description: 'Connect to Manufacturing Execution Systems for production tracking',
+        category: 'ot',
+        connected: false,
+        popular: true
+    },
+    {
+        id: 'lims',
+        name: 'LIMS',
+        type: 'Laboratory System',
+        logoUrl: 'https://cdn.simpleicons.org/microsoftazure',
+        description: 'Connect to Laboratory Information Management Systems for lab data',
+        category: 'ot',
+        connected: false
+    },
+    {
+        id: 'data-historian',
+        name: 'Data Historian',
+        type: 'Time-Series Database',
+        logoUrl: 'https://cdn.simpleicons.org/influxdb',
+        description: 'Connect to Data Historian systems (OSIsoft PI, Wonderware, etc.) for historical time-series data',
+        category: 'ot',
+        connected: false,
+        popular: true
+    },
+    {
+        id: 'opcua',
+        name: 'OPC UA',
+        type: 'Industrial Protocol',
+        logoUrl: 'https://cdn.simpleicons.org/opcua',
+        description: 'Connect via OPC UA protocol to PLCs, sensors, and industrial equipment',
+        category: 'ot',
+        connected: false
+    },
+    {
+        id: 'modbus',
+        name: 'Modbus',
+        type: 'Industrial Protocol',
+        logoUrl: 'https://cdn.simpleicons.org/opcua',
+        description: 'Connect via Modbus TCP/RTU to industrial devices and PLCs',
+        category: 'ot',
+        connected: false
+    },
+    {
+        id: 'mqtt',
+        name: 'MQTT',
+        type: 'IoT Protocol',
+        logoUrl: 'https://cdn.simpleicons.org/eclipsemosquitto',
+        description: 'Connect to MQTT brokers for IoT sensor data and device telemetry',
+        category: 'ot',
+        connected: false
+    },
+    {
+        id: 'plc',
+        name: 'PLC',
+        type: 'Industrial Controller',
+        logoUrl: 'https://cdn.simpleicons.org/opcua',
+        description: 'Direct connection to Programmable Logic Controllers for real-time control data',
+        category: 'ot',
         connected: false
     },
     // Databases
@@ -399,6 +484,7 @@ export const Connections: React.FC = () => {
             case 'analytics': return 'text-cyan-500';
             case 'productivity': return 'text-pink-500';
             case 'communication': return 'text-amber-500';
+            case 'ot': return 'text-indigo-500';
             default: return 'text-[var(--text-secondary)]';
         }
     };
@@ -412,6 +498,7 @@ export const Connections: React.FC = () => {
             case 'analytics': return 'bg-cyan-500/10 border-cyan-500/20';
             case 'productivity': return 'bg-pink-500/10 border-pink-500/20';
             case 'communication': return 'bg-amber-500/10 border-amber-500/20';
+            case 'ot': return 'bg-indigo-500/10 border-indigo-500/20';
             default: return 'bg-[var(--bg-tertiary)] border-[var(--border-light)]';
         }
     };
@@ -427,6 +514,7 @@ export const Connections: React.FC = () => {
         { id: 'all', label: 'All', count: connections.filter(c => !c.comingSoon).length },
         { id: 'crm', label: 'CRM & Sales', count: connections.filter(c => c.category === 'crm' && !c.comingSoon).length },
         { id: 'erp', label: 'ERP', count: connections.filter(c => c.category === 'erp').length },
+        { id: 'ot', label: 'OT & Industrial', count: connections.filter(c => c.category === 'ot').length },
         { id: 'database', label: 'Databases', count: connections.filter(c => c.category === 'database').length },
         { id: 'analytics', label: 'Analytics', count: connections.filter(c => c.category === 'analytics').length },
         { id: 'productivity', label: 'Productivity', count: connections.filter(c => c.category === 'productivity').length },
@@ -1021,6 +1109,336 @@ export const Connections: React.FC = () => {
                                     </div>
                                     <p className="text-xs text-[var(--text-secondary)]">
                                         Create a Slack app at api.slack.com/apps and install it to your workspace. Copy the Bot User OAuth Token (starts with xoxb-) from OAuth & Permissions.
+                                    </p>
+                                </>
+                            )}
+
+                            {/* OPC UA Configuration */}
+                            {selectedConnection.id === 'opcua' && (
+                                <>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Server URL <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="serverUrl"
+                                            required
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            placeholder="opc.tcp://server:4840"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Security Policy
+                                        </label>
+                                        <select
+                                            name="securityPolicy"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
+                                            defaultValue="None"
+                                        >
+                                            <option value="None">None</option>
+                                            <option value="Basic128Rsa15">Basic128Rsa15</option>
+                                            <option value="Basic256">Basic256</option>
+                                            <option value="Basic256Sha256">Basic256Sha256</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Username (Optional)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="username"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Password (Optional)
+                                        </label>
+                                        <input
+                                            type="password"
+                                            name="password"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-[var(--text-secondary)]">
+                                        OPC UA is the modern standard for industrial communication. Connect to PLCs, sensors, and SCADA systems.
+                                    </p>
+                                </>
+                            )}
+
+                            {/* MQTT Configuration */}
+                            {selectedConnection.id === 'mqtt' && (
+                                <>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Broker URL <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="brokerUrl"
+                                            required
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            placeholder="mqtt://broker.example.com:1883"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Port
+                                        </label>
+                                        <input
+                                            type="number"
+                                            name="port"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-light)] placeholder:text-[var(--text-tertiary)]"
+                                            placeholder="1883"
+                                            defaultValue="1883"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Username (Optional)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="username"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Password (Optional)
+                                        </label>
+                                        <input
+                                            type="password"
+                                            name="password"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-[var(--text-secondary)]">
+                                        MQTT is lightweight messaging protocol ideal for IoT sensors and devices.
+                                    </p>
+                                </>
+                            )}
+
+                            {/* Modbus Configuration */}
+                            {selectedConnection.id === 'modbus' && (
+                                <>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Protocol <span className="text-red-500">*</span>
+                                        </label>
+                                        <select
+                                            name="protocol"
+                                            required
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
+                                            defaultValue="TCP"
+                                        >
+                                            <option value="TCP">Modbus TCP</option>
+                                            <option value="RTU">Modbus RTU</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Host / Serial Port <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="host"
+                                            required
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            placeholder="192.168.1.100 or COM1"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Port / Baud Rate
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="port"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            placeholder="502 (TCP) or 9600 (RTU)"
+                                            defaultValue="502"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Unit ID / Slave ID
+                                        </label>
+                                        <input
+                                            type="number"
+                                            name="unitId"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            placeholder="1"
+                                            defaultValue="1"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-[var(--text-secondary)]">
+                                        Modbus is widely used for connecting to PLCs and industrial devices.
+                                    </p>
+                                </>
+                            )}
+
+                            {/* SCADA Configuration */}
+                            {selectedConnection.id === 'scada' && (
+                                <>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Connection Type <span className="text-red-500">*</span>
+                                        </label>
+                                        <select
+                                            name="connectionType"
+                                            required
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
+                                            defaultValue="opcua"
+                                        >
+                                            <option value="opcua">OPC UA</option>
+                                            <option value="modbus">Modbus</option>
+                                            <option value="api">REST API</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Server Endpoint <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="endpoint"
+                                            required
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            placeholder="opc.tcp://scada-server:4840 or http://scada-server/api"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Username (Optional)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="username"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Password (Optional)
+                                        </label>
+                                        <input
+                                            type="password"
+                                            name="password"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-[var(--text-secondary)]">
+                                        SCADA systems provide real-time monitoring and control of industrial processes.
+                                    </p>
+                                </>
+                            )}
+
+                            {/* MES Configuration */}
+                            {selectedConnection.id === 'mes' && (
+                                <>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            API Endpoint <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="apiEndpoint"
+                                            required
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            placeholder="https://mes-server.com/api"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            API Key / Token <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="password"
+                                            name="apiKey"
+                                            required
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            MES System Type
+                                        </label>
+                                        <select
+                                            name="mesType"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
+                                        >
+                                            <option value="generic">Generic MES</option>
+                                            <option value="siemens">Siemens SIMATIC IT</option>
+                                            <option value="rockwell">Rockwell FactoryTalk</option>
+                                            <option value="ge">GE Proficy</option>
+                                            <option value="custom">Custom</option>
+                                        </select>
+                                    </div>
+                                    <p className="text-xs text-[var(--text-secondary)]">
+                                        MES systems track production orders, work-in-process, and manufacturing operations.
+                                    </p>
+                                </>
+                            )}
+
+                            {/* Data Historian Configuration */}
+                            {selectedConnection.id === 'data-historian' && (
+                                <>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Historian Type <span className="text-red-500">*</span>
+                                        </label>
+                                        <select
+                                            name="historianType"
+                                            required
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
+                                        >
+                                            <option value="pi">OSIsoft PI System</option>
+                                            <option value="wonderware">Wonderware Historian</option>
+                                            <option value="influxdb">InfluxDB</option>
+                                            <option value="timescaledb">TimescaleDB</option>
+                                            <option value="custom">Custom</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Server URL <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="serverUrl"
+                                            required
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            placeholder="https://pi-server.com or opc.tcp://historian:4840"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Username <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="username"
+                                            required
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-1.5">
+                                            Password <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="password"
+                                            name="password"
+                                            required
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-[var(--text-secondary)]">
+                                        Data Historians store high-frequency time-series data from industrial processes.
                                     </p>
                                 </>
                             )}
