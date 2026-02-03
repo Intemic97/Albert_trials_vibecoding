@@ -358,7 +358,7 @@ export const Documentation: React.FC = () => {
 
                                 {/* What is Intemic */}
                                 <div id="getting-started-what-is-intemic" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">What is Intemic?</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">What is Intemic?</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
                                         <strong>Intemic Platform</strong> is an enterprise-grade data modeling and workflow automation platform. 
                                         It enables teams to organize their data, automate processes, and leverage AI—all without writing code.
@@ -409,7 +409,7 @@ export const Documentation: React.FC = () => {
 
                                 {/* Architecture */}
                                 <div id="getting-started-architecture" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Architecture</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Architecture</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
                                         Intemic follows a modern client-server architecture:
                                     </p>
@@ -447,7 +447,7 @@ export const Documentation: React.FC = () => {
 
                                 {/* Installation */}
                                 <div id="getting-started-installation" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Installation</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Installation</h2>
                                     <p className="text-[var(--text-primary)] mb-4">Get up and running in under 5 minutes.</p>
 
                                     <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Prerequisites</h3>
@@ -497,7 +497,7 @@ npm run dev
 
                                 {/* First Workflow */}
                                 <div id="getting-started-first-workflow" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Your First Workflow</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Your First Workflow</h2>
                                     <p className="text-[var(--text-primary)] mb-4">Create a simple workflow in 3 steps:</p>
 
                                     <div className="space-y-6">
@@ -543,7 +543,7 @@ npm run dev
 
                                 {/* Core Concepts */}
                                 <div id="knowledge-base-concepts" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Core Concepts</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Core Concepts</h2>
                                     
                                     <div className="space-y-6 mb-6">
                                         <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
@@ -587,7 +587,7 @@ npm run dev
 
                                 {/* Property Types */}
                                 <div id="knowledge-base-property-types" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Property Types</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Property Types</h2>
                                     <p className="text-[var(--text-primary)] mb-4">Intemic supports the following property types:</p>
 
                                     <Table 
@@ -607,7 +607,7 @@ npm run dev
 
                                 {/* Relationships */}
                                 <div id="knowledge-base-relationships" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Relationships</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Relationships</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
                                         Connect entities together using <strong>Relation</strong> properties. This creates navigable links between your data.
                                     </p>
@@ -643,7 +643,7 @@ Order (Entity)
 
                                 {/* Import Data */}
                                 <div id="knowledge-base-import-data" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Import Data</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Import Data</h2>
                                     <p className="text-[var(--text-primary)] mb-4">Import existing data from CSV or Excel files.</p>
 
                                     <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Importing from CSV</h3>
@@ -662,7 +662,7 @@ Order (Entity)
 
                                 {/* Use Cases */}
                                 <div id="knowledge-base-use-cases" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Use Cases</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Use Cases</h2>
                                     
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
@@ -702,7 +702,7 @@ Order (Entity)
 
                                 {/* Canvas Basics */}
                                 <div id="workflows-canvas-basics" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Canvas Basics</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Canvas Basics</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
                                         The workflow canvas is where you design your automation. It's a visual editor where you place and connect nodes.
                                     </p>
@@ -724,7 +724,7 @@ Order (Entity)
 
                                 {/* Node Types */}
                                 <div id="workflows-node-types" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Node Types</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Node Types</h2>
                                     
                                     <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Triggers</h3>
                                     <p className="text-[var(--text-primary)] mb-3">Triggers start workflow execution. Every workflow needs at least one trigger.</p>
@@ -779,7 +779,7 @@ Order (Entity)
 
                                 {/* Connecting Nodes */}
                                 <div id="workflows-connections" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Connecting Nodes</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Connecting Nodes</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
                                         Nodes communicate through connections. Data flows from output ports (right side) to input ports (left side).
                                     </p>
@@ -808,7 +808,7 @@ Order (Entity)
 
                                 {/* Execution & Testing */}
                                 <div id="workflows-execution" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Execution & Testing</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Execution & Testing</h2>
                                     
                                     <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Running a Workflow</h3>
                                     <ul className="list-disc pl-6 space-y-2 text-[var(--text-primary)] mb-4">
@@ -836,7 +836,7 @@ Order (Entity)
 
                                 {/* Templates */}
                                 <div id="workflows-templates" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Templates</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Templates</h2>
                                     <p className="text-[var(--text-primary)] mb-4">Start with pre-built templates for common use cases:</p>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -873,7 +873,7 @@ Order (Entity)
 
                                 {/* Creating Copilots */}
                                 <div id="copilots-create-copilot" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Creating Copilots</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Creating Copilots</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
                                         Copilots are AI assistants that understand your data and can answer questions, generate reports, and provide insights.
                                     </p>
@@ -907,7 +907,7 @@ Guidelines:
 
                                 {/* Data Access Control */}
                                 <div id="copilots-data-access" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Data Access Control</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Data Access Control</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
                                         Control which Knowledge Base entities each copilot can access. This ensures data security and prevents unauthorized access.
                                     </p>
@@ -929,7 +929,7 @@ Guidelines:
 
                                 {/* Using Mentions */}
                                 <div id="copilots-mentions" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Using Mentions</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Using Mentions</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
                                         Use the <code className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] rounded text-sm">@</code> symbol to reference entities in your prompts. 
                                         This automatically includes relevant data context.
@@ -955,7 +955,7 @@ Guidelines:
 
                                 {/* AI Reports */}
                                 <div id="copilots-reports" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">AI Reports</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">AI Reports</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
                                         Generate comprehensive reports using natural language prompts.
                                     </p>
@@ -986,7 +986,7 @@ Guidelines:
 
                                 {/* Widget Types */}
                                 <div id="dashboards-widgets" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Widget Types</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Widget Types</h2>
                                     
                                     <Table 
                                         headers={['Widget', 'Description', 'Best For']}
@@ -1006,7 +1006,7 @@ Guidelines:
 
                                 {/* Data Sources */}
                                 <div id="dashboards-data-sources" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Data Sources</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Data Sources</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
                                         Widgets pull data from Knowledge Base entities. Configure the data source when adding a widget.
                                     </p>
@@ -1023,7 +1023,7 @@ Guidelines:
 
                                 {/* Filters & Refresh */}
                                 <div id="dashboards-filters" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Filters & Refresh</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Filters & Refresh</h2>
                                     
                                     <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Time Range</h3>
                                     <p className="text-[var(--text-primary)] mb-3">Filter data by time period using the toolbar picker:</p>
@@ -1039,7 +1039,7 @@ Guidelines:
 
                                 {/* Sharing */}
                                 <div id="dashboards-sharing" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Sharing Dashboards</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Sharing Dashboards</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
                                         Share dashboards with team members or generate public links.
                                     </p>
@@ -1066,7 +1066,7 @@ Guidelines:
 
                                 {/* Available Connectors */}
                                 <div id="connections-available" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Available Connectors</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Available Connectors</h2>
                                     
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                                         {['SAP', 'Oracle', 'PostgreSQL', 'MySQL', 'MongoDB', 'Snowflake', 'AWS S3', 'Azure Blob', 'Google Cloud', 'Slack', 'Salesforce', 'REST API'].map(conn => (
@@ -1079,7 +1079,7 @@ Guidelines:
 
                                 {/* Configuration */}
                                 <div id="connections-configure" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Configuration</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Configuration</h2>
                                     <p className="text-[var(--text-primary)] mb-4">Each connector requires specific credentials:</p>
 
                                     <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">PostgreSQL Example</h3>
@@ -1102,7 +1102,7 @@ Guidelines:
 
                                 {/* Testing */}
                                 <div id="connections-testing" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Testing Connections</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Testing Connections</h2>
                                     <p className="text-[var(--text-primary)] mb-4">
                                         After configuration, click <strong>Test Connection</strong> to verify connectivity before saving.
                                     </p>
@@ -1122,7 +1122,7 @@ Guidelines:
 
                                 {/* Creating Experiments */}
                                 <div id="lab-create-experiment" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Creating Experiments</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Creating Experiments</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
                                         Lab experiments let you model "what-if" scenarios using workflows as the calculation engine.
                                     </p>
@@ -1139,7 +1139,7 @@ Guidelines:
 
                                 {/* Variables & Parameters */}
                                 <div id="lab-variables" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Variables & Parameters</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Variables & Parameters</h2>
                                     <p className="text-[var(--text-primary)] mb-4">Parameters are extracted from workflow inputs and can be adjusted interactively.</p>
 
                                     <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Modifier Types</h3>
@@ -1155,7 +1155,7 @@ Guidelines:
 
                                 {/* Analysis & Results */}
                                 <div id="lab-analysis" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Analysis & Results</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Analysis & Results</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
                                         Understand how changes in one variable affect outcomes by running sensitivity analysis.
                                     </p>
@@ -1168,7 +1168,7 @@ Guidelines:
 
                                 {/* Comparing Scenarios */}
                                 <div id="lab-compare" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Comparing Scenarios</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Comparing Scenarios</h2>
                                     <p className="text-[var(--text-primary)] mb-4">
                                         Create multiple scenarios within a simulation and compare them side-by-side:
                                     </p>
@@ -1193,7 +1193,7 @@ Guidelines:
 
                                 {/* Authentication */}
                                 <div id="api-authentication" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Authentication</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Authentication</h2>
                                     <p className="text-[var(--text-primary)] mb-4">API requests require authentication via session cookies or JWT tokens.</p>
 
                                     <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Cookie Authentication</h3>
@@ -1216,7 +1216,7 @@ Guidelines:
 
                                 {/* Endpoints */}
                                 <div id="api-endpoints" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Endpoints</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Endpoints</h2>
 
                                     <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Entities</h3>
                                     <div className="space-y-3 mb-6">
@@ -1278,7 +1278,7 @@ Guidelines:
 
                                 {/* Error Codes */}
                                 <div id="api-errors" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Error Codes</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Error Codes</h2>
                                     <Table 
                                         headers={['Code', 'Description']}
                                         rows={[
@@ -1306,7 +1306,7 @@ Guidelines:
 
                                 {/* User Management */}
                                 <div id="settings-users" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">User Management</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">User Management</h2>
                                     <p className="text-[var(--text-primary)] mb-4">Invite and manage team members in Settings → Users.</p>
 
                                     <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Roles</h3>
@@ -1322,7 +1322,7 @@ Guidelines:
 
                                 {/* Organizations */}
                                 <div id="settings-organizations" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Organizations</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Organizations</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
                                         Organizations are isolated workspaces. Each organization has its own entities, workflows, and users.
                                     </p>
@@ -1336,7 +1336,7 @@ Guidelines:
 
                                 {/* Notifications */}
                                 <div id="settings-notifications" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Notifications</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Notifications</h2>
                                     <p className="text-[var(--text-primary)] mb-4">Configure alerts and notification preferences.</p>
 
                                     <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Alert Types</h3>
@@ -1368,7 +1368,7 @@ Guidelines:
 
                                 {/* Common Errors */}
                                 <div id="troubleshooting-common-errors" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">Common Errors</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Common Errors</h2>
 
                                     <div className="space-y-6">
                                         <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
@@ -1399,7 +1399,7 @@ Guidelines:
 
                                 {/* FAQ */}
                                 <div id="troubleshooting-faq" className="mb-12">
-                                    <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">FAQ</h2>
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">FAQ</h2>
 
                                     <div className="space-y-6">
                                         <div>
