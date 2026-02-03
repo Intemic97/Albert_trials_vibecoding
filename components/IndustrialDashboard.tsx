@@ -36,13 +36,15 @@ import {
     WifiSlash,
     Timer,
     ChartLine,
-    BellRinging
+    BellRinging,
+    ClockCounterClockwise
 } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { DynamicChart } from './DynamicChart';
 import { OTAlertsPanel } from './OTAlertsPanel';
 import { OTNotificationSettings } from './OTNotificationSettings';
+import { OTActivityLog } from './OTActivityLog';
 
 // ============ Types ============
 interface OTConnection {
@@ -330,6 +332,7 @@ export const IndustrialDashboard: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [showAlertsPanel, setShowAlertsPanel] = useState(false);
     const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+    const [showActivityLog, setShowActivityLog] = useState(false);
     const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>('24h');
     const [filterType, setFilterType] = useState<FilterType>('all');
     const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
@@ -547,6 +550,44 @@ export const IndustrialDashboard: React.FC = () => {
         fetchAlertSummary();
     }, [selectedTimeRange, fetchAlertSummary]);
 
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Don't trigger if typing in an input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+            
+            // Ctrl/Cmd + A = Open Alerts
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !e.shiftKey) {
+                e.preventDefault();
+                setShowAlertsPanel(true);
+            }
+            // Ctrl/Cmd + L = Open Activity Log
+            if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+                e.preventDefault();
+                setShowActivityLog(true);
+            }
+            // Ctrl/Cmd + N = Open Notification Settings
+            if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+                e.preventDefault();
+                setShowNotificationSettings(true);
+            }
+            // R = Refresh
+            if (e.key === 'r' && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                handleRefresh();
+            }
+            // Escape = Close all modals
+            if (e.key === 'Escape') {
+                setShowAlertsPanel(false);
+                setShowNotificationSettings(false);
+                setShowActivityLog(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
     // ============ Computed Values ============
     const filteredConnections = useMemo(() => {
         return connections.filter(conn => {
@@ -653,9 +694,16 @@ export const IndustrialDashboard: React.FC = () => {
                             <option value="7d">Last 7 Days</option>
                         </select>
                         <button
+                            onClick={() => setShowActivityLog(true)}
+                            className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                            title="Activity Log (⌘L)"
+                        >
+                            <ClockCounterClockwise size={18} />
+                        </button>
+                        <button
                             onClick={() => setShowNotificationSettings(true)}
                             className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
-                            title="Notification Settings"
+                            title="Notification Settings (⌘N)"
                         >
                             <BellRinging size={18} />
                         </button>
@@ -896,6 +944,12 @@ export const IndustrialDashboard: React.FC = () => {
                     onClose={() => setShowNotificationSettings(false)}
                 />
             )}
+
+            {/* Activity Log Modal */}
+            <OTActivityLog
+                isOpen={showActivityLog}
+                onClose={() => setShowActivityLog(false)}
+            />
         </div>
     );
 };
