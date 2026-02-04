@@ -831,6 +831,35 @@ async function initDb() {
     // Indexes might already exist
   }
 
+  // Create ot_alerts table for OT/Industrial alerts
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS ot_alerts (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT,
+      nodeId TEXT,
+      nodeType TEXT,
+      fieldName TEXT,
+      value REAL,
+      threshold TEXT,
+      severity TEXT,
+      message TEXT,
+      metadata TEXT,
+      createdAt TEXT,
+      acknowledgedAt TEXT,
+      acknowledgedBy TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Create indexes for ot_alerts
+  try {
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_ot_alerts_org ON ot_alerts(organizationId)`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_ot_alerts_created ON ot_alerts(createdAt)`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_ot_alerts_severity ON ot_alerts(severity)`);
+  } catch (e) {
+    // Indexes might already exist
+  }
+
   return db;
 }
 
