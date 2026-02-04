@@ -1,0 +1,13 @@
+sku,producto,grado,descripcion,stock_actual_kg,stock_minimo_kg,stock_maximo_kg,ubicacion_almacen,ultimo_movimiento,precio_venta_eur_kg,cliente_principal,dias_cobertura,estado
+SKU-001,HDPE,ALCUDIA 4810-B,Polietileno alta densidad para film,185000,50000,300000,NAVE-A-01,2026-01-19,1.65,Plastipak Iberia,45,Disponible
+SKU-002,LDPE,ALCUDIA 2008-N,Polietileno baja densidad film packaging,92000,30000,150000,NAVE-A-02,2026-01-19,1.52,Sealed Air España,38,Disponible
+SKU-003,PP,ISPLEN PP040 G2M,Polipropileno homopolímero inyección,156000,60000,250000,NAVE-B-01,2026-01-19,1.72,Grupo Antolin,52,Disponible
+SKU-004,PET,NOVAPET CR,PET botella cristalino,78000,25000,120000,NAVE-B-02,2026-01-19,1.85,Coca-Cola European Partners,35,Disponible
+SKU-005,HDPE,ALCUDIA 6020-L,Polietileno alta densidad soplado,125000,40000,200000,NAVE-A-03,2026-01-19,1.68,Graham Packaging,42,Disponible
+SKU-006,LDPE,ALCUDIA 2310-N,Polietileno baja densidad agricultural,58000,20000,100000,NAVE-A-04,2026-01-19,1.48,Plasticos Romero,29,Bajo stock
+SKU-007,PP,ISPLEN PP070 G2M,Polipropileno alto flujo,142000,50000,220000,NAVE-B-03,2026-01-19,1.78,Faurecia Interior,48,Disponible
+SKU-008,EVA,ALCUDIA EVA PA-440,Copolímero etileno-acetato vinilo,32000,10000,60000,NAVE-C-01,2026-01-19,2.25,Sika España,40,Disponible
+SKU-009,EVA,ALCUDIA EVA PA-539,EVA alto contenido VA,18000,8000,45000,NAVE-C-02,2026-01-19,2.45,Henkel Ibérica,28,Bajo stock
+SKU-010,PET,NOVAPET CB,PET botella azul cobalto,45000,15000,80000,NAVE-B-04,2026-01-19,1.92,Nestlé Waters,32,Disponible
+SKU-011,HDPE,ALCUDIA 4810-B,Polietileno alta densidad premium,95000,50000,300000,NAVE-A-05,2026-01-18,1.65,Amazon Packaging EU,25,Bajo stock
+SKU-012,LDPE,ALCUDIA 2008-N,LDPE film stretch,112000,30000,150000,NAVE-A-06,2026-01-18,1.52,Coveris,48,Disponible

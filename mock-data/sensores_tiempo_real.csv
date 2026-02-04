@@ -1,0 +1,34 @@
+timestamp,sensor_id,equipo,variable,valor,unidad,calidad,alarma_activa
+2026-01-19 10:00:00,TT-L1-Z1,EXT-L1-001,Temperatura Zona 1,175.2,°C,Good,NO
+2026-01-19 10:00:00,TT-L1-Z2,EXT-L1-001,Temperatura Zona 2,182.5,°C,Good,NO
+2026-01-19 10:00:00,TT-L1-Z3,EXT-L1-001,Temperatura Zona 3,188.8,°C,Good,NO
+2026-01-19 10:00:00,TT-L1-Z4,EXT-L1-001,Temperatura Zona 4,185.3,°C,Good,NO
+2026-01-19 10:00:00,TT-L1-CAB,EXT-L1-001,Temperatura Cabezal,186.0,°C,Good,NO
+2026-01-19 10:00:00,PT-L1-001,EXT-L1-001,Presión Dosificación,128.5,bar,Good,NO
+2026-01-19 10:00:00,PT-L1-002,EXT-L1-001,Presión Cabezal,118.2,bar,Good,NO
+2026-01-19 10:00:00,ST-L1-001,EXT-L1-001,Velocidad Husillo,85.2,rpm,Good,NO
+2026-01-19 10:00:00,IT-L1-001,EXT-L1-001,Corriente Motor,78.5,%,Good,NO
+2026-01-19 10:00:00,FT-L1-001,EXT-L1-001,Caudal Material,425.8,kg/h,Good,NO
+2026-01-19 10:00:00,TT-L2-Z1,EXT-L2-001,Temperatura Zona 1,162.8,°C,Good,NO
+2026-01-19 10:00:00,TT-L2-Z2,EXT-L2-001,Temperatura Zona 2,168.4,°C,Good,NO
+2026-01-19 10:00:00,TT-L2-Z3,EXT-L2-001,Temperatura Zona 3,165.2,°C,Good,NO
+2026-01-19 10:00:00,PT-L2-001,EXT-L2-001,Presión Dosificación,92.3,bar,Good,NO
+2026-01-19 10:00:00,ST-L2-001,EXT-L2-001,Velocidad Husillo,72.8,rpm,Good,NO
+2026-01-19 10:00:00,FT-L2-001,EXT-L2-001,Caudal Material,285.4,kg/h,Good,NO
+2026-01-19 10:00:00,TT-L3-Z1,EXT-L3-001,Temperatura Zona 1,205.5,°C,Good,NO
+2026-01-19 10:00:00,TT-L3-Z2,EXT-L3-001,Temperatura Zona 2,212.8,°C,Good,NO
+2026-01-19 10:00:00,TT-L3-Z3,EXT-L3-001,Temperatura Zona 3,218.2,°C,Good,NO
+2026-01-19 10:00:00,PT-L3-001,EXT-L3-001,Presión Dosificación,148.5,bar,Good,NO
+2026-01-19 10:00:00,ST-L3-001,EXT-L3-001,Velocidad Husillo,92.4,rpm,Good,NO
+2026-01-19 10:00:00,FT-L3-001,EXT-L3-001,Caudal Material,512.6,kg/h,Good,NO
+2026-01-19 10:00:00,TT-SEC-L4,SEC-L4-001,Temperatura Secado,85.2,°C,Good,NO
+2026-01-19 10:00:00,HT-SEC-L4,SEC-L4-001,Humedad Salida,165,ppm,Good,NO
+2026-01-19 10:00:00,FT-SEC-L4,SEC-L4-001,Flujo Aire,1050,m3/h,Good,NO
+2026-01-19 10:00:00,TT-ENF-L1,ENF-L1-001,Temperatura Agua Entrada,18.5,°C,Good,NO
+2026-01-19 10:00:00,TT-ENF-L1-R,ENF-L1-001,Temperatura Agua Retorno,28.2,°C,Good,NO
+2026-01-19 10:00:00,FT-ENF-L1,ENF-L1-001,Caudal Agua,125.5,m3/h,Good,NO
+2026-01-19 10:00:00,LT-SIL-01,SIL-01,Nivel Silo,72.5,%,Good,NO
+2026-01-19 10:00:00,LT-SIL-02,SIL-02,Nivel Silo,58.3,%,Good,NO
+2026-01-19 10:00:00,LT-SIL-03,SIL-03,Nivel Silo,85.2,%,Good,NO
+2026-01-19 10:00:00,LT-SIL-04,SIL-04,Nivel Silo,42.8,%,Good,NO
+2026-01-19 10:00:00,LT-SIL-05,SIL-05,Nivel Silo,91.5,%,Good,NO

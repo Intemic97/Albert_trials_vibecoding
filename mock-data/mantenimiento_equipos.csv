@@ -1,0 +1,16 @@
+orden_id,equipo_id,equipo_nombre,tipo_mantenimiento,fecha_programada,fecha_ejecucion,duracion_horas,tecnico,estado,prioridad,coste_mano_obra_eur,coste_repuestos_eur,descripcion,observaciones
+MNT-2026-0001,EXT-L1-001,Extrusora Línea 1,Preventivo,2026-01-05,2026-01-05 06:00:00,4.5,Roberto Díaz,Completado,Media,450,280,Cambio filtros y limpieza husillo,Sin anomalías
+MNT-2026-0002,GRN-L2-001,Granuladora Línea 2,Correctivo,2026-01-08,2026-01-08 10:30:00,6.0,Antonio Ruiz,Completado,Alta,600,1250,Sustitución cuchillas desgastadas,Vida útil inferior a la esperada
+MNT-2026-0003,SIL-01,Silo Almacenamiento 01,Preventivo,2026-01-10,2026-01-10 08:00:00,3.0,Roberto Díaz,Completado,Baja,300,0,Inspección y limpieza interior,
+MNT-2026-0004,EXT-L3-001,Extrusora Línea 3,Preventivo,2026-01-12,2026-01-12 06:00:00,5.0,Antonio Ruiz,Completado,Media,500,420,Cambio aceite y revisión reductor,
+MNT-2026-0005,SEC-L4-001,Secador Línea 4,Correctivo,2026-01-14,2026-01-14 14:00:00,8.0,Roberto Díaz,Completado,Alta,800,2100,Reparación sistema calefacción,Resistencias quemadas
+MNT-2026-0006,ENF-L1-001,Sistema Enfriamiento L1,Preventivo,2026-01-15,2026-01-15 06:00:00,2.5,Antonio Ruiz,Completado,Media,250,85,Limpieza intercambiadores,
+MNT-2026-0007,EXT-L2-001,Extrusora Línea 2,Predictivo,2026-01-16,2026-01-16 08:00:00,3.5,Roberto Díaz,Completado,Media,350,0,Análisis vibraciones motor,Vibración dentro de límites
+MNT-2026-0008,GRN-L1-001,Granuladora Línea 1,Preventivo,2026-01-18,2026-01-18 06:00:00,4.0,Antonio Ruiz,Completado,Media,400,380,Afilado cuchillas y ajuste,
+MNT-2026-0009,BOB-L3-001,Bobinadora Línea 3,Correctivo,2026-01-19,2026-01-19 09:00:00,5.5,Roberto Díaz,Completado,Alta,550,890,Sustitución rodamiento eje,Ruido anómalo detectado
+MNT-2026-0010,EXT-L4-001,Extrusora Línea 4,Preventivo,2026-01-20,2026-01-20 06:00:00,4.5,Antonio Ruiz,Programado,Media,450,320,Cambio filtros y revisión general,
+MNT-2026-0011,SIL-05,Silo Almacenamiento 05,Preventivo,2026-01-22,NULL,2.0,Roberto Díaz,Programado,Baja,200,0,Calibración sensores nivel,
+MNT-2026-0012,EXT-L5-001,Extrusora Línea 5,Preventivo,2026-01-25,NULL,5.0,Antonio Ruiz,Programado,Media,500,450,Cambio aceite y filtros,
+MNT-2026-0013,SEC-L2-001,Secador Línea 2,Predictivo,2026-01-28,NULL,3.0,Roberto Díaz,Programado,Media,300,0,Termografía sistema eléctrico,
+MNT-2026-0014,ENF-L3-001,Sistema Enfriamiento L3,Preventivo,2026-01-30,NULL,2.5,Antonio Ruiz,Programado,Media,250,120,Cambio filtros agua,
+MNT-2026-0015,GRN-L4-001,Granuladora Línea 4,Preventivo,2026-02-01,NULL,4.0,Roberto Díaz,Programado,Media,400,350,Revisión general y afilado,
