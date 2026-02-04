@@ -553,6 +553,53 @@ app.post('/api/auth/switch-org', authenticateToken, switchOrganization);
 app.get('/api/organization/users', authenticateToken, getOrganizationUsers);
 app.post('/api/organization/invite', authenticateToken, inviteUser);
 
+// Get pending invitations for current organization
+app.get('/api/organization/pending-invitations', authenticateToken, async (req, res) => {
+    const orgId = req.user.orgId;
+    const db = await openDb();
+
+    try {
+        const invitations = await db.all(`
+            SELECT id, email, invitedByName, createdAt, status
+            FROM pending_invitations 
+            WHERE organizationId = ? AND status = 'pending'
+            ORDER BY createdAt DESC
+        `, [orgId]);
+
+        res.json(invitations);
+    } catch (error) {
+        console.error('Get pending invitations error:', error);
+        res.status(500).json({ error: 'Failed to fetch pending invitations' });
+    }
+});
+
+// Cancel/delete a pending invitation
+app.delete('/api/organization/pending-invitations/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const orgId = req.user.orgId;
+    const db = await openDb();
+
+    try {
+        // Verify the invitation belongs to this organization
+        const invitation = await db.get(
+            'SELECT id, email FROM pending_invitations WHERE id = ? AND organizationId = ?',
+            [id, orgId]
+        );
+
+        if (!invitation) {
+            return res.status(404).json({ error: 'Invitation not found' });
+        }
+
+        await db.run('DELETE FROM pending_invitations WHERE id = ?', [id]);
+
+        console.log(`[Auth] Invitation to ${invitation.email} cancelled for org ${orgId}`);
+        res.json({ message: 'Invitation cancelled', email: invitation.email });
+    } catch (error) {
+        console.error('Cancel invitation error:', error);
+        res.status(500).json({ error: 'Failed to cancel invitation' });
+    }
+});
+
 // Create new organization
 app.post('/api/organizations', authenticateToken, async (req, res) => {
     const { name } = req.body;

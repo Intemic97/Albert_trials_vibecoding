@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Envelope, Plus, X, Check, Lightning, Crown, Sparkle, CreditCard, ArrowSquareOut, SpinnerGap, LinkSimple, LinkBreak, Copy, CheckCircle, WarningCircle, Sun, Moon, Monitor, Shield } from '@phosphor-icons/react';
+import { User, Envelope, Plus, X, Check, Lightning, Crown, Sparkle, CreditCard, ArrowSquareOut, SpinnerGap, LinkSimple, LinkBreak, Copy, CheckCircle, WarningCircle, Sun, Moon, Monitor, Shield, Clock } from '@phosphor-icons/react';
 import { UserAvatar } from './ProfileMenu';
 import { PageHeader } from './PageHeader';
 import { API_BASE } from '../config';
@@ -56,6 +56,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
     const { mode, setMode, isDark } = useTheme();
     const [activeTab, setActiveTab] = useState<'general' | 'team' | 'integrations' | 'activity'>('general');
     const [users, setUsers] = useState<OrgUser[]>([]);
+    const [pendingInvitations, setPendingInvitations] = useState<{ id: string; email: string; invitedByName: string; createdAt: string }[]>([]);
     const [isInviting, setIsInviting] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'warning', message: string } | null>(null);
@@ -460,11 +461,13 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
 
     const fetchUsers = async () => {
         try {
-            const res = await fetch(`${API_BASE}/organization/users`, {
-                credentials: 'include'
-            });
-            if (res.ok) {
-                const data = await res.json();
+            const [usersRes, invitationsRes] = await Promise.all([
+                fetch(`${API_BASE}/organization/users`, { credentials: 'include' }),
+                fetch(`${API_BASE}/organization/pending-invitations`, { credentials: 'include' })
+            ]);
+            
+            if (usersRes.ok) {
+                const data = await usersRes.json();
                 if (Array.isArray(data)) {
                     setUsers(data);
                 } else {
@@ -472,10 +475,37 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                     setUsers([]);
                 }
             }
+            
+            if (invitationsRes.ok) {
+                const invData = await invitationsRes.json();
+                if (Array.isArray(invData)) {
+                    setPendingInvitations(invData);
+                }
+            }
         } catch (error) {
             console.error('Failed to fetch users:', error);
             setUsers([]);
         }
+    };
+
+    const cancelInvitation = async (invitationId: string) => {
+        try {
+            const res = await fetch(`${API_BASE}/organization/pending-invitations/${invitationId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+
+            if (res.ok) {
+                setPendingInvitations(prev => prev.filter(inv => inv.id !== invitationId));
+                setFeedback({ type: 'success', message: 'Invitation cancelled' });
+            } else {
+                const data = await res.json();
+                setFeedback({ type: 'error', message: data.error || 'Failed to cancel invitation' });
+            }
+        } catch (error) {
+            setFeedback({ type: 'error', message: 'An error occurred' });
+        }
+        setTimeout(() => setFeedback(null), 3000);
     };
 
     const [inviteLink, setInviteLink] = useState<string | null>(null);
@@ -615,6 +645,63 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                     </tbody>
                                 </table>
                             </div>
+
+                            {/* Pending Invitations Section */}
+                            {pendingInvitations.length > 0 && (
+                                <div className="mt-6">
+                                    <h3 className="text-base font-normal text-[var(--text-primary)] mb-3 flex items-center gap-2">
+                                        <Clock size={18} weight="light" className="text-amber-500" />
+                                        Pending Invitations
+                                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                                            {pendingInvitations.length}
+                                        </span>
+                                    </h3>
+                                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] overflow-hidden">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-amber-50/50 border-b border-[var(--border-light)]">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Email</th>
+                                                    <th className="px-6 py-3 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Invited By</th>
+                                                    <th className="px-6 py-3 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Sent</th>
+                                                    <th className="px-6 py-3 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider text-right">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {pendingInvitations.map((inv) => (
+                                                    <tr key={inv.id} className="hover:bg-amber-50/30 transition-colors">
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+                                                                    <Envelope size={14} weight="light" className="text-amber-600" />
+                                                                </div>
+                                                                <span className="text-sm text-[var(--text-primary)]">{inv.email}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                                                            {inv.invitedByName || 'Unknown'}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-[var(--text-tertiary)]">
+                                                            {new Date(inv.createdAt).toLocaleDateString('es-ES', {
+                                                                day: 'numeric',
+                                                                month: 'short',
+                                                                year: 'numeric'
+                                                            })}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <button
+                                                                onClick={() => cancelInvitation(inv.id)}
+                                                                className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
