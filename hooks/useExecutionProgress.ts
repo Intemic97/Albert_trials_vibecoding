@@ -31,6 +31,7 @@ export interface ExecutionProgress {
 interface UseExecutionProgressOptions {
     onProgress?: (progress: ExecutionProgress) => void;
     onComplete?: (progress: ExecutionProgress) => void;
+    onCancelled?: (progress: ExecutionProgress) => void;
     onError?: (error: string, executionId: string) => void;
 }
 
@@ -68,6 +69,9 @@ export function useExecutionProgress(options: UseExecutionProgressOptions = {}) 
                                 break;
                             case 'execution_complete':
                                 handleComplete(data);
+                                break;
+                            case 'execution_cancelled':
+                                handleCancelled(data);
                                 break;
                             case 'execution_error':
                                 handleError(data);
@@ -142,6 +146,24 @@ export function useExecutionProgress(options: UseExecutionProgressOptions = {}) 
         options.onComplete?.(progress);
     }, [options.onComplete]);
 
+    const handleCancelled = useCallback((data: any) => {
+        const progress: ExecutionProgress = {
+            executionId: data.executionId,
+            workflowId: data.workflowId,
+            status: 'cancelled',
+            progress: data.progress,
+            error: 'Execution cancelled by user'
+        };
+
+        setActiveExecutions(prev => {
+            const next = new Map(prev);
+            next.delete(data.executionId);
+            return next;
+        });
+
+        options.onCancelled?.(progress);
+    }, [options.onCancelled]);
+
     const handleError = useCallback((data: any) => {
         setActiveExecutions(prev => {
             const next = new Map(prev);
@@ -178,11 +200,40 @@ export function useExecutionProgress(options: UseExecutionProgressOptions = {}) 
         return false;
     }, [activeExecutions]);
 
+    // Cancel an execution
+    const cancelExecution = useCallback(async (executionId: string): Promise<boolean> => {
+        try {
+            const response = await fetch(`${API_BASE}/executions/${executionId}/cancel`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                // Remove from active executions
+                setActiveExecutions(prev => {
+                    const next = new Map(prev);
+                    next.delete(executionId);
+                    return next;
+                });
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('[ExecutionProgress] Failed to cancel execution:', error);
+            return false;
+        }
+    }, [token]);
+
     return {
         activeExecutions: Array.from(activeExecutions.values()),
         getExecution,
         getWorkflowExecution,
-        isExecuting
+        isExecuting,
+        cancelExecution
     };
 }
 

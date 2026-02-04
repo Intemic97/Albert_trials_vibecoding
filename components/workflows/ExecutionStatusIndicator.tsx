@@ -9,7 +9,8 @@ import {
     CheckCircle, 
     XCircle, 
     Clock,
-    Lightning
+    Lightning,
+    Stop
 } from '@phosphor-icons/react';
 import { useExecutionProgress } from '../../hooks';
 
@@ -81,6 +82,21 @@ export const ExecutionStatusIndicator: React.FC<ExecutionStatusIndicatorProps> =
                     />
                     {showLabel && (
                         <span className={`${textSize} text-red-600`}>Failed</span>
+                    )}
+                </div>
+            );
+        }
+
+        if (execution?.status === 'cancelled') {
+            return (
+                <div className="flex items-center gap-1.5">
+                    <Stop 
+                        size={iconSize} 
+                        className="text-amber-500" 
+                        weight="fill" 
+                    />
+                    {showLabel && (
+                        <span className={`${textSize} text-amber-600`}>Cancelled</span>
                     )}
                 </div>
             );

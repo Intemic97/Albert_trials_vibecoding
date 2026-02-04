@@ -16,7 +16,9 @@ import {
     CaretRight,
     CaretDown,
     CircleNotch,
-    Lightning
+    Lightning,
+    Stop,
+    Warning
 } from '@phosphor-icons/react';
 import { WorkflowNode } from '../types';
 import { useExecutionProgress, ExecutionProgress } from '../../../hooks';
@@ -191,6 +193,7 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
     const [executionId, setExecutionId] = useState<string | null>(null);
     const [isBackgroundExecution, setIsBackgroundExecution] = useState(false);
     const [progress, setProgress] = useState<ExecutionProgress | null>(null);
+    const [isCancelling, setIsCancelling] = useState(false);
 
     const inputNodes = getInputNodesFromWorkflow(nodes);
     const hasInputs = inputNodes.length > 0;
@@ -215,6 +218,16 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
         }
     }, [workflowId, executionId]);
 
+    const handleCancelled = useCallback((p: ExecutionProgress) => {
+        if (p.workflowId === workflowId || p.executionId === executionId) {
+            setProgress(p);
+            setIsRunning(false);
+            setIsCancelling(false);
+            setStatus('idle');
+            setError('Execution cancelled');
+        }
+    }, [workflowId, executionId]);
+
     const handleProgressError = useCallback((err: string, execId: string) => {
         if (execId === executionId) {
             setError(err);
@@ -223,11 +236,28 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
         }
     }, [executionId]);
 
-    useExecutionProgress({
+    const { cancelExecution } = useExecutionProgress({
         onProgress: handleProgress,
         onComplete: handleComplete,
+        onCancelled: handleCancelled,
         onError: handleProgressError
     });
+
+    const handleCancel = async () => {
+        if (!executionId) return;
+        
+        setIsCancelling(true);
+        const success = await cancelExecution(executionId);
+        
+        if (success) {
+            setIsRunning(false);
+            setStatus('idle');
+            setError('Execution cancelled');
+        } else {
+            setIsCancelling(false);
+            setError('Failed to cancel execution');
+        }
+    };
 
     useEffect(() => {
         if (isOpen) {
@@ -237,6 +267,7 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
             setExecutionId(null);
             setIsBackgroundExecution(false);
             setProgress(null);
+            setIsCancelling(false);
         }
     }, [isOpen]);
 
@@ -355,9 +386,24 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
                                         Running in background
                                     </span>
                                 </div>
-                                <span className="text-xs text-[var(--text-tertiary)]">
-                                    {progress?.progress?.completedNodes || 0} / {progress?.progress?.totalNodes || '?'} nodes
-                                </span>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xs text-[var(--text-tertiary)]">
+                                        {progress?.progress?.completedNodes || 0} / {progress?.progress?.totalNodes || '?'} nodes
+                                    </span>
+                                    <button
+                                        onClick={handleCancel}
+                                        disabled={isCancelling}
+                                        className="flex items-center gap-1 px-2 py-1 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50"
+                                        title="Cancel execution"
+                                    >
+                                        {isCancelling ? (
+                                            <SpinnerGap size={12} className="animate-spin" />
+                                        ) : (
+                                            <Stop size={12} weight="fill" />
+                                        )}
+                                        Cancel
+                                    </button>
+                                </div>
                             </div>
                             <div className="w-full bg-[var(--bg-tertiary)] rounded-full h-2 overflow-hidden">
                                 <div 
