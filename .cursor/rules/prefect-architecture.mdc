@@ -84,10 +84,10 @@ npm run prefect
 
 | Lenguaje | Archivo | Descripción |
 |----------|---------|-------------|
-| Python | `server/prefect-worker/tasks/node_handlers.py` | Handlers para Prefect (29 tipos) |
-| Node.js | `server/workflowExecutor.js` | Handlers para fallback local (29 tipos) |
+| Python | `server/prefect-worker/tasks/node_handlers.py` | Handlers para Prefect (35 tipos) |
+| Node.js | `server/workflowExecutor.js` | Handlers para fallback local (35 tipos) |
 
-### Lista Completa de Handlers (29)
+### Lista Completa de Handlers (35)
 
 #### Básicos
 - `trigger` - Inicio de workflow
@@ -364,11 +364,11 @@ Ver logs en terminal de Prefect. Los errores aparecen ahí con stack trace.
 
 ## Próximos Pasos Sugeridos
 
-1. **Añadir nodo Slack** - Para notificaciones a canales
-2. **Cancelación de ejecuciones** - Endpoint para cancelar workflow en curso
-3. **Retry de nodos fallidos** - UI para re-ejecutar nodos que fallaron
-4. **Implementar handlers OT reales** - Conectar con OPC UA/MQTT/Modbus reales
-5. **Dashboard de ejecuciones** - Vista de todas las ejecuciones con filtros
+1. **Cancelación de ejecuciones** - Endpoint para cancelar workflow en curso
+2. **Retry de nodos fallidos** - UI para re-ejecutar nodos que fallaron
+3. **Implementar handlers OT reales** - Conectar con OPC UA/MQTT/Modbus reales
+4. **Dashboard de ejecuciones** - Vista de todas las ejecuciones con filtros
+5. **Scheduler automático** - Ejecutar workflows en horarios definidos
 
 ---
 
@@ -393,6 +393,39 @@ TWILIO_AUTH_TOKEN=...
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 
+# Telegram (para sendTelegram)
+TELEGRAM_BOT_TOKEN=123456789:ABCdef...
+
+# Google (para googleSheets)
+GOOGLE_API_KEY=AIzaSy...
+
 # Climatiq (opcional)
 CLIMATIQ_API_KEY=...
 ```
+
+---
+
+## Nodos de Comunicación - Configuración
+
+### Slack (`sendSlack`)
+Requiere **Webhook URL** de Incoming Webhooks:
+- Ir a Slack → Apps → Incoming Webhooks → Create New
+
+### Discord (`sendDiscord`)
+Requiere **Webhook URL** del servidor:
+- Server Settings → Integrations → Webhooks → Create Webhook
+
+### Teams (`sendTeams`)
+Requiere **Webhook URL** de O365:
+- Canal → ••• → Connectors → Incoming Webhook → Configure
+
+### Telegram (`sendTelegram`)
+Requiere **Bot Token** y **Chat ID**:
+- Crear bot con @BotFather → /newbot
+- Obtener chat_id enviando mensaje al bot y consultando getUpdates
+
+### Google Sheets (`googleSheets`)
+Requiere:
+- **Spreadsheet ID** (de la URL del documento)
+- **API Key** (opcional, para sheets públicas) o Service Account
+- Operaciones: `read`, `write`, `append`
