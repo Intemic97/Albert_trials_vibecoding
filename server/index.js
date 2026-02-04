@@ -1154,6 +1154,70 @@ app.put('/api/admin/users/:id/admin', authenticateToken, requireAdmin, async (re
     }
 });
 
+// Delete user - Admin only
+app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const adminUserId = req.user.sub;
+
+        // Prevent self-deletion
+        if (id === adminUserId) {
+            return res.status(400).json({ error: 'You cannot delete your own account' });
+        }
+
+        // Check if user exists
+        const user = await db.get('SELECT id, email, name FROM users WHERE id = ?', [id]);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Start transaction for cascading deletes
+        await db.run('BEGIN TRANSACTION');
+
+        try {
+            // Delete user's organization memberships
+            await db.run('DELETE FROM user_organizations WHERE userId = ?', [id]);
+
+            // Delete user's workflows (if they are the creator)
+            await db.run('DELETE FROM workflows WHERE createdBy = ?', [id]);
+
+            // Delete user's dashboards (if they are the creator)
+            await db.run('DELETE FROM dashboards WHERE createdBy = ?', [id]);
+
+            // Delete user's reports (if they are the creator)
+            await db.run('DELETE FROM reports WHERE createdBy = ?', [id]);
+
+            // Delete user's entities (if they are the creator)
+            await db.run('DELETE FROM entities WHERE createdBy = ?', [id]);
+
+            // Delete user's credentials
+            await db.run('DELETE FROM credentials WHERE userId = ?', [id]);
+
+            // Delete user's audit logs
+            await db.run('DELETE FROM audit_logs WHERE userId = ?', [id]);
+
+            // Delete any pending invitations sent by this user
+            await db.run('DELETE FROM pending_invitations WHERE invitedBy = ?', [id]);
+
+            // Delete the user
+            await db.run('DELETE FROM users WHERE id = ?', [id]);
+
+            await db.run('COMMIT');
+
+            console.log(`[Admin] User ${user.email} (${id}) deleted by admin ${adminUserId}`);
+            res.json({ message: `User ${user.email} has been deleted`, deletedUser: { id, email: user.email, name: user.name } });
+
+        } catch (deleteError) {
+            await db.run('ROLLBACK');
+            throw deleteError;
+        }
+
+    } catch (error) {
+        console.error('Delete user error:', error);
+        res.status(500).json({ error: 'Failed to delete user' });
+    }
+});
+
 // File Upload Endpoint
 app.post('/api/upload', authenticateToken, upload.single('file'), (req, res) => {
     try {

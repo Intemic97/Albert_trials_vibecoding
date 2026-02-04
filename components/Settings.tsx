@@ -58,7 +58,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
     const [users, setUsers] = useState<OrgUser[]>([]);
     const [isInviting, setIsInviting] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
-    const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+    const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'warning', message: string } | null>(null);
     const [tutorialEnabled, setTutorialEnabled] = useState(() => {
         return !localStorage.getItem('intemic_tutorial_completed');
     });
@@ -478,8 +478,11 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
         }
     };
 
+    const [inviteLink, setInviteLink] = useState<string | null>(null);
+
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
+        setInviteLink(null);
         try {
             const res = await fetch(`${API_BASE}/organization/invite`, {
                 method: 'POST',
@@ -491,9 +494,16 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
             const data = await res.json();
 
             if (res.ok) {
-                setFeedback({ type: 'success', message: data.message });
-                setIsInviting(false);
-                setInviteEmail('');
+                // Check if email was actually sent
+                if (data.emailSent === false && data.inviteUrl) {
+                    // Email not sent - show link for manual sharing
+                    setInviteLink(data.inviteUrl);
+                    setFeedback({ type: 'warning', message: data.message || 'Email not sent - copy the link below to share manually' });
+                } else {
+                    setFeedback({ type: 'success', message: data.message });
+                    setIsInviting(false);
+                    setInviteEmail('');
+                }
                 if (data.added) {
                     fetchUsers();
                 }
@@ -504,7 +514,15 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
             setFeedback({ type: 'error', message: 'An error occurred' });
         }
 
-        setTimeout(() => setFeedback(null), 3000);
+        setTimeout(() => setFeedback(null), 5000);
+    };
+
+    const copyInviteLink = () => {
+        if (inviteLink) {
+            navigator.clipboard.writeText(inviteLink);
+            setFeedback({ type: 'success', message: 'Link copied to clipboard!' });
+            setTimeout(() => setFeedback(null), 2000);
+        }
     };
 
     return (
@@ -1258,20 +1276,47 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                         Invitation will be sent via email. If they have an account, they'll be added immediately.
                                     </p>
                                 </div>
+                                
+                                {/* Show invite link when email fails */}
+                                {inviteLink && (
+                                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                        <p className="text-sm text-amber-800 mb-2">
+                                            Email could not be sent. Share this link manually:
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                readOnly
+                                                value={inviteLink}
+                                                className="flex-1 text-xs bg-white border border-amber-300 rounded px-2 py-1.5 text-slate-600"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={copyInviteLink}
+                                                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs rounded transition-colors"
+                                            >
+                                                Copy
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                                
                                 <div className="flex justify-end gap-3 mt-6">
                                     <button
                                         type="button"
-                                        onClick={() => setIsInviting(false)}
+                                        onClick={() => { setIsInviting(false); setInviteLink(null); }}
                                         className="px-4 py-2 text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded-lg text-sm font-medium transition-colors"
                                     >
-                                        Cancel
+                                        {inviteLink ? 'Done' : 'Cancel'}
                                     </button>
-                                    <button
-                                        type="submit"
-                                        className="btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
-                                    >
-                                        Send Invitation
-                                    </button>
+                                    {!inviteLink && (
+                                        <button
+                                            type="submit"
+                                            className="btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
+                                        >
+                                            Send Invitation
+                                        </button>
+                                    )}
                                 </div>
                             </form>
                         </div>

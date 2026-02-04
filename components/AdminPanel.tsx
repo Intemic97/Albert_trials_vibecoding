@@ -133,6 +133,48 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
         }
     };
 
+    const deleteUser = async (userId: string, userEmail: string) => {
+        if (userId === user?.id) {
+            alert('You cannot delete your own account');
+            return;
+        }
+
+        const confirmed = confirm(
+            `⚠️ Are you sure you want to delete the user "${userEmail}"?\n\n` +
+            `This will permanently delete:\n` +
+            `• The user account\n` +
+            `• All their workflows\n` +
+            `• All their dashboards\n` +
+            `• All their reports\n` +
+            `• All their entities\n\n` +
+            `This action cannot be undone!`
+        );
+
+        if (!confirmed) return;
+
+        try {
+            const res = await fetch(`${API_BASE}/admin/users/${userId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+
+            if (res.ok) {
+                setUsers(prev => prev.filter(u => u.id !== userId));
+                // Update stats
+                if (stats) {
+                    setStats({ ...stats, users: stats.users - 1 });
+                }
+                alert(`User ${userEmail} has been deleted successfully`);
+            } else {
+                const data = await res.json();
+                alert(data.error || 'Failed to delete user');
+            }
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            alert('An error occurred while deleting the user');
+        }
+    };
+
     const formatDate = (dateStr: string) => {
         if (!dateStr) return 'N/A';
         return new Date(dateStr).toLocaleDateString('es-ES', {
@@ -309,6 +351,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                                     <th className="px-6 py-3 text-center text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Dashboards</th>
                                     <th className="px-6 py-3 text-left text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Registered</th>
                                     <th className="px-6 py-3 text-center text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Admin</th>
+                                    <th className="px-6 py-3 text-center text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200">
@@ -407,11 +450,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                                                     {u.isAdmin ? <ShieldCheck size={18} weight="light" /> : <Shield size={18} weight="light" />}
                                                 </button>
                                             </td>
+                                            <td className="px-6 py-4 text-center">
+                                                {u.id !== user?.id ? (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            deleteUser(u.id, u.email);
+                                                        }}
+                                                        className="p-2 rounded-lg transition-colors bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:bg-red-100 hover:text-red-600"
+                                                        title="Delete user"
+                                                    >
+                                                        <Trash size={18} weight="light" />
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-xs text-[var(--text-tertiary)]">—</span>
+                                                )}
+                                            </td>
                                         </tr>
                                         {/* Expanded onboarding details */}
                                         {expandedUserId === u.id && (
                                             <tr className="bg-[var(--bg-tertiary)]">
-                                                <td colSpan={6} className="px-6 py-4">
+                                                <td colSpan={7} className="px-6 py-4">
                                                     <div className="ml-10">
                                                         <h4 className="text-sm font-normal text-[var(--text-primary)] mb-3 flex items-center gap-2">
                                                             <Users size={16} weight="light" />

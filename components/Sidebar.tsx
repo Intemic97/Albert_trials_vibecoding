@@ -145,7 +145,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
     };
   }, [searchQuery]);
 
-  const NavItem = ({ icon: Icon, label, view, active = false, onClick, onNavigate: onNavCb }: { icon: any, label: string, view?: string, active?: boolean, onClick?: () => void, onNavigate?: () => void }) => {
+  const NavItem = ({ icon: Icon, label, view, active = false, onClick, onNavigate: onNavCb, badge }: { icon: any, label: string, view?: string, active?: boolean, onClick?: () => void, onNavigate?: () => void, badge?: string }) => {
     const route = view ? viewToRoute[view] || `/${view}` : '#';
     
     const baseClasses = `flex items-center ${isCollapsed ? 'justify-center px-2' : 'px-3'} py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out w-full text-left group relative`;
@@ -155,10 +155,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
     
     const iconClasses = `${isCollapsed ? '' : 'mr-3'} transition-colors duration-200 ease-in-out flex-shrink-0 ${active ? 'text-[var(--sidebar-icon-active)]' : 'text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]'}`;
     
+    // Badge component
+    const badgeElement = badge && !isCollapsed ? (
+      <span className="ml-auto px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide bg-amber-100 text-amber-700 rounded">
+        {badge}
+      </span>
+    ) : null;
+
     // Tooltip for collapsed state
     const tooltip = isCollapsed ? (
       <span className="absolute left-full ml-2 px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md text-xs text-[var(--text-primary)] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
-        {label}
+        {label}{badge ? ` (${badge})` : ''}
       </span>
     ) : null;
     
@@ -171,6 +178,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         >
           <Icon size={isCollapsed ? 18 : 16} weight="light" className={iconClasses} />
           {!isCollapsed && <span className="transition-colors duration-200 ease-in-out">{label}</span>}
+          {badgeElement}
           {tooltip}
         </button>
       );
@@ -181,6 +189,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         <div className={`${baseClasses} ${activeClasses}`} title={isCollapsed ? label : undefined}>
           <Icon size={isCollapsed ? 18 : 16} weight="light" className={iconClasses} />
           {!isCollapsed && <span className="transition-colors duration-200 ease-in-out">{label}</span>}
+          {badgeElement}
           {tooltip}
         </div>
       );
@@ -202,6 +211,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
       >
         <Icon size={isCollapsed ? 18 : 16} weight="light" className={iconClasses} />
         {!isCollapsed && <span className="transition-colors duration-200 ease-in-out">{label}</span>}
+        {badgeElement}
         {tooltip}
       </Link>
     );
@@ -383,7 +393,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
             <NavItem icon={FlowArrow} label="Workflows" view="workflows" active={activeView === 'workflows'} />
             <NavItem icon={Database} label="Knowledge Base" view="database" active={activeView === 'database'} />
             <NavItem icon={Sparkle} label="Copilots" view="copilots" active={activeView === 'copilots'} />
-            <NavItem icon={Flask} label="Lab" view="lab" active={activeView === 'lab'} />
+            <NavItem icon={Flask} label="Lab" view="lab" active={activeView === 'lab'} badge="beta" />
           </div>
 
           <SectionLabel label="Reports" />

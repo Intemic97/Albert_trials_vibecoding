@@ -383,10 +383,17 @@ async function inviteUser(req, res) {
 
         // Send invitation email
         const inviteUrl = `${APP_URL}/invite?token=${inviteToken}`;
+        let emailSent = false;
+        let emailError = null;
+        
+        console.log(`[Auth] Preparing invitation email for ${email}`);
+        console.log(`[Auth] Invite URL: ${inviteUrl}`);
+        console.log(`[Auth] Resend configured: ${!!resend}, From: ${RESEND_FROM}`);
         
         try {
             if (!resend) {
-                console.warn('[Auth] RESEND_API_KEY missing, skipping invitation email');
+                console.warn('[Auth] RESEND_API_KEY missing - invitation saved but email NOT sent');
+                console.warn('[Auth] To enable email sending, set RESEND_API_KEY in your environment variables');
             } else {
                 const sendResult = await resend.emails.send({
                     from: RESEND_FROM,
@@ -432,11 +439,19 @@ async function inviteUser(req, res) {
                     `
                 });
                 console.log(`[Auth] Invitation email sent to ${email} for org ${org?.name}`);
-                console.log('[Auth] Resend send result:', sendResult);
+                console.log('[Auth] Resend send result:', JSON.stringify(sendResult, null, 2));
+                
+                if (sendResult?.data?.id) {
+                    emailSent = true;
+                } else if (sendResult?.error) {
+                    emailError = sendResult.error.message || 'Unknown Resend error';
+                    console.error('[Auth] Resend returned error:', sendResult.error);
+                }
             }
-        } catch (emailError) {
-            console.error('[Auth] Failed to send invitation email:', emailError);
-            // Don't fail the invitation if email fails
+        } catch (err) {
+            emailError = err.message;
+            console.error('[Auth] Failed to send invitation email:', err);
+            // Don't fail the invitation if email fails - invitation is still saved
         }
 
         // Log invite activity
@@ -446,13 +461,30 @@ async function inviteUser(req, res) {
                 `INSERT INTO audit_logs (id, organizationId, userId, userName, userEmail, action, resourceType, resourceId, resourceName, details, ipAddress, userAgent, createdAt)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [logId, orgId, inviterId, inviter?.name, req.user.email, 'invite', 'user', inviteId, email, 
-                 JSON.stringify({ organizationName: org?.name }), req.ip || req.headers['x-forwarded-for'], req.headers['user-agent'], new Date().toISOString()]
+                 JSON.stringify({ organizationName: org?.name, emailSent, emailError }), req.ip || req.headers['x-forwarded-for'], req.headers['user-agent'], new Date().toISOString()]
             );
         } catch (logErr) {
             console.error('Error logging invite:', logErr);
         }
 
-        res.json({ message: 'Invitation email sent', added: false });
+        // Return appropriate message based on email status
+        if (!resend) {
+            res.json({ 
+                message: 'Invitation created but email service not configured. Please configure RESEND_API_KEY.', 
+                added: false,
+                emailSent: false,
+                inviteUrl // Include URL for manual sharing in development
+            });
+        } else if (emailSent) {
+            res.json({ message: 'Invitation email sent', added: false, emailSent: true });
+        } else {
+            res.json({ 
+                message: `Invitation created but email failed to send: ${emailError || 'Unknown error'}`, 
+                added: false,
+                emailSent: false,
+                inviteUrl // Include URL for manual sharing as fallback
+            });
+        }
 
     } catch (error) {
         console.error('InviteUser error:', error);
