@@ -176,7 +176,7 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+      <div className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col border border-[var(--border-light)]">
         {/* Header */}
         <div className="px-6 py-4 border-b border-[var(--border-light)] flex items-center justify-between shrink-0">
           <h2 className="text-xl font-normal text-[var(--text-primary)]">Edit Template</h2>
@@ -187,29 +187,29 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
 
         {/* Usage Warning */}
         {usage?.inUse && (
-          <div className="mx-6 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="mx-6 mt-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
             <div className="flex items-start gap-3">
-              <div className="p-1.5 bg-amber-100 rounded-lg">
-                <Warning className="text-amber-600" size={18} weight="fill" />
+              <div className="p-1.5 bg-amber-500/20 rounded-lg">
+                <Warning className="text-amber-500" size={18} weight="fill" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-amber-800">
+                <p className="text-sm font-medium text-amber-500">
                   Template in use
                 </p>
-                <p className="text-xs text-amber-600 mt-0.5">
+                <p className="text-xs text-amber-500/80 mt-0.5">
                   This template is used in {usage.reportCount} document{usage.reportCount !== 1 ? 's' : ''}. Changes to sections may affect existing documents.
                 </p>
                 {usage.reports.length > 0 && (
                   <div className="mt-3">
-                    <p className="text-[10px] uppercase tracking-wider text-amber-500 font-medium mb-1.5">Affected documents</p>
+                    <p className="text-[10px] uppercase tracking-wider text-amber-500/60 font-medium mb-1.5">Affected documents</p>
                     <div className="flex flex-wrap gap-1.5">
                       {usage.reports.slice(0, 5).map((report) => (
-                        <span key={report.id} className="px-2 py-1 bg-white border border-amber-200 text-amber-700 rounded-md text-xs font-medium shadow-sm">
+                        <span key={report.id} className="px-2 py-1 bg-[var(--bg-tertiary)] border border-amber-500/30 text-amber-500 rounded-md text-xs font-medium">
                           {report.name}
                         </span>
                       ))}
                       {usage.reports.length > 5 && (
-                        <span className="px-2 py-1 bg-amber-100 text-amber-600 rounded-md text-xs">
+                        <span className="px-2 py-1 bg-amber-500/20 text-amber-500 rounded-md text-xs">
                           +{usage.reports.length - 5} more
                         </span>
                       )}
@@ -244,8 +244,8 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
                     onClick={() => setIcon(value)}
                     className={`p-2.5 rounded-lg border-2 transition-all ${
                       icon === value
-                        ? 'border-teal-500 bg-teal-50 text-teal-600'
-                        : 'border-[var(--border-light)] hover:border-[var(--border-medium)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        ? 'border-teal-500 bg-teal-500/10 text-teal-500'
+                        : 'border-[var(--border-light)] hover:border-[var(--border-medium)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-tertiary)]'
                     }`}
                     title={label}
                   >
@@ -274,7 +274,7 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
                 <label className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Sections</label>
                 <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Define the structure of your template</p>
               </div>
-              <button onClick={addSection} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-lg font-medium transition-colors">
+              <button onClick={addSection} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-teal-500 hover:text-teal-400 hover:bg-teal-500/10 rounded-lg font-medium transition-colors">
                 <Plus size={16} weight="bold" />
                 Add Section
               </button>
@@ -296,10 +296,10 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
                       placeholder="Section title..."
                       className="flex-1 px-3 py-1.5 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                     />
-                    <button onClick={() => addItem(sIdx)} className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors" title="Add item">
+                    <button onClick={() => addItem(sIdx)} className="p-1.5 text-teal-500 hover:bg-teal-500/10 rounded-lg transition-colors" title="Add item">
                       <Plus size={16} weight="bold" />
                     </button>
-                    <button onClick={() => removeSection(sIdx)} className="p-1.5 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Remove section">
+                    <button onClick={() => removeSection(sIdx)} className="p-1.5 text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors" title="Remove section">
                       <Trash size={16} weight="light" />
                     </button>
                   </div>
@@ -354,7 +354,7 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
                                         placeholder="Item title..."
                                         className="flex-1 px-3 py-1.5 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                                       />
-                                      <button onClick={() => removeItem(sIdx, iIdx)} className="p-1.5 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-lg shrink-0 transition-colors" title="Remove item">
+                                      <button onClick={() => removeItem(sIdx, iIdx)} className="p-1.5 text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg shrink-0 transition-colors" title="Remove item">
                                         <Trash size={14} weight="light" />
                                       </button>
                                     </div>
@@ -382,7 +382,7 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
                         ) : (
                           <div className="text-center py-6 border-2 border-dashed border-[var(--border-light)] rounded-lg bg-[var(--bg-tertiary)]/50">
                             <p className="text-sm text-[var(--text-tertiary)]">No items in this section</p>
-                            <button onClick={() => addItem(sIdx)} className="mt-2 text-sm text-teal-600 hover:text-teal-700 font-medium">
+                            <button onClick={() => addItem(sIdx)} className="mt-2 text-sm text-teal-500 hover:text-teal-400 font-medium">
                               + Add item
                             </button>
                           </div>
