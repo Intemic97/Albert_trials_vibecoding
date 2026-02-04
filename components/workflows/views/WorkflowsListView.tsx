@@ -18,6 +18,7 @@ import {
 } from '@phosphor-icons/react';
 import { PageHeader } from '../../PageHeader';
 import { Pagination } from '../../Pagination';
+import { ExecutionStatusIndicator, ExecutionProgressBar } from '../ExecutionStatusIndicator';
 
 // ============================================================================
 // TYPES
@@ -219,11 +220,16 @@ export const WorkflowsListView: React.FC<WorkflowsListViewProps> = ({
                                 </div>
                             </div>
 
+                            {/* Execution Progress Bar */}
+                            <ExecutionProgressBar workflowId={workflow.id} />
+
                             <div className="flex items-center justify-between mt-5">
                                 <div className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary)]">
                                     <CaretRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" weight="light" />
                                     <span className="opacity-0 group-hover:opacity-100 transition-opacity font-medium text-[var(--text-secondary)]">Open workflow</span>
                                 </div>
+                                {/* Execution Status Indicator */}
+                                <ExecutionStatusIndicator workflowId={workflow.id} size="sm" showLabel />
                             </div>
                         </div>
                     ))}
