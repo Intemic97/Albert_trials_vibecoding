@@ -1,9 +1,10 @@
 /**
  * Workflow Runner Modal
  * Allows users to run a workflow with input parameters
+ * Supports real-time progress tracking via WebSocket
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
     X, 
     Play, 
@@ -13,9 +14,12 @@ import {
     FileText,
     Database,
     CaretRight,
-    CaretDown
+    CaretDown,
+    CircleNotch,
+    Lightning
 } from '@phosphor-icons/react';
 import { WorkflowNode } from '../types';
+import { useExecutionProgress, ExecutionProgress } from '../../../hooks';
 
 // ============================================================================
 // TYPES
@@ -24,9 +28,10 @@ import { WorkflowNode } from '../types';
 interface WorkflowRunnerModalProps {
     isOpen: boolean;
     onClose: () => void;
+    workflowId: string;
     workflowName: string;
     nodes: WorkflowNode[];
-    onRun: (inputs: Record<string, any>) => Promise<void>;
+    onRun: (inputs: Record<string, any>) => Promise<{ executionId?: string; backgroundExecution?: boolean }>;
 }
 
 interface NodeInput {
@@ -174,6 +179,7 @@ const InputField: React.FC<InputFieldProps> = ({ input, value, onChange }) => {
 export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
     isOpen,
     onClose,
+    workflowId,
     workflowName,
     nodes,
     onRun
@@ -182,15 +188,55 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
     const [isRunning, setIsRunning] = useState(false);
     const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
     const [error, setError] = useState<string | null>(null);
+    const [executionId, setExecutionId] = useState<string | null>(null);
+    const [isBackgroundExecution, setIsBackgroundExecution] = useState(false);
+    const [progress, setProgress] = useState<ExecutionProgress | null>(null);
 
     const inputNodes = getInputNodesFromWorkflow(nodes);
     const hasInputs = inputNodes.length > 0;
+
+    // Real-time progress tracking
+    const handleProgress = useCallback((p: ExecutionProgress) => {
+        if (p.workflowId === workflowId || p.executionId === executionId) {
+            setProgress(p);
+        }
+    }, [workflowId, executionId]);
+
+    const handleComplete = useCallback((p: ExecutionProgress) => {
+        if (p.workflowId === workflowId || p.executionId === executionId) {
+            setProgress(p);
+            setIsRunning(false);
+            if (p.status === 'completed') {
+                setStatus('success');
+            } else if (p.status === 'failed') {
+                setStatus('error');
+                setError(p.error || 'Workflow execution failed');
+            }
+        }
+    }, [workflowId, executionId]);
+
+    const handleProgressError = useCallback((err: string, execId: string) => {
+        if (execId === executionId) {
+            setError(err);
+            setStatus('error');
+            setIsRunning(false);
+        }
+    }, [executionId]);
+
+    useExecutionProgress({
+        onProgress: handleProgress,
+        onComplete: handleComplete,
+        onError: handleProgressError
+    });
 
     useEffect(() => {
         if (isOpen) {
             setInputs({});
             setStatus('idle');
             setError(null);
+            setExecutionId(null);
+            setIsBackgroundExecution(false);
+            setProgress(null);
         }
     }, [isOpen]);
 
@@ -208,17 +254,25 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
         setError(null);
 
         try {
-            await onRun(inputs);
-            setStatus('success');
+            const result = await onRun(inputs);
             
-            // Auto-close after success
-            setTimeout(() => {
-                onClose();
-            }, 1500);
+            if (result?.executionId) {
+                setExecutionId(result.executionId);
+            }
+            
+            if (result?.backgroundExecution) {
+                // Background execution - keep modal open to show progress
+                setIsBackgroundExecution(true);
+            } else {
+                // Synchronous execution completed
+                setStatus('success');
+                setTimeout(() => {
+                    onClose();
+                }, 1500);
+            }
         } catch (err) {
             setStatus('error');
             setError(err instanceof Error ? err.message : 'Workflow execution failed');
-        } finally {
             setIsRunning(false);
         }
     };
@@ -227,6 +281,8 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
         setInputs(prev => ({ ...prev, [nodeId]: value }));
         setError(null);
     };
+
+    const progressPercentage = progress?.progress?.percentage || 0;
 
     if (!isOpen) return null;
 
@@ -289,8 +345,58 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
                         </div>
                     )}
 
+                    {/* Progress bar for background execution */}
+                    {isBackgroundExecution && isRunning && (
+                        <div className="mb-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Lightning size={14} className="text-[#256A65]" weight="fill" />
+                                    <span className="text-xs font-medium text-[var(--text-secondary)]">
+                                        Running in background
+                                    </span>
+                                </div>
+                                <span className="text-xs text-[var(--text-tertiary)]">
+                                    {progress?.progress?.completedNodes || 0} / {progress?.progress?.totalNodes || '?'} nodes
+                                </span>
+                            </div>
+                            <div className="w-full bg-[var(--bg-tertiary)] rounded-full h-2 overflow-hidden">
+                                <div 
+                                    className="bg-[#256A65] h-2 rounded-full transition-all duration-300 ease-out"
+                                    style={{ width: `${progressPercentage}%` }}
+                                />
+                            </div>
+                            {progress?.currentNodeId && (
+                                <p className="text-xs text-[var(--text-tertiary)]">
+                                    Processing: {progress.currentNodeId}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Execution logs */}
+                    {isBackgroundExecution && progress?.logs && progress.logs.length > 0 && (
+                        <div className="mb-4 max-h-32 overflow-y-auto border border-[var(--border-light)] rounded-lg">
+                            <div className="p-2 space-y-1">
+                                {progress.logs.map((log, idx) => (
+                                    <div key={idx} className="flex items-center gap-2 text-xs">
+                                        {log.status === 'completed' ? (
+                                            <CheckCircle size={12} className="text-green-500 flex-shrink-0" weight="fill" />
+                                        ) : log.status === 'error' || log.status === 'failed' ? (
+                                            <XCircle size={12} className="text-red-500 flex-shrink-0" weight="fill" />
+                                        ) : (
+                                            <CircleNotch size={12} className="text-[#256A65] flex-shrink-0 animate-spin" weight="light" />
+                                        )}
+                                        <span className="text-[var(--text-secondary)] truncate">
+                                            {log.nodeLabel || log.nodeType}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Input fields */}
-                    {hasInputs ? (
+                    {!isBackgroundExecution && (hasInputs ? (
                         <div className="space-y-3">
                             <p className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-3">
                                 Workflow Inputs
@@ -310,7 +416,7 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
                             <p className="text-sm text-[var(--text-secondary)]">This workflow has no input nodes</p>
                             <p className="text-xs text-[var(--text-tertiary)] mt-1">Click "Run" to execute the workflow</p>
                         </div>
-                    )}
+                    ))}
                 </div>
 
                 {/* Footer */}
