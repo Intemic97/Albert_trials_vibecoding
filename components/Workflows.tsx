@@ -709,6 +709,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             setConnections(workflow.data.connections || []);
             setWorkflowTags(workflow.tags || []);
             lastLoadedWorkflowIdRef.current = workflow.id;
+            // Reset unsaved changes flag after loading
+            setHasUnsavedChanges(false);
             // Update URL to reflect the loaded workflow
             if (updateUrl) {
                 navigate(`/workflow/${workflow.id}`, { replace: true });
@@ -790,6 +792,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             }
 
             await fetchWorkflows();
+            setHasUnsavedChanges(false);
             showToast('Workflow saved successfully!', 'success');
         } catch (error) {
             console.error('Error saving workflow:', error);
@@ -843,8 +846,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     };
 
     const backToList = () => {
-        // Show confirmation popup if there might be unsaved changes
-        if (currentView === 'canvas' && (nodes.length > 0 || workflowName.trim())) {
+        // Only show confirmation if there are actual unsaved changes
+        if (currentView === 'canvas' && hasUnsavedChanges) {
             setShowExitConfirmation(true);
         } else {
             navigate('/workflows');
@@ -9449,42 +9452,78 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                         {/* Split Columns Configuration Modal */}
                         {configuringSplitColumnsNodeId && (() => {
-                            const allColumns = [...splitColumnsAvailable, ...splitColumnsOutputA, ...splitColumnsOutputB];
+                            // Get unique columns from all lists
+                            const allUniqueColumns = Array.from(new Set([...splitColumnsAvailable, ...splitColumnsOutputA, ...splitColumnsOutputB]));
                             
-                            const handleDragStart = (column: string) => {
+                            const handleDragStart = (column: string, source: 'A' | 'B', index: number) => {
                                 setDraggedColumn(column);
+                                // Store source info in data transfer
+                                (window as any).__splitDragSource = { source, index };
                             };
                             
                             const handleDragEnd = () => {
                                 setDraggedColumn(null);
+                                delete (window as any).__splitDragSource;
                             };
                             
-                            const handleDropOnOutputA = (e: React.DragEvent) => {
+                            const handleDropOnOutputA = (e: React.DragEvent, dropIndex?: number) => {
                                 e.preventDefault();
                                 if (!draggedColumn) return;
                                 
-                                // Remove from other lists
-                                setSplitColumnsAvailable(prev => prev.filter(c => c !== draggedColumn));
-                                setSplitColumnsOutputB(prev => prev.filter(c => c !== draggedColumn));
+                                const dragSource = (window as any).__splitDragSource;
                                 
-                                // Add to Output A if not already there
-                                if (!splitColumnsOutputA.includes(draggedColumn)) {
-                                    setSplitColumnsOutputA(prev => [...prev, draggedColumn]);
+                                // If dragging within Output A (reorder)
+                                if (dragSource?.source === 'A' && dropIndex !== undefined) {
+                                    setSplitColumnsOutputA(prev => {
+                                        const newArr = prev.filter((_, i) => i !== dragSource.index);
+                                        const insertIdx = dropIndex > dragSource.index ? dropIndex - 1 : dropIndex;
+                                        newArr.splice(insertIdx, 0, draggedColumn);
+                                        return newArr;
+                                    });
+                                } else {
+                                    // Add to Output A (allow duplicates - same column can be in both)
+                                    if (!splitColumnsOutputA.includes(draggedColumn)) {
+                                        if (dropIndex !== undefined) {
+                                            setSplitColumnsOutputA(prev => {
+                                                const newArr = [...prev];
+                                                newArr.splice(dropIndex, 0, draggedColumn);
+                                                return newArr;
+                                            });
+                                        } else {
+                                            setSplitColumnsOutputA(prev => [...prev, draggedColumn]);
+                                        }
+                                    }
                                 }
                                 setDraggedColumn(null);
                             };
                             
-                            const handleDropOnOutputB = (e: React.DragEvent) => {
+                            const handleDropOnOutputB = (e: React.DragEvent, dropIndex?: number) => {
                                 e.preventDefault();
                                 if (!draggedColumn) return;
                                 
-                                // Remove from other lists
-                                setSplitColumnsAvailable(prev => prev.filter(c => c !== draggedColumn));
-                                setSplitColumnsOutputA(prev => prev.filter(c => c !== draggedColumn));
+                                const dragSource = (window as any).__splitDragSource;
                                 
-                                // Add to Output B if not already there
-                                if (!splitColumnsOutputB.includes(draggedColumn)) {
-                                    setSplitColumnsOutputB(prev => [...prev, draggedColumn]);
+                                // If dragging within Output B (reorder)
+                                if (dragSource?.source === 'B' && dropIndex !== undefined) {
+                                    setSplitColumnsOutputB(prev => {
+                                        const newArr = prev.filter((_, i) => i !== dragSource.index);
+                                        const insertIdx = dropIndex > dragSource.index ? dropIndex - 1 : dropIndex;
+                                        newArr.splice(insertIdx, 0, draggedColumn);
+                                        return newArr;
+                                    });
+                                } else {
+                                    // Add to Output B (allow duplicates - same column can be in both)
+                                    if (!splitColumnsOutputB.includes(draggedColumn)) {
+                                        if (dropIndex !== undefined) {
+                                            setSplitColumnsOutputB(prev => {
+                                                const newArr = [...prev];
+                                                newArr.splice(dropIndex, 0, draggedColumn);
+                                                return newArr;
+                                            });
+                                        } else {
+                                            setSplitColumnsOutputB(prev => [...prev, draggedColumn]);
+                                        }
+                                    }
                                 }
                                 setDraggedColumn(null);
                             };
@@ -9493,38 +9532,75 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 e.preventDefault();
                             };
                             
-                            const moveColumnToA = (column: string) => {
-                                setSplitColumnsOutputB(prev => prev.filter(c => c !== column));
+                            // Copy column to A (allows duplicates)
+                            const copyColumnToA = (column: string) => {
                                 if (!splitColumnsOutputA.includes(column)) {
                                     setSplitColumnsOutputA(prev => [...prev, column]);
                                 }
                             };
                             
-                            const moveColumnToB = (column: string) => {
-                                setSplitColumnsOutputA(prev => prev.filter(c => c !== column));
+                            // Copy column to B (allows duplicates)
+                            const copyColumnToB = (column: string) => {
                                 if (!splitColumnsOutputB.includes(column)) {
                                     setSplitColumnsOutputB(prev => [...prev, column]);
                                 }
                             };
                             
+                            // Remove column from A
+                            const removeFromA = (column: string) => {
+                                setSplitColumnsOutputA(prev => prev.filter(c => c !== column));
+                            };
+                            
+                            // Remove column from B
+                            const removeFromB = (column: string) => {
+                                setSplitColumnsOutputB(prev => prev.filter(c => c !== column));
+                            };
+                            
+                            // Move column up in list
+                            const moveUp = (list: 'A' | 'B', index: number) => {
+                                if (index === 0) return;
+                                const setter = list === 'A' ? setSplitColumnsOutputA : setSplitColumnsOutputB;
+                                setter(prev => {
+                                    const newArr = [...prev];
+                                    [newArr[index - 1], newArr[index]] = [newArr[index], newArr[index - 1]];
+                                    return newArr;
+                                });
+                            };
+                            
+                            // Move column down in list
+                            const moveDown = (list: 'A' | 'B', index: number, length: number) => {
+                                if (index === length - 1) return;
+                                const setter = list === 'A' ? setSplitColumnsOutputA : setSplitColumnsOutputB;
+                                setter(prev => {
+                                    const newArr = [...prev];
+                                    [newArr[index], newArr[index + 1]] = [newArr[index + 1], newArr[index]];
+                                    return newArr;
+                                });
+                            };
+                            
                             const moveAllToA = () => {
-                                setSplitColumnsOutputA([...splitColumnsOutputA, ...splitColumnsOutputB]);
+                                const allCols = Array.from(new Set([...splitColumnsOutputA, ...splitColumnsOutputB]));
+                                setSplitColumnsOutputA(allCols);
                                 setSplitColumnsOutputB([]);
                             };
                             
                             const moveAllToB = () => {
-                                setSplitColumnsOutputB([...splitColumnsOutputB, ...splitColumnsOutputA]);
+                                const allCols = Array.from(new Set([...splitColumnsOutputA, ...splitColumnsOutputB]));
+                                setSplitColumnsOutputB(allCols);
                                 setSplitColumnsOutputA([]);
                             };
+                            
+                            // Check if column is in both outputs
+                            const isInBoth = (column: string) => splitColumnsOutputA.includes(column) && splitColumnsOutputB.includes(column);
                             
                             return (
                                 <NodeConfigSidePanel
                                     isOpen={!!configuringSplitColumnsNodeId}
                                     onClose={() => setConfiguringSplitColumnsNodeId(null)}
                                     title="Split by Columns"
-                                    description="Drag columns between outputs A and B"
+                                    description="Distribute columns between outputs. Same column can be in both outputs."
                                     icon={Columns}
-                                    width="w-[600px]"
+                                    width="w-[650px]"
                                     footer={
                                         <>
                                             <button
@@ -9543,7 +9619,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </>
                                     }
                                 >
-                                        {allColumns.length === 0 ? (
+                                        {allUniqueColumns.length === 0 ? (
                                             <div className="text-center py-8 text-[var(--text-secondary)]">
                                                 <Columns size={32} className="mx-auto mb-2 opacity-50" />
                                                 <p className="font-medium">No columns available</p>
@@ -9556,7 +9632,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     <div 
                                                         className="flex-1 flex flex-col"
                                                         onDragOver={handleDragOver}
-                                                        onDrop={handleDropOnOutputA}
+                                                        onDrop={(e) => handleDropOnOutputA(e)}
                                                     >
                                                         <div className="flex items-center justify-between mb-2">
                                                             <div className="flex items-center gap-2">
@@ -9578,24 +9654,37 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 </div>
                                                             ) : (
                                                                 <div className="space-y-1">
-                                                                    {splitColumnsOutputA.map(column => (
+                                                                    {splitColumnsOutputA.map((column, idx) => (
                                                                         <div
-                                                                            key={column}
+                                                                            key={`a-${column}-${idx}`}
                                                                             draggable
-                                                                            onDragStart={() => handleDragStart(column)}
+                                                                            onDragStart={() => handleDragStart(column, 'A', idx)}
                                                                             onDragEnd={handleDragEnd}
-                                                                            className="flex items-center justify-between px-2.5 py-1.5 bg-[var(--bg-card)] rounded border border-[var(--border-light)] cursor-grab group"
+                                                                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                                                            onDrop={(e) => { e.stopPropagation(); handleDropOnOutputA(e, idx); }}
+                                                                            className={`flex items-center justify-between px-2.5 py-1.5 bg-[var(--bg-card)] rounded border cursor-grab group ${isInBoth(column) ? 'border-teal-500/50 bg-teal-500/5' : 'border-[var(--border-light)]'}`}
                                                                         >
                                                                             <div className="flex items-center gap-2">
                                                                                 <GripVertical size={12} className="text-[var(--text-tertiary)]" />
                                                                                 <span className="text-xs font-medium text-[var(--text-primary)]">{column}</span>
+                                                                                {isInBoth(column) && (
+                                                                                    <span className="text-[10px] px-1.5 py-0.5 bg-teal-500/20 text-teal-500 rounded">A+B</span>
+                                                                                )}
                                                                             </div>
-                                                                            <button
-                                                                                onClick={() => moveColumnToB(column)}
-                                                                                className="opacity-0 group-hover:opacity-100 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-opacity"
-                                                                            >
-                                                                                → B
-                                                                            </button>
+                                                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                <button onClick={() => moveUp('A', idx)} className="p-0.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]" title="Move up">
+                                                                                    <ChevronUp size={12} weight="bold" />
+                                                                                </button>
+                                                                                <button onClick={() => moveDown('A', idx, splitColumnsOutputA.length)} className="p-0.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]" title="Move down">
+                                                                                    <ChevronDown size={12} weight="bold" />
+                                                                                </button>
+                                                                                <button onClick={() => copyColumnToB(column)} className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] px-1" title="Copy to B">
+                                                                                    +B
+                                                                                </button>
+                                                                                <button onClick={() => removeFromA(column)} className="p-0.5 text-red-400 hover:text-red-500" title="Remove">
+                                                                                    <X size={12} weight="bold" />
+                                                                                </button>
+                                                                            </div>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -9607,7 +9696,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     <div 
                                                         className="flex-1 flex flex-col"
                                                         onDragOver={handleDragOver}
-                                                        onDrop={handleDropOnOutputB}
+                                                        onDrop={(e) => handleDropOnOutputB(e)}
                                                     >
                                                         <div className="flex items-center justify-between mb-2">
                                                             <div className="flex items-center gap-2">
@@ -9629,24 +9718,37 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 </div>
                                                             ) : (
                                                                 <div className="space-y-1">
-                                                                    {splitColumnsOutputB.map(column => (
+                                                                    {splitColumnsOutputB.map((column, idx) => (
                                                                         <div
-                                                                            key={column}
+                                                                            key={`b-${column}-${idx}`}
                                                                             draggable
-                                                                            onDragStart={() => handleDragStart(column)}
+                                                                            onDragStart={() => handleDragStart(column, 'B', idx)}
                                                                             onDragEnd={handleDragEnd}
-                                                                            className="flex items-center justify-between px-2.5 py-1.5 bg-[var(--bg-card)] rounded border border-[var(--border-light)] cursor-grab group"
+                                                                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                                                            onDrop={(e) => { e.stopPropagation(); handleDropOnOutputB(e, idx); }}
+                                                                            className={`flex items-center justify-between px-2.5 py-1.5 bg-[var(--bg-card)] rounded border cursor-grab group ${isInBoth(column) ? 'border-teal-500/50 bg-teal-500/5' : 'border-[var(--border-light)]'}`}
                                                                         >
                                                                             <div className="flex items-center gap-2">
                                                                                 <GripVertical size={12} className="text-[var(--text-tertiary)]" />
                                                                                 <span className="text-xs font-medium text-[var(--text-primary)]">{column}</span>
+                                                                                {isInBoth(column) && (
+                                                                                    <span className="text-[10px] px-1.5 py-0.5 bg-teal-500/20 text-teal-500 rounded">A+B</span>
+                                                                                )}
                                                                             </div>
-                                                                            <button
-                                                                                onClick={() => moveColumnToA(column)}
-                                                                                className="opacity-0 group-hover:opacity-100 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-opacity"
-                                                                            >
-                                                                                ← A
-                                                                            </button>
+                                                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                <button onClick={() => moveUp('B', idx)} className="p-0.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]" title="Move up">
+                                                                                    <ChevronUp size={12} weight="bold" />
+                                                                                </button>
+                                                                                <button onClick={() => moveDown('B', idx, splitColumnsOutputB.length)} className="p-0.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]" title="Move down">
+                                                                                    <ChevronDown size={12} weight="bold" />
+                                                                                </button>
+                                                                                <button onClick={() => copyColumnToA(column)} className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] px-1" title="Copy to A">
+                                                                                    +A
+                                                                                </button>
+                                                                                <button onClick={() => removeFromB(column)} className="p-0.5 text-red-400 hover:text-red-500" title="Remove">
+                                                                                    <X size={12} weight="bold" />
+                                                                                </button>
+                                                                            </div>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -9657,7 +9759,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 
                                                 <div className="mt-4 pt-3 border-t border-[var(--border-light)]">
                                                     <p className="text-xs text-[var(--text-secondary)]">
-                                                        <span className="font-medium">Tip:</span> Drag columns between outputs, or use the arrow buttons. Each row will be split into two datasets with the selected columns.
+                                                        <span className="font-medium">Tip:</span> Drag to reorder within a column. Use <span className="px-1 py-0.5 bg-[var(--bg-tertiary)] rounded text-[10px]">+A</span>/<span className="px-1 py-0.5 bg-[var(--bg-tertiary)] rounded text-[10px]">+B</span> to add a column to both outputs (useful for timestamps).
                                                     </p>
                                                 </div>
                                             </>
