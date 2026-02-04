@@ -181,13 +181,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 } : n
             ));
         },
-        onWorkflowRunning: (userName) => {
-            // Show notification that another user started running
-            console.log(`${userName} started running the workflow`);
+        onWorkflowRunning: (_userName) => {
+            // TODO: Show notification that another user started running
         },
-        onWorkflowCompleted: (userName) => {
-            // Show notification that another user finished running
-            console.log(`${userName} finished running the workflow`);
+        onWorkflowCompleted: (_userName) => {
+            // TODO: Show notification that another user finished running
         }
     });
     const [savedWorkflows, setSavedWorkflows] = useState<any[]>([]);
@@ -2376,7 +2374,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             if (response.ok) {
                 const data = await response.json();
-                console.log('Climatiq search response:', data);
                 // Extract top 10 results
                 const results = data.results?.slice(0, 10) || [];
                 setClimatiqSearchResults(results);
@@ -2460,13 +2457,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 columns,
                                 sampleData: parentData.slice(0, 3) // Send first 3 records as sample
                             };
-                            console.log('Python AI - Input data schema:', inputDataSchema);
                         }
                     }
                 }
             }
-
-            console.log('Python AI - Sending to API:', { prompt: pythonAiPrompt, inputDataSchema });
             const response = await fetch(`${API_BASE}/python/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

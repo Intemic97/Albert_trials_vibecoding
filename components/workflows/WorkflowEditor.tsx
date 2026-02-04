@@ -215,8 +215,8 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
       });
       
       if (response.ok) {
-        const result = await response.json();
-        console.log('Workflow executed:', result);
+        await response.json();
+        // Execution completed successfully
       }
     } catch (error) {
       console.error('Error running workflow:', error);

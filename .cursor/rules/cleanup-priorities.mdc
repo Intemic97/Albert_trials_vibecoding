@@ -1,0 +1,145 @@
+---
+description: Plan de limpieza y prioridades para el proyecto - Febrero 2026
+globs: ["**/*.tsx", "**/*.ts"]
+alwaysApply: false
+---
+
+# Plan de Limpieza y Prioridades
+
+## Estado Actual del Código (Actualizado 2026-02-04)
+
+### Limpieza Completada ✅
+
+- [x] Eliminado `WorkflowsRefactored.example.tsx` (381 líneas)
+- [x] Eliminados 3 archivos de documentación duplicada (MIGRATION_*.md)
+- [x] Limpiados console.logs de desarrollo
+- [x] Verificados lints (sin errores)
+
+### Problema Principal: `Workflows.tsx`
+
+| Métrica | Valor | Objetivo |
+|---------|-------|----------|
+| Líneas actuales | **11,541** | < 500 |
+| useState hooks | ~170 | 0 (usar stores) |
+| Componentes inline | ~20 | 0 |
+
+Este archivo es el **tech debt más crítico** del proyecto.
+
+### Arquitectura Actual vs Deseada
+
+```
+ACTUAL (Monolito):                    DESEADO (Modular):
+┌─────────────────────┐               ┌──────────────────┐
+│   Workflows.tsx     │               │ WorkflowEditor   │ (~500 líneas)
+│   11,547 líneas     │      →        ├──────────────────┤
+│   170 useState      │               │ Zustand Stores   │
+│   Todo mezclado     │               │ + Hooks modulares│
+└─────────────────────┘               └──────────────────┘
+```
+
+## Prioridades de Refactorización
+
+### 🔴 URGENTE (Sprint actual)
+
+#### 1. Completar migración de ejecución de nodos
+**Archivos:** `components/workflows/hooks/useWorkflowExecution.ts`
+
+El sistema de ejecución actual en `Workflows.tsx` (líneas ~3404-3480) debe moverse a un hook dedicado que:
+- Ejecute nodos secuencialmente según el DAG
+- Actualice estado via WebSocket
+- Soporte cancelación (ya implementado backend)
+
+**Esfuerzo:** 2-3 días
+
+#### 2. Extraer configuración de nodos del monolito
+**Archivos:** `components/workflows/modals/` (ya existen muchos)
+
+El código de configuración en `Workflows.tsx` (líneas ~4200-8000) son ~4000 líneas que ya tienen equivalentes en `modals/`. Necesitamos:
+- Conectar los modales existentes con `nodeConfigStore`
+- Eliminar código duplicado de `Workflows.tsx`
+
+**Esfuerzo:** 1-2 días
+
+#### 3. Unificar las dos versiones
+**Rutas:** `/workflows` (original) vs `/workflows-v2` (nueva)
+
+Actualmente hay DOS versiones corriendo. Debemos:
+- Validar que `/workflows-v2` tiene feature parity
+- Hacer switch gradual
+- Deprecar la versión original
+
+**Esfuerzo:** 3-5 días
+
+### 🟡 ALTA (Próximo sprint)
+
+#### 4. Limpiar archivos de ejemplo/documentación
+Archivos que pueden eliminarse o moverse:
+- `WorkflowsRefactored.example.tsx` → Mover a docs o eliminar
+- `MIGRATION_*.md` → Consolidar en cursor rules
+- Comentarios TODO antiguos
+
+#### 5. Optimizar re-renders
+El canvas actual re-renderiza demasiado. Implementar:
+- `React.memo` en nodos
+- Selectores específicos de Zustand
+- `useMemo`/`useCallback` consistentes
+
+#### 6. Tests unitarios para stores
+- `workflowStore.test.ts`
+- `nodeConfigStore.test.ts`
+- Tests de hooks de canvas
+
+### 🟢 MEDIA (Backlog)
+
+#### 7. Separar lógica de negocio
+Crear `utils/workflowEngine.ts`:
+- Validación de conexiones
+- Cálculo de orden de ejecución (topological sort)
+- Serialización/deserialización
+
+#### 8. Documentación inline
+- JSDoc en funciones públicas
+- Storybook para componentes de UI
+
+## Archivos a NO tocar (estables)
+
+| Archivo | Razón |
+|---------|-------|
+| `stores/workflowStore.ts` | Funcionando bien |
+| `stores/nodeConfigStore.ts` | Funcionando bien |
+| `hooks/useExecutionProgress.ts` | Recién actualizado |
+| `components/workflows/modals/*` | Ya modulares |
+
+## Archivos a eliminar eventualmente
+
+| Archivo | Reemplazo |
+|---------|-----------|
+| `Workflows.tsx` (11,547 líneas) | `WorkflowEditor.tsx` |
+| `WorkflowsRefactored.example.tsx` | Documentación |
+
+## Métricas de Éxito
+
+| Métrica | Actual | Meta |
+|---------|--------|------|
+| Archivo más grande | 11,547 líneas | < 800 líneas |
+| Tiempo de carga inicial | ~2s | < 500ms |
+| Re-renders por interacción | ~15 | < 5 |
+| Cobertura de tests | 0% | > 60% |
+
+## Comando para verificar progreso
+
+```bash
+# Ver tamaño de archivos principales
+wc -l components/Workflows.tsx components/workflows/WorkflowEditor.tsx
+
+# Buscar useState en Workflows.tsx
+grep -c "useState" components/Workflows.tsx
+
+# Buscar TODO pendientes
+grep -r "TODO" components/workflows --include="*.tsx" | wc -l
+```
+
+---
+
+**Última actualización:** 2026-02-04
+**Responsable:** Equipo de desarrollo
