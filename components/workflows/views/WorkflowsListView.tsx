@@ -167,17 +167,26 @@ export const WorkflowsListView: React.FC<WorkflowsListViewProps> = ({
                                             <h3 className="text-base font-normal text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors truncate">
                                                 {workflow.name}
                                             </h3>
-                                            {/* Tags */}
+                                            {/* Tags - Limited to 3 visible, truncated */}
                                             {workflow.tags && workflow.tags.length > 0 && (
-                                                <div className="flex flex-wrap gap-1.5 mt-2">
-                                                    {workflow.tags.map((tag: string, idx: number) => (
+                                                <div className="flex flex-wrap gap-1.5 mt-2 max-h-[52px] overflow-hidden">
+                                                    {workflow.tags.slice(0, 3).map((tag: string, idx: number) => (
                                                         <span
                                                             key={idx}
-                                                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-light)]"
+                                                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] max-w-[120px] truncate"
+                                                            title={tag}
                                                         >
-                                                            {tag}
+                                                            {tag.length > 15 ? `${tag.slice(0, 15)}...` : tag}
                                                         </span>
                                                     ))}
+                                                    {workflow.tags.length > 3 && (
+                                                        <span
+                                                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] border border-[var(--border-light)]"
+                                                            title={`${workflow.tags.length - 3} more tags`}
+                                                        >
+                                                            +{workflow.tags.length - 3}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -187,7 +196,7 @@ export const WorkflowsListView: React.FC<WorkflowsListViewProps> = ({
                                             e.stopPropagation();
                                             onDeleteWorkflow(workflow.id);
                                         }}
-                                        className="text-[var(--text-tertiary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                        className="text-[var(--text-tertiary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
                                     >
                                         <Trash size={16} weight="light" />
                                     </button>

@@ -309,7 +309,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
   );
 
   return (
-    <div data-tutorial="sidebar" className={`${isCollapsed ? 'w-16' : 'w-60'} bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] h-screen flex flex-col sticky top-0 font-sans z-40 transition-all duration-300`}>
+    <div data-tutorial="sidebar" className={`${isCollapsed ? 'w-16' : 'w-60'} bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] h-screen flex flex-col sticky top-0 font-sans z-40 transition-all duration-300 overflow-x-hidden`}>
       {/* Collapse Toggle Button */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
@@ -372,11 +372,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
                 }
                 if (e.key === 'Escape') {
                   setShowResults(false);
+                  setSearchQuery('');
                 }
               }}
+              onBlur={() => {
+                // Small delay to allow click events on results
+                setTimeout(() => setShowResults(false), 200);
+              }}
               placeholder="Search"
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-[var(--bg-input)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] focus:border-[var(--border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] transition-all duration-200"
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-[var(--bg-input)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] focus:border-[var(--border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] transition-all duration-200"
             />
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setShowResults(false);
+                  searchRef.current?.focus();
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+              >
+                <X size={14} weight="light" />
+              </button>
+            )}
           {showResults && (
             <div className="absolute left-0 right-0 mt-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-lg text-sm z-20 overflow-hidden">
               <div className="px-3 py-2 text-xs font-medium text-[var(--text-secondary)] border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">

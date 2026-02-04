@@ -141,7 +141,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
         const data = last7Days.map(({ date, executions }) => ({ date, executions }));
         
         return {
-            type: 'bar' as const,
+            type: 'area' as const,
             title: 'Workflow Executions',
             description: 'Last 7 days',
             data,

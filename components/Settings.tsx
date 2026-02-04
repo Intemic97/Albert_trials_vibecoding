@@ -598,13 +598,15 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                     <h2 className="text-lg font-normal text-slate-800">Team Members</h2>
                                     <p className="text-[var(--text-secondary)] text-sm">Manage who has access to this organization.</p>
                                 </div>
-                                <button
-                                    onClick={() => setIsInviting(true)}
-                                    className="flex items-center btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
-                                >
-                                    <Plus size={16} weight="light" className="mr-2" />
-                                    Invite Member
-                                </button>
+                                {currentOrg?.role === 'admin' && (
+                                    <button
+                                        onClick={() => setIsInviting(true)}
+                                        className="flex items-center btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                        <Plus size={16} weight="light" className="mr-2" />
+                                        Invite Member
+                                    </button>
+                                )}
                             </div>
 
                             {feedback && (
@@ -621,7 +623,9 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             <th className="px-6 py-4 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">User</th>
                                             <th className="px-6 py-4 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Role</th>
                                             <th className="px-6 py-4 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Email</th>
-                                            <th className="px-6 py-4 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Actions</th>
+                                            {currentOrg?.role === 'admin' && (
+                                                <th className="px-6 py-4 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Actions</th>
+                                            )}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -649,12 +653,21 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                 <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
                                                     {user.email}
                                                 </td>
-                                                <td className="px-6 py-4">
-                                                    <button className="text-[var(--text-tertiary)] hover:text-red-600 transition-colors">
-                                                        <span className="sr-only">Remove</span>
-                                                        <X size={16} weight="light" />
-                                                    </button>
-                                                </td>
+                                                {/* Only show delete button if current user is admin */}
+                                                {currentOrg?.role === 'admin' && (
+                                                    <td className="px-6 py-4">
+                                                        <button 
+                                                            className="text-[var(--text-tertiary)] hover:text-red-600 transition-colors"
+                                                            onClick={() => {
+                                                                // TODO: Implement user removal
+                                                                console.log('Remove user:', user.id);
+                                                            }}
+                                                        >
+                                                            <span className="sr-only">Remove</span>
+                                                            <X size={16} weight="light" />
+                                                        </button>
+                                                    </td>
+                                                )}
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1220,13 +1233,15 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                                     </p>
                                                                 )}
                                                             </div>
-                                                            <button
-                                                                onClick={disconnectSlack}
-                                                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                            >
-                                                                <LinkBreak size={14} weight="light" />
-                                                                Disconnect
-                                                            </button>
+                                                            {currentOrg?.role === 'admin' && (
+                                                                <button
+                                                                    onClick={disconnectSlack}
+                                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-500/10 rounded-lg transition-colors"
+                                                                >
+                                                                    <LinkBreak size={14} weight="light" />
+                                                                    Disconnect
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
 
