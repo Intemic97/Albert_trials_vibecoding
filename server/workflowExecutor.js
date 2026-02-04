@@ -261,6 +261,7 @@ class WorkflowExecutor {
             mysql: () => this.handleMySQL(node, inputData),
             sendEmail: () => this.handleSendEmail(node, inputData),
             sendSMS: () => this.handleSendSMS(node, inputData),
+            sendSlack: () => this.handleSendSlack(node, inputData),
             dataVisualization: () => this.handleDataVisualization(node, inputData),
             esios: () => this.handleEsios(node, inputData),
             climatiq: () => this.handleClimatiq(node, inputData),
@@ -864,6 +865,83 @@ class WorkflowExecutor {
             };
         } catch (error) {
             throw new Error(`Failed to send SMS: ${error.message}`);
+        }
+    }
+
+    async handleSendSlack(node, inputData) {
+        const config = node.config || {};
+        const { slackWebhookUrl, slackChannel, slackMessage, slackUsername, slackIconEmoji } = config;
+
+        if (!slackWebhookUrl) {
+            throw new Error('Slack webhook URL not configured');
+        }
+
+        if (!slackMessage) {
+            throw new Error('Slack message is empty');
+        }
+
+        // Replace placeholders in message with input data
+        let message = slackMessage;
+        if (inputData && typeof inputData === 'object') {
+            for (const [key, value] of Object.entries(inputData)) {
+                const placeholder = `{{${key}}}`;
+                if (message.includes(placeholder)) {
+                    message = message.replace(new RegExp(placeholder, 'g'), String(value));
+                }
+            }
+        }
+
+        // Build Slack payload
+        const payload = {
+            text: message,
+            username: slackUsername || 'Workflow Bot',
+            icon_emoji: slackIconEmoji || ':robot_face:'
+        };
+
+        if (slackChannel) {
+            payload.channel = slackChannel;
+        }
+
+        // Add attachments if we have structured data
+        if (inputData && typeof inputData === 'object') {
+            const fields = [];
+            for (const [key, value] of Object.entries(inputData)) {
+                if (!['_webhookData', 'response'].includes(key)) {
+                    fields.push({
+                        title: key,
+                        value: String(value).substring(0, 100),
+                        short: true
+                    });
+                }
+            }
+
+            if (fields.length > 0) {
+                payload.attachments = [{
+                    color: '#36a64f',
+                    fields: fields.slice(0, 10)
+                }];
+            }
+        }
+
+        try {
+            const response = await fetch(slackWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Slack API error: ${errorText}`);
+            }
+
+            return {
+                success: true,
+                message: `Slack message sent${slackChannel ? ' to ' + slackChannel : ''}`,
+                outputData: inputData
+            };
+        } catch (error) {
+            throw new Error(`Failed to send Slack message: ${error.message}`);
         }
     }
 

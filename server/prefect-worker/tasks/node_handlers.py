@@ -1149,6 +1149,77 @@ async def handle_human_approval(node: Dict, input_data: Optional[Dict] = None, e
         "paused": True
     }
 
+@task(name="send_slack", retries=2)
+async def handle_send_slack(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
+    """Handle Slack message sending node"""
+    config_data = node.get("config", {})
+    
+    webhook_url = config_data.get("slackWebhookUrl")
+    channel = config_data.get("slackChannel")
+    message = config_data.get("slackMessage", "")
+    username = config_data.get("slackUsername", "Workflow Bot")
+    icon_emoji = config_data.get("slackIconEmoji", ":robot_face:")
+    
+    if not webhook_url:
+        raise ValueError("Slack webhook URL not configured")
+    
+    if not message:
+        raise ValueError("Slack message is empty")
+    
+    # Replace placeholders in message with input data
+    if input_data and isinstance(input_data, dict):
+        for key, value in input_data.items():
+            placeholder = f"{{{{{key}}}}}"
+            if placeholder in message:
+                message = message.replace(placeholder, str(value))
+    
+    # Build Slack payload
+    payload = {
+        "text": message,
+        "username": username,
+        "icon_emoji": icon_emoji
+    }
+    
+    if channel:
+        payload["channel"] = channel
+    
+    # Add attachments if we have structured data
+    if input_data and isinstance(input_data, dict):
+        fields = []
+        for key, value in input_data.items():
+            if key not in ["_webhookData", "response"]:  # Skip internal fields
+                fields.append({
+                    "title": key,
+                    "value": str(value)[:100],  # Limit length
+                    "short": True
+                })
+        
+        if fields:
+            payload["attachments"] = [{
+                "color": "#36a64f",
+                "fields": fields[:10]  # Max 10 fields
+            }]
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                webhook_url,
+                json=payload,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if response.status_code != 200:
+                raise ValueError(f"Slack API error: {response.text}")
+            
+            return {
+                "success": True,
+                "message": f"Slack message sent{' to ' + channel if channel else ''}",
+                "outputData": input_data,
+                "slackResponse": response.text
+            }
+    except Exception as e:
+        raise ValueError(f"Failed to send Slack message: {str(e)}")
+
 # Export all handlers
 NODE_HANDLERS = {
     "trigger": handle_trigger,
@@ -1171,6 +1242,7 @@ NODE_HANDLERS = {
     "mysql": handle_mysql,
     "sendEmail": handle_send_email,
     "sendSMS": handle_send_sms,
+    "sendSlack": handle_send_slack,
     "dataVisualization": handle_data_visualization,
     "esios": handle_esios,
     "climatiq": handle_climatiq,

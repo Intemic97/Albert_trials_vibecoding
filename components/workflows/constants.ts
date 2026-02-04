@@ -24,7 +24,8 @@ import {
   ChartBar, 
   FilePdf, 
   ChatCircle, 
-  Flask 
+  Flask,
+  SlackLogo
 } from '@phosphor-icons/react';
 import { DraggableItem, NodeType } from './types';
 
@@ -65,6 +66,7 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   // Actions
   { type: 'sendEmail', label: 'Send Email', icon: Envelope, description: 'Send an email notification', category: 'Actions' },
   { type: 'sendSMS', label: 'Send SMS', icon: DeviceMobile, description: 'Send an SMS text message via Twilio', category: 'Actions' },
+  { type: 'sendSlack', label: 'Send Slack', icon: SlackLogo, description: 'Send a message to Slack channel', category: 'Actions' },
   { type: 'dataVisualization', label: 'Data Visualization', icon: ChartBar, description: 'Generate charts from data using AI', category: 'Actions' },
   { type: 'pdfReport', label: 'PDF Report Generator', icon: FilePdf, description: 'Generate structured PDF reports from data', category: 'Actions' },
   { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },

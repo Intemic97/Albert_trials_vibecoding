@@ -25,6 +25,9 @@ export { SaveRecordsConfigModal } from './SaveRecordsConfigModal';
 export { LLMConfigModal } from './LLMConfigModal';
 export { PythonConfigModal } from './PythonConfigModal';
 
+// Communication/Notification modals
+export { SlackConfigModal } from './SlackConfigModal';
+
 // Workflow runner modals
 export { ExecutionHistoryModal } from './ExecutionHistoryModal';
 export { WorkflowRunnerModal } from './WorkflowRunnerModal';

@@ -115,6 +115,7 @@ npm run prefect
 - `mysql` - Consultas MySQL
 - `sendEmail` - Enviar email (SMTP)
 - `sendSMS` - Enviar SMS (Twilio)
+- `sendSlack` - Enviar mensaje a Slack (Webhook)
 - `esios` - Datos mercado eléctrico español
 - `climatiq` - Datos de emisiones CO2
 - `python` - Ejecutar código Python custom

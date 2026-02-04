@@ -30,6 +30,7 @@ import {
   Gauge,
   Clock,
   ChartLine,
+  SlackLogo,
 } from '@phosphor-icons/react';
 import { NodeType, NodeStatus } from '../types';
 
@@ -335,6 +336,16 @@ export const NODE_DEFINITIONS: Record<NodeType, NodeDefinition> = {
     color: 'text-green-600',
     bgColor: 'bg-green-50',
     borderColor: 'border-green-200',
+  },
+  sendSlack: {
+    type: 'sendSlack',
+    label: 'Send Slack',
+    description: 'Send a message to a Slack channel',
+    category: 'actions',
+    icon: SlackLogo,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-200',
   },
   dataVisualization: {
     type: 'dataVisualization',
