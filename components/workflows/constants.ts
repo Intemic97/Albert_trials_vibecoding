@@ -25,7 +25,11 @@ import {
   FilePdf, 
   ChatCircle, 
   Flask,
-  SlackLogo
+  SlackLogo,
+  DiscordLogo,
+  MicrosoftTeamsLogo,
+  TelegramLogo,
+  GoogleLogo
 } from '@phosphor-icons/react';
 import { DraggableItem, NodeType } from './types';
 
@@ -67,6 +71,10 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   { type: 'sendEmail', label: 'Send Email', icon: Envelope, description: 'Send an email notification', category: 'Actions' },
   { type: 'sendSMS', label: 'Send SMS', icon: DeviceMobile, description: 'Send an SMS text message via Twilio', category: 'Actions' },
   { type: 'sendSlack', label: 'Send Slack', icon: SlackLogo, description: 'Send a message to Slack channel', category: 'Actions' },
+  { type: 'sendDiscord', label: 'Send Discord', icon: DiscordLogo, description: 'Send a message to Discord channel', category: 'Actions' },
+  { type: 'sendTeams', label: 'Send Teams', icon: MicrosoftTeamsLogo, description: 'Send a message to Microsoft Teams', category: 'Actions' },
+  { type: 'sendTelegram', label: 'Send Telegram', icon: TelegramLogo, description: 'Send a message to Telegram', category: 'Actions' },
+  { type: 'googleSheets', label: 'Google Sheets', icon: GoogleLogo, description: 'Read/write data from Google Sheets', category: 'Data' },
   { type: 'dataVisualization', label: 'Data Visualization', icon: ChartBar, description: 'Generate charts from data using AI', category: 'Actions' },
   { type: 'pdfReport', label: 'PDF Report Generator', icon: FilePdf, description: 'Generate structured PDF reports from data', category: 'Actions' },
   { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },

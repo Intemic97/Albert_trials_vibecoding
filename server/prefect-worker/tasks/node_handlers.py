@@ -1149,6 +1149,307 @@ async def handle_human_approval(node: Dict, input_data: Optional[Dict] = None, e
         "paused": True
     }
 
+@task(name="send_discord", retries=2)
+async def handle_send_discord(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
+    """Handle Discord webhook message sending node"""
+    config_data = node.get("config", {})
+    
+    webhook_url = config_data.get("discordWebhookUrl")
+    message = config_data.get("discordMessage", "")
+    username = config_data.get("discordUsername", "Workflow Bot")
+    avatar_url = config_data.get("discordAvatarUrl")
+    embed_title = config_data.get("discordEmbedTitle")
+    embed_color = config_data.get("discordEmbedColor", "5865F2")  # Discord blurple
+    
+    if not webhook_url:
+        raise ValueError("Discord webhook URL not configured")
+    
+    if not message and not embed_title:
+        raise ValueError("Discord message or embed title is required")
+    
+    # Replace placeholders in message with input data
+    if input_data and isinstance(input_data, dict):
+        for key, value in input_data.items():
+            placeholder = f"{{{{{key}}}}}"
+            if message and placeholder in message:
+                message = message.replace(placeholder, str(value))
+            if embed_title and placeholder in embed_title:
+                embed_title = embed_title.replace(placeholder, str(value))
+    
+    # Build Discord payload
+    payload = {
+        "username": username,
+    }
+    
+    if message:
+        payload["content"] = message
+    
+    if avatar_url:
+        payload["avatar_url"] = avatar_url
+    
+    # Add embed if we have structured data or embed title
+    if embed_title or (input_data and isinstance(input_data, dict)):
+        embed = {
+            "color": int(embed_color.lstrip('#'), 16) if embed_color else 0x5865F2,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        if embed_title:
+            embed["title"] = embed_title
+        
+        if input_data and isinstance(input_data, dict):
+            fields = []
+            for key, value in input_data.items():
+                if key not in ["_webhookData", "response"]:
+                    fields.append({
+                        "name": key,
+                        "value": str(value)[:1024],
+                        "inline": True
+                    })
+            if fields:
+                embed["fields"] = fields[:25]  # Discord max 25 fields
+        
+        payload["embeds"] = [embed]
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                webhook_url,
+                json=payload,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if response.status_code not in [200, 204]:
+                raise ValueError(f"Discord API error: {response.text}")
+            
+            return {
+                "success": True,
+                "message": "Discord message sent successfully",
+                "outputData": input_data
+            }
+    except Exception as e:
+        raise ValueError(f"Failed to send Discord message: {str(e)}")
+
+@task(name="send_teams", retries=2)
+async def handle_send_teams(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
+    """Handle Microsoft Teams webhook message sending node"""
+    config_data = node.get("config", {})
+    
+    webhook_url = config_data.get("teamsWebhookUrl")
+    message = config_data.get("teamsMessage", "")
+    title = config_data.get("teamsTitle", "Workflow Notification")
+    theme_color = config_data.get("teamsThemeColor", "0078D4")  # Microsoft blue
+    
+    if not webhook_url:
+        raise ValueError("Teams webhook URL not configured")
+    
+    if not message:
+        raise ValueError("Teams message is empty")
+    
+    # Replace placeholders in message with input data
+    if input_data and isinstance(input_data, dict):
+        for key, value in input_data.items():
+            placeholder = f"{{{{{key}}}}}"
+            if placeholder in message:
+                message = message.replace(placeholder, str(value))
+            if placeholder in title:
+                title = title.replace(placeholder, str(value))
+    
+    # Build Teams Adaptive Card payload
+    payload = {
+        "@type": "MessageCard",
+        "@context": "http://schema.org/extensions",
+        "themeColor": theme_color.lstrip('#'),
+        "summary": title,
+        "sections": [{
+            "activityTitle": title,
+            "text": message,
+            "markdown": True
+        }]
+    }
+    
+    # Add facts if we have structured data
+    if input_data and isinstance(input_data, dict):
+        facts = []
+        for key, value in input_data.items():
+            if key not in ["_webhookData", "response"]:
+                facts.append({
+                    "name": key,
+                    "value": str(value)[:500]
+                })
+        if facts:
+            payload["sections"][0]["facts"] = facts[:10]
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                webhook_url,
+                json=payload,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if response.status_code != 200:
+                raise ValueError(f"Teams API error: {response.text}")
+            
+            return {
+                "success": True,
+                "message": "Teams message sent successfully",
+                "outputData": input_data
+            }
+    except Exception as e:
+        raise ValueError(f"Failed to send Teams message: {str(e)}")
+
+@task(name="google_sheets", retries=2)
+async def handle_google_sheets(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
+    """Handle Google Sheets read/write operations"""
+    config_data = node.get("config", {})
+    
+    api_key = config_data.get("googleApiKey") or os.getenv("GOOGLE_API_KEY")
+    spreadsheet_id = config_data.get("spreadsheetId")
+    sheet_range = config_data.get("sheetRange", "Sheet1!A1:Z1000")
+    operation = config_data.get("operation", "read")  # read, append, write
+    
+    if not spreadsheet_id:
+        raise ValueError("Google Sheets spreadsheet ID not configured")
+    
+    base_url = "https://sheets.googleapis.com/v4/spreadsheets"
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            if operation == "read":
+                # Read data from sheet
+                url = f"{base_url}/{spreadsheet_id}/values/{sheet_range}"
+                params = {"key": api_key} if api_key else {}
+                
+                response = await client.get(url, params=params)
+                
+                if response.status_code != 200:
+                    raise ValueError(f"Google Sheets API error: {response.text}")
+                
+                data = response.json()
+                values = data.get("values", [])
+                
+                # Convert to list of dicts using first row as headers
+                if len(values) > 1:
+                    headers = values[0]
+                    records = []
+                    for row in values[1:]:
+                        record = {}
+                        for i, header in enumerate(headers):
+                            record[header] = row[i] if i < len(row) else ""
+                        records.append(record)
+                    output_data = records
+                else:
+                    output_data = values
+                
+                return {
+                    "success": True,
+                    "message": f"Read {len(values)} rows from Google Sheets",
+                    "outputData": output_data,
+                    "rowCount": len(values)
+                }
+            
+            elif operation in ["append", "write"]:
+                # Write data to sheet
+                if not input_data:
+                    raise ValueError("No data to write to Google Sheets")
+                
+                # Convert input data to 2D array
+                if isinstance(input_data, list) and len(input_data) > 0:
+                    if isinstance(input_data[0], dict):
+                        headers = list(input_data[0].keys())
+                        values = [headers]
+                        for record in input_data:
+                            values.append([str(record.get(h, "")) for h in headers])
+                    else:
+                        values = input_data
+                elif isinstance(input_data, dict):
+                    headers = list(input_data.keys())
+                    values = [headers, [str(v) for v in input_data.values()]]
+                else:
+                    values = [[str(input_data)]]
+                
+                endpoint = "append" if operation == "append" else "update"
+                url = f"{base_url}/{spreadsheet_id}/values/{sheet_range}:{endpoint}"
+                params = {
+                    "valueInputOption": "USER_ENTERED",
+                    "key": api_key
+                } if api_key else {"valueInputOption": "USER_ENTERED"}
+                
+                response = await client.post(
+                    url,
+                    params=params,
+                    json={"values": values}
+                )
+                
+                if response.status_code not in [200, 201]:
+                    raise ValueError(f"Google Sheets API error: {response.text}")
+                
+                return {
+                    "success": True,
+                    "message": f"{'Appended' if operation == 'append' else 'Wrote'} {len(values)} rows to Google Sheets",
+                    "outputData": input_data,
+                    "rowCount": len(values)
+                }
+            
+            else:
+                raise ValueError(f"Unknown operation: {operation}")
+                
+    except Exception as e:
+        raise ValueError(f"Google Sheets operation failed: {str(e)}")
+
+@task(name="send_telegram", retries=2)
+async def handle_send_telegram(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
+    """Handle Telegram message sending node"""
+    config_data = node.get("config", {})
+    
+    bot_token = config_data.get("telegramBotToken") or os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = config_data.get("telegramChatId")
+    message = config_data.get("telegramMessage", "")
+    parse_mode = config_data.get("telegramParseMode", "HTML")  # HTML or Markdown
+    
+    if not bot_token:
+        raise ValueError("Telegram bot token not configured")
+    
+    if not chat_id:
+        raise ValueError("Telegram chat ID not configured")
+    
+    if not message:
+        raise ValueError("Telegram message is empty")
+    
+    # Replace placeholders in message with input data
+    if input_data and isinstance(input_data, dict):
+        for key, value in input_data.items():
+            placeholder = f"{{{{{key}}}}}"
+            if placeholder in message:
+                message = message.replace(placeholder, str(value))
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            payload = {
+                "chat_id": chat_id,
+                "text": message,
+                "parse_mode": parse_mode
+            }
+            
+            response = await client.post(url, json=payload)
+            
+            if response.status_code != 200:
+                error_data = response.json()
+                raise ValueError(f"Telegram API error: {error_data.get('description', response.text)}")
+            
+            result = response.json()
+            
+            return {
+                "success": True,
+                "message": f"Telegram message sent to chat {chat_id}",
+                "outputData": input_data,
+                "messageId": result.get("result", {}).get("message_id")
+            }
+    except Exception as e:
+        raise ValueError(f"Failed to send Telegram message: {str(e)}")
+
 @task(name="send_slack", retries=2)
 async def handle_send_slack(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
     """Handle Slack message sending node"""
@@ -1243,6 +1544,10 @@ NODE_HANDLERS = {
     "sendEmail": handle_send_email,
     "sendSMS": handle_send_sms,
     "sendSlack": handle_send_slack,
+    "sendDiscord": handle_send_discord,
+    "sendTeams": handle_send_teams,
+    "sendTelegram": handle_send_telegram,
+    "googleSheets": handle_google_sheets,
     "dataVisualization": handle_data_visualization,
     "esios": handle_esios,
     "climatiq": handle_climatiq,

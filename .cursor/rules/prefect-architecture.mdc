@@ -116,6 +116,10 @@ npm run prefect
 - `sendEmail` - Enviar email (SMTP)
 - `sendSMS` - Enviar SMS (Twilio)
 - `sendSlack` - Enviar mensaje a Slack (Webhook)
+- `sendDiscord` - Enviar mensaje a Discord (Webhook)
+- `sendTeams` - Enviar mensaje a Microsoft Teams (Webhook)
+- `sendTelegram` - Enviar mensaje a Telegram (Bot API)
+- `googleSheets` - Leer/escribir Google Sheets (API)
 - `esios` - Datos mercado eléctrico español
 - `climatiq` - Datos de emisiones CO2
 - `python` - Ejecutar código Python custom

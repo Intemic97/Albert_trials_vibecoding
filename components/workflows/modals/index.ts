@@ -27,6 +27,12 @@ export { PythonConfigModal } from './PythonConfigModal';
 
 // Communication/Notification modals
 export { SlackConfigModal } from './SlackConfigModal';
+export { DiscordConfigModal } from './DiscordConfigModal';
+export { TeamsConfigModal } from './TeamsConfigModal';
+export { TelegramConfigModal } from './TelegramConfigModal';
+
+// Data integration modals
+export { GoogleSheetsConfigModal } from './GoogleSheetsConfigModal';
 
 // Workflow runner modals
 export { ExecutionHistoryModal } from './ExecutionHistoryModal';

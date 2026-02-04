@@ -262,6 +262,10 @@ class WorkflowExecutor {
             sendEmail: () => this.handleSendEmail(node, inputData),
             sendSMS: () => this.handleSendSMS(node, inputData),
             sendSlack: () => this.handleSendSlack(node, inputData),
+            sendDiscord: () => this.handleSendDiscord(node, inputData),
+            sendTeams: () => this.handleSendTeams(node, inputData),
+            sendTelegram: () => this.handleSendTelegram(node, inputData),
+            googleSheets: () => this.handleGoogleSheets(node, inputData),
             dataVisualization: () => this.handleDataVisualization(node, inputData),
             esios: () => this.handleEsios(node, inputData),
             climatiq: () => this.handleClimatiq(node, inputData),
@@ -942,6 +946,330 @@ class WorkflowExecutor {
             };
         } catch (error) {
             throw new Error(`Failed to send Slack message: ${error.message}`);
+        }
+    }
+
+    async handleSendDiscord(node, inputData) {
+        const config = node.config || {};
+        const { discordWebhookUrl, discordMessage, discordUsername, discordAvatarUrl, discordEmbedTitle, discordEmbedColor } = config;
+
+        if (!discordWebhookUrl) {
+            throw new Error('Discord webhook URL not configured');
+        }
+
+        if (!discordMessage && !discordEmbedTitle) {
+            throw new Error('Discord message or embed title is required');
+        }
+
+        // Replace placeholders in message with input data
+        let message = discordMessage || '';
+        let embedTitle = discordEmbedTitle || '';
+        if (inputData && typeof inputData === 'object') {
+            for (const [key, value] of Object.entries(inputData)) {
+                const placeholder = `{{${key}}}`;
+                message = message.replace(new RegExp(placeholder, 'g'), String(value));
+                embedTitle = embedTitle.replace(new RegExp(placeholder, 'g'), String(value));
+            }
+        }
+
+        // Build Discord payload
+        const payload = {
+            username: discordUsername || 'Workflow Bot',
+        };
+
+        if (message) {
+            payload.content = message;
+        }
+
+        if (discordAvatarUrl) {
+            payload.avatar_url = discordAvatarUrl;
+        }
+
+        // Add embed if we have structured data or embed title
+        if (embedTitle || (inputData && typeof inputData === 'object')) {
+            const colorHex = (discordEmbedColor || '5865F2').replace('#', '');
+            const embed = {
+                color: parseInt(colorHex, 16),
+                timestamp: new Date().toISOString()
+            };
+
+            if (embedTitle) {
+                embed.title = embedTitle;
+            }
+
+            if (inputData && typeof inputData === 'object') {
+                const fields = [];
+                for (const [key, value] of Object.entries(inputData)) {
+                    if (!['_webhookData', 'response'].includes(key)) {
+                        fields.push({
+                            name: key,
+                            value: String(value).substring(0, 1024),
+                            inline: true
+                        });
+                    }
+                }
+                if (fields.length > 0) {
+                    embed.fields = fields.slice(0, 25);
+                }
+            }
+
+            payload.embeds = [embed];
+        }
+
+        try {
+            const response = await fetch(discordWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok && response.status !== 204) {
+                const errorText = await response.text();
+                throw new Error(`Discord API error: ${errorText}`);
+            }
+
+            return {
+                success: true,
+                message: 'Discord message sent successfully',
+                outputData: inputData
+            };
+        } catch (error) {
+            throw new Error(`Failed to send Discord message: ${error.message}`);
+        }
+    }
+
+    async handleSendTeams(node, inputData) {
+        const config = node.config || {};
+        const { teamsWebhookUrl, teamsMessage, teamsTitle, teamsThemeColor } = config;
+
+        if (!teamsWebhookUrl) {
+            throw new Error('Teams webhook URL not configured');
+        }
+
+        if (!teamsMessage) {
+            throw new Error('Teams message is empty');
+        }
+
+        // Replace placeholders in message with input data
+        let message = teamsMessage;
+        let title = teamsTitle || 'Workflow Notification';
+        if (inputData && typeof inputData === 'object') {
+            for (const [key, value] of Object.entries(inputData)) {
+                const placeholder = `{{${key}}}`;
+                message = message.replace(new RegExp(placeholder, 'g'), String(value));
+                title = title.replace(new RegExp(placeholder, 'g'), String(value));
+            }
+        }
+
+        // Build Teams MessageCard payload
+        const payload = {
+            '@type': 'MessageCard',
+            '@context': 'http://schema.org/extensions',
+            themeColor: (teamsThemeColor || '0078D4').replace('#', ''),
+            summary: title,
+            sections: [{
+                activityTitle: title,
+                text: message,
+                markdown: true
+            }]
+        };
+
+        // Add facts if we have structured data
+        if (inputData && typeof inputData === 'object') {
+            const facts = [];
+            for (const [key, value] of Object.entries(inputData)) {
+                if (!['_webhookData', 'response'].includes(key)) {
+                    facts.push({
+                        name: key,
+                        value: String(value).substring(0, 500)
+                    });
+                }
+            }
+            if (facts.length > 0) {
+                payload.sections[0].facts = facts.slice(0, 10);
+            }
+        }
+
+        try {
+            const response = await fetch(teamsWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Teams API error: ${errorText}`);
+            }
+
+            return {
+                success: true,
+                message: 'Teams message sent successfully',
+                outputData: inputData
+            };
+        } catch (error) {
+            throw new Error(`Failed to send Teams message: ${error.message}`);
+        }
+    }
+
+    async handleSendTelegram(node, inputData) {
+        const config = node.config || {};
+        const { telegramBotToken, telegramChatId, telegramMessage, telegramParseMode } = config;
+
+        const botToken = telegramBotToken || process.env.TELEGRAM_BOT_TOKEN;
+        
+        if (!botToken) {
+            throw new Error('Telegram bot token not configured');
+        }
+
+        if (!telegramChatId) {
+            throw new Error('Telegram chat ID not configured');
+        }
+
+        if (!telegramMessage) {
+            throw new Error('Telegram message is empty');
+        }
+
+        // Replace placeholders in message with input data
+        let message = telegramMessage;
+        if (inputData && typeof inputData === 'object') {
+            for (const [key, value] of Object.entries(inputData)) {
+                const placeholder = `{{${key}}}`;
+                message = message.replace(new RegExp(placeholder, 'g'), String(value));
+            }
+        }
+
+        try {
+            const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: telegramChatId,
+                    text: message,
+                    parse_mode: telegramParseMode || 'HTML'
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`Telegram API error: ${errorData.description || response.statusText}`);
+            }
+
+            const result = await response.json();
+
+            return {
+                success: true,
+                message: `Telegram message sent to chat ${telegramChatId}`,
+                outputData: inputData,
+                messageId: result.result?.message_id
+            };
+        } catch (error) {
+            throw new Error(`Failed to send Telegram message: ${error.message}`);
+        }
+    }
+
+    async handleGoogleSheets(node, inputData) {
+        const config = node.config || {};
+        const { spreadsheetId, sheetRange, operation } = config;
+        const apiKey = config.googleApiKey || process.env.GOOGLE_API_KEY;
+
+        if (!spreadsheetId) {
+            throw new Error('Google Sheets spreadsheet ID not configured');
+        }
+
+        const range = sheetRange || 'Sheet1!A1:Z1000';
+        const op = operation || 'read';
+        const baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
+
+        try {
+            if (op === 'read') {
+                const url = `${baseUrl}/${spreadsheetId}/values/${encodeURIComponent(range)}`;
+                const params = apiKey ? `?key=${apiKey}` : '';
+                
+                const response = await fetch(url + params);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Google Sheets API error: ${errorText}`);
+                }
+
+                const data = await response.json();
+                const values = data.values || [];
+
+                // Convert to list of dicts using first row as headers
+                let outputData;
+                if (values.length > 1) {
+                    const headers = values[0];
+                    outputData = values.slice(1).map(row => {
+                        const record = {};
+                        headers.forEach((header, i) => {
+                            record[header] = row[i] || '';
+                        });
+                        return record;
+                    });
+                } else {
+                    outputData = values;
+                }
+
+                return {
+                    success: true,
+                    message: `Read ${values.length} rows from Google Sheets`,
+                    outputData,
+                    rowCount: values.length
+                };
+
+            } else if (op === 'append' || op === 'write') {
+                if (!inputData) {
+                    throw new Error('No data to write to Google Sheets');
+                }
+
+                // Convert input data to 2D array
+                let values;
+                if (Array.isArray(inputData) && inputData.length > 0) {
+                    if (typeof inputData[0] === 'object') {
+                        const headers = Object.keys(inputData[0]);
+                        values = [headers];
+                        inputData.forEach(record => {
+                            values.push(headers.map(h => String(record[h] || '')));
+                        });
+                    } else {
+                        values = inputData;
+                    }
+                } else if (typeof inputData === 'object') {
+                    const headers = Object.keys(inputData);
+                    values = [headers, headers.map(h => String(inputData[h] || ''))];
+                } else {
+                    values = [[String(inputData)]];
+                }
+
+                const endpoint = op === 'append' ? 'append' : 'update';
+                const url = `${baseUrl}/${spreadsheetId}/values/${encodeURIComponent(range)}:${endpoint}`;
+                const params = apiKey ? `?valueInputOption=USER_ENTERED&key=${apiKey}` : '?valueInputOption=USER_ENTERED';
+
+                const response = await fetch(url + params, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ values })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Google Sheets API error: ${errorText}`);
+                }
+
+                return {
+                    success: true,
+                    message: `${op === 'append' ? 'Appended' : 'Wrote'} ${values.length} rows to Google Sheets`,
+                    outputData: inputData,
+                    rowCount: values.length
+                };
+
+            } else {
+                throw new Error(`Unknown operation: ${op}`);
+            }
+        } catch (error) {
+            throw new Error(`Google Sheets operation failed: ${error.message}`);
         }
     }
 
