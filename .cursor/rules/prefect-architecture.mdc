@@ -1,0 +1,393 @@
+# Arquitectura de Ejecución de Workflows con Prefect
+
+## Visión General
+
+El sistema usa una arquitectura de 3 servicios para ejecutar workflows de forma robusta:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                           FRONTEND                                   │
+│                         (React + Vite)                               │
+│                          Puerto :3000                                │
+├─────────────────────────────────────────────────────────────────────┤
+│  Componentes clave:                                                  │
+│  • useExecutionProgress (hook) - Recibe updates via WebSocket        │
+│  • WorkflowRunnerModal - Modal con progreso en tiempo real          │
+│  • ExecutionStatusIndicator - Indicador en lista de workflows       │
+│  • ExecutionProgressBar - Barra de progreso inline                  │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │ WebSocket (execution_progress/complete/error)
+                             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                        NODE.JS BACKEND                               │
+│                      (Express + SQLite)                              │
+│                          Puerto :3001                                │
+├─────────────────────────────────────────────────────────────────────┤
+│  Archivos clave:                                                     │
+│  • server/index.js - API REST + WebSocket server                    │
+│  • server/workflowExecutor.js - Ejecución local (fallback)          │
+│  • server/prefectClient.js - Cliente HTTP para Prefect              │
+│  • server/executionPolling.js - Polling de estado + broadcast WS    │
+│                                                                      │
+│  Flujo:                                                              │
+│  1. Recibe POST /workflow/:id/execute                               │
+│  2. Delega a Prefect via prefectClient.executeWorkflow()            │
+│  3. Inicia polling cada 2s con ExecutionPollingService              │
+│  4. Broadcast de updates via WebSocket a la organización            │
+│  5. Si Prefect no disponible → fallback a workflowExecutor local    │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │ HTTP (polling cada 2s)
+                             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      PYTHON/PREFECT BACKEND                          │
+│                      (FastAPI + Prefect 3.0)                         │
+│                          Puerto :8000                                │
+├─────────────────────────────────────────────────────────────────────┤
+│  Archivos clave:                                                     │
+│  • server/prefect-worker/api_service.py - FastAPI endpoints         │
+│  • server/prefect-worker/database.py - Acceso a SQLite              │
+│  • server/prefect-worker/config.py - Configuración                  │
+│  • server/prefect-worker/flows/workflow_flow_optimized.py           │
+│  • server/prefect-worker/tasks/node_handlers.py - 29 handlers       │
+│                                                                      │
+│  Flujo:                                                              │
+│  1. Recibe POST /api/workflows/execute                              │
+│  2. Crea execution record en DB                                     │
+│  3. Ejecuta workflow en background (FastAPI BackgroundTasks)        │
+│  4. Analiza dependencias y crea "layers" de nodos                   │
+│  5. Ejecuta nodos en paralelo dentro de cada layer                  │
+│  6. Actualiza estado en DB (logs + status)                          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Comandos para Levantar el Sistema
+
+```bash
+# Terminal 1 - Frontend
+npm run dev
+
+# Terminal 2 - Backend Node.js
+npm run server
+
+# Terminal 3 - Backend Python/Prefect
+npm run prefect:install  # Solo primera vez
+npm run prefect
+```
+
+---
+
+## Handlers de Nodos Disponibles
+
+### Ubicación de Código
+
+| Lenguaje | Archivo | Descripción |
+|----------|---------|-------------|
+| Python | `server/prefect-worker/tasks/node_handlers.py` | Handlers para Prefect (29 tipos) |
+| Node.js | `server/workflowExecutor.js` | Handlers para fallback local (29 tipos) |
+
+### Lista Completa de Handlers (29)
+
+#### Básicos
+- `trigger` - Inicio de workflow
+- `manualInput` - Entrada manual de valores
+- `output` - Salida final del workflow
+- `comment` - Comentario (no-op)
+- `webhook` - Recibir datos externos
+
+#### Datos
+- `fetchData` - Obtener registros de una entidad
+- `excelInput` - Cargar archivo Excel/CSV
+- `pdfInput` - Cargar archivo PDF
+- `saveRecords` - Guardar datos a base de datos
+
+#### Lógica
+- `condition` - Condicional/branching
+- `join` - Unir datos de múltiples fuentes
+- `addField` - Añadir campo a registros
+- `splitColumns` - Dividir columnas en dos outputs
+- `humanApproval` - Pausar para aprobación humana
+
+#### Integraciones
+- `http` - Peticiones HTTP (GET/POST/PUT/DELETE)
+- `llm` - OpenAI/LLM (requiere OPENAI_API_KEY)
+- `mysql` - Consultas MySQL
+- `sendEmail` - Enviar email (SMTP)
+- `sendSMS` - Enviar SMS (Twilio)
+- `esios` - Datos mercado eléctrico español
+- `climatiq` - Datos de emisiones CO2
+- `python` - Ejecutar código Python custom
+- `dataVisualization` - Generar visualizaciones
+
+#### OT/Industrial (simulados por ahora)
+- `opcua` - OPC UA
+- `mqtt` - MQTT
+- `modbus` - Modbus
+- `scada` - SCADA
+- `mes` - MES
+- `dataHistorian` - Data Historian
+- `timeSeriesAggregator` - Agregación time-series
+
+---
+
+## Cómo Añadir un Nuevo Handler
+
+### Paso 1: Python (server/prefect-worker/tasks/node_handlers.py)
+
+```python
+@task(name="my_new_node", retries=1)
+async def handle_my_new_node(
+    node: Dict, 
+    input_data: Optional[Dict] = None, 
+    execution_context: Optional[Dict] = None
+) -> Dict:
+    """Handle my new node type"""
+    config_data = node.get("config", {})
+    
+    # Tu lógica aquí
+    result = do_something(config_data, input_data)
+    
+    return {
+        "success": True,
+        "message": "Description of what happened",
+        "outputData": result
+    }
+
+# Registrar en NODE_HANDLERS al final del archivo
+NODE_HANDLERS = {
+    # ... otros handlers ...
+    "myNewNode": handle_my_new_node,
+}
+```
+
+### Paso 2: Node.js (server/workflowExecutor.js)
+
+```javascript
+async handleMyNewNode(node, inputData) {
+    const config = node.config || {};
+    
+    // Tu lógica aquí
+    const result = await doSomething(config, inputData);
+    
+    return {
+        success: true,
+        message: 'Description of what happened',
+        outputData: result
+    };
+}
+
+// Registrar en runNodeHandler()
+const handlers = {
+    // ... otros handlers ...
+    myNewNode: () => this.handleMyNewNode(node, inputData),
+};
+```
+
+### Paso 3: Frontend - Definición del nodo
+
+**constants.ts:**
+```typescript
+{ type: 'myNewNode', label: 'My New Node', icon: SomeIcon, description: 'Does something', category: 'Actions' },
+```
+
+**nodeDefinitions.ts:**
+```typescript
+myNewNode: {
+    type: 'myNewNode',
+    label: 'My New Node',
+    description: 'Does something useful',
+    category: 'actions',
+    icon: SomeIcon,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-200',
+},
+```
+
+### Paso 4: Frontend - Panel de configuración (si necesita)
+
+Crear en `components/workflows/modals/MyNewNodeConfigModal.tsx` siguiendo el patrón de otros modals como `MysqlConfigModal.tsx`.
+
+---
+
+## Sistema de Progreso en Tiempo Real
+
+### Flujo de Eventos WebSocket
+
+1. **Frontend ejecuta workflow** → POST `/api/workflow/:id/execute`
+2. **Node.js delega a Prefect** → POST `http://localhost:8000/api/workflows/execute`
+3. **Node.js inicia polling** → `ExecutionPollingService.startPolling()`
+4. **Polling cada 2s** → GET `http://localhost:8000/api/executions/:id`
+5. **Node.js broadcast** → WebSocket `execution_progress` event
+6. **Frontend recibe** → `useExecutionProgress` hook actualiza estado
+
+### Eventos WebSocket
+
+```typescript
+// Progreso intermedio
+{
+    type: 'execution_progress',
+    executionId: string,
+    workflowId: string,
+    status: 'pending' | 'running',
+    progress: { totalNodes, completedNodes, failedNodes, percentage },
+    currentNodeId: string,
+    logs: Array<{ nodeId, nodeType, status, timestamp }>
+}
+
+// Ejecución completada
+{
+    type: 'execution_complete',
+    executionId: string,
+    workflowId: string,
+    status: 'completed' | 'failed',
+    error?: string,
+    finalOutput?: any
+}
+
+// Error de ejecución
+{
+    type: 'execution_error',
+    executionId: string,
+    error: string
+}
+```
+
+### Hook useExecutionProgress
+
+```tsx
+import { useExecutionProgress } from '../hooks';
+
+const MyComponent = () => {
+    const { 
+        activeExecutions,      // Array de ejecuciones activas
+        getExecution,          // (executionId) => ExecutionProgress
+        getWorkflowExecution,  // (workflowId) => ExecutionProgress
+        isExecuting            // (workflowId) => boolean
+    } = useExecutionProgress({
+        onProgress: (progress) => { /* actualizar UI */ },
+        onComplete: (progress) => { /* mostrar éxito/error */ },
+        onError: (error, executionId) => { /* manejar error */ }
+    });
+    
+    // Uso
+    const running = isExecuting(workflowId);
+    const progress = getWorkflowExecution(workflowId);
+};
+```
+
+---
+
+## Tablas de Base de Datos Relevantes
+
+### workflow_executions
+```sql
+CREATE TABLE workflow_executions (
+    id TEXT PRIMARY KEY,
+    workflowId TEXT,
+    organizationId TEXT,
+    status TEXT,  -- pending, running, completed, failed, paused
+    inputs TEXT,  -- JSON
+    finalOutput TEXT,  -- JSON
+    nodeResults TEXT,  -- JSON
+    error TEXT,
+    currentNodeId TEXT,
+    createdAt TEXT,
+    startedAt TEXT,
+    completedAt TEXT
+);
+```
+
+### execution_logs
+```sql
+CREATE TABLE execution_logs (
+    id TEXT PRIMARY KEY,
+    executionId TEXT,
+    nodeId TEXT,
+    nodeType TEXT,
+    nodeLabel TEXT,
+    status TEXT,  -- running, completed, error
+    inputData TEXT,  -- JSON
+    outputData TEXT,  -- JSON
+    error TEXT,
+    duration REAL,
+    timestamp TEXT
+);
+```
+
+---
+
+## Troubleshooting
+
+### Prefect no arranca
+```bash
+# Verificar Python
+python3 --version  # Debe ser 3.10+
+
+# Reinstalar dependencias
+cd server/prefect-worker
+pip install -r requirements.txt --force-reinstall
+```
+
+### No hay actualizaciones en tiempo real
+1. Verificar WebSocket conectado (consola navegador)
+2. Verificar polling activo: `curl http://localhost:3001/api/executions/polling/active`
+3. Verificar Prefect corriendo: `curl http://localhost:8000/`
+
+### Workflow falla silenciosamente
+Ver logs en terminal de Prefect. Los errores aparecen ahí con stack trace.
+
+---
+
+## Archivos Clave a Conocer
+
+| Archivo | Propósito |
+|---------|-----------|
+| `server/index.js` | API REST principal, WebSocket, delegación a Prefect |
+| `server/executionPolling.js` | Servicio de polling + broadcast WebSocket |
+| `server/prefectClient.js` | Cliente HTTP para comunicarse con Prefect |
+| `server/workflowExecutor.js` | Ejecución local (fallback si Prefect no disponible) |
+| `server/prefect-worker/api_service.py` | FastAPI endpoints |
+| `server/prefect-worker/tasks/node_handlers.py` | Handlers de nodos en Python |
+| `server/prefect-worker/flows/workflow_flow_optimized.py` | Lógica de ejecución paralela |
+| `hooks/useExecutionProgress.ts` | Hook React para recibir updates |
+| `components/workflows/modals/WorkflowRunnerModal.tsx` | Modal de ejecución con progreso |
+| `components/workflows/ExecutionStatusIndicator.tsx` | Indicador visual de estado |
+
+---
+
+## Próximos Pasos Sugeridos
+
+1. **Añadir nodo Slack** - Para notificaciones a canales
+2. **Cancelación de ejecuciones** - Endpoint para cancelar workflow en curso
+3. **Retry de nodos fallidos** - UI para re-ejecutar nodos que fallaron
+4. **Implementar handlers OT reales** - Conectar con OPC UA/MQTT/Modbus reales
+5. **Dashboard de ejecuciones** - Vista de todas las ejecuciones con filtros
+
+---
+
+## Variables de Entorno Necesarias
+
+```env
+# Backend Node.js
+PORT=3001
+JWT_SECRET=your-secret
+
+# Prefect Service URL
+PREFECT_SERVICE_URL=http://localhost:8000
+
+# OpenAI (para nodos LLM)
+OPENAI_API_KEY=sk-...
+
+# Twilio (para SMS)
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+
+# Email SMTP (para sendEmail)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+
+# Climatiq (opcional)
+CLIMATIQ_API_KEY=...
+```
