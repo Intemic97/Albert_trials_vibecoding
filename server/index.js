@@ -11,6 +11,7 @@ const { initDb, openDb } = require('./db');
 const { WorkflowExecutor, setBroadcastToOrganization } = require('./workflowExecutor');
 const { gcsService } = require('./gcsService');
 const { prefectClient } = require('./prefectClient');
+const { initPollingService, getPollingService } = require('./executionPolling');
 const { getConnectionHealthChecker } = require('./utils/otConnections');
 // Load environment variables - Try multiple methods to ensure it loads
 const envPath = path.join(__dirname, '.env');
@@ -563,6 +564,9 @@ function broadcastToOrganization(orgId, message) {
 }
 
 // ==================== END WEBSOCKET SETUP ====================
+
+// Initialize execution polling service
+initPollingService(broadcastToOrganization);
 
 // Configure multer for file uploads
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -6166,6 +6170,13 @@ app.post('/api/workflow/:id/execute', authenticateToken, async (req, res) => {
                 // Delegate to Prefect microservice for background execution
                 const result = await prefectClient.executeWorkflow(id, inputs || {}, req.user.orgId);
 
+                // Start polling for execution progress
+                const pollingService = getPollingService();
+                if (pollingService && result.executionId) {
+                    pollingService.startPolling(result.executionId, req.user.orgId, id);
+                    console.log(`[WorkflowExecutor] Started progress polling for execution ${result.executionId}`);
+                }
+
                 return res.json({
                     success: true,
                     executionId: result.executionId,
@@ -6199,6 +6210,67 @@ app.post('/api/workflow/:id/execute', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Error executing workflow:', error);
         res.status(500).json({ error: error.message || 'Failed to execute workflow' });
+    }
+});
+
+// Get execution status (authenticated)
+app.get('/api/executions/:executionId', authenticateToken, async (req, res) => {
+    try {
+        const { executionId } = req.params;
+        
+        // Try Prefect service first
+        try {
+            const status = await prefectClient.getExecutionStatus(executionId);
+            return res.json(status);
+        } catch (prefectError) {
+            // Fallback to local database
+            const db = await openDb();
+            const execution = await db.get(
+                'SELECT * FROM workflow_executions WHERE id = ?',
+                [executionId]
+            );
+            
+            if (!execution) {
+                return res.status(404).json({ error: 'Execution not found' });
+            }
+            
+            // Get logs
+            const logs = await db.all(
+                'SELECT * FROM execution_logs WHERE executionId = ? ORDER BY timestamp',
+                [executionId]
+            );
+            
+            return res.json({
+                executionId,
+                workflowId: execution.workflowId,
+                status: execution.status,
+                createdAt: execution.createdAt,
+                startedAt: execution.startedAt,
+                completedAt: execution.completedAt,
+                error: execution.error,
+                progress: {
+                    totalNodes: logs.length,
+                    completedNodes: logs.filter(l => l.status === 'completed').length,
+                    failedNodes: logs.filter(l => l.status === 'error').length
+                },
+                logs: logs.slice(-10)
+            });
+        }
+    } catch (error) {
+        console.error('Error getting execution status:', error);
+        res.status(500).json({ error: error.message || 'Failed to get execution status' });
+    }
+});
+
+// Get active polling executions (for debugging)
+app.get('/api/executions/polling/active', authenticateToken, async (req, res) => {
+    const pollingService = getPollingService();
+    if (pollingService) {
+        res.json({
+            activeExecutions: pollingService.getActiveExecutions()
+        });
+    } else {
+        res.json({ activeExecutions: [] });
     }
 });
 

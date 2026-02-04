@@ -81,7 +81,7 @@ async def log_node_execution(
     
     async with aiosqlite.connect(DATABASE_PATH) as db:
         await db.execute("""
-            INSERT INTO workflow_execution_logs 
+            INSERT INTO execution_logs 
             (id, executionId, nodeId, nodeType, nodeLabel, status, inputData, outputData, error, duration, timestamp)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
