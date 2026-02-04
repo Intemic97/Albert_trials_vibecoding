@@ -1171,35 +1171,47 @@ app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, 
             return res.status(404).json({ error: 'User not found' });
         }
 
+        // Helper function to safely delete from a table (ignores errors if table doesn't exist)
+        const safeDelete = async (query, params) => {
+            try {
+                await db.run(query, params);
+            } catch (err) {
+                console.log(`[Admin] Safe delete skipped (table may not exist): ${err.message}`);
+            }
+        };
+
         // Start transaction for cascading deletes
         await db.run('BEGIN TRANSACTION');
 
         try {
             // Delete user's organization memberships
-            await db.run('DELETE FROM user_organizations WHERE userId = ?', [id]);
+            await safeDelete('DELETE FROM user_organizations WHERE userId = ?', [id]);
 
             // Delete user's workflows (if they are the creator)
-            await db.run('DELETE FROM workflows WHERE createdBy = ?', [id]);
+            await safeDelete('DELETE FROM workflows WHERE createdBy = ?', [id]);
 
             // Delete user's dashboards (if they are the creator)
-            await db.run('DELETE FROM dashboards WHERE createdBy = ?', [id]);
+            await safeDelete('DELETE FROM dashboards WHERE createdBy = ?', [id]);
 
             // Delete user's reports (if they are the creator)
-            await db.run('DELETE FROM reports WHERE createdBy = ?', [id]);
+            await safeDelete('DELETE FROM reports WHERE createdBy = ?', [id]);
 
             // Delete user's entities (if they are the creator)
-            await db.run('DELETE FROM entities WHERE createdBy = ?', [id]);
+            await safeDelete('DELETE FROM entities WHERE createdBy = ?', [id]);
 
             // Delete user's credentials
-            await db.run('DELETE FROM credentials WHERE userId = ?', [id]);
+            await safeDelete('DELETE FROM credentials WHERE userId = ?', [id]);
 
             // Delete user's audit logs
-            await db.run('DELETE FROM audit_logs WHERE userId = ?', [id]);
+            await safeDelete('DELETE FROM audit_logs WHERE userId = ?', [id]);
 
             // Delete any pending invitations sent by this user
-            await db.run('DELETE FROM pending_invitations WHERE invitedBy = ?', [id]);
+            await safeDelete('DELETE FROM pending_invitations WHERE invitedBy = ?', [id]);
 
-            // Delete the user
+            // Delete node feedback from this user
+            await safeDelete('DELETE FROM node_feedback WHERE userId = ?', [id]);
+
+            // Delete the user (this one must succeed)
             await db.run('DELETE FROM users WHERE id = ?', [id]);
 
             await db.run('COMMIT');
@@ -1214,7 +1226,7 @@ app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, 
 
     } catch (error) {
         console.error('Delete user error:', error);
-        res.status(500).json({ error: 'Failed to delete user' });
+        res.status(500).json({ error: 'Failed to delete user: ' + error.message });
     }
 });
 

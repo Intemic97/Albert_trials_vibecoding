@@ -583,7 +583,6 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             <th className="px-6 py-4 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">User</th>
                                             <th className="px-6 py-4 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Role</th>
                                             <th className="px-6 py-4 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Email</th>
-                                            <th className="px-6 py-4 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -610,12 +609,6 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                 </td>
                                                 <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
                                                     {user.email}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <button className="text-[var(--text-tertiary)] hover:text-red-600 transition-colors">
-                                                        <span className="sr-only">Remove</span>
-                                                        <X size={16} weight="light" />
-                                                    </button>
                                                 </td>
                                             </tr>
                                         ))}
