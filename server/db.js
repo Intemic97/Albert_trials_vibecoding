@@ -703,6 +703,11 @@ async function initDb() {
   } catch (e) {
     // Column already exists, ignore
   }
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN logo TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
 
   // Create copilot_chats table for storing chat history
   await db.exec(`

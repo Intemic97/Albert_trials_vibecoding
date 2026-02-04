@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
-import { ProfileMenu, UserAvatar } from './ProfileMenu';
+import { ProfileMenu, UserAvatar, OrganizationLogo } from './ProfileMenu';
 import { NotificationBell, NotificationCenter, useNotificationCenter } from './NotificationCenter';
 import {
   SquaresFour,
@@ -21,6 +21,7 @@ import {
   CaretUp,
   CaretLeft,
   CaretRight,
+  CaretUpDown,
   Checks,
   ClipboardText,
   Flask,
@@ -550,33 +551,44 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
           <NavItem icon={GearSix} label="Settings" view="settings" active={activeView === 'settings'} />
         </div>
         
-        {/* Profile */}
+        {/* Organization Switcher */}
         {isCollapsed ? (
           <ProfileMenu
             onNavigate={onNavigate}
             menuPlacement="top-right"
+            initialView="organizations"
             triggerClassName="w-full flex items-center justify-center p-2 rounded-lg hover:bg-[var(--sidebar-bg-hover)] transition-colors duration-200 ease-in-out"
-            triggerContent={<UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="sm" />}
+            triggerContent={<OrganizationLogo name={currentOrg?.name} logo={(currentOrg as any)?.logo} size="sm" />}
           />
         ) : (
-          <ProfileMenu
-            onNavigate={onNavigate}
-            menuPlacement="top-right"
-            triggerClassName="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--sidebar-bg-hover)] transition-colors duration-200 ease-in-out text-left border border-transparent hover:border-[var(--sidebar-border)]"
-            triggerContent={(
-              <>
-                <UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="md" />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-normal text-[var(--sidebar-text)] truncate">{user?.name || 'User'}</div>
-                  {currentOrg && (
-                    <div className="text-xs text-[var(--text-tertiary)] truncate">
-                      {currentOrg.name}
+          <div className="flex items-center justify-between w-full px-2 py-2 rounded-lg hover:bg-[var(--sidebar-bg-hover)] transition-colors duration-200 ease-in-out">
+            {/* Main area - opens full menu */}
+            <ProfileMenu
+              onNavigate={onNavigate}
+              menuPlacement="top-right"
+              triggerClassName="flex items-center gap-3 min-w-0 flex-1"
+              triggerContent={(
+                <>
+                  <OrganizationLogo name={currentOrg?.name} logo={(currentOrg as any)?.logo} size="md" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-normal text-[var(--sidebar-text)] truncate uppercase tracking-wide">
+                      {currentOrg?.name || 'Organization'}
                     </div>
-                  )}
-                </div>
-              </>
-            )}
-          />
+                  </div>
+                </>
+              )}
+            />
+            {/* Switch button - opens directly to organizations */}
+            <ProfileMenu
+              onNavigate={onNavigate}
+              menuPlacement="top-right"
+              initialView="organizations"
+              triggerClassName="p-1.5 rounded hover:bg-[var(--sidebar-bg-active)] transition-colors duration-200 ease-in-out flex-shrink-0"
+              triggerContent={
+                <CaretUpDown size={16} weight="light" className="text-[var(--sidebar-icon)]" />
+              }
+            />
+          </div>
         )}
       </div>
     </div>

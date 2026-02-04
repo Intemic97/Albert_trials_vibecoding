@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { User, Envelope, Plus, X, Check, Lightning, Crown, Sparkle, CreditCard, ArrowSquareOut, SpinnerGap, LinkSimple, LinkBreak, Copy, CheckCircle, WarningCircle, Sun, Moon, Monitor, Shield } from '@phosphor-icons/react';
-import { UserAvatar } from './ProfileMenu';
+import React, { useState, useEffect, useRef } from 'react';
+import { User, Envelope, Plus, X, Check, Lightning, Crown, Sparkle, CreditCard, ArrowSquareOut, SpinnerGap, LinkSimple, LinkBreak, Copy, CheckCircle, WarningCircle, Sun, Moon, Monitor, Shield, Camera } from '@phosphor-icons/react';
+import { UserAvatar, OrganizationLogo } from './ProfileMenu';
 import { PageHeader } from './PageHeader';
 import { API_BASE } from '../config';
 import { useTheme } from '../context/ThemeContext';
 import { ActivityLog } from './ActivityLog';
+import { useAuth } from '../context/AuthContext';
 
 // Slack icon component
 const SlackIcon = () => (
@@ -54,6 +55,7 @@ interface OrgUser {
 
 export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial }) => {
     const { mode, setMode, isDark } = useTheme();
+    const { organizations, refreshOrganizations, user } = useAuth();
     const [activeTab, setActiveTab] = useState<'general' | 'team' | 'integrations' | 'activity'>('general');
     const [users, setUsers] = useState<OrgUser[]>([]);
     const [isInviting, setIsInviting] = useState(false);
@@ -62,6 +64,11 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
     const [tutorialEnabled, setTutorialEnabled] = useState(() => {
         return !localStorage.getItem('intemic_tutorial_completed');
     });
+    
+    // Organization logo state
+    const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+    const logoInputRef = useRef<HTMLInputElement>(null);
+    const currentOrg = organizations.find(o => o.id === user?.orgId);
     
     // Slack Integration State
     const [slackConnected, setSlackConnected] = useState(false);
@@ -458,6 +465,55 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
         setTimeout(() => setFeedback(null), 3000);
     };
 
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploadingLogo(true);
+        try {
+            // First upload the file
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const uploadRes = await fetch(`${API_BASE}/upload`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+
+            if (uploadRes.ok) {
+                const uploadData = await uploadRes.json();
+                
+                // Then update the organization with the new logo
+                const updateRes = await fetch(`${API_BASE}/organizations/current/logo`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ logo: uploadData.filename }),
+                    credentials: 'include'
+                });
+
+                if (updateRes.ok) {
+                    await refreshOrganizations();
+                    setFeedback({ type: 'success', message: 'Organization logo updated successfully!' });
+                } else {
+                    setFeedback({ type: 'error', message: 'Failed to update organization logo' });
+                }
+            } else {
+                setFeedback({ type: 'error', message: 'Failed to upload image' });
+            }
+        } catch (error) {
+            console.error('Logo upload error:', error);
+            setFeedback({ type: 'error', message: 'An error occurred while uploading' });
+        } finally {
+            setIsUploadingLogo(false);
+            // Reset input
+            if (logoInputRef.current) {
+                logoInputRef.current.value = '';
+            }
+        }
+        setTimeout(() => setFeedback(null), 3000);
+    };
+
     const fetchUsers = async () => {
         try {
             const res = await fetch(`${API_BASE}/organization/users`, {
@@ -702,14 +758,82 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                 </div>
                             </div>
 
-                            {/* Company Information Section */}
+                            {/* Organization Logo Section */}
                             <div className="mt-8 mb-5">
+                                <h2 className="text-base font-normal text-[var(--text-primary)] tracking-tight mb-0.5">Organization</h2>
+                                <p className="text-xs text-[var(--text-secondary)] font-light">Manage your organization's branding and identity.</p>
+                            </div>
+
+                            <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-6 mb-6">
+                                <div className="flex items-center gap-6">
+                                    {/* Logo Preview */}
+                                    <div className="relative group">
+                                        <div className="w-20 h-20 rounded-xl overflow-hidden bg-[var(--bg-tertiary)] flex items-center justify-center border-2 border-[var(--border-light)]">
+                                            {(currentOrg as any)?.logo ? (
+                                                <img 
+                                                    src={`${API_BASE}/files/${(currentOrg as any).logo}`}
+                                                    alt={currentOrg?.name || 'Organization'}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <OrganizationLogo name={currentOrg?.name} size="lg" />
+                                            )}
+                                        </div>
+                                        <input
+                                            type="file"
+                                            ref={logoInputRef}
+                                            onChange={handleLogoUpload}
+                                            accept="image/*"
+                                            className="hidden"
+                                        />
+                                        <button
+                                            onClick={() => logoInputRef.current?.click()}
+                                            disabled={isUploadingLogo}
+                                            className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                        >
+                                            {isUploadingLogo ? (
+                                                <SpinnerGap size={24} weight="light" className="text-white animate-spin" />
+                                            ) : (
+                                                <Camera size={24} weight="light" className="text-white" />
+                                            )}
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Logo Info */}
+                                    <div className="flex-1">
+                                        <h3 className="font-medium text-[var(--text-primary)] mb-1">{currentOrg?.name || 'Organization'}</h3>
+                                        <p className="text-sm text-[var(--text-secondary)] mb-3">
+                                            Upload your organization's logo. It will appear in the sidebar and other places.
+                                        </p>
+                                        <button
+                                            onClick={() => logoInputRef.current?.click()}
+                                            disabled={isUploadingLogo}
+                                            className="text-sm text-[var(--accent-primary)] hover:underline flex items-center gap-1.5"
+                                        >
+                                            {isUploadingLogo ? (
+                                                <>
+                                                    <SpinnerGap size={14} weight="light" className="animate-spin" />
+                                                    Uploading...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Camera size={14} weight="light" />
+                                                    Change logo
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Company Information Section */}
+                            <div className="mb-5">
                                 <h2 className="text-base font-normal text-[var(--text-primary)] tracking-tight mb-0.5">Company Information</h2>
                                 <p className="text-xs text-[var(--text-secondary)] font-light">Manage your company's core information.</p>
                             </div>
 
                             {feedback && (
-                                <div className={`p-4 rounded-lg text-sm font-medium ${feedback.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                                <div className={`p-4 rounded-lg text-sm font-medium mb-4 ${feedback.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
                                     }`}>
                                     {feedback.message}
                                 </div>
@@ -718,7 +842,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                             <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-6">
                                 <div className="flex justify-between items-center mb-6">
                                     <div>
-                                        <h3 className="font-medium text-slate-800">Company Profile</h3>
+                                        <h3 className="font-medium text-[var(--text-primary)]">Company Profile</h3>
                                         <p className="text-sm text-[var(--text-secondary)] font-light">Update your organization details. You can use them in Reports for faster document generation</p>
                                     </div>
                                     <button

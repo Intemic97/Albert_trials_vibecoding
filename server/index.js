@@ -585,7 +585,7 @@ const upload = multer({
     storage,
     limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
     fileFilter: (req, file, cb) => {
-        // Allow common file types
+        // Allow common file types and all images
         const allowedTypes = [
             'application/pdf',
             'application/msword',
@@ -593,15 +593,15 @@ const upload = multer({
             'application/vnd.ms-excel',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'text/plain',
-            'text/csv',
-            'image/jpeg',
-            'image/png',
-            'image/gif'
+            'text/csv'
         ];
-        if (allowedTypes.includes(file.mimetype)) {
+        
+        // Accept any image type (image/*)
+        if (file.mimetype.startsWith('image/') || allowedTypes.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('File type not allowed'), false);
+            console.log(`[Upload] Rejected file type: ${file.mimetype} for file: ${file.originalname}`);
+            cb(new Error(`File type not allowed: ${file.mimetype}`), false);
         }
     }
 });
@@ -753,6 +753,30 @@ app.put('/api/company', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Update company info error:', error);
         res.status(500).json({ error: 'Failed to update company information' });
+    }
+});
+
+// Update organization logo
+app.put('/api/organizations/current/logo', authenticateToken, async (req, res) => {
+    const { logo } = req.body;
+    
+    if (!logo) {
+        return res.status(400).json({ error: 'Logo filename is required' });
+    }
+    
+    const db = await openDb();
+    
+    try {
+        await db.run(
+            'UPDATE organizations SET logo = ? WHERE id = ?',
+            [logo, req.user.orgId]
+        );
+        
+        console.log(`[Org] Updated logo for organization ${req.user.orgId}`);
+        res.json({ message: 'Organization logo updated successfully', logo });
+    } catch (error) {
+        console.error('Update organization logo error:', error);
+        res.status(500).json({ error: 'Failed to update organization logo' });
     }
 });
 
