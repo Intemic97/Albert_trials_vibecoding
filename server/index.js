@@ -6274,6 +6274,91 @@ app.get('/api/executions/polling/active', authenticateToken, async (req, res) =>
     }
 });
 
+// Cancel a running execution
+app.post('/api/executions/:executionId/cancel', authenticateToken, async (req, res) => {
+    try {
+        const { executionId } = req.params;
+        
+        console.log(`[Execution] Cancel request for: ${executionId}`);
+        
+        // Try Prefect service first
+        try {
+            const result = await prefectClient.cancelExecution(executionId);
+            
+            // Stop polling if active
+            const pollingService = getPollingService();
+            if (pollingService) {
+                pollingService.stopPolling(executionId);
+            }
+            
+            // Broadcast cancellation via WebSocket
+            const db = await openDb();
+            const execution = await db.get(
+                'SELECT workflowId, organizationId FROM workflow_executions WHERE id = ?',
+                [executionId]
+            );
+            
+            if (execution && execution.organizationId) {
+                broadcastToOrganization(execution.organizationId, {
+                    type: 'execution_cancelled',
+                    executionId,
+                    workflowId: execution.workflowId,
+                    message: 'Execution cancelled by user'
+                });
+            }
+            
+            return res.json(result);
+        } catch (prefectError) {
+            console.warn('[Execution] Prefect cancel failed, trying local:', prefectError.message);
+            
+            // Fallback: cancel in local database
+            const db = await openDb();
+            const execution = await db.get(
+                'SELECT * FROM workflow_executions WHERE id = ?',
+                [executionId]
+            );
+            
+            if (!execution) {
+                return res.status(404).json({ error: 'Execution not found' });
+            }
+            
+            if (!['pending', 'running'].includes(execution.status)) {
+                return res.json({
+                    success: false,
+                    executionId,
+                    message: `Cannot cancel execution with status '${execution.status}'`,
+                    previousStatus: execution.status
+                });
+            }
+            
+            await db.run(
+                "UPDATE workflow_executions SET status = 'cancelled', error = 'Execution cancelled by user' WHERE id = ?",
+                [executionId]
+            );
+            
+            // Broadcast cancellation
+            if (execution.organizationId) {
+                broadcastToOrganization(execution.organizationId, {
+                    type: 'execution_cancelled',
+                    executionId,
+                    workflowId: execution.workflowId,
+                    message: 'Execution cancelled by user'
+                });
+            }
+            
+            return res.json({
+                success: true,
+                executionId,
+                message: 'Execution cancelled successfully',
+                previousStatus: execution.status
+            });
+        }
+    } catch (error) {
+        console.error('Error cancelling execution:', error);
+        res.status(500).json({ error: error.message || 'Failed to cancel execution' });
+    }
+});
+
 // Execute a single node (authenticated)
 app.post('/api/workflow/:id/execute-node', authenticateToken, async (req, res) => {
     try {

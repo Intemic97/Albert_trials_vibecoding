@@ -257,6 +257,14 @@ Crear en `components/workflows/modals/MyNewNodeConfigModal.tsx` siguiendo el pat
     executionId: string,
     error: string
 }
+
+// Ejecución cancelada
+{
+    type: 'execution_cancelled',
+    executionId: string,
+    workflowId: string,
+    message: 'Execution cancelled by user'
+}
 ```
 
 ### Hook useExecutionProgress
@@ -364,7 +372,7 @@ Ver logs en terminal de Prefect. Los errores aparecen ahí con stack trace.
 
 ## Próximos Pasos Sugeridos
 
-1. **Cancelación de ejecuciones** - Endpoint para cancelar workflow en curso
+1. ~~**Cancelación de ejecuciones**~~ - ✅ Implementado
 2. **Retry de nodos fallidos** - UI para re-ejecutar nodos que fallaron
 3. **Implementar handlers OT reales** - Conectar con OPC UA/MQTT/Modbus reales
 4. **Dashboard de ejecuciones** - Vista de todas las ejecuciones con filtros

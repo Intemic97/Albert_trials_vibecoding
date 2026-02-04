@@ -301,6 +301,50 @@ async def get_execution_logs(execution_id: str):
     }
 
 
+@app.post("/api/executions/{execution_id}/cancel")
+async def cancel_execution(execution_id: str):
+    """
+    Cancel a running execution
+    
+    This endpoint:
+    1. Marks the execution as 'cancelled' in the database
+    2. The workflow_flow_optimized checks for cancellation between layers
+    3. Any currently running node will complete, but no new nodes start
+    """
+    db = Database()
+    
+    execution = await db.get_execution(execution_id)
+    if not execution:
+        raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
+    
+    current_status = execution.get("status")
+    
+    # Can only cancel pending or running executions
+    if current_status not in ["pending", "running"]:
+        return {
+            "success": False,
+            "executionId": execution_id,
+            "message": f"Cannot cancel execution with status '{current_status}'",
+            "previousStatus": current_status
+        }
+    
+    # Update execution status to cancelled
+    await db.update_execution(
+        execution_id,
+        status="cancelled",
+        error="Execution cancelled by user"
+    )
+    
+    print(f"🛑 Execution {execution_id} cancelled by user")
+    
+    return {
+        "success": True,
+        "executionId": execution_id,
+        "message": "Execution cancelled successfully",
+        "previousStatus": current_status
+    }
+
+
 @app.get("/api/workflows/{workflow_id}/executions")
 async def get_workflow_executions(workflow_id: str, limit: int = 50):
     """Get recent executions for a workflow"""

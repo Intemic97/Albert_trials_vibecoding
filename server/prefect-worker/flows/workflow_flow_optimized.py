@@ -282,6 +282,24 @@ async def workflow_flow_optimized(
         node_results = {}  # nodeId -> result
         
         for layer_idx, layer_node_ids in enumerate(layers):
+            # Check if execution was cancelled before starting this layer
+            async with aiosqlite.connect(DATABASE_PATH) as db:
+                cursor = await db.execute(
+                    "SELECT status FROM workflow_executions WHERE id = ?",
+                    (execution_id,)
+                )
+                row = await cursor.fetchone()
+                if row and row[0] == 'cancelled':
+                    print(f"[Optimized Flow] Execution {execution_id} was cancelled - stopping at layer {layer_idx}")
+                    return {
+                        "success": False,
+                        "executionId": execution_id,
+                        "status": "cancelled",
+                        "message": "Execution was cancelled by user",
+                        "stoppedAtLayer": layer_idx,
+                        "nodeResults": node_results
+                    }
+            
             print(f"[Optimized Flow] Executing layer {layer_idx} with {len(layer_node_ids)} node(s): {layer_node_ids}")
             
             # Prepare tasks for this layer
