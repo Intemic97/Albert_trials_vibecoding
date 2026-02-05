@@ -285,7 +285,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     <div className="flex items-center">
                                         <OrganizationLogo name={currentOrg?.name} logo={(currentOrg as any)?.logo} size="sm" className="mr-3" />
                                         <div className="text-left">
-                                            <span className="text-sm">Change organization</span>
+                                            <span className="text-sm">Change workspace</span>
                                             <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{currentOrg?.name || 'Select'}</p>
                                         </div>
                                     </div>
@@ -337,7 +337,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                 >
                                     <CaretRight className="rotate-180" size={16} weight="light" />
                                 </button>
-                                <h3 className="font-normal text-[var(--sidebar-text)] text-sm">Organizations</h3>
+                                <h3 className="font-normal text-[var(--sidebar-text)] text-sm">Workspace</h3>
                             </div>
 
                             <div className="px-3 py-2 space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
@@ -369,7 +369,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                 ))}
                             </div>
                             
-                            {/* Create Organization Button */}
+                            {/* Create Workspace Button */}
                             <div className="px-3 py-2 border-t border-[var(--sidebar-border)]">
                                 <button
                                     onClick={() => {
@@ -379,7 +379,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     className="w-full flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left group text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
                                 >
                                     <Plus size={16} weight="light" className="mr-3 transition-colors duration-200 ease-in-out text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]" />
-                                    <span className="transition-colors duration-200 ease-in-out">Create Organization</span>
+                                    <span className="transition-colors duration-200 ease-in-out">Create Workspace</span>
                                 </button>
                             </div>
                         </>
@@ -501,13 +501,13 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
             </div>
         )}
 
-        {/* Create Organization Modal */}
+        {/* Create Workspace Modal */}
         {showCreateOrgModal && (
             <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowCreateOrgModal(false)}>
                 <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-lg w-[400px] max-w-full mx-4" onClick={e => e.stopPropagation()}>
                     {/* Header */}
                     <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
-                        <h2 className="text-sm font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Create Organization</h2>
+                        <h2 className="text-sm font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Create Workspace</h2>
                         <button 
                             onClick={() => setShowCreateOrgModal(false)}
                             className="p-1 hover:bg-[var(--bg-hover)] rounded-md transition-colors"
@@ -519,12 +519,12 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                     {/* Content */}
                     <div className="p-5">
                         <p className="text-xs text-[var(--text-secondary)] mb-4">
-                            Create a new organization and become its admin. You can invite team members after creation.
+                            Create a new workspace and become its admin. You can invite team members after creation.
                         </p>
                         
                         <div>
                             <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                                Organization Name
+                                Workspace Name
                             </label>
                             <input
                                 type="text"
@@ -556,7 +556,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                             className="px-3 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-sm text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
                             {isCreatingOrg && <SpinnerGap size={16} weight="bold" className="animate-spin" />}
-                            Create Organization
+                            Create Workspace
                         </button>
                     </div>
                 </div>

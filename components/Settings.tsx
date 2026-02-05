@@ -494,9 +494,9 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
 
                 if (updateRes.ok) {
                     await refreshOrganizations();
-                    setFeedback({ type: 'success', message: 'Organization logo updated successfully!' });
+                    setFeedback({ type: 'success', message: 'Workspace logo updated successfully!' });
                 } else {
-                    setFeedback({ type: 'error', message: 'Failed to update organization logo' });
+                    setFeedback({ type: 'error', message: 'Failed to update workspace logo' });
                 }
             } else {
                 setFeedback({ type: 'error', message: 'Failed to upload image' });
@@ -566,7 +566,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
     return (
         <div className="flex flex-col h-full bg-[var(--bg-primary)]" data-tutorial="settings-content">
             {/* Header */}
-            <PageHeader title="Settings" subtitle="Manage organization and preferences" />
+            <PageHeader title="Settings" subtitle="Manage workspace and preferences" />
 
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-5xl mx-auto">
@@ -596,7 +596,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                             <div className="flex items-center justify-between">
                                 <div>
                                     <h2 className="text-lg font-normal text-slate-800">Team Members</h2>
-                                    <p className="text-[var(--text-secondary)] text-sm">Manage who has access to this organization.</p>
+                                    <p className="text-[var(--text-secondary)] text-sm">Manage who has access to this workspace.</p>
                                 </div>
                                 {currentOrg?.role === 'admin' && (
                                     <button
@@ -771,10 +771,10 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                 </div>
                             </div>
 
-                            {/* Organization Logo Section */}
+                            {/* Workspace Branding Section */}
                             <div className="mt-8 mb-5">
-                                <h2 className="text-base font-normal text-[var(--text-primary)] tracking-tight mb-0.5">Organization</h2>
-                                <p className="text-xs text-[var(--text-secondary)] font-light">Manage your organization's branding and identity.</p>
+                                <h2 className="text-base font-normal text-[var(--text-primary)] tracking-tight mb-0.5">Workspace</h2>
+                                <p className="text-xs text-[var(--text-secondary)] font-light">Manage your workspace's branding and identity.</p>
                             </div>
 
                             <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-6 mb-6">
@@ -785,7 +785,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             {(currentOrg as any)?.logo ? (
                                                 <img 
                                                     src={`${API_BASE}/files/${(currentOrg as any).logo}`}
-                                                    alt={currentOrg?.name || 'Organization'}
+                                                    alt={currentOrg?.name || 'Workspace'}
                                                     className="w-full h-full object-cover"
                                                 />
                                             ) : (
@@ -814,9 +814,9 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                     
                                     {/* Logo Info */}
                                     <div className="flex-1">
-                                        <h3 className="font-medium text-[var(--text-primary)] mb-1">{currentOrg?.name || 'Organization'}</h3>
+                                        <h3 className="font-medium text-[var(--text-primary)] mb-1">{currentOrg?.name || 'Workspace'}</h3>
                                         <p className="text-sm text-[var(--text-secondary)] mb-3">
-                                            Upload your organization's logo. It will appear in the sidebar and other places.
+                                            Upload your workspace logo. It will appear in the sidebar and other places.
                                         </p>
                                         <button
                                             onClick={() => logoInputRef.current?.click()}
@@ -856,7 +856,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                 <div className="flex justify-between items-center mb-6">
                                     <div>
                                         <h3 className="font-medium text-[var(--text-primary)]">Company Profile</h3>
-                                        <p className="text-sm text-[var(--text-secondary)] font-light">Update your organization details. You can use them in Reports for faster document generation</p>
+                                        <p className="text-sm text-[var(--text-secondary)] font-light">Update your company details. You can use them in Reports for faster document generation</p>
                                     </div>
                                     <button
                                         onClick={updateCompanyInfo}
