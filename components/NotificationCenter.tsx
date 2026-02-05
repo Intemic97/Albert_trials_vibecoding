@@ -221,7 +221,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
     return (
         <div 
             ref={panelRef}
-            className="absolute top-full left-0 mt-2 w-80 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-2xl overflow-hidden z-[100]"
+            className="absolute top-full left-0 mt-2 w-80 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-2xl overflow-hidden z-[99999]"
         >
             {/* Header */}
             <div className="px-4 py-3 border-b border-[var(--border-light)] flex items-center justify-between">
