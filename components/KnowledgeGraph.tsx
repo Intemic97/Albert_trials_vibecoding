@@ -52,10 +52,12 @@ const NODE_COLORS = {
 };
 
 // Force simulation constants
-const REPULSION = 400;
+const REPULSION = 800;
 const ATTRACTION = 0.012;
-const CENTER_PULL = 0.006;
-const DAMPING = 0.88;
+const CENTER_PULL = 0.004;
+const DAMPING = 0.85;
+const COLLISION_STRENGTH = 0.8; // How strongly nodes push each other when overlapping
+const MIN_SEPARATION = 120; // Minimum distance between entity centers (includes orbit space)
 
 export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     entities,
@@ -110,12 +112,16 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
             propCount: e.properties?.length || 0
         })).sort((a, b) => b.propCount - a.propCount);
         
-        // Distribute entities in a spiral pattern from center
+        // Distribute entities in a spiral pattern from center with more spacing
         entityGroups.forEach((group, i) => {
             const spiralAngle = i * 2.4; // Golden angle for even distribution
-            const spiralRadius = 30 + (i * 35);
-            const entityX = centerX + Math.cos(spiralAngle) * Math.min(spiralRadius, baseRadius * 0.6);
-            const entityY = centerY + Math.sin(spiralAngle) * Math.min(spiralRadius, baseRadius * 0.6);
+            // Increase spacing based on number of properties (more props = needs more space)
+            const propCount = group.propCount;
+            const baseSpacing = 80 + (propCount * 15); // More properties = more initial spacing
+            const spiralRadius = baseSpacing + (i * 50);
+            const maxRadius = baseRadius * 0.85;
+            const entityX = centerX + Math.cos(spiralAngle) * Math.min(spiralRadius, maxRadius);
+            const entityY = centerY + Math.sin(spiralAngle) * Math.min(spiralRadius, maxRadius);
             
             newNodes.push({
                 id: `entity-${group.entity.id}`,
@@ -267,34 +273,63 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                     }
                 });
                 
-                // Only apply forces in the first 150 frames for settling
+                // Apply forces for entity separation - runs longer for better settling
                 // Skip nodes that are fixed (manually moved by user)
-                if (frameCount < 150) {
+                if (frameCount < 300) {
+                    // Calculate each entity's "territory" (radius including its orbiting properties)
+                    const entityTerritories = new Map<string, number>();
+                    updated.forEach(node => {
+                        if (node.type === 'entity') {
+                            // Find max orbit radius of properties belonging to this entity
+                            let maxOrbit = 0;
+                            updated.forEach(other => {
+                                if (other.parentId === node.id && other.orbitRadius) {
+                                    maxOrbit = Math.max(maxOrbit, other.orbitRadius);
+                                }
+                            });
+                            entityTerritories.set(node.id, maxOrbit + 15); // Add padding
+                        }
+                    });
+                    
                     updated.forEach((node, i) => {
                         if (node.type !== 'entity' || node.fixed) return;
                         
                         let fx = 0, fy = 0;
+                        const nodeTerritory = entityTerritories.get(node.id) || MIN_SEPARATION / 2;
                         
-                        // Repulsion from other entities
+                        // Repulsion from other entities - based on territory collision
                         updated.forEach((other, j) => {
                             if (i === j || other.type !== 'entity') return;
+                            
+                            const otherTerritory = entityTerritories.get(other.id) || MIN_SEPARATION / 2;
+                            const minDist = nodeTerritory + otherTerritory; // Combined territories
                             
                             const dx = node.x - other.x;
                             const dy = node.y - other.y;
                             const dist = Math.sqrt(dx * dx + dy * dy) || 1;
                             
-                            if (dist < 120) {
-                                const force = REPULSION / (dist * dist);
-                                fx += (dx / dist) * force;
-                                fy += (dy / dist) * force;
+                            // Always apply some repulsion within interaction range
+                            if (dist < minDist * 1.5) {
+                                // Strong collision response when overlapping
+                                if (dist < minDist) {
+                                    const overlap = minDist - dist;
+                                    const force = overlap * COLLISION_STRENGTH;
+                                    fx += (dx / dist) * force;
+                                    fy += (dy / dist) * force;
+                                } else {
+                                    // Softer repulsion at distance
+                                    const force = REPULSION / (dist * dist);
+                                    fx += (dx / dist) * force;
+                                    fy += (dy / dist) * force;
+                                }
                             }
                         });
                         
-                        // Center gravity
+                        // Center gravity - weaker to allow spreading
                         fx += (centerX - node.x) * CENTER_PULL;
                         fy += (centerY - node.y) * CENTER_PULL;
                         
-                        // Update velocity
+                        // Update velocity with damping
                         node.vx = (node.vx + fx) * DAMPING;
                         node.vy = (node.vy + fy) * DAMPING;
                         
@@ -302,9 +337,10 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                         node.x += node.vx;
                         node.y += node.vy;
                         
-                        // Bounds
-                        node.x = Math.max(80, Math.min(width - 80, node.x));
-                        node.y = Math.max(80, Math.min(height - 80, node.y));
+                        // Bounds with padding
+                        const padding = nodeTerritory + 20;
+                        node.x = Math.max(padding, Math.min(width - padding, node.x));
+                        node.y = Math.max(padding, Math.min(height - padding, node.y));
                         
                         entityMap.set(node.id, node);
                     });
@@ -548,7 +584,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     }, [selectedNode, nodes, entities, folders]);
     
     return (
-        <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: '#1a1d21' }}>
+        <div className="fixed inset-0 z-[9999] flex flex-col" style={{ backgroundColor: '#1a1d21' }}>
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
                 <div className="flex items-center gap-4">

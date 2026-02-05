@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
@@ -151,6 +152,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', String(isCollapsed));
   }, [isCollapsed]);
+
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -310,14 +312,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
   );
 
   return (
-    <div data-tutorial="sidebar" className={`${isCollapsed ? 'w-16' : 'w-60'} bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] h-screen flex flex-col sticky top-0 font-sans z-40 transition-all duration-300 overflow-x-hidden`}>
-      {/* Collapse Toggle Button */}
-      <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-20 w-6 h-6 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:border-[var(--accent-primary)] transition-colors z-[100] shadow-sm"
-      >
-        {isCollapsed ? <CaretRight size={12} weight="bold" /> : <CaretLeft size={12} weight="bold" />}
-      </button>
+    <>
+      {/* Collapse Toggle Button - rendered via portal to avoid z-index stacking context issues */}
+      {createPortal(
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="fixed w-6 h-6 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:border-[var(--accent-primary)] transition-all duration-300 z-[100] shadow-sm"
+          style={{ 
+            top: 80, 
+            left: isCollapsed ? 52 : 228 // w-16 (64px) - 12px or w-60 (240px) - 12px
+          }}
+        >
+          {isCollapsed ? <CaretRight size={12} weight="bold" /> : <CaretLeft size={12} weight="bold" />}
+        </button>,
+        document.body
+      )}
+      <div data-tutorial="sidebar" className={`${isCollapsed ? 'w-16' : 'w-60'} bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] h-screen flex flex-col sticky top-0 font-sans z-40 transition-all duration-300 overflow-x-hidden`}>
 
       {/* Header */}
       <div className={`${isCollapsed ? 'px-3' : 'px-6'} pt-5 pb-5 border-b border-[var(--sidebar-border)]`}>
@@ -612,5 +622,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         )}
       </div>
     </div>
+    </>
   );
 };
