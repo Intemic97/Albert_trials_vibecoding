@@ -52,14 +52,13 @@ const NODE_COLORS = {
     folder: '#F59E0B',      // Amber - Folders (if shown)
 };
 
-// Force simulation constants - tuned for fluid, organic movement
-const REPULSION = 500;           // Gentler repulsion for smoother movement
-const LINK_ATTRACTION = 0.08;    // Strong attraction between connected entities
-const CENTER_PULL = 0.003;       // Very gentle center gravity
-const DAMPING_START = 0.95;      // Start with high damping (slow, fluid)
-const DAMPING_END = 0.7;         // End with low damping (quick settle)
-const COLLISION_STRENGTH = 0.5;  // Softer collision response
-const MIN_SEPARATION = 100;      // Minimum distance between entity centers
+// Force simulation constants - tuned for very smooth, gentle animation
+const REPULSION = 200;           // Very gentle repulsion
+const LINK_ATTRACTION = 0.03;    // Gentle attraction between connected entities
+const CENTER_PULL = 0.001;       // Very subtle center gravity
+const DAMPING = 0.92;            // Consistent high damping for smooth movement
+const COLLISION_STRENGTH = 0.2;  // Very soft collision response
+const MIN_SEPARATION = 80;       // Minimum distance between entity centers
 
 export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     entities,
@@ -126,14 +125,14 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
             propCount: e.properties?.length || 0
         })).sort((a, b) => b.propCount - a.propCount);
         
-        // Start entities clustered near center - they will flow outward naturally
+        // Start entities in a natural spiral - already somewhat spaced
         entityGroups.forEach((group, i) => {
             const goldenAngle = i * 2.39996; // Golden angle for organic distribution
-            // Start closer to center - physics will push them apart smoothly
-            const initialRadius = 30 + (i * 25); // Compact initial placement
-            const maxRadius = baseRadius * 0.6;
-            const entityX = centerX + Math.cos(goldenAngle) * Math.min(initialRadius, maxRadius) + (Math.random() - 0.5) * 20;
-            const entityY = centerY + Math.sin(goldenAngle) * Math.min(initialRadius, maxRadius) + (Math.random() - 0.5) * 20;
+            // Start with moderate spacing - animation will fine-tune positions gently
+            const initialRadius = 60 + (i * 40); // More spaced initial placement
+            const maxRadius = baseRadius * 0.8;
+            const entityX = centerX + Math.cos(goldenAngle) * Math.min(initialRadius, maxRadius);
+            const entityY = centerY + Math.sin(goldenAngle) * Math.min(initialRadius, maxRadius);
             
             newNodes.push({
                 id: `entity-${group.entity.id}`,
@@ -272,7 +271,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         
         let frameCount = 0;
         let animating = true;
-        const maxFrames = 200; // More frames for smoother, fluid animation
+        const maxFrames = 300; // More frames for very smooth animation
         
         // Build adjacency map for connected entities
         const connectedEntities = new Map<string, Set<string>>();
@@ -292,14 +291,10 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                 return;
             }
             
-            // Easing: start slow, speed up in middle, slow down at end
+            // Very gentle easing - starts extremely slow
             const progress = frameCount / maxFrames;
-            const easeProgress = progress < 0.5 
-                ? 2 * progress * progress 
-                : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-            
-            // Variable damping: high at start (fluid), low at end (settle)
-            const damping = DAMPING_START - (DAMPING_START - DAMPING_END) * easeProgress;
+            // Cubic ease-out for very gentle start
+            const forceMultiplier = Math.min(1, progress * progress * 3);
             
             setNodes(prev => {
                 const updated = prev.map(node => ({ ...node }));
@@ -345,53 +340,53 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                         const isConnected = connections?.has(other.id);
                         
                         if (isConnected) {
-                            // ATTRACTION: Pull connected entities together
-                            const idealDist = nodeTerritory + otherTerritory + 20; // Close but not overlapping
+                            // ATTRACTION: Gently pull connected entities together
+                            const idealDist = nodeTerritory + otherTerritory + 30;
                             if (dist > idealDist) {
-                                const pullStrength = (dist - idealDist) * LINK_ATTRACTION;
+                                const pullStrength = (dist - idealDist) * LINK_ATTRACTION * forceMultiplier;
                                 fx -= (dx / dist) * pullStrength;
                                 fy -= (dy / dist) * pullStrength;
                             }
                         }
                         
-                        // REPULSION: Push apart when too close (applies to all)
+                        // REPULSION: Very gentle push when too close
                         const minDist = nodeTerritory + otherTerritory;
-                        if (dist < minDist * 1.1) {
+                        if (dist < minDist) {
                             const overlap = minDist - dist;
-                            const pushStrength = Math.max(overlap * COLLISION_STRENGTH, REPULSION / (dist * dist + 100));
+                            const pushStrength = overlap * COLLISION_STRENGTH * forceMultiplier;
                             fx += (dx / dist) * pushStrength;
                             fy += (dy / dist) * pushStrength;
-                        } else if (!isConnected && dist < minDist * 2) {
-                            // Gentle repulsion for unconnected entities
-                            const gentlePush = REPULSION * 0.3 / (dist * dist + 200);
+                        } else if (!isConnected && dist < minDist * 1.5) {
+                            // Very gentle repulsion for unconnected entities
+                            const gentlePush = REPULSION * forceMultiplier / (dist * dist + 500);
                             fx += (dx / dist) * gentlePush;
                             fy += (dy / dist) * gentlePush;
                         }
                     });
                     
-                    // Gentle center pull (keeps graph centered)
-                    fx += (centerX - node.x) * CENTER_PULL;
-                    fy += (centerY - node.y) * CENTER_PULL;
+                    // Very gentle center pull
+                    fx += (centerX - node.x) * CENTER_PULL * forceMultiplier;
+                    fy += (centerY - node.y) * CENTER_PULL * forceMultiplier;
                     
-                    // Apply velocity with eased damping
-                    node.vx = (node.vx + fx * 0.1) * damping;
-                    node.vy = (node.vy + fy * 0.1) * damping;
+                    // Apply velocity with consistent damping for smooth movement
+                    node.vx = (node.vx + fx * 0.05) * DAMPING;
+                    node.vy = (node.vy + fy * 0.05) * DAMPING;
                     
                     // Smooth position update
                     node.x += node.vx;
                     node.y += node.vy;
                     
-                    // Soft bounds (elastic)
-                    const padding = nodeTerritory + 40;
-                    if (node.x < padding) node.vx += (padding - node.x) * 0.1;
-                    if (node.x > width - padding) node.vx -= (node.x - (width - padding)) * 0.1;
-                    if (node.y < padding) node.vy += (padding - node.y) * 0.1;
-                    if (node.y > height - padding) node.vy -= (node.y - (height - padding)) * 0.1;
+                    // Very soft bounds (elastic, subtle)
+                    const padding = nodeTerritory + 50;
+                    if (node.x < padding) node.vx += (padding - node.x) * 0.02;
+                    if (node.x > width - padding) node.vx -= (node.x - (width - padding)) * 0.02;
+                    if (node.y < padding) node.vy += (padding - node.y) * 0.02;
+                    if (node.y > height - padding) node.vy -= (node.y - (height - padding)) * 0.02;
                     
                     entityMap.set(node.id, node);
                 });
                 
-                // Smoothly update property positions around their parent entities
+                // Very smoothly update property positions around their parent entities
                 updated.forEach(node => {
                     if (node.fixed) return;
                     if (node.parentId && node.orbitRadius && node.orbitAngle !== undefined) {
@@ -399,9 +394,9 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                         if (parent) {
                             const targetX = parent.x + Math.cos(node.orbitAngle) * node.orbitRadius;
                             const targetY = parent.y + Math.sin(node.orbitAngle) * node.orbitRadius;
-                            // Smooth interpolation for fluid property movement
-                            node.x += (targetX - node.x) * 0.3;
-                            node.y += (targetY - node.y) * 0.3;
+                            // Very smooth interpolation - properties follow gently
+                            node.x += (targetX - node.x) * 0.15;
+                            node.y += (targetY - node.y) * 0.15;
                         }
                     }
                 });
@@ -537,31 +532,39 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         setDraggingNodeId(null);
     };
     
-    const handleWheel = (e: React.WheelEvent) => {
-        e.preventDefault();
+    // Wheel handler with passive: false to allow preventDefault
+    useEffect(() => {
+        const svg = svgRef.current;
+        if (!svg) return;
         
-        const rect = svgRef.current?.getBoundingClientRect();
-        if (!rect) return;
+        const handleWheel = (e: WheelEvent) => {
+            e.preventDefault();
+            
+            const rect = svg.getBoundingClientRect();
+            
+            // Get mouse position relative to the SVG
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            // Calculate the point in world coordinates under the mouse
+            const worldX = (mouseX - offset.x) / zoom;
+            const worldY = (mouseY - offset.y) / zoom;
+            
+            // Calculate new zoom
+            const zoomFactor = e.deltaY > 0 ? 0.95 : 1.05;
+            const newZoom = Math.max(0.3, Math.min(3, zoom * zoomFactor));
+            
+            // Adjust offset to keep the same point under the mouse
+            const newOffsetX = mouseX - worldX * newZoom;
+            const newOffsetY = mouseY - worldY * newZoom;
+            
+            setZoom(newZoom);
+            setOffset({ x: newOffsetX, y: newOffsetY });
+        };
         
-        // Get mouse position relative to the SVG
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        
-        // Calculate the point in world coordinates under the mouse
-        const worldX = (mouseX - offset.x) / zoom;
-        const worldY = (mouseY - offset.y) / zoom;
-        
-        // Calculate new zoom
-        const zoomFactor = e.deltaY > 0 ? 0.95 : 1.05;
-        const newZoom = Math.max(0.3, Math.min(3, zoom * zoomFactor));
-        
-        // Adjust offset to keep the same point under the mouse
-        const newOffsetX = mouseX - worldX * newZoom;
-        const newOffsetY = mouseY - worldY * newZoom;
-        
-        setZoom(newZoom);
-        setOffset({ x: newOffsetX, y: newOffsetY });
-    };
+        svg.addEventListener('wheel', handleWheel, { passive: false });
+        return () => svg.removeEventListener('wheel', handleWheel);
+    }, [zoom, offset]);
     
     const zoomIn = () => setZoom(z => Math.min(3, z * 1.2));
     const zoomOut = () => setZoom(z => Math.max(0.3, z / 1.2));
@@ -707,7 +710,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                         onMouseMove={handleMouseMove}
                         onMouseUp={handleMouseUp}
                         onMouseLeave={handleMouseUp}
-                        onWheel={handleWheel}
                         style={{ background: '#1a1d21' }}
                     >
                         {/* Clean background - no grid for cleaner look */}

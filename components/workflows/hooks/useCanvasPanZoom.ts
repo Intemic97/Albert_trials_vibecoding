@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, RefObject } from 'react';
 
 interface CanvasPanZoomState {
   scale: number;
@@ -13,6 +13,8 @@ interface UseCanvasPanZoomOptions {
   initialOffset?: { x: number; y: number };
   onScaleChange?: (scale: number) => void;
   onOffsetChange?: (x: number, y: number) => void;
+  /** Ref to the canvas element for attaching wheel listener with passive: false */
+  canvasRef?: RefObject<HTMLElement>;
 }
 
 interface UseCanvasPanZoomReturn {
@@ -22,8 +24,7 @@ interface UseCanvasPanZoomReturn {
   offsetY: number;
   isPanning: boolean;
   
-  // Handlers
-  handleWheel: (e: React.WheelEvent) => void;
+  // Handlers (handleWheel is now internal, attached via useEffect)
   handleMouseDown: (e: React.MouseEvent) => void;
   handleMouseMove: (e: React.MouseEvent) => void;
   handleMouseUp: () => void;
@@ -52,6 +53,7 @@ export const useCanvasPanZoom = (options: UseCanvasPanZoomOptions = {}): UseCanv
     initialOffset = { x: 0, y: 0 },
     onScaleChange,
     onOffsetChange,
+    canvasRef,
   } = options;
 
   const [state, setState] = useState<CanvasPanZoomState>({
@@ -63,16 +65,24 @@ export const useCanvasPanZoom = (options: UseCanvasPanZoomOptions = {}): UseCanv
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef({ x: 0, y: 0 });
   const lastOffsetRef = useRef({ x: 0, y: 0 });
+  
+  // Store refs for values needed in wheel handler
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
-  // Handle wheel zoom
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
+  // Handle wheel zoom with passive: false to allow preventDefault
+  useEffect(() => {
+    const canvas = canvasRef?.current;
+    if (!canvas) return;
     
-    const rect = (e.target as HTMLElement).getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    
-    setState(prev => {
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      const prev = stateRef.current;
       const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
       const newScale = Math.max(minScale, Math.min(maxScale, prev.scale * zoomFactor));
       
@@ -84,13 +94,16 @@ export const useCanvasPanZoom = (options: UseCanvasPanZoomOptions = {}): UseCanv
       onScaleChange?.(newScale);
       onOffsetChange?.(newOffsetX, newOffsetY);
       
-      return {
+      setState({
         scale: newScale,
         offsetX: newOffsetX,
         offsetY: newOffsetY,
-      };
-    });
-  }, [minScale, maxScale, onScaleChange, onOffsetChange]);
+      });
+    };
+    
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', handleWheel);
+  }, [canvasRef, minScale, maxScale, onScaleChange, onOffsetChange]);
 
   // Handle pan start (middle mouse or space+click)
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -234,7 +247,6 @@ export const useCanvasPanZoom = (options: UseCanvasPanZoomOptions = {}): UseCanv
     offsetX: state.offsetX,
     offsetY: state.offsetY,
     isPanning,
-    handleWheel,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,

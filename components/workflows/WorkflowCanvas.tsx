@@ -75,14 +75,13 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   const setHoveredConnection = useWorkflowStore(state => state.setHoveredConnection);
   
   // =========================================================================
-  // HOOK: Canvas pan & zoom
+  // HOOK: Canvas pan & zoom (wheel handler attached via useEffect with passive: false)
   // =========================================================================
   const {
     scale,
     offsetX,
     offsetY,
     isPanning,
-    handleWheel,
     handleMouseDown: handlePanStart,
     handleMouseMove: handlePanMove,
     handleMouseUp: handlePanEnd,
@@ -95,6 +94,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   } = useCanvasPanZoom({
     minScale: 0.25,
     maxScale: 3,
+    canvasRef,
   });
   
   // =========================================================================
@@ -449,12 +449,11 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   // =========================================================================
   return (
     <div className="absolute inset-0 overflow-hidden bg-[var(--bg-secondary)]">
-      {/* Canvas container */}
+      {/* Canvas container - wheel handled via useEffect with passive: false */}
       <div
         ref={canvasRef}
         className="w-full h-full relative"
         style={{ cursor: isPanning ? 'grabbing' : 'default' }}
-        onWheel={handleWheel}
         onMouseDown={handleCanvasMouseDown}
         onMouseMove={handleCanvasMouseMove}
         onMouseUp={handleCanvasMouseUp}
