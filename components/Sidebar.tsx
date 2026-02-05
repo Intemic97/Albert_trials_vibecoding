@@ -60,6 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
   const navigate = useNavigate();
   const notificationCenter = useNotificationCenter();
   const searchRef = useRef<HTMLInputElement>(null);
+  const notificationBellRef = useRef<HTMLButtonElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchScope, setSearchScope] = useState<'workflows' | 'chats' | 'knowledge'>('workflows');
   const [isSearching, setIsSearching] = useState(false);
@@ -309,11 +310,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
   );
 
   return (
-    <div data-tutorial="sidebar" className={`${isCollapsed ? 'w-16' : 'w-60'} bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] h-screen flex flex-col sticky top-0 font-sans z-40 transition-all duration-300 overflow-x-hidden`}>
+    <div data-tutorial="sidebar" className={`${isCollapsed ? 'w-16' : 'w-60'} bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] h-screen flex flex-col sticky top-0 font-sans z-[60] transition-all duration-300 overflow-x-hidden`}>
       {/* Collapse Toggle Button */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-20 w-6 h-6 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:border-[var(--accent-primary)] transition-colors z-50 shadow-sm"
+        className="absolute -right-3 top-20 w-6 h-6 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:border-[var(--accent-primary)] transition-colors z-[100] shadow-sm"
       >
         {isCollapsed ? <CaretRight size={12} weight="bold" /> : <CaretLeft size={12} weight="bold" />}
       </button>
@@ -339,12 +340,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
               {/* Notification Bell */}
               <div className="relative">
                 <NotificationBell 
+                  ref={notificationBellRef}
                   onClick={notificationCenter.toggle} 
                   unreadCount={notificationCenter.unreadCount} 
                 />
                 <NotificationCenter 
                   isOpen={notificationCenter.isOpen} 
-                  onClose={notificationCenter.close} 
+                  onClose={notificationCenter.close}
+                  triggerRef={notificationBellRef}
                 />
               </div>
             </>

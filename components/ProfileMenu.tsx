@@ -265,15 +265,19 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
 
                     {view === 'main' ? (
                         <>
-                            {/* Header */}
+                            {/* Header with user info */}
                             <div className="px-4 py-3 border-b border-[var(--sidebar-border)]">
-                                <div className="flex items-center gap-3">
+                                <button 
+                                    onClick={openProfileModal}
+                                    className="w-full flex items-center gap-3 hover:opacity-80 transition-opacity"
+                                >
                                     <UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="sm" />
-                                    <div className="min-w-0 flex-1">
+                                    <div className="min-w-0 flex-1 text-left">
                                         <h3 className="font-normal text-[var(--sidebar-text)] text-sm truncate">{user?.name || 'User'}</h3>
                                         <p className="text-xs text-[var(--text-tertiary)] truncate">{user?.email || 'user@example.com'}</p>
                                     </div>
-                                </div>
+                                    <CaretRight size={14} weight="light" className="text-[var(--sidebar-icon)]" />
+                                </button>
                             </div>
 
                             {/* Menu Items */}
@@ -290,14 +294,6 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                         </div>
                                     </div>
                                     <CaretRight size={16} weight="light" className="text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)] transition-colors duration-200 ease-in-out" />
-                                </button>
-
-                                <button 
-                                    onClick={openProfileModal}
-                                    className="w-full flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left group text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
-                                >
-                                    <User size={16} weight="light" className="mr-3 transition-colors duration-200 ease-in-out text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]" />
-                                    <span className="transition-colors duration-200 ease-in-out">My Profile</span>
                                 </button>
                                 
                                 {/* Admin Panel - Only visible for admins */}

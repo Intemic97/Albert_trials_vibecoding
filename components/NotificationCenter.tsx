@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
     Bell, BellRinging, X, Check, CheckCircle, WarningCircle, XCircle, Info,
     Trash, Eye, EyeSlash, GearSix, CaretRight, Clock, GitBranch, Database,
@@ -46,28 +47,31 @@ interface NotificationBellProps {
     unreadCount: number;
 }
 
-export const NotificationBell: React.FC<NotificationBellProps> = ({ onClick, unreadCount }) => {
-    const hasUnread = unreadCount > 0;
-    
-    const handleClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        onClick();
-    };
-    
-    return (
-        <button
-            onClick={handleClick}
-            className="relative p-1.5 hover:bg-[var(--bg-tertiary)] rounded-md transition-colors"
-            title="Notifications"
-            data-notification-bell
-        >
-            <Bell size={16} className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]" weight="light" />
-            {hasUnread && (
-                <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-[#256A65] rounded-full" />
-            )}
-        </button>
-    );
-};
+export const NotificationBell = React.forwardRef<HTMLButtonElement, NotificationBellProps>(
+    ({ onClick, unreadCount }, ref) => {
+        const hasUnread = unreadCount > 0;
+        
+        const handleClick = (e: React.MouseEvent) => {
+            e.stopPropagation();
+            onClick();
+        };
+        
+        return (
+            <button
+                ref={ref}
+                onClick={handleClick}
+                className="relative p-1.5 hover:bg-[var(--bg-tertiary)] rounded-md transition-colors"
+                title="Notifications"
+                data-notification-bell
+            >
+                <Bell size={16} className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]" weight="light" />
+                {hasUnread && (
+                    <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-[#256A65] rounded-full" />
+                )}
+            </button>
+        );
+    }
+);
 
 // ============================================================================
 // NOTIFICATION CENTER PANEL
@@ -76,14 +80,27 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onClick, unr
 interface NotificationCenterProps {
     isOpen: boolean;
     onClose: () => void;
+    triggerRef?: React.RefObject<HTMLButtonElement>;
 }
 
-export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose }) => {
+export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose, triggerRef }) => {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'settings'>('all');
     const [alertConfigs, setAlertConfigs] = useState<AlertConfig[]>([]);
     const panelRef = useRef<HTMLDivElement>(null);
+    const [position, setPosition] = useState({ top: 0, left: 0 });
+
+    // Calculate position based on trigger button
+    useEffect(() => {
+        if (isOpen && triggerRef?.current) {
+            const rect = triggerRef.current.getBoundingClientRect();
+            setPosition({
+                top: rect.bottom + 8,
+                left: Math.max(16, rect.left - 280 + rect.width) // Align right edge with button, min 16px from left
+            });
+        }
+    }, [isOpen, triggerRef]);
 
     // Fetch notifications on mount
     useEffect(() => {
@@ -218,10 +235,11 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <div 
             ref={panelRef}
-            className="absolute top-full left-0 mt-2 w-80 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-2xl overflow-hidden z-[99999]"
+            className="fixed w-80 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-2xl overflow-hidden z-[99999]"
+            style={{ top: position.top, left: position.left }}
         >
             {/* Header */}
             <div className="px-4 py-3 border-b border-[var(--border-light)] flex items-center justify-between">
@@ -358,7 +376,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
                     </button>
                 </div>
             )}
-        </div>
+        </div>,
+        document.body
     );
 };
 
