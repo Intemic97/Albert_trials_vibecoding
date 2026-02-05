@@ -95,48 +95,52 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
     }
   }, []);
 
-  // Subscribe to OT alerts via WebSocket
+  // Subscribe to OT alerts - polling only in development, WebSocket in production
   useEffect(() => {
     if (!user?.orgId) return;
 
     fetchOtAlertCount();
     
-    // Refresh every 30 seconds
+    // Refresh every 30 seconds (primary method in development)
     const interval = setInterval(fetchOtAlertCount, 30000);
 
-    // WebSocket for real-time updates
-    const wsUrl = window.location.protocol === 'https:'
-      ? `wss://${window.location.hostname}${window.location.port ? `:${window.location.port}` : ''}/ws`
-      : `ws://${window.location.hostname}:3001/ws`;
+    // Only attempt WebSocket in production (not localhost)
+    const enableWebSocket = window.location.hostname !== 'localhost';
+    
+    if (enableWebSocket) {
+      const wsUrl = window.location.protocol === 'https:'
+        ? `wss://${window.location.hostname}${window.location.port ? `:${window.location.port}` : ''}/ws`
+        : `ws://${window.location.hostname}:3001/ws`;
 
-    try {
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
+      try {
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
 
-      ws.onopen = () => {
-        ws.send(JSON.stringify({
-          type: 'subscribe_ot_alerts',
-          orgId: user.orgId,
-          user: { id: user.id, name: user.name || 'User', email: user.email }
-        }));
-      };
+        ws.onopen = () => {
+          ws.send(JSON.stringify({
+            type: 'subscribe_ot_alerts',
+            orgId: user.orgId,
+            user: { id: user.id, name: user.name || 'User', email: user.email }
+          }));
+        };
 
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          if (message.type === 'ot_alert') {
-            // New alert received, refresh count
-            fetchOtAlertCount();
+        ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            if (message.type === 'ot_alert') {
+              // New alert received, refresh count
+              fetchOtAlertCount();
+            }
+          } catch (e) {
+            // Ignore parse errors
           }
-        } catch (e) {
-          // Ignore parse errors
-        }
-      };
+        };
 
-      ws.onerror = () => {};
-      ws.onclose = () => {};
-    } catch (e) {
-      // WebSocket not available
+        ws.onerror = () => {};
+        ws.onclose = () => {};
+      } catch (e) {
+        // WebSocket not available - rely on polling
+      }
     }
 
     return () => {

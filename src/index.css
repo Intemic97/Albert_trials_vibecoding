@@ -53,6 +53,7 @@
   
   /* Accents */
   --accent-primary: #2383E2;
+  --accent-primary-hover: #1a6fc0;
   --accent-success: #0F766E;
   --accent-warning: #D97706;
   --accent-error: #DC2626;
@@ -112,6 +113,7 @@
   
   /* Accents */
   --accent-primary: #529CCA;
+  --accent-primary-hover: #6ab0d8;
   --accent-success: #2DD4BF;
   --accent-warning: #FBBF24;
   --accent-error: #F87171;

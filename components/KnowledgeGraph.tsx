@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { 
     X, MagnifyingGlass, Minus, Plus, ArrowsOut, TreeStructure, Eye, CaretRight, Folder as FolderIcon, Database, Tag, ArrowLeft
 } from '@phosphor-icons/react';
@@ -51,13 +52,14 @@ const NODE_COLORS = {
     folder: '#F59E0B',      // Amber - Folders (if shown)
 };
 
-// Force simulation constants
-const REPULSION = 800;
-const ATTRACTION = 0.012;
-const CENTER_PULL = 0.004;
-const DAMPING = 0.85;
-const COLLISION_STRENGTH = 0.8; // How strongly nodes push each other when overlapping
-const MIN_SEPARATION = 120; // Minimum distance between entity centers (includes orbit space)
+// Force simulation constants - tuned for fluid, organic movement
+const REPULSION = 500;           // Gentler repulsion for smoother movement
+const LINK_ATTRACTION = 0.08;    // Strong attraction between connected entities
+const CENTER_PULL = 0.003;       // Very gentle center gravity
+const DAMPING_START = 0.95;      // Start with high damping (slow, fluid)
+const DAMPING_END = 0.7;         // End with low damping (quick settle)
+const COLLISION_STRENGTH = 0.5;  // Softer collision response
+const MIN_SEPARATION = 100;      // Minimum distance between entity centers
 
 export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     entities,
@@ -87,6 +89,18 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     // Graph data
     const [nodes, setNodes] = useState<GraphNode[]>([]);
     const [edges, setEdges] = useState<GraphEdge[]>([]);
+    const [isSettled, setIsSettled] = useState(false);
+    
+    // Animation state for smooth entrance
+    const [isVisible, setIsVisible] = useState(false);
+    
+    // Trigger entrance animation on mount
+    useEffect(() => {
+        // Small delay to ensure CSS transition works
+        requestAnimationFrame(() => {
+            setIsVisible(true);
+        });
+    }, []);
     
     // All properties use the same gray color
     const getPropertyColor = (): string => NODE_COLORS.property;
@@ -112,16 +126,14 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
             propCount: e.properties?.length || 0
         })).sort((a, b) => b.propCount - a.propCount);
         
-        // Distribute entities in a spiral pattern from center with more spacing
+        // Start entities clustered near center - they will flow outward naturally
         entityGroups.forEach((group, i) => {
-            const spiralAngle = i * 2.4; // Golden angle for even distribution
-            // Increase spacing based on number of properties (more props = needs more space)
-            const propCount = group.propCount;
-            const baseSpacing = 80 + (propCount * 15); // More properties = more initial spacing
-            const spiralRadius = baseSpacing + (i * 50);
-            const maxRadius = baseRadius * 0.85;
-            const entityX = centerX + Math.cos(spiralAngle) * Math.min(spiralRadius, maxRadius);
-            const entityY = centerY + Math.sin(spiralAngle) * Math.min(spiralRadius, maxRadius);
+            const goldenAngle = i * 2.39996; // Golden angle for organic distribution
+            // Start closer to center - physics will push them apart smoothly
+            const initialRadius = 30 + (i * 25); // Compact initial placement
+            const maxRadius = baseRadius * 0.6;
+            const entityX = centerX + Math.cos(goldenAngle) * Math.min(initialRadius, maxRadius) + (Math.random() - 0.5) * 20;
+            const entityY = centerY + Math.sin(goldenAngle) * Math.min(initialRadius, maxRadius) + (Math.random() - 0.5) * 20;
             
             newNodes.push({
                 id: `entity-${group.entity.id}`,
@@ -150,7 +162,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                     const posInRing = j % propsPerRing;
                     const propsInThisRing = Math.min(propsPerRing, numProps - ringIndex * propsPerRing);
                     
-                    const orbitRadius = 35 + ringIndex * 25;
+                    const orbitRadius = 20 + ringIndex * 12; // Closer to entity
                     const angleOffset = ringIndex * 0.3; // Offset each ring
                     const propAngle = angleOffset + (posInRing / propsInThisRing) * 2 * Math.PI;
                     
@@ -245,11 +257,13 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         
         setNodes(newNodes);
         setEdges(newEdges);
+        setIsSettled(false); // Reset to allow new settling
     }, [entities, showProperties]);
     
-    // Gentle orbital animation for property nodes
+    // Fluid physics simulation with link-based clustering
     useEffect(() => {
-        if (nodes.length === 0) return;
+        if (nodes.length === 0 || edges.length === 0) return;
+        if (isSettled) return;
         
         const width = containerRef.current?.clientWidth || 800;
         const height = containerRef.current?.clientHeight || 600;
@@ -258,105 +272,136 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         
         let frameCount = 0;
         let animating = true;
+        const maxFrames = 200; // More frames for smoother, fluid animation
+        
+        // Build adjacency map for connected entities
+        const connectedEntities = new Map<string, Set<string>>();
+        edges.forEach(edge => {
+            // Only consider entity-to-entity connections (relations)
+            if (edge.source.startsWith('entity-') && edge.target.startsWith('entity-')) {
+                if (!connectedEntities.has(edge.source)) connectedEntities.set(edge.source, new Set());
+                if (!connectedEntities.has(edge.target)) connectedEntities.set(edge.target, new Set());
+                connectedEntities.get(edge.source)!.add(edge.target);
+                connectedEntities.get(edge.target)!.add(edge.source);
+            }
+        });
         
         const simulate = () => {
-            if (!animating) return;
+            if (!animating || frameCount >= maxFrames) {
+                setIsSettled(true);
+                return;
+            }
+            
+            // Easing: start slow, speed up in middle, slow down at end
+            const progress = frameCount / maxFrames;
+            const easeProgress = progress < 0.5 
+                ? 2 * progress * progress 
+                : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+            
+            // Variable damping: high at start (fluid), low at end (settle)
+            const damping = DAMPING_START - (DAMPING_START - DAMPING_END) * easeProgress;
             
             setNodes(prev => {
                 const updated = prev.map(node => ({ ...node }));
                 const entityMap = new Map<string, GraphNode>();
                 
-                // First pass: update entities and store positions
+                // First pass: store entity positions
                 updated.forEach(node => {
                     if (node.type === 'entity') {
                         entityMap.set(node.id, node);
                     }
                 });
                 
-                // Apply forces for entity separation - runs longer for better settling
-                // Skip nodes that are fixed (manually moved by user)
-                if (frameCount < 300) {
-                    // Calculate each entity's "territory" (radius including its orbiting properties)
-                    const entityTerritories = new Map<string, number>();
-                    updated.forEach(node => {
-                        if (node.type === 'entity') {
-                            // Find max orbit radius of properties belonging to this entity
-                            let maxOrbit = 0;
-                            updated.forEach(other => {
-                                if (other.parentId === node.id && other.orbitRadius) {
-                                    maxOrbit = Math.max(maxOrbit, other.orbitRadius);
-                                }
-                            });
-                            entityTerritories.set(node.id, maxOrbit + 15); // Add padding
+                // Calculate territories (space needed by each entity including its properties)
+                const entityTerritories = new Map<string, number>();
+                updated.forEach(node => {
+                    if (node.type === 'entity') {
+                        let maxOrbit = 0;
+                        updated.forEach(other => {
+                            if (other.parentId === node.id && other.orbitRadius) {
+                                maxOrbit = Math.max(maxOrbit, other.orbitRadius);
+                            }
+                        });
+                        entityTerritories.set(node.id, maxOrbit + 25);
+                    }
+                });
+                
+                // Apply forces to entities
+                updated.forEach((node, i) => {
+                    if (node.type !== 'entity' || node.fixed) return;
+                    
+                    let fx = 0, fy = 0;
+                    const nodeTerritory = entityTerritories.get(node.id) || MIN_SEPARATION / 2;
+                    const connections = connectedEntities.get(node.id);
+                    
+                    updated.forEach((other, j) => {
+                        if (i === j || other.type !== 'entity') return;
+                        
+                        const otherTerritory = entityTerritories.get(other.id) || MIN_SEPARATION / 2;
+                        const dx = node.x - other.x;
+                        const dy = node.y - other.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                        
+                        const isConnected = connections?.has(other.id);
+                        
+                        if (isConnected) {
+                            // ATTRACTION: Pull connected entities together
+                            const idealDist = nodeTerritory + otherTerritory + 20; // Close but not overlapping
+                            if (dist > idealDist) {
+                                const pullStrength = (dist - idealDist) * LINK_ATTRACTION;
+                                fx -= (dx / dist) * pullStrength;
+                                fy -= (dy / dist) * pullStrength;
+                            }
+                        }
+                        
+                        // REPULSION: Push apart when too close (applies to all)
+                        const minDist = nodeTerritory + otherTerritory;
+                        if (dist < minDist * 1.1) {
+                            const overlap = minDist - dist;
+                            const pushStrength = Math.max(overlap * COLLISION_STRENGTH, REPULSION / (dist * dist + 100));
+                            fx += (dx / dist) * pushStrength;
+                            fy += (dy / dist) * pushStrength;
+                        } else if (!isConnected && dist < minDist * 2) {
+                            // Gentle repulsion for unconnected entities
+                            const gentlePush = REPULSION * 0.3 / (dist * dist + 200);
+                            fx += (dx / dist) * gentlePush;
+                            fy += (dy / dist) * gentlePush;
                         }
                     });
                     
-                    updated.forEach((node, i) => {
-                        if (node.type !== 'entity' || node.fixed) return;
-                        
-                        let fx = 0, fy = 0;
-                        const nodeTerritory = entityTerritories.get(node.id) || MIN_SEPARATION / 2;
-                        
-                        // Repulsion from other entities - based on territory collision
-                        updated.forEach((other, j) => {
-                            if (i === j || other.type !== 'entity') return;
-                            
-                            const otherTerritory = entityTerritories.get(other.id) || MIN_SEPARATION / 2;
-                            const minDist = nodeTerritory + otherTerritory; // Combined territories
-                            
-                            const dx = node.x - other.x;
-                            const dy = node.y - other.y;
-                            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                            
-                            // Always apply some repulsion within interaction range
-                            if (dist < minDist * 1.5) {
-                                // Strong collision response when overlapping
-                                if (dist < minDist) {
-                                    const overlap = minDist - dist;
-                                    const force = overlap * COLLISION_STRENGTH;
-                                    fx += (dx / dist) * force;
-                                    fy += (dy / dist) * force;
-                                } else {
-                                    // Softer repulsion at distance
-                                    const force = REPULSION / (dist * dist);
-                                    fx += (dx / dist) * force;
-                                    fy += (dy / dist) * force;
-                                }
-                            }
-                        });
-                        
-                        // Center gravity - weaker to allow spreading
-                        fx += (centerX - node.x) * CENTER_PULL;
-                        fy += (centerY - node.y) * CENTER_PULL;
-                        
-                        // Update velocity with damping
-                        node.vx = (node.vx + fx) * DAMPING;
-                        node.vy = (node.vy + fy) * DAMPING;
-                        
-                        // Update position
-                        node.x += node.vx;
-                        node.y += node.vy;
-                        
-                        // Bounds with padding
-                        const padding = nodeTerritory + 20;
-                        node.x = Math.max(padding, Math.min(width - padding, node.x));
-                        node.y = Math.max(padding, Math.min(height - padding, node.y));
-                        
-                        entityMap.set(node.id, node);
-                    });
-                }
+                    // Gentle center pull (keeps graph centered)
+                    fx += (centerX - node.x) * CENTER_PULL;
+                    fy += (centerY - node.y) * CENTER_PULL;
+                    
+                    // Apply velocity with eased damping
+                    node.vx = (node.vx + fx * 0.1) * damping;
+                    node.vy = (node.vy + fy * 0.1) * damping;
+                    
+                    // Smooth position update
+                    node.x += node.vx;
+                    node.y += node.vy;
+                    
+                    // Soft bounds (elastic)
+                    const padding = nodeTerritory + 40;
+                    if (node.x < padding) node.vx += (padding - node.x) * 0.1;
+                    if (node.x > width - padding) node.vx -= (node.x - (width - padding)) * 0.1;
+                    if (node.y < padding) node.vy += (padding - node.y) * 0.1;
+                    if (node.y > height - padding) node.vy -= (node.y - (height - padding)) * 0.1;
+                    
+                    entityMap.set(node.id, node);
+                });
                 
-                // Update property positions to orbit around their parent entities
-                // Skip nodes that are fixed (manually moved) or being dragged
+                // Smoothly update property positions around their parent entities
                 updated.forEach(node => {
-                    if (node.fixed) return; // Skip manually positioned nodes
+                    if (node.fixed) return;
                     if (node.parentId && node.orbitRadius && node.orbitAngle !== undefined) {
                         const parent = entityMap.get(node.parentId);
                         if (parent) {
-                            // Slow orbital rotation
-                            node.orbitAngle += node.orbitSpeed || 0.0003;
-                            node.x = parent.x + Math.cos(node.orbitAngle) * node.orbitRadius;
-                            node.y = parent.y + Math.sin(node.orbitAngle) * node.orbitRadius;
+                            const targetX = parent.x + Math.cos(node.orbitAngle) * node.orbitRadius;
+                            const targetY = parent.y + Math.sin(node.orbitAngle) * node.orbitRadius;
+                            // Smooth interpolation for fluid property movement
+                            node.x += (targetX - node.x) * 0.3;
+                            node.y += (targetY - node.y) * 0.3;
                         }
                     }
                 });
@@ -376,7 +421,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                 cancelAnimationFrame(animationRef.current);
             }
         };
-    }, [nodes.length, edges]);
+    }, [nodes.length, edges.length, isSettled]);
     
     // Hover effect - push nearby nodes
     useEffect(() => {
@@ -583,8 +628,13 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         return pathParts.length > 0 ? pathParts : null;
     }, [selectedNode, nodes, entities, folders]);
     
-    return (
-        <div className="fixed inset-0 z-[9999] flex flex-col" style={{ backgroundColor: '#1a1d21' }}>
+    return createPortal(
+        <div 
+            className={`fixed inset-0 z-[9999] flex flex-col transition-opacity duration-300 ease-out ${
+                isVisible ? 'opacity-100' : 'opacity-0'
+            }`} 
+            style={{ backgroundColor: '#1a1d21' }}
+        >
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
                 <div className="flex items-center gap-4">
@@ -882,6 +932,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                     </div>
                 )}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

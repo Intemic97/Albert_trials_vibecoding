@@ -10581,19 +10581,21 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             {/* Execution History Modal */}
             {showExecutionHistory && (
                 <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none" onClick={() => setShowExecutionHistory(false)}>
-                    <div className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col pointer-events-auto border border-[var(--border-light)]" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="bg-gradient-to-r from-teal-600 to-teal-700 px-6 py-4 text-white rounded-t-xl shrink-0">
+                        <div className="px-6 py-4 border-b border-[var(--border-light)] rounded-t-xl shrink-0">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <History size={24} />
+                                    <div className="w-10 h-10 rounded-lg bg-[var(--accent-primary)]/10 flex items-center justify-center">
+                                        <History size={20} className="text-[var(--accent-primary)]" />
+                                    </div>
                                     <div>
-                                        <h3 className="font-normal text-lg">Execution History</h3>
-                                        <p className="text-teal-200 text-sm">View past workflow executions and their results</p>
+                                        <h3 className="font-medium text-base text-[var(--text-primary)]">Execution History</h3>
+                                        <p className="text-[var(--text-secondary)] text-sm">View past workflow executions and their results</p>
                                     </div>
                                 </div>
-                                <button onClick={() => setShowExecutionHistory(false)} className="text-white/80 hover:text-white">
-                                    <X size={24} />
+                                <button onClick={() => setShowExecutionHistory(false)} className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors">
+                                    <X size={20} />
                                 </button>
                             </div>
                         </div>
@@ -10605,10 +10607,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <div className="p-3 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
                                     <button
                                         onClick={loadExecutionHistory}
-                                        className="w-full px-3 py-2 bg-teal-100 text-[#1e554f] rounded-lg text-sm font-medium hover:bg-teal-200 transition-colors flex items-center justify-center gap-2"
+                                        className="w-full px-3 py-2 bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] rounded-lg text-sm font-medium hover:bg-[var(--accent-primary)]/20 transition-colors flex items-center justify-center gap-2"
                                     >
                                         {loadingExecutions ? (
-                                            <div className="w-4 h-4 border-2 border-[#256A65] border-t-transparent rounded-full animate-spin" />
+                                            <div className="w-4 h-4 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
                                         ) : (
                                             <History size={14} />
                                         )}
@@ -10617,7 +10619,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 </div>
                                 {loadingExecutions ? (
                                     <div className="p-8 text-center text-[var(--text-secondary)]">
-                                        <div className="w-8 h-8 border-2 border-[#256A65] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                                        <div className="w-8 h-8 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                                         Loading...
                                     </div>
                                 ) : executionHistory.length === 0 ? (
@@ -10627,18 +10629,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <p className="text-xs mt-1">Run the workflow or send a webhook to see executions here</p>
                                     </div>
                                 ) : (
-                                    <div className="divide-y divide-slate-100">
+                                    <div className="divide-y divide-[var(--border-light)]">
                                         {executionHistory.map((exec) => (
                                             <button
                                                 key={exec.id}
                                                 onClick={() => setSelectedExecution(exec)}
-                                                className={`w-full p-3 text-left hover:bg-[var(--bg-tertiary)] transition-colors ${selectedExecution?.id === exec.id ? 'bg-[#256A65]/5 border-l-2 border-[#256A65]' : ''}`}
+                                                className={`w-full p-3 text-left hover:bg-[var(--bg-tertiary)] transition-colors ${selectedExecution?.id === exec.id ? 'bg-[var(--accent-primary)]/5 border-l-2 border-[var(--accent-primary)]' : ''}`}
                                             >
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                                        exec.status === 'completed' ? 'bg-[#256A65]/10 text-[#1e554f]' :
-                                                        exec.status === 'failed' ? 'bg-red-100 text-red-700' :
-                                                        exec.status === 'running' ? 'bg-yellow-100 text-yellow-700' :
+                                                        exec.status === 'completed' ? 'bg-[var(--accent-success)]/10 text-[var(--accent-success)]' :
+                                                        exec.status === 'failed' ? 'bg-[var(--accent-error)]/10 text-[var(--accent-error)]' :
+                                                        exec.status === 'running' ? 'bg-[var(--accent-warning)]/10 text-[var(--accent-warning)]' :
                                                         'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
                                                     }`}>
                                                         {exec.status}
@@ -10665,8 +10667,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 <div>
                                                     <span className="text-[var(--text-secondary)]">Status:</span>
                                                     <span className={`ml-2 font-medium ${
-                                                        selectedExecution.status === 'completed' ? 'text-[#256A65]' :
-                                                        selectedExecution.status === 'failed' ? 'text-red-600' :
+                                                        selectedExecution.status === 'completed' ? 'text-[var(--accent-success)]' :
+                                                        selectedExecution.status === 'failed' ? 'text-[var(--accent-error)]' :
                                                         'text-[var(--text-secondary)]'
                                                     }`}>{selectedExecution.status}</span>
                                                 </div>
@@ -10686,20 +10688,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </div>
 
                                         {selectedExecution.inputs && Object.keys(selectedExecution.inputs).length > 0 && (
-                                            <div className="bg-blue-500/10 rounded-lg p-4">
-                                                <h4 className="font-normal text-blue-500 mb-2 flex items-center gap-2">
+                                            <div className="bg-[var(--accent-info)]/10 rounded-lg p-4">
+                                                <h4 className="font-normal text-[var(--accent-info)] mb-2 flex items-center gap-2">
                                                     <ArrowRight size={16} />
                                                     Inputs
                                                 </h4>
-                                                <pre className="text-xs bg-[var(--bg-card)] p-3 rounded border border-blue-100 overflow-x-auto max-h-40">
+                                                <pre className="text-xs bg-[var(--bg-card)] p-3 rounded border border-[var(--border-light)] overflow-x-auto max-h-40 text-[var(--text-primary)]">
                                                     {JSON.stringify(selectedExecution.inputs, null, 2)}
                                                 </pre>
                                             </div>
                                         )}
 
                                         {selectedExecution.nodeResults && Object.keys(selectedExecution.nodeResults).length > 0 && (
-                                            <div className="bg-[#256A65]/5 rounded-lg p-4">
-                                                <h4 className="font-normal text-[#1e554f] mb-2 flex items-center gap-2">
+                                            <div className="bg-[var(--accent-success)]/5 rounded-lg p-4">
+                                                <h4 className="font-normal text-[var(--accent-success)] mb-2 flex items-center gap-2">
                                                     <CheckCircle size={16} />
                                                     Node Results
                                                 </h4>
@@ -10711,11 +10713,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         const nodeType = node?.type || result.nodeType || '';
                                                         
                                                         return (
-                                                            <div key={nodeId} className="bg-[var(--bg-card)] p-3 rounded border border-[#256A65]/20">
+                                                            <div key={nodeId} className="bg-[var(--bg-card)] p-3 rounded border border-[var(--border-light)]">
                                                                 <div className="flex items-center gap-2 mb-1">
                                                                     <span className="font-medium text-[var(--text-primary)]">{nodeLabel}</span>
                                                                     {nodeType && <span className="text-xs text-[var(--text-tertiary)]">({nodeType})</span>}
-                                                                    {result.success && <Check size={14} className="text-[#256A65]" />}
+                                                                    {result.success && <Check size={14} className="text-[var(--accent-success)]" />}
                                                                 </div>
                                                                 {result.message && (
                                                                     <p className="text-xs text-[var(--text-secondary)] mb-1">{result.message}</p>
@@ -10733,12 +10735,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         )}
 
                                         {selectedExecution.error && (
-                                            <div className="bg-red-50 rounded-lg p-4">
-                                                <h4 className="font-normal text-red-800 mb-2 flex items-center gap-2">
+                                            <div className="bg-[var(--accent-error)]/10 rounded-lg p-4">
+                                                <h4 className="font-normal text-[var(--accent-error)] mb-2 flex items-center gap-2">
                                                     <XCircle size={16} />
                                                     Error
                                                 </h4>
-                                                <pre className="text-xs bg-[var(--bg-card)] p-3 rounded border border-red-100 text-red-600 overflow-x-auto">
+                                                <pre className="text-xs bg-[var(--bg-card)] p-3 rounded border border-[var(--accent-error)]/20 text-[var(--accent-error)] overflow-x-auto">
                                                     {selectedExecution.error}
                                                 </pre>
                                             </div>

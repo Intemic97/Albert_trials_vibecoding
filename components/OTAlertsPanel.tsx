@@ -56,6 +56,7 @@ export const OTAlertsPanel: React.FC<OTAlertsPanelProps> = ({
     const { user } = useAuth();
     const [alerts, setAlerts] = useState<OTAlert[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [apiError, setApiError] = useState<string | null>(null);
     const [filterSeverity, setFilterSeverity] = useState<'all' | 'error' | 'warning'>('all');
     const [filterAcknowledged, setFilterAcknowledged] = useState<'all' | 'true' | 'false'>('false');
     const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -75,9 +76,18 @@ export const OTAlertsPanel: React.FC<OTAlertsPanelProps> = ({
         }
     }, [isOpen]);
 
-    // WebSocket connection for real-time alerts
+    // WebSocket connection for real-time alerts (optional - falls back to polling)
     useEffect(() => {
         if (!isOpen || !user?.orgId) return;
+
+        // Only attempt WebSocket in production or if explicitly enabled
+        const enableWebSocket = window.location.hostname !== 'localhost' || 
+                                import.meta.env.VITE_ENABLE_WEBSOCKET === 'true';
+        
+        if (!enableWebSocket) {
+            // Skip WebSocket in development - rely on polling instead
+            return;
+        }
 
         // Build WebSocket URL
         const getWsUrl = () => {
@@ -87,92 +97,101 @@ export const OTAlertsPanel: React.FC<OTAlertsPanelProps> = ({
             return `ws://${window.location.hostname}:3001/ws`;
         };
 
-        const wsUrl = getWsUrl();
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
+        let ws: WebSocket | null = null;
+        let reconnectTimeout: NodeJS.Timeout | null = null;
 
-        ws.onopen = () => {
-            // Subscribe to OT alerts for the organization
-            ws.send(JSON.stringify({
-                type: 'subscribe_ot_alerts',
-                orgId: user.orgId,
-                user: {
-                    id: user.id,
-                    name: user.name || user.email?.split('@')[0] || 'Anonymous',
-                    email: user.email
-                }
-            }));
-        };
-
-        ws.onmessage = (event) => {
+        const connect = () => {
             try {
-                const message = JSON.parse(event.data);
-                
-                if (message.type === 'ot_alert' && message.alert) {
-                    const newAlert = {
-                        id: message.alert.id,
-                        nodeId: message.alert.nodeId,
-                        nodeType: message.alert.nodeType,
-                        fieldName: message.alert.fieldName,
-                        value: message.alert.value,
-                        threshold: message.alert.threshold,
-                        severity: message.alert.severity,
-                        message: message.alert.message,
-                        createdAt: message.alert.timestamp,
-                        acknowledgedAt: undefined,
-                        acknowledgedBy: undefined
-                    };
-                    
-                    // New alert received, add to list
-                    setAlerts(prev => {
-                        // Check if alert already exists
-                        const exists = prev.some(a => a.id === newAlert.id);
-                        if (exists) return prev;
-                        
-                        // Add new alert at the beginning
-                        return [newAlert, ...prev];
-                    });
-                    
-                    // Show browser notification for critical alerts
-                    if (newAlert.severity === 'error' && 'Notification' in window) {
-                        const permission = notificationPermissionRef.current || Notification.permission;
-                        if (permission === 'granted') {
-                            try {
-                                new Notification(`OT Alert: ${newAlert.nodeType.toUpperCase()} - ${newAlert.fieldName}`, {
-                                    body: newAlert.message,
-                                    icon: '/logo.png',
-                                    tag: `ot-alert-${newAlert.id}`,
-                                    requireInteraction: false,
-                                    badge: '/logo.png'
-                                });
-                            } catch (error) {
-                                console.error('Error showing notification:', error);
-                            }
+                const wsUrl = getWsUrl();
+                ws = new WebSocket(wsUrl);
+                wsRef.current = ws;
+
+                ws.onopen = () => {
+                    // Subscribe to OT alerts for the organization
+                    ws?.send(JSON.stringify({
+                        type: 'subscribe_ot_alerts',
+                        orgId: user.orgId,
+                        user: {
+                            id: user.id,
+                            name: user.name || user.email?.split('@')[0] || 'Anonymous',
+                            email: user.email
                         }
+                    }));
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const message = JSON.parse(event.data);
+                        
+                        if (message.type === 'ot_alert' && message.alert) {
+                            const newAlert = {
+                                id: message.alert.id,
+                                nodeId: message.alert.nodeId,
+                                nodeType: message.alert.nodeType,
+                                fieldName: message.alert.fieldName,
+                                value: message.alert.value,
+                                threshold: message.alert.threshold,
+                                severity: message.alert.severity,
+                                message: message.alert.message,
+                                createdAt: message.alert.timestamp,
+                                acknowledgedAt: undefined,
+                                acknowledgedBy: undefined
+                            };
+                            
+                            // New alert received, add to list
+                            setAlerts(prev => {
+                                // Check if alert already exists
+                                const exists = prev.some(a => a.id === newAlert.id);
+                                if (exists) return prev;
+                                
+                                // Add new alert at the beginning
+                                return [newAlert, ...prev];
+                            });
+                            
+                            // Show browser notification for critical alerts
+                            if (newAlert.severity === 'error' && 'Notification' in window) {
+                                const permission = notificationPermissionRef.current || Notification.permission;
+                                if (permission === 'granted') {
+                                    try {
+                                        new Notification(`OT Alert: ${newAlert.nodeType.toUpperCase()} - ${newAlert.fieldName}`, {
+                                            body: newAlert.message,
+                                            icon: '/logo.png',
+                                            tag: `ot-alert-${newAlert.id}`,
+                                            requireInteraction: false,
+                                            badge: '/logo.png'
+                                        });
+                                    } catch (error) {
+                                        // Silently fail for notification errors
+                                    }
+                                }
+                            }
+                            
+                            // Update last refresh time
+                            setLastRefresh(new Date());
+                        }
+                    } catch (error) {
+                        // Silently fail for parse errors
                     }
-                    
-                    // Update last refresh time
-                    setLastRefresh(new Date());
-                }
+                };
+
+                ws.onerror = () => {
+                    // Silently handle WebSocket errors - fall back to polling
+                };
+
+                ws.onclose = () => {
+                    // Don't auto-reconnect to avoid spam - polling is the fallback
+                };
             } catch (error) {
-                console.error('Error parsing WebSocket message:', error);
+                // WebSocket not available - rely on polling
             }
         };
 
-        ws.onerror = (error) => {
-            console.error('WebSocket error:', error);
-        };
-
-        ws.onclose = () => {
-            // Attempt to reconnect after 3 seconds
-            setTimeout(() => {
-                if (isOpen && user?.orgId) {
-                    // Reconnect will be handled by useEffect
-                }
-            }, 3000);
-        };
+        connect();
 
         return () => {
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+            }
             if (wsRef.current) {
                 wsRef.current.close();
                 wsRef.current = null;
@@ -191,6 +210,7 @@ export const OTAlertsPanel: React.FC<OTAlertsPanelProps> = ({
 
     const fetchAlerts = async () => {
         setIsLoading(true);
+        setApiError(null);
         try {
             const params = new URLSearchParams();
             if (filterSeverity !== 'all') {
@@ -220,9 +240,17 @@ export const OTAlertsPanel: React.FC<OTAlertsPanelProps> = ({
 
                 setAlerts(filteredAlerts);
                 setLastRefresh(new Date());
+            } else if (res.status === 500) {
+                // Server error - OT alerts endpoint may not be configured
+                setApiError('OT Alerts service not available. This feature requires backend configuration.');
+                setAlerts([]);
+            } else {
+                setApiError(`Failed to load alerts (${res.status})`);
             }
         } catch (error) {
-            console.error('Error fetching OT alerts:', error);
+            // Network error or server not running
+            setApiError('Cannot connect to alerts service. Server may be offline.');
+            setAlerts([]);
         } finally {
             setIsLoading(false);
         }
@@ -432,6 +460,22 @@ export const OTAlertsPanel: React.FC<OTAlertsPanelProps> = ({
                     {isLoading && alerts.length === 0 ? (
                         <div className="flex items-center justify-center py-12">
                             <SpinnerGap size={24} className="text-[var(--text-tertiary)] animate-spin" />
+                        </div>
+                    ) : apiError ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                            <Warning size={48} className="text-[var(--accent-warning)] mb-3" weight="light" />
+                            <p className="text-sm font-medium text-[var(--text-primary)] mb-1">
+                                Service Unavailable
+                            </p>
+                            <p className="text-xs text-[var(--text-tertiary)] max-w-xs">
+                                {apiError}
+                            </p>
+                            <button
+                                onClick={fetchAlerts}
+                                className="mt-4 px-4 py-2 text-xs font-medium bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] rounded-lg hover:bg-[var(--accent-primary)]/20 transition-colors"
+                            >
+                                Try Again
+                            </button>
                         </div>
                     ) : filteredAlerts.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-center">
