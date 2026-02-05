@@ -1255,7 +1255,7 @@ function AuthenticatedApp() {
                 />
             )}
 
-            <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+            <div className="flex-1 flex flex-col min-h-screen overflow-hidden z-30">
                 {!hideSidebarForRoutes && (
                     <TopNav activeView={currentView} />
                 )}
