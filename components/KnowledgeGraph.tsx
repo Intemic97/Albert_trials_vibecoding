@@ -6,7 +6,7 @@ import {
 import { Entity } from '../types';
 
 // Modular components
-import { GraphMinimap, GraphSearch, GraphControls, FolderCluster } from './knowledge-graph/components';
+import { GraphSearch } from './knowledge-graph/components';
 
 interface KnowledgeGraphProps {
     entities: Entity[];
@@ -58,6 +58,7 @@ const NODE_COLORS = {
 // Force simulation constants - tuned for very smooth, gentle animation
 const REPULSION = 200;           // Very gentle repulsion
 const LINK_ATTRACTION = 0.03;    // Gentle attraction between connected entities
+const FOLDER_ATTRACTION = 0.04;  // Attraction between entities in same folder
 const CENTER_PULL = 0.001;       // Very subtle center gravity
 const DAMPING = 0.92;            // Consistent high damping for smooth movement
 const COLLISION_STRENGTH = 0.2;  // Very soft collision response
@@ -98,12 +99,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     
     // Search highlighting
     const [highlightedNodeIds, setHighlightedNodeIds] = useState<string[]>([]);
-    
-    // Show minimap
-    const [showMinimap, setShowMinimap] = useState(true);
-    
-    // Show folder clusters
-    const [showFolderClusters, setShowFolderClusters] = useState(true);
     
     // Trigger entrance animation on mount
     useEffect(() => {
@@ -297,6 +292,14 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
             }
         });
         
+        // Build map of entity -> folder for folder-based attraction
+        const entityFolderMap = new Map<string, string>();
+        folders.forEach(folder => {
+            folder.entityIds?.forEach(entityId => {
+                entityFolderMap.set(`entity-${entityId}`, folder.id);
+            });
+        });
+        
         const simulate = () => {
             if (!animating || frameCount >= maxFrames) {
                 setIsSettled(true);
@@ -341,6 +344,9 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                     const nodeTerritory = entityTerritories.get(node.id) || MIN_SEPARATION / 2;
                     const connections = connectedEntities.get(node.id);
                     
+                    // Get this node's folder
+                    const nodeFolder = entityFolderMap.get(node.id);
+                    
                     updated.forEach((other, j) => {
                         if (i === j || other.type !== 'entity') return;
                         
@@ -350,12 +356,24 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
                         
                         const isConnected = connections?.has(other.id);
+                        const otherFolder = entityFolderMap.get(other.id);
+                        const sameFolder = nodeFolder && otherFolder && nodeFolder === otherFolder;
                         
                         if (isConnected) {
                             // ATTRACTION: Gently pull connected entities together
                             const idealDist = nodeTerritory + otherTerritory + 30;
                             if (dist > idealDist) {
                                 const pullStrength = (dist - idealDist) * LINK_ATTRACTION * forceMultiplier;
+                                fx -= (dx / dist) * pullStrength;
+                                fy -= (dy / dist) * pullStrength;
+                            }
+                        }
+                        
+                        // FOLDER ATTRACTION: Pull entities in same folder closer together
+                        if (sameFolder && !isConnected) {
+                            const idealFolderDist = nodeTerritory + otherTerritory + 50;
+                            if (dist > idealFolderDist) {
+                                const pullStrength = (dist - idealFolderDist) * FOLDER_ATTRACTION * forceMultiplier;
                                 fx -= (dx / dist) * pullStrength;
                                 fy -= (dy / dist) * pullStrength;
                             }
@@ -368,8 +386,8 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                             const pushStrength = overlap * COLLISION_STRENGTH * forceMultiplier;
                             fx += (dx / dist) * pushStrength;
                             fy += (dy / dist) * pushStrength;
-                        } else if (!isConnected && dist < minDist * 1.5) {
-                            // Very gentle repulsion for unconnected entities
+                        } else if (!isConnected && !sameFolder && dist < minDist * 1.5) {
+                            // Very gentle repulsion for unconnected entities not in same folder
                             const gentlePush = REPULSION * forceMultiplier / (dist * dist + 500);
                             fx += (dx / dist) * gentlePush;
                             fy += (dy / dist) * gentlePush;
@@ -712,11 +730,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         setTimeout(() => setHighlightedNodeIds([]), 3000);
     }, [nodes, zoom]);
     
-    // Handle minimap viewport change
-    const handleMinimapViewportChange = useCallback((newOffsetX: number, newOffsetY: number) => {
-        setOffset({ x: newOffsetX, y: newOffsetY });
-    }, []);
-    
     // Get connected nodes for highlighting
     const connectedNodes = useMemo(() => {
         if (!hoveredNode && !selectedEntity) return new Set<string>();
@@ -813,30 +826,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                         onHighlight={setHighlightedNodeIds}
                     />
                     
-                    {/* Toggle folders */}
-                    <button
-                        onClick={() => setShowFolderClusters(!showFolderClusters)}
-                        className={`px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
-                            showFolderClusters 
-                                ? 'bg-amber-500/20 text-amber-400' 
-                                : 'bg-white/5 text-white/40 hover:bg-white/10'
-                        }`}
-                    >
-                        Folders
-                    </button>
-                    
-                    {/* Toggle minimap */}
-                    <button
-                        onClick={() => setShowMinimap(!showMinimap)}
-                        className={`px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
-                            showMinimap 
-                                ? 'bg-[#419CAF]/20 text-[#419CAF]' 
-                                : 'bg-white/5 text-white/40 hover:bg-white/10'
-                        }`}
-                    >
-                        Minimap
-                    </button>
-                    
                     {/* Toggle properties */}
                     <button
                         onClick={() => setShowProperties(!showProperties)}
@@ -876,34 +865,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                         {/* Clean background - no grid for cleaner look */}
                         
                         <g transform={`translate(${offset.x}, ${offset.y}) scale(${zoom})`}>
-                            {/* Folder clusters - background groupings */}
-                            {showFolderClusters && folders.map(folder => {
-                                // Check if folder has entities that are in the current view
-                                const hasEntities = folder.entityIds?.some(entityId => 
-                                    entities.some(e => e.id === entityId)
-                                );
-                                if (!hasEntities) return null;
-                                
-                                const isHighlighted = selectedEntityData && 
-                                    folder.entityIds?.includes(selectedEntityData.id);
-                                
-                                return (
-                                    <FolderCluster
-                                        key={folder.id}
-                                        folder={folder}
-                                        nodes={nodes.map(n => ({
-                                            id: n.id,
-                                            x: n.x,
-                                            y: n.y,
-                                            radius: n.radius,
-                                            type: n.type,
-                                            entityId: n.entityId,
-                                        }))}
-                                        isHighlighted={isHighlighted || false}
-                                    />
-                                );
-                            })}
-                            
                             {/* Edges - subtle lines */}
                             {edges.map(edge => {
                                 const source = nodes.find(n => n.id === edge.source);
@@ -1089,35 +1050,10 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                 <Crosshair size={12} className="text-white/60" />
                             </button>
                         )}
-                        <div className="w-px h-3 bg-white/10 mx-0.5" />
-                        <button onClick={resetView} className="p-1.5 hover:bg-white/10 rounded transition-colors" title="Reiniciar vista">
-                            <ArrowsOut size={12} className="text-white/60" />
-                        </button>
                     </div>
                     
-                    {/* Minimap */}
-                    {showMinimap && nodes.length > 0 && (
-                        <GraphMinimap
-                            nodes={nodes.map(n => ({
-                                id: n.id,
-                                x: n.x,
-                                y: n.y,
-                                vx: n.vx,
-                                vy: n.vy,
-                                radius: n.radius,
-                                type: n.type,
-                            }))}
-                            viewportWidth={containerRef.current?.clientWidth || 800}
-                            viewportHeight={containerRef.current?.clientHeight || 600}
-                            zoom={zoom}
-                            offsetX={offset.x}
-                            offsetY={offset.y}
-                            onViewportChange={handleMinimapViewportChange}
-                        />
-                    )}
-                    
                     {/* Legend */}
-                    <div className="absolute bottom-4 right-4 flex items-center gap-4 px-3 py-2 bg-black/40 backdrop-blur-sm rounded text-[10px] text-white/60" style={{ marginBottom: showMinimap ? '140px' : '0' }}>
+                    <div className="absolute bottom-4 right-4 flex items-center gap-4 px-3 py-2 bg-black/40 backdrop-blur-sm rounded text-[10px] text-white/60">
                         <div className="flex items-center gap-1.5">
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: NODE_COLORS.entity }} />
                             <span>Entity</span>
