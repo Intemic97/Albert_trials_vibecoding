@@ -1074,22 +1074,23 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                             style={{ transition: 'all 0.2s ease-out' }}
                                         />
                                         
-                                        {/* Category icon for entities at zoom > 0.7 */}
-                                        {node.type === 'entity' && node.category && zoom > 0.7 && (
+                                        {/* Category letter icon for entities at zoom > 0.7 */}
+                                        {node.type === 'entity' && node.category && node.category !== 'generic' && zoom > 0.7 && (
                                             <text
                                                 textAnchor="middle"
                                                 dominantBaseline="central"
                                                 fill="white"
-                                                fontSize={baseRadius * scale * 0.9}
-                                                fontFamily="system-ui"
+                                                fontSize={baseRadius * scale * 0.8}
+                                                fontFamily="system-ui, -apple-system, sans-serif"
+                                                fontWeight={600}
                                                 style={{ pointerEvents: 'none' }}
                                             >
-                                                {node.category === 'plant' && '🏭'}
-                                                {node.category === 'equipment' && '⚙'}
-                                                {node.category === 'sensor' && '📡'}
-                                                {node.category === 'material' && '🧪'}
-                                                {node.category === 'process' && '⚡'}
-                                                {node.category === 'safety' && '🛡'}
+                                                {node.category === 'plant' && 'P'}
+                                                {node.category === 'equipment' && 'E'}
+                                                {node.category === 'sensor' && 'S'}
+                                                {node.category === 'material' && 'M'}
+                                                {node.category === 'process' && 'F'}
+                                                {node.category === 'safety' && '!'}
                                             </text>
                                         )}
                                         

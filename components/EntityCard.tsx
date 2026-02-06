@@ -1,6 +1,10 @@
 import React from 'react';
-import { Trash, Database, User, Calendar, Hash, CaretRight } from '@phosphor-icons/react';
+import { Trash, Database, User, Calendar, Hash, CaretRight, Factory, Gear, Thermometer, Flask, Lightning, ShieldCheck } from '@phosphor-icons/react';
 import { Entity, ENTITY_TYPE_OPTIONS } from '../types';
+
+const ENTITY_ICON_MAP: Record<string, React.ElementType> = {
+    Database, Factory, Gear, Thermometer, Flask, Lightning, ShieldCheck
+};
 
 interface EntityCardProps {
   entity: Entity;
@@ -17,11 +21,12 @@ export const EntityCard: React.FC<EntityCardProps> = ({ entity, onClick, onDelet
         <div className="flex-1">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--bg-hover)] transition-all duration-300 text-lg">
-              {entity.entityType && entity.entityType !== 'generic'
-                ? (ENTITY_TYPE_OPTIONS.find(o => o.value === entity.entityType)?.icon || '📋')
-                : <Database size={18} weight="light" className="text-[var(--text-secondary)]" />
-              }
+            <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--bg-hover)] transition-all duration-300">
+              {(() => {
+                const opt = ENTITY_TYPE_OPTIONS.find(o => o.value === entity.entityType);
+                const Icon = opt ? (ENTITY_ICON_MAP[opt.iconName] || Database) : Database;
+                return <Icon size={18} weight="light" className="text-[var(--text-secondary)]" />;
+              })()}
             </div>
             <div className="min-w-0 flex-1">
               <h3 className="text-base font-normal text-[var(--text-primary)] transition-colors truncate" style={{ fontFamily: "'Berkeley Mono', monospace" }}>

@@ -9,14 +9,14 @@ export type EntityType =
   | 'process'
   | 'safety';
 
-export const ENTITY_TYPE_OPTIONS: { value: EntityType; label: string; icon: string; description: string }[] = [
-  { value: 'generic',   label: 'Generic',       icon: '📋', description: 'General purpose entity' },
-  { value: 'plant',     label: 'Plant / Area',   icon: '🏭', description: 'Factory, plant, building, area' },
-  { value: 'equipment', label: 'Equipment',      icon: '⚙️', description: 'Reactor, pump, valve, tank, motor' },
-  { value: 'sensor',    label: 'Sensor',         icon: '📡', description: 'Sensor, instrument, meter, transmitter' },
-  { value: 'material',  label: 'Material',       icon: '🧪', description: 'Product, chemical, raw material, batch' },
-  { value: 'process',   label: 'Process',        icon: '⚡', description: 'Process, operation, recipe, production' },
-  { value: 'safety',    label: 'Safety',         icon: '🛡️', description: 'Alarm, inspection, incident, compliance' },
+export const ENTITY_TYPE_OPTIONS: { value: EntityType; label: string; iconName: string; description: string }[] = [
+  { value: 'generic',   label: 'Generic',       iconName: 'Database',       description: 'General purpose entity' },
+  { value: 'plant',     label: 'Plant / Area',   iconName: 'Factory',        description: 'Factory, plant, building, area' },
+  { value: 'equipment', label: 'Equipment',      iconName: 'Gear',           description: 'Reactor, pump, valve, tank, motor' },
+  { value: 'sensor',    label: 'Sensor',         iconName: 'Thermometer',    description: 'Sensor, instrument, meter, transmitter' },
+  { value: 'material',  label: 'Material',       iconName: 'Flask',          description: 'Product, chemical, raw material, batch' },
+  { value: 'process',   label: 'Process',        iconName: 'Lightning',      description: 'Process, operation, recipe, production' },
+  { value: 'safety',    label: 'Safety',         iconName: 'ShieldCheck',    description: 'Alarm, inspection, incident, compliance' },
 ];
 
 export interface Property {
