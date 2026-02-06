@@ -363,6 +363,15 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     const handleCreateEntity = async () => {
         if (!newEntityName.trim()) return;
 
+        // Check if there's a template with predefined properties
+        const templateProps = (window as any).__entityTemplate || [];
+        const properties = templateProps.map((p: any) => ({
+            id: Math.random().toString(36).substr(2, 9),
+            name: p.name,
+            type: p.type || 'text',
+            unit: p.unit || undefined,
+        }));
+        
         const newEntity = {
             id: Math.random().toString(36).substr(2, 9),
             name: newEntityName,
@@ -370,8 +379,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             entityType: newEntityType,
             author: user?.name || user?.email?.split('@')[0] || 'User',
             lastEdited: 'Just now',
-            properties: []
+            properties,
         };
+        
+        // Clean up template
+        delete (window as any).__entityTemplate;
 
         try {
             const res = await fetch(`${API_BASE}/entities`, {
@@ -1223,6 +1235,12 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                     >
                                         From File
                                     </button>
+                                    <button
+                                        onClick={() => setUploadMode('template' as any)}
+                                        className={`flex-1 py-2 text-xs font-medium rounded-lg transition-colors ${uploadMode === 'template' ? 'bg-[var(--bg-selected)] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'}`}
+                                    >
+                                        Template
+                                    </button>
                                 </div>
                                 
                                 <div className="space-y-4">
@@ -1278,6 +1296,77 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                 className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] resize-none"
                                             />
                                         </div>
+                                    ) : uploadMode === 'template' ? (
+                                        <div>
+                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">Industry Templates</label>
+                                            <div className="space-y-2 max-h-[280px] overflow-y-auto custom-scrollbar">
+                                                {[
+                                                    { name: 'Polymers & Plastics', type: 'material' as EntityType, desc: 'Polymer material properties database', props: [
+                                                        { name: 'Material Name', type: 'text' }, { name: 'Polymer Type', type: 'text' }, { name: 'Density', type: 'number', unit: 'g/cm³' },
+                                                        { name: 'Melt Flow Index', type: 'number', unit: 'g/10min' }, { name: 'Tensile Strength', type: 'number', unit: 'MPa' },
+                                                        { name: 'Elongation at Break', type: 'number', unit: '%' }, { name: 'Glass Transition Temp', type: 'number', unit: '°C' },
+                                                        { name: 'Melting Point', type: 'number', unit: '°C' }, { name: 'Grade', type: 'text' }, { name: 'Supplier', type: 'text' },
+                                                    ]},
+                                                    { name: 'Metals & Alloys', type: 'material' as EntityType, desc: 'Metal material properties', props: [
+                                                        { name: 'Alloy Name', type: 'text' }, { name: 'Composition', type: 'text' }, { name: 'Density', type: 'number', unit: 'g/cm³' },
+                                                        { name: 'Yield Strength', type: 'number', unit: 'MPa' }, { name: 'Ultimate Tensile Strength', type: 'number', unit: 'MPa' },
+                                                        { name: 'Hardness', type: 'number', unit: 'HRC' }, { name: 'Melting Point', type: 'number', unit: '°C' },
+                                                        { name: 'Thermal Conductivity', type: 'number', unit: 'W/m·K' }, { name: 'Grade Standard', type: 'text' },
+                                                    ]},
+                                                    { name: 'Chemicals & Reagents', type: 'material' as EntityType, desc: 'Chemical substance database', props: [
+                                                        { name: 'Chemical Name', type: 'text' }, { name: 'CAS Number', type: 'text' }, { name: 'Molecular Weight', type: 'number', unit: 'g/mol' },
+                                                        { name: 'Boiling Point', type: 'number', unit: '°C' }, { name: 'Flash Point', type: 'number', unit: '°C' },
+                                                        { name: 'pH', type: 'number' }, { name: 'Concentration', type: 'number', unit: '%' },
+                                                        { name: 'Hazard Class', type: 'text' }, { name: 'Storage Conditions', type: 'text' },
+                                                    ]},
+                                                    { name: 'Production Equipment', type: 'equipment' as EntityType, desc: 'Equipment asset registry', props: [
+                                                        { name: 'Equipment Name', type: 'text' }, { name: 'Equipment ID', type: 'text' }, { name: 'Manufacturer', type: 'text' },
+                                                        { name: 'Model', type: 'text' }, { name: 'Serial Number', type: 'text' }, { name: 'Installation Date', type: 'text' },
+                                                        { name: 'Location', type: 'text' }, { name: 'Max Capacity', type: 'number' }, { name: 'Status', type: 'text' },
+                                                        { name: 'Last Maintenance', type: 'text' },
+                                                    ]},
+                                                    { name: 'Process Sensors', type: 'sensor' as EntityType, desc: 'Sensor/instrument registry', props: [
+                                                        { name: 'Tag Name', type: 'text' }, { name: 'Sensor Type', type: 'text' }, { name: 'Measurement', type: 'text' },
+                                                        { name: 'Unit', type: 'text' }, { name: 'Range Min', type: 'number' }, { name: 'Range Max', type: 'number' },
+                                                        { name: 'Location', type: 'text' }, { name: 'Calibration Date', type: 'text' }, { name: 'Accuracy', type: 'number', unit: '%' },
+                                                    ]},
+                                                    { name: 'Emission Factors', type: 'material' as EntityType, desc: 'CO2 emission factors for sustainability reporting', props: [
+                                                        { name: 'Source', type: 'text' }, { name: 'Category', type: 'text' }, { name: 'Scope', type: 'text' },
+                                                        { name: 'Emission Factor', type: 'number', unit: 'kgCO2e/unit' }, { name: 'Unit Type', type: 'text' },
+                                                        { name: 'Region', type: 'text' }, { name: 'Year', type: 'number' }, { name: 'Data Source', type: 'text' },
+                                                    ]},
+                                                    { name: 'Quality Control Batches', type: 'process' as EntityType, desc: 'Production batch quality tracking', props: [
+                                                        { name: 'Batch ID', type: 'text' }, { name: 'Product', type: 'text' }, { name: 'Production Date', type: 'text' },
+                                                        { name: 'Quantity', type: 'number', unit: 'kg' }, { name: 'Quality Grade', type: 'text' },
+                                                        { name: 'Defect Rate', type: 'number', unit: '%' }, { name: 'Inspector', type: 'text' }, { name: 'Status', type: 'text' },
+                                                    ]},
+                                                ].map(template => (
+                                                    <button
+                                                        key={template.name}
+                                                        onClick={() => {
+                                                            setNewEntityName(template.name);
+                                                            setNewEntityDescription(template.desc);
+                                                            setNewEntityType(template.type);
+                                                            // Store template props for creation
+                                                            (window as any).__entityTemplate = template.props;
+                                                        }}
+                                                        className={`w-full text-left px-3 py-2.5 rounded-lg border transition-all ${
+                                                            newEntityName === template.name 
+                                                                ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/5' 
+                                                                : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div>
+                                                                <p className="text-sm font-medium text-[var(--text-primary)]">{template.name}</p>
+                                                                <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5">{template.desc}</p>
+                                                            </div>
+                                                            <span className="text-[10px] text-[var(--text-tertiary)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full">{template.props.length} props</span>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
                                     ) : (
                                         <div>
                                             <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Upload File</label>
@@ -1300,13 +1389,13 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                     >
                                         Cancel
                                     </button>
-                                    {uploadMode === 'manual' && (
+                                    {(uploadMode === 'manual' || uploadMode === 'template') && (
                                         <button
                                             onClick={handleCreateEntity}
                                             disabled={!newEntityName.trim()}
                                             className="px-4 py-2 text-sm bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            Create
+                                            {uploadMode === 'template' ? 'Create from Template' : 'Create'}
                                         </button>
                                     )}
                                 </div>

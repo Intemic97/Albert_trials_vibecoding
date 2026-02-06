@@ -47,6 +47,7 @@ export const MqttConfigModal: React.FC<MqttConfigModalProps> = ({
   const [topicsList, setTopicsList] = useState<string[]>(topics);
   const [qosLevel, setQosLevel] = useState(qos);
   const [alertConfig, setAlertConfig] = useState(alerts || { enabled: false });
+  const [sparkplugEnabled, setSparkplugEnabled] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -74,7 +75,7 @@ export const MqttConfigModal: React.FC<MqttConfigModalProps> = ({
         mqttConnectionId: selectedConnectionId,
         mqttTopics: topicsList,
         mqttQos: qosLevel,
-        // alerts configured via dedicated Alert Agent node
+        mqttSparkplugB: sparkplugEnabled,
       });
     }
   };
@@ -191,10 +192,26 @@ export const MqttConfigModal: React.FC<MqttConfigModalProps> = ({
           </p>
         </div>
 
+        {/* Sparkplug B Toggle */}
+        <div className="flex items-center justify-between p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
+          <div>
+            <p className="text-sm font-medium text-[var(--text-primary)]">Sparkplug B Protocol</p>
+            <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Decode IIoT Sparkplug B payloads (protobuf)</p>
+          </div>
+          <button
+            onClick={() => setSparkplugEnabled(!sparkplugEnabled)}
+            className="relative inline-flex items-center focus:outline-none"
+          >
+            <div className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${sparkplugEnabled ? 'bg-[var(--accent-primary)]' : 'bg-[var(--border-medium)]'}`}>
+              <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${sparkplugEnabled ? 'translate-x-5' : ''}`} />
+            </div>
+          </button>
+        </div>
+
         <div className="p-3 bg-[var(--bg-tertiary)] rounded-lg">
           <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
             <span className="font-medium text-[var(--text-primary)]">Note:</span> This node will subscribe to the specified MQTT topics
-            and output messages as they arrive. Use wildcards (# for multi-level, + for single-level) for flexible subscriptions.
+            and output messages as they arrive. {sparkplugEnabled ? 'Sparkplug B payloads will be automatically decoded.' : 'Use wildcards (# for multi-level, + for single-level) for flexible subscriptions.'}
           </p>
         </div>
 

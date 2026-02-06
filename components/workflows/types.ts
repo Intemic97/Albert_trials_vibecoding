@@ -33,6 +33,8 @@ export type NodeType =
   | 'opcua' 
   | 'mqtt' 
   | 'modbus'
+  | 'kafka'
+  | 'restApi'
   | 'scada'
   | 'mes'
   | 'dataHistorian'

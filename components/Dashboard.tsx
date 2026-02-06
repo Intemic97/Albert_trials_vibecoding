@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Entity } from '../types';
-import { Database, Sparkle, X, Info, Plus, Share, CaretDown, Copy, Check, Trash, Link, ArrowSquareOut, Layout, MagnifyingGlass, ArrowLeft, Calendar, Clock, CaretRight, DotsSixVertical, GearSix, ArrowsClockwise } from '@phosphor-icons/react';
+import { Database, Sparkle, X, Info, Plus, Share, CaretDown, Copy, Check, Trash, Link, ArrowSquareOut, Layout, MagnifyingGlass, ArrowLeft, Calendar, Clock, CaretRight, DotsSixVertical, GearSix, ArrowsClockwise, Bell } from '@phosphor-icons/react';
 import { PromptInput } from './PromptInput';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { Pagination } from './Pagination';
@@ -375,6 +375,24 @@ const WidgetCard: React.FC<WidgetCardProps> = React.memo(({ widget, onSave, onRe
                         <Plus size={16} weight="light" aria-hidden="true" />
                     </button>
                 )}
+                <button
+                    onClick={() => {
+                        const msg = `Alert from "${widget.title}": ${widget.description}`;
+                        if ('Notification' in window && Notification.permission === 'granted') {
+                            new Notification(`Dashboard Alert: ${widget.title}`, { body: widget.description, icon: '/logo.png' });
+                        } else if ('Notification' in window && Notification.permission === 'default') {
+                            Notification.requestPermission().then(p => {
+                                if (p === 'granted') new Notification(`Dashboard Alert: ${widget.title}`, { body: widget.description, icon: '/logo.png' });
+                            });
+                        }
+                        alert(`Notification sent: ${msg}`);
+                    }}
+                    className="p-1 text-[var(--text-tertiary)] rounded transition-colors hover:text-amber-500 hover:bg-amber-50"
+                    title="Send notification"
+                    aria-label="Send notification"
+                >
+                    <Bell size={14} weight="light" aria-hidden="true" />
+                </button>
                 <button
                     onClick={onRemove}
                     className="p-1 text-[var(--text-tertiary)] rounded transition-colors hover:text-red-500 hover:bg-red-50"

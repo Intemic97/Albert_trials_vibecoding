@@ -62,6 +62,8 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   { type: 'opcua', label: 'OPC UA Input', icon: Factory, description: 'Read data from PLCs and SCADA via OPC UA', category: 'Data' },
   { type: 'mqtt', label: 'MQTT Subscriber', icon: WifiHigh, description: 'Subscribe to MQTT topics for IoT sensor data', category: 'Data' },
   { type: 'modbus', label: 'Modbus Input', icon: Cpu, description: 'Read data from Modbus devices (PLCs, sensors)', category: 'Data' },
+  { type: 'kafka', label: 'Kafka Consumer', icon: Database, description: 'Consume messages from Apache Kafka topics', category: 'Data' },
+  { type: 'restApi', label: 'REST API Source', icon: Globe, description: 'Fetch data from external REST APIs with auth', category: 'Data' },
   
   // Logic
   { type: 'condition', label: 'If / Else', icon: WarningCircle, description: 'Branch based on conditions', category: 'Logic' },
@@ -136,6 +138,8 @@ export const NODE_ICONS: Record<NodeType, React.ElementType> = {
   opcua: Factory,
   mqtt: WifiHigh,
   modbus: Cpu,
+  kafka: Database,
+  restApi: Globe,
   agent: Robot,
   limsFetch: Flask,
   statisticalAnalysis: TrendUp,
