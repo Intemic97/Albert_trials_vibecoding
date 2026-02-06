@@ -53,6 +53,11 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
 
+// Helper to generate unique IDs
+function generateId() {
+    return Math.random().toString(36).substr(2, 9);
+}
+
 // ==================== WEBSOCKET SETUP ====================
 const wss = new WebSocketServer({ server, path: '/ws' });
 
@@ -7680,7 +7685,7 @@ app.put('/api/reports/:id/status', authenticateToken, async (req, res) => {
         }
         
         const existing = await db.get(
-            'SELECT id FROM reports WHERE id = ? AND organizationId = ?',
+            'SELECT id, name, status as previousStatus FROM reports WHERE id = ? AND organizationId = ?',
             [id, req.user.orgId]
         );
         
@@ -7692,11 +7697,55 @@ app.put('/api/reports/:id/status', authenticateToken, async (req, res) => {
             'UPDATE reports SET status = ?, updatedAt = ? WHERE id = ?',
             [status, now, id]
         );
+
+        // Log status change in audit trail
+        const user = await db.get('SELECT name, email FROM users WHERE id = ?', [req.user.sub]);
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: user?.name || req.user.email,
+            userEmail: user?.email || req.user.email,
+            action: 'status_change',
+            resourceType: 'report',
+            resourceId: id,
+            resourceName: existing.name,
+            details: { previousStatus: existing.previousStatus, newStatus: status },
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
         
         res.json({ message: 'Status updated', status });
     } catch (error) {
         console.error('Error updating report status:', error);
         res.status(500).json({ error: 'Failed to update status' });
+    }
+});
+
+// Get audit trail for a specific report
+app.get('/api/reports/:id/audit-trail', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Verify report belongs to user's organization
+        const existing = await db.get(
+            'SELECT id FROM reports WHERE id = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+        
+        if (!existing) {
+            return res.status(404).json({ error: 'Report not found' });
+        }
+        
+        const logs = await db.all(`
+            SELECT * FROM audit_logs 
+            WHERE organizationId = ? AND resourceType = 'report' AND resourceId = ?
+            ORDER BY createdAt DESC
+        `, [req.user.orgId, id]);
+        
+        res.json(logs);
+    } catch (error) {
+        console.error('Error fetching report audit trail:', error);
+        res.status(500).json({ error: 'Failed to fetch audit trail' });
     }
 });
 
@@ -7955,6 +8004,22 @@ Write in a professional tone suitable for a formal report.`;
         
         // Update report timestamp
         await db.run('UPDATE reports SET updatedAt = ? WHERE id = ?', [now, id]);
+
+        // Log generation in audit trail
+        const userInfo = await db.get('SELECT name, email FROM users WHERE id = ?', [req.user.sub]);
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: userInfo?.name || req.user.email,
+            userEmail: userInfo?.email || req.user.email,
+            action: 'generate_content',
+            resourceType: 'report',
+            resourceId: id,
+            resourceName: report.name,
+            details: { sectionTitle: templateSection.title, prompt: prompt?.substring(0, 150) },
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
         
         res.json({ content: generatedContent, generatedAt: now });
     } catch (error) {
@@ -8089,6 +8154,22 @@ app.post('/api/reports/:id/comments', authenticateToken, async (req, res) => {
         `, [commentId, id, sectionId, req.user.sub, user?.name || 'Unknown', selectedText, startOffset, endOffset, commentText, suggestionText || null, now, now]);
         
         const comment = await db.get('SELECT * FROM report_comments WHERE id = ?', [commentId]);
+
+        // Log comment creation in audit trail
+        const reportInfo = await db.get('SELECT name FROM reports WHERE id = ?', [id]);
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: user?.name || req.user.email,
+            userEmail: req.user.email,
+            action: 'add_comment',
+            resourceType: 'report',
+            resourceId: id,
+            resourceName: reportInfo?.name || id,
+            details: { commentText: commentText?.substring(0, 100) },
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
         
         res.json(comment);
     } catch (error) {
@@ -8156,6 +8237,23 @@ app.put('/api/reports/:id/comments/:commentId/resolve', authenticateToken, async
                 UPDATE report_comments SET status = 'open', resolvedAt = NULL, resolvedBy = NULL, updatedAt = ? WHERE id = ?
             `, [now, commentId]);
         }
+
+        // Log comment resolve/reopen in audit trail
+        const reportInfo = await db.get('SELECT name FROM reports WHERE id = ?', [id]);
+        const userInfo = await db.get('SELECT name, email FROM users WHERE id = ?', [req.user.sub]);
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: userInfo?.name || req.user.email,
+            userEmail: userInfo?.email || req.user.email,
+            action: resolved ? 'resolve_comment' : 'reopen_comment',
+            resourceType: 'report',
+            resourceId: id,
+            resourceName: reportInfo?.name || id,
+            details: { commentId },
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
         
         res.json({ message: resolved ? 'Comment resolved' : 'Comment reopened' });
     } catch (error) {
