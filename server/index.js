@@ -2027,6 +2027,20 @@ app.delete('/api/properties/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// GET audit log for an entity
+app.get('/api/entities/:id/audit', authenticateToken, async (req, res) => {
+    try {
+        const logs = await db.all(
+            'SELECT * FROM audit_log WHERE entityId = ? AND organizationId = ? ORDER BY timestamp DESC LIMIT 100',
+            [req.params.id, req.user.orgId]
+        );
+        res.json(logs);
+    } catch (error) {
+        console.error('Error fetching audit log:', error);
+        res.status(500).json({ error: 'Failed to fetch audit log' });
+    }
+});
+
 // Helper to resolve relation values
 async function resolveRelationValue(db, value, relatedEntityId) {
     if (!value || !relatedEntityId) return value;
@@ -2228,23 +2242,40 @@ app.put('/api/records/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Record not found or access denied' });
         }
 
+        // Get entity info for audit log
+        const recordInfo = await db.get('SELECT entityId FROM records WHERE id = ?', [id]);
+        const entityInfo = recordInfo ? await db.get('SELECT organizationId FROM entities WHERE id = ?', [recordInfo.entityId]) : null;
+
         if (values) {
             for (const [propId, val] of Object.entries(values)) {
                 const existing = await db.get(
-                    'SELECT id FROM record_values WHERE recordId = ? AND propertyId = ?',
+                    'SELECT id, value FROM record_values WHERE recordId = ? AND propertyId = ?',
                     [id, propId]
                 );
 
+                const oldValue = existing?.value || null;
+                const newValue = String(val);
+
                 if (existing) {
-                    await db.run(
-                        'UPDATE record_values SET value = ? WHERE id = ?',
-                        [String(val), existing.id]
-                    );
+                    if (oldValue !== newValue) {
+                        await db.run(
+                            'UPDATE record_values SET value = ? WHERE id = ?',
+                            [newValue, existing.id]
+                        );
+                        // Audit log
+                        if (entityInfo && recordInfo) {
+                            const prop = await db.get('SELECT name FROM properties WHERE id = ?', [propId]);
+                            await db.run(
+                                'INSERT INTO audit_log (id, organizationId, entityId, recordId, action, field, oldValue, newValue, userId, userName, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                [Math.random().toString(36).substr(2, 12), entityInfo.organizationId, recordInfo.entityId, id, 'update', prop?.name || propId, oldValue, newValue, req.user.sub, req.user.email, new Date().toISOString()]
+                            );
+                        }
+                    }
                 } else {
                     const valueId = Math.random().toString(36).substr(2, 9);
                     await db.run(
                         'INSERT INTO record_values (id, recordId, propertyId, value) VALUES (?, ?, ?, ?)',
-                        [valueId, id, propId, String(val)]
+                        [valueId, id, propId, newValue]
                     );
                 }
             }

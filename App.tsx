@@ -232,6 +232,12 @@ function AuthenticatedApp() {
     const [recordSortDir, setRecordSortDir] = useState<'asc' | 'desc'>('asc');
     const [recordPage, setRecordPage] = useState(0);
     const recordsPerPage = 25;
+    // Advanced filters: { propertyId: { op: '>', value: '100' } }
+    const [recordFilters, setRecordFilters] = useState<Record<string, { op: string; value: string }>>({});
+    const [showFilters, setShowFilters] = useState(false);
+    // Inline editing
+    const [inlineEditCell, setInlineEditCell] = useState<{ recordId: string; propId: string } | null>(null);
+    const [inlineEditValue, setInlineEditValue] = useState('');
 
     // New Entity State
     const [isCreatingEntity, setIsCreatingEntity] = useState(false);
@@ -631,6 +637,9 @@ function AuthenticatedApp() {
         setRecordSearch('');
         setRecordSortKey(null);
         setRecordPage(0);
+        setRecordFilters({});
+        setShowFilters(false);
+        setInlineEditCell(null);
     }, [activeEntityId, activeTab]);
 
     const fetchEntities = async () => {
@@ -791,6 +800,34 @@ function AuthenticatedApp() {
         } catch (error) {
             console.error('Error adding property:', error);
         }
+    };
+
+    // Inline edit: save single cell
+    const saveInlineEdit = async () => {
+        if (!inlineEditCell || !activeEntityId) return;
+        const { recordId, propId } = inlineEditCell;
+        try {
+            // Find current record values
+            const record = records.find(r => r.id === recordId);
+            if (!record) return;
+            const updatedValues: Record<string, any> = {};
+            activeEntity?.properties.forEach(p => {
+                updatedValues[p.name] = p.id === propId ? inlineEditValue : (record.values[p.id] ?? '');
+            });
+            await fetch(`${API_BASE}/records/${recordId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ values: updatedValues }),
+                credentials: 'include'
+            });
+            // Update local state immediately
+            setRecords(prev => prev.map(r => 
+                r.id === recordId ? { ...r, values: { ...r.values, [propId]: inlineEditValue } } : r
+            ));
+        } catch (error) {
+            console.error('Inline edit failed:', error);
+        }
+        setInlineEditCell(null);
     };
 
     const deleteProperty = async (propId: string) => {
@@ -1765,22 +1802,112 @@ function AuthenticatedApp() {
                                                     )}
                                                 </div>
                                             )}
+                                            {/* Advanced Filters */}
+                                            {records.length > 0 && (
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <button
+                                                        onClick={() => setShowFilters(!showFilters)}
+                                                        className={`flex items-center gap-1 px-2 py-1 text-[10px] rounded border transition-colors ${
+                                                            Object.keys(recordFilters).length > 0 
+                                                                ? 'border-[var(--accent-primary)] text-[var(--accent-primary)] bg-[var(--accent-primary)]/5'
+                                                                : 'border-[var(--border-light)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                                                        }`}
+                                                    >
+                                                        <Funnel size={10} />
+                                                        Filters {Object.keys(recordFilters).length > 0 && `(${Object.keys(recordFilters).length})`}
+                                                    </button>
+                                                    {/* Active filter chips */}
+                                                    {Object.entries(recordFilters).map(([propId, filter]) => {
+                                                        const prop = activeEntity.properties.find(p => p.id === propId);
+                                                        return (
+                                                            <span key={propId} className="inline-flex items-center gap-1 px-2 py-0.5 bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] text-[10px] rounded-full">
+                                                                {prop?.name} {filter.op} {filter.value}
+                                                                <button onClick={() => setRecordFilters(prev => { const next = { ...prev }; delete next[propId]; return next; })} className="hover:text-red-500">
+                                                                    <X size={8} />
+                                                                </button>
+                                                            </span>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                            {/* Filter form */}
+                                            {showFilters && (
+                                                <div className="flex items-end gap-2 p-3 bg-[var(--bg-tertiary)] rounded-lg">
+                                                    <div className="flex-1">
+                                                        <label className="block text-[10px] text-[var(--text-tertiary)] mb-1">Property</label>
+                                                        <select id="filter-prop" className="w-full px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-xs text-[var(--text-primary)]">
+                                                            {activeEntity.properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div className="w-20">
+                                                        <label className="block text-[10px] text-[var(--text-tertiary)] mb-1">Operator</label>
+                                                        <select id="filter-op" className="w-full px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-xs text-[var(--text-primary)]">
+                                                            <option value="contains">contains</option>
+                                                            <option value="=">=</option>
+                                                            <option value="!=">!=</option>
+                                                            <option value=">">&gt;</option>
+                                                            <option value="<">&lt;</option>
+                                                            <option value=">=">&gt;=</option>
+                                                            <option value="<=">&lt;=</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <label className="block text-[10px] text-[var(--text-tertiary)] mb-1">Value</label>
+                                                        <input id="filter-value" type="text" placeholder="Value..." className="w-full px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-xs text-[var(--text-primary)]" />
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            const propEl = document.getElementById('filter-prop') as HTMLSelectElement;
+                                                            const opEl = document.getElementById('filter-op') as HTMLSelectElement;
+                                                            const valEl = document.getElementById('filter-value') as HTMLInputElement;
+                                                            if (propEl && opEl && valEl && valEl.value) {
+                                                                setRecordFilters(prev => ({ ...prev, [propEl.value]: { op: opEl.value, value: valEl.value } }));
+                                                                valEl.value = '';
+                                                                setRecordPage(0);
+                                                            }
+                                                        }}
+                                                        className="px-3 py-1 bg-[var(--accent-primary)] text-white text-xs rounded font-medium hover:opacity-90"
+                                                    >
+                                                        Add
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="overflow-auto max-h-[500px] custom-scrollbar">
                                             {/* Compute filtered, sorted, paginated records */}
                                             {(() => {
-                                                // Filter
+                                                // Search filter
                                                 let displayRecords = records;
                                                 if (recordSearch.trim()) {
                                                     const q = recordSearch.toLowerCase();
-                                                    displayRecords = records.filter(r => 
+                                                    displayRecords = displayRecords.filter(r => 
                                                         activeEntity.properties.some(p => {
                                                             const v = r.values?.[p.id];
                                                             return v && String(v).toLowerCase().includes(q);
                                                         })
                                                     );
                                                 }
+                                                // Advanced filters
+                                                Object.entries(recordFilters).forEach(([propId, filter]) => {
+                                                    displayRecords = displayRecords.filter(r => {
+                                                        const v = r.values?.[propId];
+                                                        if (v === undefined || v === null) return false;
+                                                        const strV = String(v).toLowerCase();
+                                                        const numV = Number(v);
+                                                        const numF = Number(filter.value);
+                                                        switch (filter.op) {
+                                                            case 'contains': return strV.includes(filter.value.toLowerCase());
+                                                            case '=': return strV === filter.value.toLowerCase() || (!isNaN(numV) && !isNaN(numF) && numV === numF);
+                                                            case '!=': return strV !== filter.value.toLowerCase();
+                                                            case '>': return !isNaN(numV) && !isNaN(numF) && numV > numF;
+                                                            case '<': return !isNaN(numV) && !isNaN(numF) && numV < numF;
+                                                            case '>=': return !isNaN(numV) && !isNaN(numF) && numV >= numF;
+                                                            case '<=': return !isNaN(numV) && !isNaN(numF) && numV <= numF;
+                                                            default: return true;
+                                                        }
+                                                    });
+                                                });
                                                 // Sort
                                                 if (recordSortKey) {
                                                     displayRecords = [...displayRecords].sort((a, b) => {
@@ -1819,6 +1946,23 @@ function AuthenticatedApp() {
                                                                     {recordSortKey === prop.id && (
                                                                         <span className="text-[var(--accent-primary)]">{recordSortDir === 'asc' ? '↑' : '↓'}</span>
                                                                     )}
+                                                                    {/* Sparkline for numeric columns */}
+                                                                    {prop.type === 'number' && records.length > 1 && (() => {
+                                                                        const vals = records.map(r => Number(r.values?.[prop.id])).filter(n => !isNaN(n));
+                                                                        if (vals.length < 2) return null;
+                                                                        const min = Math.min(...vals);
+                                                                        const max = Math.max(...vals);
+                                                                        const range = max - min || 1;
+                                                                        const w = 40, h = 12;
+                                                                        const points = vals.slice(-20).map((v, i, arr) => 
+                                                                            `${(i / (arr.length - 1)) * w},${h - ((v - min) / range) * h}`
+                                                                        ).join(' ');
+                                                                        return (
+                                                                            <svg width={w} height={h} className="ml-1 opacity-60">
+                                                                                <polyline points={points} fill="none" stroke="var(--accent-primary)" strokeWidth="1" />
+                                                                            </svg>
+                                                                        );
+                                                                    })()}
                                                                 </div>
                                                             </th>
                                                         ))}
@@ -1844,11 +1988,38 @@ function AuthenticatedApp() {
                                                     ) : (
                                                         paged.map(record => (
                                                             <tr key={record.id} className="hover:bg-[var(--bg-tertiary)] transition-colors group">
-                                                                {activeEntity.properties.map((prop, pIdx) => (
-                                                                    <td key={prop.id || `td-${pIdx}`} className="px-4 py-3 text-sm text-[var(--text-secondary)]">
-                                                                        {renderCellValue(prop, record.values[prop.id])}
-                                                                    </td>
-                                                                ))}
+                                                                {activeEntity.properties.map((prop, pIdx) => {
+                                                                    const isEditing = inlineEditCell?.recordId === record.id && inlineEditCell?.propId === prop.id;
+                                                                    return (
+                                                                        <td 
+                                                                            key={prop.id || `td-${pIdx}`} 
+                                                                            className="px-4 py-3 text-sm text-[var(--text-secondary)]"
+                                                                            onDoubleClick={() => {
+                                                                                if (prop.type === 'text' || prop.type === 'number') {
+                                                                                    setInlineEditCell({ recordId: record.id, propId: prop.id });
+                                                                                    setInlineEditValue(record.values[prop.id] ?? '');
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            {isEditing ? (
+                                                                                <input
+                                                                                    autoFocus
+                                                                                    type={prop.type === 'number' ? 'number' : 'text'}
+                                                                                    value={inlineEditValue}
+                                                                                    onChange={(e) => setInlineEditValue(e.target.value)}
+                                                                                    onBlur={saveInlineEdit}
+                                                                                    onKeyDown={(e) => {
+                                                                                        if (e.key === 'Enter') saveInlineEdit();
+                                                                                        if (e.key === 'Escape') setInlineEditCell(null);
+                                                                                    }}
+                                                                                    className="w-full px-2 py-1 text-sm bg-[var(--bg-primary)] border border-[var(--accent-primary)] rounded focus:outline-none text-[var(--text-primary)]"
+                                                                                />
+                                                                            ) : (
+                                                                                renderCellValue(prop, record.values[prop.id])
+                                                                            )}
+                                                                        </td>
+                                                                    );
+                                                                })}
                                                                 {Object.values(incomingData).map(({ sourceEntity, sourceProperty, records: sourceRecords }) => {
                                                                     const linkedRecords = sourceRecords.filter(r => {
                                                                         const val = r.values[sourceProperty.id];

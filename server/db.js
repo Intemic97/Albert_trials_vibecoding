@@ -725,6 +725,25 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  // Audit trail table for record changes
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT NOT NULL,
+      entityId TEXT NOT NULL,
+      recordId TEXT,
+      action TEXT NOT NULL,
+      field TEXT,
+      oldValue TEXT,
+      newValue TEXT,
+      userId TEXT,
+      userName TEXT,
+      timestamp TEXT NOT NULL,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(entityId) REFERENCES entities(id) ON DELETE CASCADE
+    );
+  `);
+
   // Create copilot_chats table for storing chat history
   await db.exec(`
     CREATE TABLE IF NOT EXISTS copilot_chats (
