@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Database, Copy, X, DotsThreeVertical } from '@phosphor-icons/react';
+import { Play, Database, Copy, X, DotsThreeVertical, ArrowClockwise } from '@phosphor-icons/react';
 import { WorkflowNode as WorkflowNodeType, NodeType } from './types';
 import { NODE_ICONS } from './constants';
 
@@ -167,6 +167,26 @@ export const WorkflowNode: React.FC<WorkflowNodeProps> = ({
         >
           {React.createElement(topTag.icon, { size: 13, weight: "light" })}
           <span className="truncate">{topTag.label}</span>
+        </div>
+      )}
+
+      {/* Retry Button - Always visible when node has error */}
+      {node.status === 'error' && (
+        <div 
+          className="absolute -top-9 left-0 z-30"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRunNode(node.id);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-md text-xs font-medium transition-all active:scale-90"
+            title="Retry this node"
+          >
+            <ArrowClockwise size={12} weight="bold" />
+            Retry
+          </button>
         </div>
       )}
 
