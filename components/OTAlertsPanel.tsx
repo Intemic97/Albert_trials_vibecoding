@@ -256,7 +256,7 @@ export const OTAlertsPanel: React.FC<OTAlertsPanelProps> = ({
         }
     };
 
-    const handleAcknowledge = async (alertId: string) => {
+    const handleAcknowledge = useCallback(async (alertId: string) => {
         try {
             const res = await fetch(`${API_BASE}/ot-alerts/${alertId}/acknowledge`, {
                 method: 'POST',
@@ -265,17 +265,17 @@ export const OTAlertsPanel: React.FC<OTAlertsPanelProps> = ({
 
             if (res.ok) {
                 // Update local state
-                setAlerts(prev => prev.map(alert =>
-                    alert.id === alertId
-                        ? { ...alert, acknowledgedAt: new Date().toISOString() }
-                        : alert
+                setAlerts(prev => prev.map(a =>
+                    a.id === alertId
+                        ? { ...a, acknowledgedAt: new Date().toISOString() }
+                        : a
                 ));
             }
         } catch (error) {
             console.error('Error acknowledging alert:', error);
-            alert('Failed to acknowledge alert');
+            window.alert('Failed to acknowledge alert');
         }
-    };
+    }, []);
 
     const getSeverityIcon = (severity: string) => {
         if (severity === 'error') {
@@ -304,8 +304,6 @@ export const OTAlertsPanel: React.FC<OTAlertsPanelProps> = ({
         if (diffHours < 24) return `${diffHours}h ago`;
         return `${diffDays}d ago`;
     };
-
-    if (!isOpen) return null;
 
     const filteredAlerts = alerts.filter(alert => {
         if (filterSeverity !== 'all' && alert.severity !== filterSeverity) return false;
@@ -355,17 +353,20 @@ export const OTAlertsPanel: React.FC<OTAlertsPanelProps> = ({
     }, [filteredAlerts]);
 
     // Acknowledge all unacknowledged alerts
-    const handleAcknowledgeAll = async () => {
+    const handleAcknowledgeAll = useCallback(async () => {
         const unacknowledged = filteredAlerts.filter(a => !a.acknowledgedAt);
         if (unacknowledged.length === 0) return;
         
         const confirmMsg = `Are you sure you want to acknowledge ${unacknowledged.length} alerts?`;
         if (!window.confirm(confirmMsg)) return;
         
-        for (const alert of unacknowledged) {
-            await handleAcknowledge(alert.id);
+        for (const a of unacknowledged) {
+            await handleAcknowledge(a.id);
         }
-    };
+    }, [filteredAlerts, handleAcknowledge]);
+
+    // Early return AFTER all hooks to comply with Rules of Hooks
+    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
