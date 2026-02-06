@@ -152,7 +152,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     // All properties use the same gray color
     const getPropertyColor = (): string => NODE_COLORS.property;
     
-    // Initialize graph - nodes start OUTSIDE and converge inward
+    // Initialize graph - nodes start AT their final positions (minimal movement)
     useEffect(() => {
         const width = containerRef.current?.clientWidth || 800;
         const height = containerRef.current?.clientHeight || 600;
@@ -173,25 +173,13 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
             folder.entityIds?.forEach(eid => entityFolderNameMap.set(eid, folder.name));
         });
         
-        // Pre-compute target positions using golden angle spiral (where they SHOULD end up)
-        const targetPositions = new Map<string, { x: number; y: number }>();
+        // Entities start directly at their final spiral position - no travel animation
         entityGroups.forEach((group, i) => {
             const goldenAngle = i * 2.39996;
-            const targetRadius = 60 + (i * 35);
+            const radius = 60 + (i * 35);
             const maxRadius = Math.min(width, height) * 0.3;
-            const tx = centerX + Math.cos(goldenAngle) * Math.min(targetRadius, maxRadius);
-            const ty = centerY + Math.sin(goldenAngle) * Math.min(targetRadius, maxRadius);
-            targetPositions.set(group.entity.id, { x: tx, y: ty });
-        });
-        
-        // Start entities FAR OUTSIDE the viewport in a large circle
-        const startRadius = Math.max(width, height) * 0.9;
-        
-        entityGroups.forEach((group, i) => {
-            // Spread evenly on outer circle
-            const angle = (i / entityGroups.length) * 2 * Math.PI - Math.PI / 2;
-            const startX = centerX + Math.cos(angle) * startRadius;
-            const startY = centerY + Math.sin(angle) * startRadius;
+            const entityX = centerX + Math.cos(goldenAngle) * Math.min(radius, maxRadius);
+            const entityY = centerY + Math.sin(goldenAngle) * Math.min(radius, maxRadius);
             
             const folderName = entityFolderNameMap.get(group.entity.id);
             const category = detectEntityCategory(group.entity.name, folderName);
@@ -202,8 +190,8 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                 type: 'entity',
                 label: group.entity.name,
                 color: categoryColor,
-                x: startX,
-                y: startY,
+                x: entityX,
+                y: entityY,
                 vx: 0,
                 vy: 0,
                 radius: 8,
@@ -211,7 +199,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                 category,
             });
             
-            // Properties start at same position as parent (outside)
+            // Properties start at their orbit positions directly
             if (showProperties && group.entity.properties) {
                 const props = group.entity.properties;
                 const numProps = props.length;
@@ -233,8 +221,8 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                         type: 'property',
                         label: prop.name,
                         color: propColor,
-                        x: startX,
-                        y: startY,
+                        x: entityX + Math.cos(propAngle) * orbitRadius,
+                        y: entityY + Math.sin(propAngle) * orbitRadius,
                         vx: 0,
                         vy: 0,
                         radius: 3,
@@ -320,8 +308,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         setIsSettled(false); // Reset to allow new settling
     }, [entities, showProperties]);
     
-    // Smooth converge animation: nodes fly in from outside → settle at target positions
-    // Two phases: (1) Pure lerp convergence (liquid), (2) Gentle physics settling
+    // Minimal settling: nodes already start in place, just a gentle nudge for clustering
     useEffect(() => {
         if (nodes.length === 0) return;
         if (isSettled) return;
@@ -333,26 +320,9 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         
         let frameCount = 0;
         let animating = true;
+        const maxFrames = 90; // Very short ~1.5s - just minor adjustments
         
-        // Phase 1: 120 frames of pure lerp convergence (~2 seconds at 60fps)
-        // Phase 2: 180 frames of gentle physics settling
-        const convergenceFrames = 120;
-        const settlingFrames = 180;
-        const maxFrames = convergenceFrames + settlingFrames;
-        
-        // Pre-compute target positions (golden angle spiral) 
-        const entityNodeIds = nodes.filter(n => n.type === 'entity').map(n => n.id);
-        const targetPos = new Map<string, { x: number; y: number }>();
-        entityNodeIds.forEach((nodeId, i) => {
-            const goldenAngle = i * 2.39996;
-            const targetRadius = 60 + (i * 35);
-            const maxRadius = Math.min(width, height) * 0.3;
-            const tx = centerX + Math.cos(goldenAngle) * Math.min(targetRadius, maxRadius);
-            const ty = centerY + Math.sin(goldenAngle) * Math.min(targetRadius, maxRadius);
-            targetPos.set(nodeId, { x: tx, y: ty });
-        });
-        
-        // Build adjacency map for settling phase
+        // Build adjacency map
         const connectedEntities = new Map<string, Set<string>>();
         edges.forEach(edge => {
             if (edge.source.startsWith('entity-') && edge.target.startsWith('entity-')) {
@@ -370,161 +340,113 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
             });
         });
         
-        // Store initial (outside) positions for lerp
-        const startPos = new Map<string, { x: number; y: number }>();
-        nodes.forEach(n => {
-            if (n.type === 'entity') startPos.set(n.id, { x: n.x, y: n.y });
-        });
-        
         const simulate = () => {
             if (!animating || frameCount >= maxFrames) {
                 setIsSettled(true);
                 return;
             }
             
-            const inConvergence = frameCount < convergenceFrames;
+            // Force fades to zero quickly - just gentle nudges
+            const t = frameCount / maxFrames;
+            const forceFade = Math.pow(1 - t, 3); // Cubic fade-out: strong → zero fast
             
             setNodes(prev => {
                 const updated = prev.map(node => ({ ...node }));
                 const entityMap = new Map<string, GraphNode>();
                 
-                if (inConvergence) {
-                    // ====== PHASE 1: Pure lerp convergence (liquid, no jitter) ======
-                    const t = frameCount / convergenceFrames;
-                    // Quintic ease-out: extremely smooth deceleration
-                    const ease = 1 - Math.pow(1 - t, 4);
-                    // Property orbit expansion
-                    const orbitExpand = Math.max(0, (t - 0.4) / 0.6); // Properties appear after 40%
-                    const orbitEase = orbitExpand * orbitExpand * (3 - 2 * orbitExpand);
-                    
-                    updated.forEach(node => {
-                        if (node.type === 'entity' && !node.fixed) {
-                            const start = startPos.get(node.id);
-                            const target = targetPos.get(node.id);
-                            if (start && target) {
-                                // Pure linear interpolation with easing = perfectly smooth
-                                node.x = start.x + (target.x - start.x) * ease;
-                                node.y = start.y + (target.y - start.y) * ease;
-                                node.vx = 0;
-                                node.vy = 0;
-                            }
-                            entityMap.set(node.id, node);
-                        }
-                    });
-                    
-                    // Properties lerp to orbit positions
-                    updated.forEach(node => {
-                        if (node.parentId && node.orbitRadius && node.orbitAngle !== undefined) {
-                            const parent = entityMap.get(node.parentId);
-                            if (parent) {
-                                const orbitX = parent.x + Math.cos(node.orbitAngle) * node.orbitRadius * orbitEase;
-                                const orbitY = parent.y + Math.sin(node.orbitAngle) * node.orbitRadius * orbitEase;
-                                // During convergence, properties stick close to parent then fan out
-                                node.x = parent.x + (orbitX - parent.x);
-                                node.y = parent.y + (orbitY - parent.y);
-                            }
-                        }
-                    });
-                } else {
-                    // ====== PHASE 2: Gentle physics settling ======
-                    const settleT = (frameCount - convergenceFrames) / settlingFrames;
-                    // Fading force: strong at start, near zero at end
-                    const forceFade = 1 - settleT * settleT;
-                    
-                    updated.forEach(node => {
-                        if (node.type === 'entity') entityMap.set(node.id, node);
-                    });
-                    
-                    const entityTerritories = new Map<string, number>();
-                    updated.forEach(node => {
-                        if (node.type === 'entity') {
-                            let maxOrbit = 0;
-                            updated.forEach(other => {
-                                if (other.parentId === node.id && other.orbitRadius) {
-                                    maxOrbit = Math.max(maxOrbit, other.orbitRadius);
-                                }
-                            });
-                            entityTerritories.set(node.id, maxOrbit + 25);
-                        }
-                    });
-                    
-                    updated.forEach((node, i) => {
-                        if (node.type !== 'entity' || node.fixed) return;
-                        
-                        let fx = 0, fy = 0;
-                        const nodeTerritory = entityTerritories.get(node.id) || MIN_SEPARATION / 2;
-                        const connections = connectedEntities.get(node.id);
-                        const nodeFolder = entityFolderMap.get(node.id);
-                        
-                        updated.forEach((other, j) => {
-                            if (i === j || other.type !== 'entity') return;
-                            
-                            const otherTerritory = entityTerritories.get(other.id) || MIN_SEPARATION / 2;
-                            const dx = node.x - other.x;
-                            const dy = node.y - other.y;
-                            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                            
-                            const isConnected = connections?.has(other.id);
-                            const otherFolder = entityFolderMap.get(other.id);
-                            const sameFolder = nodeFolder && otherFolder && nodeFolder === otherFolder;
-                            
-                            // Attraction for connected / same folder
-                            if (isConnected) {
-                                const idealDist = nodeTerritory + otherTerritory + 30;
-                                if (dist > idealDist) {
-                                    const pull = (dist - idealDist) * LINK_ATTRACTION * forceFade;
-                                    fx -= (dx / dist) * pull;
-                                    fy -= (dy / dist) * pull;
-                                }
-                            }
-                            if (sameFolder && !isConnected) {
-                                const idealDist = nodeTerritory + otherTerritory + 50;
-                                if (dist > idealDist) {
-                                    const pull = (dist - idealDist) * FOLDER_ATTRACTION * forceFade;
-                                    fx -= (dx / dist) * pull;
-                                    fy -= (dy / dist) * pull;
-                                }
-                            }
-                            
-                            // Collision: push apart if overlapping
-                            const minDist = nodeTerritory + otherTerritory;
-                            if (dist < minDist) {
-                                const overlap = minDist - dist;
-                                const push = overlap * COLLISION_STRENGTH * forceFade;
-                                fx += (dx / dist) * push;
-                                fy += (dy / dist) * push;
-                            } else if (!isConnected && !sameFolder && dist < minDist * 1.5) {
-                                const gentlePush = REPULSION * forceFade / (dist * dist + 500);
-                                fx += (dx / dist) * gentlePush;
-                                fy += (dy / dist) * gentlePush;
+                updated.forEach(node => {
+                    if (node.type === 'entity') entityMap.set(node.id, node);
+                });
+                
+                const entityTerritories = new Map<string, number>();
+                updated.forEach(node => {
+                    if (node.type === 'entity') {
+                        let maxOrbit = 0;
+                        updated.forEach(other => {
+                            if (other.parentId === node.id && other.orbitRadius) {
+                                maxOrbit = Math.max(maxOrbit, other.orbitRadius);
                             }
                         });
-                        
-                        fx += (centerX - node.x) * CENTER_PULL * forceFade;
-                        fy += (centerY - node.y) * CENTER_PULL * forceFade;
-                        
-                        node.vx = (node.vx + fx * 0.04) * DAMPING;
-                        node.vy = (node.vy + fy * 0.04) * DAMPING;
-                        node.x += node.vx;
-                        node.y += node.vy;
-                        
-                        entityMap.set(node.id, node);
-                    });
+                        entityTerritories.set(node.id, maxOrbit + 25);
+                    }
+                });
+                
+                // Very gentle forces - just resolve overlaps and nudge connected closer
+                updated.forEach((node, i) => {
+                    if (node.type !== 'entity' || node.fixed) return;
                     
-                    // Properties follow parent during settling
-                    updated.forEach(node => {
-                        if (node.fixed) return;
-                        if (node.parentId && node.orbitRadius && node.orbitAngle !== undefined) {
-                            const parent = entityMap.get(node.parentId);
-                            if (parent) {
-                                const tx = parent.x + Math.cos(node.orbitAngle) * node.orbitRadius;
-                                const ty = parent.y + Math.sin(node.orbitAngle) * node.orbitRadius;
-                                node.x += (tx - node.x) * 0.15;
-                                node.y += (ty - node.y) * 0.15;
+                    let fx = 0, fy = 0;
+                    const nodeTerritory = entityTerritories.get(node.id) || MIN_SEPARATION / 2;
+                    const connections = connectedEntities.get(node.id);
+                    const nodeFolder = entityFolderMap.get(node.id);
+                    
+                    updated.forEach((other, j) => {
+                        if (i === j || other.type !== 'entity') return;
+                        
+                        const otherTerritory = entityTerritories.get(other.id) || MIN_SEPARATION / 2;
+                        const dx = node.x - other.x;
+                        const dy = node.y - other.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                        
+                        const isConnected = connections?.has(other.id);
+                        const otherFolder = entityFolderMap.get(other.id);
+                        const sameFolder = nodeFolder && otherFolder && nodeFolder === otherFolder;
+                        
+                        // Gently pull connected nodes closer
+                        if (isConnected) {
+                            const idealDist = nodeTerritory + otherTerritory + 30;
+                            if (dist > idealDist) {
+                                const pull = (dist - idealDist) * LINK_ATTRACTION * forceFade;
+                                fx -= (dx / dist) * pull;
+                                fy -= (dy / dist) * pull;
                             }
                         }
+                        // Folder attraction
+                        if (sameFolder && !isConnected) {
+                            const idealDist = nodeTerritory + otherTerritory + 50;
+                            if (dist > idealDist) {
+                                const pull = (dist - idealDist) * FOLDER_ATTRACTION * forceFade;
+                                fx -= (dx / dist) * pull;
+                                fy -= (dy / dist) * pull;
+                            }
+                        }
+                        
+                        // Only push apart if actually overlapping
+                        const minDist = nodeTerritory + otherTerritory;
+                        if (dist < minDist) {
+                            const overlap = minDist - dist;
+                            const push = overlap * COLLISION_STRENGTH * forceFade;
+                            fx += (dx / dist) * push;
+                            fy += (dy / dist) * push;
+                        }
                     });
-                }
+                    
+                    // Very subtle center pull
+                    fx += (centerX - node.x) * CENTER_PULL * 0.5 * forceFade;
+                    fy += (centerY - node.y) * CENTER_PULL * 0.5 * forceFade;
+                    
+                    // High damping = slow, gentle movement
+                    node.vx = (node.vx + fx * 0.03) * 0.85;
+                    node.vy = (node.vy + fy * 0.03) * 0.85;
+                    node.x += node.vx;
+                    node.y += node.vy;
+                    
+                    entityMap.set(node.id, node);
+                });
+                
+                // Properties follow parent smoothly
+                updated.forEach(node => {
+                    if (node.fixed) return;
+                    if (node.parentId && node.orbitRadius && node.orbitAngle !== undefined) {
+                        const parent = entityMap.get(node.parentId);
+                        if (parent) {
+                            const tx = parent.x + Math.cos(node.orbitAngle) * node.orbitRadius;
+                            const ty = parent.y + Math.sin(node.orbitAngle) * node.orbitRadius;
+                            node.x += (tx - node.x) * 0.2;
+                            node.y += (ty - node.y) * 0.2;
+                        }
+                    }
+                });
                 
                 return updated;
             });
