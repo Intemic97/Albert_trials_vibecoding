@@ -1474,7 +1474,7 @@ function AuthenticatedApp() {
                                 <div className="flex items-center">
                                     <button
                                         onClick={() => {
-                                            setActiveEntityId(null);
+                                            // Navigate first, useEffect will clear activeEntityId
                                             navigate('/database');
                                         }}
                                         className="mr-4 p-2 hover:bg-[var(--bg-tertiary)] rounded-full transition-colors text-[var(--text-secondary)]"
