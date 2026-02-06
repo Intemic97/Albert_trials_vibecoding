@@ -133,7 +133,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
             description: 'Para equipos en crecimiento',
             icon: <Lightning weight="light" className="w-6 h-6" />,
             popular: true,
-            gradient: 'from-teal-500 to-emerald-600',
+            gradient: 'from-[#256A65] to-emerald-600',
             features: [
                 { text: 'Workflows ilimitados', included: true },
                 { text: '5.000 ejecuciones/mes', included: true },
@@ -881,7 +881,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             type="text"
                                             value={companyInfo.name}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, name: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                         />
                                     </div>
 
@@ -891,7 +891,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             type="text"
                                             value={companyInfo.industry}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, industry: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                         />
                                     </div>
 
@@ -900,7 +900,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                         <select
                                             value={companyInfo.employees}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, employees: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                         >
                                             <option value="">Select...</option>
                                             <option value="1-10">1-10</option>
@@ -917,7 +917,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             type="url"
                                             value={companyInfo.website}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, website: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                         />
                                     </div>
 
@@ -927,7 +927,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             type="url"
                                             value={companyInfo.linkedinUrl}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, linkedinUrl: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                         />
                                     </div>
 
@@ -937,7 +937,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             type="text"
                                             value={companyInfo.headquarters}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, headquarters: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                         />
                                     </div>
 
@@ -947,7 +947,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             type="text"
                                             value={companyInfo.foundingYear}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, foundingYear: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                         />
                                     </div>
 
@@ -957,7 +957,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             rows={4}
                                             value={companyInfo.overview}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, overview: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                             placeholder="Brief overview of your company..."
                                         />
                                     </div>
@@ -1045,7 +1045,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                             {/* Pricing Cards */}
                             {isLoadingSubscription ? (
                                 <div className="flex items-center justify-center py-16">
-                                    <SpinnerGap weight="light" className="w-8 h-8 text-teal-500 animate-spin" />
+                                    <SpinnerGap weight="light" className="w-8 h-8 text-[var(--accent-primary)] animate-spin" />
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1058,9 +1058,9 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                 key={plan.id}
                                                 className={`relative bg-[var(--bg-card)] rounded-2xl border-2 transition-all duration-300 overflow-hidden ${
                                                     isCurrentPlan 
-                                                        ? 'border-teal-500 shadow-lg shadow-teal-500/10' 
+                                                        ? 'border-[var(--accent-primary)] shadow-lg shadow-[var(--accent-primary)]/10' 
                                                         : plan.popular 
-                                                            ? 'border-teal-200 hover:border-teal-400 hover:shadow-lg' 
+                                                            ? 'border-[var(--accent-primary)]/30 hover:border-[var(--accent-primary)]/60 hover:shadow-lg' 
                                                             : 'border-[var(--border-light)] hover:border-[var(--border-medium)] hover:shadow-md'
                                                 }`}
                                             >
@@ -1246,10 +1246,10 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                     </div>
 
                                                     {/* Usage Instructions */}
-                                                    <div className="bg-teal-50 border border-teal-100 rounded-lg p-4">
-                                                        <h4 className="text-sm font-medium text-teal-800 mb-2">How to use</h4>
-                                                        <ul className="text-sm text-teal-700 space-y-1">
-                                                            <li>• Mention the app: <code className="bg-teal-100 px-1 rounded">@YourApp how many customers do we have?</code></li>
+                                                    <div className="bg-[var(--accent-primary)]/5 border border-[var(--accent-primary)]/10 rounded-lg p-4">
+                                                        <h4 className="text-sm font-medium text-[var(--text-primary)] mb-2">How to use</h4>
+                                                        <ul className="text-sm text-[var(--text-secondary)] space-y-1">
+                                                            <li>• Mention the app: <code className="bg-[var(--bg-tertiary)] px-1 rounded">@YourApp how many customers do we have?</code></li>
                                                             <li>• Or send a direct message to the app</li>
                                                             <li>• The Database Assistant will analyze your data and respond</li>
                                                         </ul>
@@ -1263,7 +1263,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                         <ol className="text-sm text-[var(--text-secondary)] space-y-2">
                                                             <li className="flex gap-2">
                                                                 <span className="flex-shrink-0 w-5 h-5 bg-[var(--bg-selected)] rounded-full flex items-center justify-center text-xs font-medium">1</span>
-                                                                <span>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">api.slack.com/apps</a> and create a new app</span>
+                                                                <span>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-primary)] hover:underline">api.slack.com/apps</a> and create a new app</span>
                                                             </li>
                                                             <li className="flex gap-2">
                                                                 <span className="flex-shrink-0 w-5 h-5 bg-[var(--bg-selected)] rounded-full flex items-center justify-center text-xs font-medium">2</span>
@@ -1318,7 +1318,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                             value={slackBotToken}
                                                             onChange={(e) => setSlackBotToken(e.target.value)}
                                                             placeholder="xoxb-..."
-                                                            className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+                                                            className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg text-sm focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] outline-none transition-all"
                                                         />
                                                     </div>
 
@@ -1389,7 +1389,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             required
                                             value={inviteEmail}
                                             onChange={(e) => setInviteEmail(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-2 rounded-lg border border-[var(--border-medium)] focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+                                            className="w-full pl-10 pr-4 py-2 rounded-lg border border-[var(--border-medium)] focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] outline-none transition-all"
                                             placeholder="colleague@company.com"
                                         />
                                     </div>
