@@ -360,29 +360,14 @@ export const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
 
                 <div className="h-4 w-px bg-[var(--border-light)]" />
 
-                {/* Edit Mode Toggle */}
+                {/* Add Widget - always available */}
                 <button
-                    onClick={onToggleEditMode}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        isEditMode
-                            ? 'bg-[#256A65] text-white'
-                            : 'bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)] hover:border-[var(--border-medium)]'
-                    }`}
+                    onClick={onAddWidget}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-xs font-medium transition-colors"
                 >
-                    <GearSix size={14} weight="light" />
-                    {isEditMode ? 'Done Editing' : 'Edit'}
+                    <Plus size={14} weight="light" />
+                    Add Widget
                 </button>
-
-                {/* Add Widget (only in edit mode) */}
-                {isEditMode && (
-                    <button
-                        onClick={onAddWidget}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-xs font-medium transition-colors"
-                    >
-                        <Plus size={14} weight="light" />
-                        Add Widget
-                    </button>
-                )}
 
                 {/* Actions */}
                 <div className="flex items-center gap-1">
