@@ -5,7 +5,8 @@ import {
     CaretRight, CaretDown, CaretLeft, SpinnerGap, X, File, Trash, CheckCircle, Circle,
     FloppyDisk, WarningCircle, User, Calendar, ChatCircle, DotsThreeVertical,
     PencilSimple, Checks, ArrowElbowDownRight, Plus, DotsSixVertical, Clipboard,
-    Flask, Wrench, Warning, Robot, SidebarSimple, DownloadSimple
+    Flask, Wrench, Warning, Robot, SidebarSimple, DownloadSimple, GitBranch,
+    ArrowRight, UserCircle
 } from '@phosphor-icons/react';
 import { Entity } from '../types';
 import { PromptInput } from './PromptInput';
@@ -102,6 +103,19 @@ interface AIContextFile {
     uploadedAt: Date;
 }
 
+interface AuditLogEntry {
+    id: string;
+    userId: string;
+    userName: string;
+    userEmail: string;
+    action: string;
+    resourceType: string;
+    resourceId: string;
+    resourceName: string;
+    details: string | null;
+    createdAt: string;
+}
+
 const statusConfig = {
     draft: { label: 'Draft', color: 'text-amber-500', bg: 'bg-amber-500/15', icon: Clock },
     review: { label: 'Review', color: 'text-[var(--accent-primary)]', bg: 'bg-[var(--accent-primary)]/15', icon: Eye },
@@ -152,6 +166,11 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
         suggestedContent: string;
     } | null>(null);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+    
+    // Audit Trail state
+    const [showAuditTrail, setShowAuditTrail] = useState(false);
+    const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+    const [auditLoading, setAuditLoading] = useState(false);
     
     const fileInputRef = useRef<HTMLInputElement>(null);
     const aiFileInputRef = useRef<HTMLInputElement>(null);
@@ -472,10 +491,122 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
             });
             if (res.ok) {
                 setReport({ ...report, status: newStatus });
+                // Refresh audit trail if panel is open
+                if (showAuditTrail) {
+                    fetchAuditTrail();
+                }
             }
         } catch (error) {
             console.error('Error updating status:', error);
         }
+    };
+
+    const fetchAuditTrail = async () => {
+        if (!report) return;
+        setAuditLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/reports/${report.id}/audit-trail`, {
+                credentials: 'include'
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setAuditLogs(data);
+            }
+        } catch (error) {
+            console.error('Error fetching audit trail:', error);
+        } finally {
+            setAuditLoading(false);
+        }
+    };
+
+    const toggleAuditTrail = () => {
+        const newState = !showAuditTrail;
+        setShowAuditTrail(newState);
+        if (newState) {
+            fetchAuditTrail();
+        }
+    };
+
+    const getActionLabel = (action: string): string => {
+        const labels: Record<string, string> = {
+            'create': 'Created document',
+            'status_change': 'Status changed',
+            'update': 'Updated document',
+            'delete': 'Deleted document',
+            'generate_content': 'Generated content with AI',
+            'upload_context': 'Uploaded context file',
+            'add_comment': 'Added comment',
+            'resolve_comment': 'Resolved comment',
+            'reopen_comment': 'Reopened comment',
+        };
+        return labels[action] || action;
+    };
+
+    const getStatusLabel = (status: string): string => {
+        const labels: Record<string, string> = {
+            'draft': 'Draft',
+            'review': 'In Review',
+            'ready_to_send': 'Ready to Send',
+        };
+        return labels[status] || status;
+    };
+
+    const getStatusColor = (status: string): string => {
+        const colors: Record<string, string> = {
+            'draft': 'text-amber-500',
+            'review': 'text-[var(--accent-primary)]',
+            'ready_to_send': 'text-emerald-500',
+        };
+        return colors[status] || 'text-[var(--text-secondary)]';
+    };
+
+    const getActionIcon = (action: string) => {
+        switch (action) {
+            case 'create': return <Plus size={14} weight="bold" />;
+            case 'status_change': return <ArrowRight size={14} weight="bold" />;
+            case 'update': return <PencilSimple size={14} weight="bold" />;
+            case 'generate_content': return <Sparkle size={14} weight="bold" />;
+            case 'add_comment': return <ChatCircle size={14} weight="bold" />;
+            case 'resolve_comment': return <CheckCircle size={14} weight="bold" />;
+            case 'reopen_comment': return <ChatCircle size={14} weight="bold" />;
+            default: return <Circle size={14} weight="fill" />;
+        }
+    };
+
+    const getActionColor = (action: string): string => {
+        switch (action) {
+            case 'create': return 'bg-emerald-500';
+            case 'status_change': return 'bg-[var(--accent-primary)]';
+            case 'update': return 'bg-blue-500';
+            case 'generate_content': return 'bg-purple-500';
+            case 'add_comment': return 'bg-amber-500';
+            case 'resolve_comment': return 'bg-emerald-500';
+            case 'reopen_comment': return 'bg-amber-500';
+            default: return 'bg-[var(--text-secondary)]';
+        }
+    };
+
+    const formatAuditDate = (dateStr: string): string => {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+
+    const formatAuditDateTime = (dateStr: string): string => {
+        const date = new Date(dateStr);
+        return date.toLocaleString('en-US', { 
+            month: 'short', day: 'numeric', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -921,6 +1052,20 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                     {report.templateName} • Created by {report.createdByName}
                                 </p>
                             </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={toggleAuditTrail}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                    showAuditTrail 
+                                        ? 'bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] ring-1 ring-[var(--accent-primary)]/30' 
+                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+                                }`}
+                                title="Audit Trail"
+                            >
+                                <GitBranch size={18} weight="bold" />
+                                <span className="hidden sm:inline">Audit Trail</span>
+                            </button>
                         </div>
                     </div>
 
@@ -2513,6 +2658,175 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                     {toast.type === 'info' && <X size={20} weight="light" />}
                     <span className="font-medium">{toast.message}</span>
                 </div>
+            )}
+
+            {/* Audit Trail Slide-Over Panel */}
+            {showAuditTrail && (
+                <>
+                    {/* Backdrop */}
+                    <div 
+                        className="fixed inset-0 bg-black/30 z-40 transition-opacity"
+                        onClick={() => setShowAuditTrail(false)}
+                    />
+                    {/* Panel */}
+                    <div className="fixed right-0 top-0 h-full w-[420px] max-w-[90vw] bg-[var(--bg-card)] border-l border-[var(--border-light)] shadow-2xl z-50 flex flex-col"
+                        style={{ animation: 'slideInRight 0.25s ease-out' }}
+                    >
+                        {/* Panel Header */}
+                        <div className="px-5 py-4 border-b border-[var(--border-light)] flex items-center justify-between shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-[var(--accent-primary)]/10 rounded-lg">
+                                    <GitBranch size={20} weight="bold" className="text-[var(--accent-primary)]" />
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-semibold text-[var(--text-primary)]">Audit Trail</h2>
+                                    <p className="text-xs text-[var(--text-secondary)]">
+                                        {auditLogs.length} event{auditLogs.length !== 1 ? 's' : ''} recorded
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowAuditTrail(false)}
+                                className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+                            >
+                                <X size={18} weight="light" className="text-[var(--text-secondary)]" />
+                            </button>
+                        </div>
+
+                        {/* Panel Content */}
+                        <div className="flex-1 overflow-y-auto px-5 py-4">
+                            {auditLoading ? (
+                                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                                    <SpinnerGap className="animate-spin text-[var(--accent-primary)]" size={28} weight="light" />
+                                    <span className="text-sm text-[var(--text-secondary)]">Loading history...</span>
+                                </div>
+                            ) : auditLogs.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                                    <GitBranch size={40} weight="light" className="text-[var(--text-secondary)] opacity-40" />
+                                    <p className="text-sm text-[var(--text-secondary)]">No events recorded yet</p>
+                                </div>
+                            ) : (
+                                <div className="relative">
+                                    {/* Git-style vertical line */}
+                                    <div className="absolute left-[15px] top-2 bottom-2 w-[2px] bg-[var(--border-light)]" />
+
+                                    {auditLogs.map((log, idx) => {
+                                        const details = log.details ? JSON.parse(log.details) : null;
+                                        const isStatusChange = log.action === 'status_change';
+                                        const isFirst = idx === 0;
+
+                                        return (
+                                            <div key={log.id} className="relative flex gap-4 pb-6 last:pb-0 group">
+                                                {/* Git-style node dot */}
+                                                <div className={`relative z-10 flex items-center justify-center w-[32px] h-[32px] rounded-full shrink-0 ${
+                                                    isFirst 
+                                                        ? `${getActionColor(log.action)} text-white shadow-lg`
+                                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-2 border-[var(--border-light)]'
+                                                }`}>
+                                                    {getActionIcon(log.action)}
+                                                </div>
+
+                                                {/* Content */}
+                                                <div className={`flex-1 min-w-0 pt-1 ${isFirst ? '' : 'opacity-80 group-hover:opacity-100 transition-opacity'}`}>
+                                                    {/* Action label */}
+                                                    <div className="flex items-start justify-between gap-2 mb-1">
+                                                        <span className="text-sm font-medium text-[var(--text-primary)] leading-tight">
+                                                            {getActionLabel(log.action)}
+                                                        </span>
+                                                        <span className="text-[11px] text-[var(--text-secondary)] whitespace-nowrap shrink-0" title={formatAuditDateTime(log.createdAt)}>
+                                                            {formatAuditDate(log.createdAt)}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Status change details */}
+                                                    {isStatusChange && details && (
+                                                        <div className="flex items-center gap-2 mt-1.5 mb-1.5">
+                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                                                                details.previousStatus === 'draft' ? 'bg-amber-500/15 text-amber-500' :
+                                                                details.previousStatus === 'review' ? 'bg-[var(--accent-primary)]/15 text-[var(--accent-primary)]' :
+                                                                'bg-emerald-500/15 text-emerald-500'
+                                                            }`}>
+                                                                {getStatusLabel(details.previousStatus)}
+                                                            </span>
+                                                            <ArrowRight size={12} weight="bold" className="text-[var(--text-secondary)]" />
+                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                                                                details.newStatus === 'draft' ? 'bg-amber-500/15 text-amber-500' :
+                                                                details.newStatus === 'review' ? 'bg-[var(--accent-primary)]/15 text-[var(--accent-primary)]' :
+                                                                'bg-emerald-500/15 text-emerald-500'
+                                                            }`}>
+                                                                {getStatusLabel(details.newStatus)}
+                                                            </span>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Generation details */}
+                                                    {log.action === 'generate_content' && details && (
+                                                        <div className="mt-1.5 mb-1.5 p-2 bg-purple-500/5 border border-purple-500/15 rounded-lg">
+                                                            {details.sectionTitle && (
+                                                                <div className="flex items-center gap-1.5 mb-1">
+                                                                    <FileText size={12} weight="light" className="text-purple-400 shrink-0" />
+                                                                    <span className="text-[11px] font-medium text-purple-400 truncate">
+                                                                        {details.sectionTitle}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                            {details.prompt && (
+                                                                <p className="text-[11px] text-[var(--text-secondary)] italic leading-relaxed line-clamp-2">
+                                                                    "{details.prompt}"
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Comment details */}
+                                                    {log.action === 'add_comment' && details?.commentText && (
+                                                        <div className="mt-1.5 mb-1.5 p-2 bg-amber-500/5 border border-amber-500/15 rounded-lg">
+                                                            <p className="text-[11px] text-[var(--text-secondary)] italic leading-relaxed line-clamp-2">
+                                                                "{details.commentText}"
+                                                            </p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* User info */}
+                                                    <div className="flex items-center gap-1.5 mt-1">
+                                                        <UserCircle size={14} weight="light" className="text-[var(--text-secondary)]" />
+                                                        <span className="text-xs text-[var(--text-secondary)]">
+                                                            {log.userName || log.userEmail}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Full timestamp on hover */}
+                                                    <div className="text-[10px] text-[var(--text-secondary)] mt-1 opacity-0 group-hover:opacity-70 transition-opacity">
+                                                        {formatAuditDateTime(log.createdAt)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Panel Footer */}
+                        <div className="px-5 py-3 border-t border-[var(--border-light)] shrink-0">
+                            <button
+                                onClick={fetchAuditTrail}
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+                            >
+                                <SpinnerGap size={14} weight="light" className={auditLoading ? 'animate-spin' : ''} />
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Keyframe animation */}
+                    <style>{`
+                        @keyframes slideInRight {
+                            from { transform: translateX(100%); }
+                            to { transform: translateX(0); }
+                        }
+                    `}</style>
+                </>
             )}
         </div>
     );
