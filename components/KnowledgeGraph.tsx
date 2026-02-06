@@ -90,14 +90,14 @@ const NODE_COLORS = {
     folder: '#F59E0B',      // Amber - Folders (if shown)
 };
 
-// Force simulation constants - tuned for very smooth, gentle animation
-const REPULSION = 200;           // Very gentle repulsion
-const LINK_ATTRACTION = 0.03;    // Gentle attraction between connected entities
-const FOLDER_ATTRACTION = 0.04;  // Attraction between entities in same folder
-const CENTER_PULL = 0.001;       // Very subtle center gravity
-const DAMPING = 0.92;            // Consistent high damping for smooth movement
-const COLLISION_STRENGTH = 0.2;  // Very soft collision response
-const MIN_SEPARATION = 80;       // Minimum distance between entity centers
+// Force simulation constants
+const REPULSION = 300;           // Push overlapping entities apart
+const LINK_ATTRACTION = 0.02;    // Pull connected entities together
+const FOLDER_ATTRACTION = 0.03;  // Pull same-folder entities together
+const CENTER_PULL = 0.0005;      // Very subtle center gravity
+const DAMPING = 0.85;            // High damping for smooth, slow movement
+const COLLISION_STRENGTH = 0.5;  // Strong collision response to prevent overlap
+const MIN_SEPARATION = 120;      // Larger minimum distance between entity centers
 
 export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     entities,
@@ -174,10 +174,13 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         });
         
         // Entities start directly at their final spiral position - no travel animation
+        // Spacing accounts for each entity's property cloud size
         entityGroups.forEach((group, i) => {
             const goldenAngle = i * 2.39996;
-            const radius = 60 + (i * 35);
-            const maxRadius = Math.min(width, height) * 0.3;
+            // More generous spacing: base + per-entity step, scaled by property count
+            const propRadius = 30 + Math.ceil((group.propCount || 0) / 8) * 15; // Space needed for properties
+            const radius = 80 + (i * 55) + propRadius; // Much wider spiral
+            const maxRadius = Math.min(width, height) * 0.42; // Use more of the viewport
             const entityX = centerX + Math.cos(goldenAngle) * Math.min(radius, maxRadius);
             const entityY = centerY + Math.sin(goldenAngle) * Math.min(radius, maxRadius);
             
@@ -210,8 +213,8 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                     const posInRing = j % propsPerRing;
                     const propsInThisRing = Math.min(propsPerRing, numProps - ringIndex * propsPerRing);
                     
-                    const orbitRadius = 20 + ringIndex * 12;
-                    const angleOffset = ringIndex * 0.3;
+                    const orbitRadius = 28 + ringIndex * 16; // More space between rings
+                    const angleOffset = ringIndex * 0.4; // More angular offset per ring
                     const propAngle = angleOffset + (posInRing / propsInThisRing) * 2 * Math.PI;
                     
                     const propColor = getPropertyColor();
@@ -320,7 +323,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         
         let frameCount = 0;
         let animating = true;
-        const maxFrames = 90; // Very short ~1.5s - just minor adjustments
+        const maxFrames = 150; // ~2.5s - enough to resolve overlaps smoothly
         
         // Build adjacency map
         const connectedEntities = new Map<string, Set<string>>();
@@ -367,7 +370,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                 maxOrbit = Math.max(maxOrbit, other.orbitRadius);
                             }
                         });
-                        entityTerritories.set(node.id, maxOrbit + 25);
+                        entityTerritories.set(node.id, maxOrbit + 40); // Generous padding around property cloud
                     }
                 });
                 
