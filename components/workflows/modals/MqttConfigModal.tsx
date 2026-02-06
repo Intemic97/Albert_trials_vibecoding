@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { NodeConfigSidePanel } from '../../NodeConfigSidePanel';
 import { X } from '@phosphor-icons/react';
-import { AlertConfigSection } from './AlertConfigSection';
+// AlertConfigSection removed - alerts are configured via dedicated Alert Agent node
 
 interface MqttConfigModalProps {
   isOpen: boolean;
@@ -74,7 +74,7 @@ export const MqttConfigModal: React.FC<MqttConfigModalProps> = ({
         mqttConnectionId: selectedConnectionId,
         mqttTopics: topicsList,
         mqttQos: qosLevel,
-        alerts: alertConfig.enabled ? alertConfig : undefined,
+        // alerts configured via dedicated Alert Agent node
       });
     }
   };
@@ -198,11 +198,6 @@ export const MqttConfigModal: React.FC<MqttConfigModalProps> = ({
           </p>
         </div>
 
-        <AlertConfigSection
-          config={alertConfig}
-          availableFields={topicsList}
-          onChange={(config) => setAlertConfig(config)}
-        />
       </div>
     </NodeConfigSidePanel>
   );
