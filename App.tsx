@@ -224,6 +224,14 @@ function AuthenticatedApp() {
     const [newPropName, setNewPropName] = useState('');
     const [newPropType, setNewPropType] = useState<PropertyType>('text');
     const [newPropRelationId, setNewPropRelationId] = useState<string>('');
+    const [newPropUnit, setNewPropUnit] = useState<string>('');
+    
+    // Records table state
+    const [recordSearch, setRecordSearch] = useState('');
+    const [recordSortKey, setRecordSortKey] = useState<string | null>(null);
+    const [recordSortDir, setRecordSortDir] = useState<'asc' | 'desc'>('asc');
+    const [recordPage, setRecordPage] = useState(0);
+    const recordsPerPage = 25;
 
     // New Entity State
     const [isCreatingEntity, setIsCreatingEntity] = useState(false);
@@ -619,6 +627,10 @@ function AuthenticatedApp() {
             fetchRelatedData();
             fetchIncomingData();
         }
+        // Reset table state when entity changes
+        setRecordSearch('');
+        setRecordSortKey(null);
+        setRecordPage(0);
     }, [activeEntityId, activeTab]);
 
     const fetchEntities = async () => {
@@ -755,6 +767,7 @@ function AuthenticatedApp() {
             type: newPropType,
             relatedEntityId: newPropType === 'relation' ? newPropRelationId : undefined,
             defaultValue: newPropType === 'number' ? 0 : '',
+            unit: newPropType === 'number' ? newPropUnit || undefined : undefined,
         };
 
         try {
@@ -772,6 +785,7 @@ function AuthenticatedApp() {
             setNewPropName('');
             setNewPropType('text');
             setNewPropRelationId('');
+            setNewPropUnit('');
             setIsAddingProp(false);
 
         } catch (error) {
@@ -1097,7 +1111,14 @@ function AuthenticatedApp() {
     };
 
     const renderCellValue = (prop: Property, value: any) => {
-        if (!value) return '-';
+        if (value === undefined || value === null || value === '') return '-';
+
+        // Number with unit
+        if (prop.type === 'number' && prop.unit) {
+            const num = Number(value);
+            const formatted = isNaN(num) ? value : num.toLocaleString(undefined, { maximumFractionDigits: 4 });
+            return <span>{formatted} <span className="text-[var(--text-tertiary)] text-xs">{prop.unit}</span></span>;
+        }
 
         if (prop.type === 'json') {
             return (
@@ -1608,6 +1629,18 @@ function AuthenticatedApp() {
                                                                     </select>
                                                                 </div>
                                                             )}
+                                                            {newPropType === 'number' && (
+                                                                <div className="w-24">
+                                                                    <label className="block text-[10px] text-[var(--text-tertiary)] mb-1">Unit</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={newPropUnit}
+                                                                        onChange={(e) => setNewPropUnit(e.target.value)}
+                                                                        placeholder="°C, bar, kg..."
+                                                                        className="w-full px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[#419CAF] focus:outline-none"
+                                                                    />
+                                                                </div>
+                                                            )}
                                                             <div className="flex gap-2">
                                                                 <button
                                                                     onClick={handleAddProperty}
@@ -1632,51 +1665,161 @@ function AuthenticatedApp() {
 
                                     {/* DATA RECORDS - Always visible */}
                                     <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] overflow-hidden">
-                                        <div className="px-4 py-3 border-b border-[var(--border-light)] flex justify-between items-center">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium text-[var(--text-primary)]">Records</span>
-                                                <span className="text-xs text-[var(--text-tertiary)]">({records.length})</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => {
-                                                        resetImportState();
-                                                        setIsImportModalOpen(true);
-                                                    }}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded text-sm font-medium transition-colors border border-[var(--border-light)]"
-                                                >
-                                                    <Download size={14} className="rotate-180" />
-                                                    Import more data
-                                                </button>
-                                                <div className="relative group/addrecord">
+                                        {/* Records toolbar: search, completeness, actions */}
+                                        <div className="px-4 py-3 border-b border-[var(--border-light)] space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-sm font-medium text-[var(--text-primary)]">Records</span>
+                                                    <span className="text-xs text-[var(--text-tertiary)]">({records.length})</span>
+                                                    {/* Data completeness badge */}
+                                                    {records.length > 0 && activeEntity.properties.length > 0 && (() => {
+                                                        const totalCells = records.length * activeEntity.properties.length;
+                                                        const filledCells = records.reduce((sum, r) => {
+                                                            return sum + activeEntity.properties.filter(p => {
+                                                                const v = r.values?.[p.id];
+                                                                return v !== undefined && v !== null && v !== '';
+                                                            }).length;
+                                                        }, 0);
+                                                        const pct = Math.round((filledCells / totalCells) * 100);
+                                                        const color = pct >= 90 ? 'text-green-600 bg-green-500/10' : pct >= 60 ? 'text-amber-600 bg-amber-500/10' : 'text-red-600 bg-red-500/10';
+                                                        return (
+                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${color}`} title={`${filledCells}/${totalCells} fields filled`}>
+                                                                {pct}% complete
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {/* Export CSV */}
+                                                    {records.length > 0 && (
+                                                        <button
+                                                            onClick={() => {
+                                                                const headers = activeEntity.properties.map(p => p.unit ? `${p.name} (${p.unit})` : p.name);
+                                                                const rows = records.map(r => 
+                                                                    activeEntity.properties.map(p => {
+                                                                        const v = r.values?.[p.id];
+                                                                        if (v === undefined || v === null) return '';
+                                                                        const str = String(v);
+                                                                        return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str.replace(/"/g, '""')}"` : str;
+                                                                    })
+                                                                );
+                                                                const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+                                                                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                                                                const link = document.createElement('a');
+                                                                link.href = URL.createObjectURL(blob);
+                                                                link.download = `${activeEntity.name.replace(/\s+/g, '_')}_records.csv`;
+                                                                link.click();
+                                                            }}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded text-xs font-medium transition-colors border border-[var(--border-light)]"
+                                                        >
+                                                            <Download size={14} />
+                                                            Export CSV
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={() => {
-                                                            setEditingRecordId(null);
-                                                            setNewRecordValues({});
-                                                            setIsAddingRecord(true);
+                                                            resetImportState();
+                                                            setIsImportModalOpen(true);
                                                         }}
-                                                        disabled={activeEntity.properties.length === 0}
-                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#419CAF] hover:bg-[#3a8a9d] text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded text-xs font-medium transition-colors border border-[var(--border-light)]"
                                                     >
-                                                        <Plus size={14} />
-                                                        Add Record
+                                                        <Download size={14} className="rotate-180" />
+                                                        Import
                                                     </button>
-                                                    {activeEntity.properties.length === 0 && (
-                                                        <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-[var(--bg-selected)] text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/addrecord:opacity-100 transition-opacity pointer-events-none z-50">
-                                                            Add properties first
-                                                        </div>
-                                                    )}
+                                                    <div className="relative group/addrecord">
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingRecordId(null);
+                                                                setNewRecordValues({});
+                                                                setIsAddingRecord(true);
+                                                            }}
+                                                            disabled={activeEntity.properties.length === 0}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#419CAF] hover:bg-[#3a8a9d] text-white rounded text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        >
+                                                            <Plus size={14} />
+                                                            Add Record
+                                                        </button>
+                                                        {activeEntity.properties.length === 0 && (
+                                                            <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-[var(--bg-selected)] text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/addrecord:opacity-100 transition-opacity pointer-events-none z-50">
+                                                                Add properties first
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
+                                            {/* Search bar */}
+                                            {records.length > 0 && (
+                                                <div className="relative">
+                                                    <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+                                                    <input
+                                                        type="text"
+                                                        value={recordSearch}
+                                                        onChange={(e) => { setRecordSearch(e.target.value); setRecordPage(0); }}
+                                                        placeholder="Search records..."
+                                                        className="w-full pl-9 pr-8 py-1.5 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)]"
+                                                    />
+                                                    {recordSearch && (
+                                                        <button onClick={() => setRecordSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">
+                                                            <X size={12} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="overflow-auto max-h-[500px] custom-scrollbar">
+                                            {/* Compute filtered, sorted, paginated records */}
+                                            {(() => {
+                                                // Filter
+                                                let displayRecords = records;
+                                                if (recordSearch.trim()) {
+                                                    const q = recordSearch.toLowerCase();
+                                                    displayRecords = records.filter(r => 
+                                                        activeEntity.properties.some(p => {
+                                                            const v = r.values?.[p.id];
+                                                            return v && String(v).toLowerCase().includes(q);
+                                                        })
+                                                    );
+                                                }
+                                                // Sort
+                                                if (recordSortKey) {
+                                                    displayRecords = [...displayRecords].sort((a, b) => {
+                                                        const va = a.values?.[recordSortKey] ?? '';
+                                                        const vb = b.values?.[recordSortKey] ?? '';
+                                                        const numA = Number(va), numB = Number(vb);
+                                                        const cmp = (!isNaN(numA) && !isNaN(numB)) ? numA - numB : String(va).localeCompare(String(vb));
+                                                        return recordSortDir === 'asc' ? cmp : -cmp;
+                                                    });
+                                                }
+                                                // Paginate
+                                                const totalFiltered = displayRecords.length;
+                                                const totalPages = Math.ceil(totalFiltered / recordsPerPage);
+                                                const paged = displayRecords.slice(recordPage * recordsPerPage, (recordPage + 1) * recordsPerPage);
+                                                
+                                                return (
+                                                    <>
                                             <table className="w-full text-left border-collapse">
                                                 <thead className="sticky top-0 z-10">
                                                     <tr className="bg-[var(--bg-tertiary)] border-b border-[var(--border-light)]">
                                                         {activeEntity.properties.map((prop, pIdx) => (
-                                                            <th key={prop.id || `th-${pIdx}`} className="px-4 py-2.5 text-[10px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider bg-[var(--bg-tertiary)]">
-                                                                {prop.name}
+                                                            <th 
+                                                                key={prop.id || `th-${pIdx}`} 
+                                                                className="px-4 py-2.5 text-[10px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider bg-[var(--bg-tertiary)] cursor-pointer hover:text-[var(--text-primary)] select-none"
+                                                                onClick={() => {
+                                                                    if (recordSortKey === prop.id) {
+                                                                        setRecordSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                                                                    } else {
+                                                                        setRecordSortKey(prop.id);
+                                                                        setRecordSortDir('asc');
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <div className="flex items-center gap-1">
+                                                                    <span>{prop.name}{prop.unit ? ` (${prop.unit})` : ''}</span>
+                                                                    {recordSortKey === prop.id && (
+                                                                        <span className="text-[var(--accent-primary)]">{recordSortDir === 'asc' ? '↑' : '↓'}</span>
+                                                                    )}
+                                                                </div>
                                                             </th>
                                                         ))}
                                                         {Object.values(incomingData).map(({ sourceEntity, sourceProperty }) => (
@@ -1688,16 +1831,18 @@ function AuthenticatedApp() {
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-[var(--border-light)]">
-                                                    {records.length === 0 ? (
+                                                    {paged.length === 0 ? (
                                                         <tr>
                                                             <td colSpan={Math.max(activeEntity.properties.length, 1) + 1 + Object.keys(incomingData).length} className="p-8 text-center text-[var(--text-tertiary)] text-sm">
-                                                                {activeEntity.properties.length === 0 
-                                                                    ? 'Add properties to define your data structure first.'
-                                                                    : 'No records yet. Click "Add Record" to create one.'}
+                                                                {records.length === 0 
+                                                                    ? (activeEntity.properties.length === 0 
+                                                                        ? 'Add properties to define your data structure first.'
+                                                                        : 'No records yet. Click "Add Record" to create one.')
+                                                                    : `No records match "${recordSearch}"`}
                                                             </td>
                                                         </tr>
                                                     ) : (
-                                                        records.map(record => (
+                                                        paged.map(record => (
                                                             <tr key={record.id} className="hover:bg-[var(--bg-tertiary)] transition-colors group">
                                                                 {activeEntity.properties.map((prop, pIdx) => (
                                                                     <td key={prop.id || `td-${pIdx}`} className="px-4 py-3 text-sm text-[var(--text-secondary)]">
@@ -1750,6 +1895,37 @@ function AuthenticatedApp() {
                                                     )}
                                                 </tbody>
                                             </table>
+                                                    {/* Pagination footer */}
+                                                    {totalPages > 1 && (
+                                                        <div className="px-4 py-2.5 border-t border-[var(--border-light)] bg-[var(--bg-tertiary)] flex items-center justify-between text-xs text-[var(--text-tertiary)]">
+                                                            <span>
+                                                                {recordPage * recordsPerPage + 1}-{Math.min((recordPage + 1) * recordsPerPage, totalFiltered)} of {totalFiltered}
+                                                                {totalFiltered !== records.length && ` (filtered from ${records.length})`}
+                                                            </span>
+                                                            <div className="flex items-center gap-1">
+                                                                <button
+                                                                    onClick={() => setRecordPage(p => Math.max(0, p - 1))}
+                                                                    disabled={recordPage === 0}
+                                                                    className="px-2 py-1 rounded hover:bg-[var(--bg-hover)] disabled:opacity-30 transition-colors"
+                                                                >
+                                                                    Previous
+                                                                </button>
+                                                                <span className="px-2 font-medium text-[var(--text-secondary)]">
+                                                                    {recordPage + 1} / {totalPages}
+                                                                </span>
+                                                                <button
+                                                                    onClick={() => setRecordPage(p => Math.min(totalPages - 1, p + 1))}
+                                                                    disabled={recordPage >= totalPages - 1}
+                                                                    className="px-2 py-1 rounded hover:bg-[var(--bg-hover)] disabled:opacity-30 transition-colors"
+                                                                >
+                                                                    Next
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    </>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                 </div>

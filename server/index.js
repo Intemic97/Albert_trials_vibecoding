@@ -1941,8 +1941,8 @@ app.post('/api/entities', authenticateToken, async (req, res) => {
         if (properties && properties.length > 0) {
             for (const prop of properties) {
                 await db.run(
-                    'INSERT INTO properties (id, entityId, name, type, defaultValue, relatedEntityId) VALUES (?, ?, ?, ?, ?, ?)',
-                    [prop.id, id, prop.name, prop.type, prop.defaultValue, prop.relatedEntityId]
+                    'INSERT INTO properties (id, entityId, name, type, defaultValue, relatedEntityId, unit) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [prop.id, id, prop.name, prop.type, prop.defaultValue, prop.relatedEntityId, prop.unit]
                 );
             }
         }
@@ -2002,11 +2002,11 @@ app.delete('/api/entities/:id', authenticateToken, async (req, res) => {
 
 // POST add property
 app.post('/api/properties', authenticateToken, async (req, res) => {
-    const { id, entityId, name, type, defaultValue, relatedEntityId } = req.body;
+    const { id, entityId, name, type, defaultValue, relatedEntityId, unit } = req.body;
     try {
         await db.run(
-            'INSERT INTO properties (id, entityId, name, type, defaultValue, relatedEntityId) VALUES (?, ?, ?, ?, ?, ?)',
-            [id, entityId, name, type, defaultValue, relatedEntityId]
+            'INSERT INTO properties (id, entityId, name, type, defaultValue, relatedEntityId, unit) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [id, entityId, name, type, defaultValue, relatedEntityId, unit]
         );
         res.status(201).json({ message: 'Property added' });
     } catch (error) {

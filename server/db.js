@@ -71,6 +71,7 @@ async function initDb() {
       type TEXT,
       defaultValue TEXT,
       relatedEntityId TEXT,
+      unit TEXT,
       FOREIGN KEY(entityId) REFERENCES entities(id) ON DELETE CASCADE
     );
 
@@ -713,6 +714,13 @@ async function initDb() {
   // Migration: Add entityType column to entities table
   try {
     await db.exec(`ALTER TABLE entities ADD COLUMN entityType TEXT DEFAULT 'generic'`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add unit column to properties table
+  try {
+    await db.exec(`ALTER TABLE properties ADD COLUMN unit TEXT`);
   } catch (e) {
     // Column already exists, ignore
   }

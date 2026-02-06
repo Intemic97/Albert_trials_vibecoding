@@ -27,6 +27,8 @@ export interface Property {
   relatedEntityId?: string;
   // A sample value for visualization
   defaultValue?: string | number;
+  // Unit for numeric properties (e.g. °C, bar, kg, m³/h, ppm)
+  unit?: string;
 }
 
 export interface Entity {
