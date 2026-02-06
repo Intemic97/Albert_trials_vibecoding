@@ -703,7 +703,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             const workflow = await res.json();
             setWorkflowName(workflow.name);
             setCurrentWorkflowId(workflow.id);
-            setNodes(workflow.data.nodes || []);
+            const loadedNodes = workflow.data.nodes || [];
+            setNodes(loadedNodes);
             setConnections(workflow.data.connections || []);
             setWorkflowTags(workflow.tags || []);
             lastLoadedWorkflowIdRef.current = workflow.id;
@@ -712,6 +713,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             // Update URL to reflect the loaded workflow
             if (updateUrl) {
                 navigate(`/workflow/${workflow.id}`, { replace: true });
+            }
+            // Auto fit-to-content after loading - small delay to ensure canvas is rendered
+            if (loadedNodes.length > 0) {
+                setTimeout(() => fitToContent(loadedNodes), 150);
             }
         } catch (error) {
             console.error('Error loading workflow:', error);
@@ -4749,6 +4754,41 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setCanvasZoom(1);
     };
 
+    // Fit all nodes into the viewport with comfortable zoom level
+    const fitToContent = useCallback((nodesList?: WorkflowNode[]) => {
+        const targetNodes = nodesList || nodes;
+        if (targetNodes.length === 0 || !canvasRef.current) return;
+        
+        const container = canvasRef.current;
+        const padding = 120;
+        
+        // Find bounding box (account for node dimensions ~320x100)
+        const minX = Math.min(...targetNodes.map(n => n.x)) - 160;
+        const maxX = Math.max(...targetNodes.map(n => n.x)) + 160;
+        const minY = Math.min(...targetNodes.map(n => n.y)) - 60;
+        const maxY = Math.max(...targetNodes.map(n => n.y)) + 60;
+        
+        const contentWidth = maxX - minX;
+        const contentHeight = maxY - minY;
+        
+        const containerWidth = container.clientWidth - padding * 2;
+        const containerHeight = container.clientHeight - padding * 2;
+        
+        const scaleX = containerWidth / contentWidth;
+        const scaleY = containerHeight / contentHeight;
+        // Cap at 0.75 (75%) so workflows don't appear too large by default
+        const newZoom = Math.max(0.25, Math.min(0.75, Math.min(scaleX, scaleY)));
+        
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        
+        const newOffsetX = container.clientWidth / 2 - centerX * newZoom;
+        const newOffsetY = container.clientHeight / 2 - centerY * newZoom;
+        
+        setCanvasZoom(newZoom);
+        setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+    }, [nodes]);
+
     // Navigate to a remote user's cursor position
     const goToUserCursor = useCallback((userId: string) => {
         if (!canvasRef.current) return;
@@ -5819,9 +5859,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 
                                 {/* Fit View */}
                                 <button
-                                    onClick={resetView}
+                                    onClick={() => fitToContent()}
                                     className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
-                                    title="Fit view to screen"
+                                    title="Fit to content"
                                 >
                                     <Maximize2 size={18} className="text-[var(--text-secondary)]" weight="light" />
                                 </button>
