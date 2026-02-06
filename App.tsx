@@ -238,6 +238,11 @@ function AuthenticatedApp() {
     // Inline editing
     const [inlineEditCell, setInlineEditCell] = useState<{ recordId: string; propId: string } | null>(null);
     const [inlineEditValue, setInlineEditValue] = useState('');
+    // Tags
+    const [editingTagsRecordId, setEditingTagsRecordId] = useState<string | null>(null);
+
+    // Predefined tag options
+    const TAG_OPTIONS = ['verified', 'estimated', 'audited', 'pending', 'flagged', 'draft'] as const;
 
     // New Entity State
     const [isCreatingEntity, setIsCreatingEntity] = useState(false);
@@ -777,6 +782,7 @@ function AuthenticatedApp() {
             relatedEntityId: newPropType === 'relation' ? newPropRelationId : undefined,
             defaultValue: newPropType === 'number' ? 0 : '',
             unit: newPropType === 'number' ? newPropUnit || undefined : undefined,
+            formula: undefined, // Can be set later via property editor
         };
 
         try {
@@ -800,6 +806,44 @@ function AuthenticatedApp() {
         } catch (error) {
             console.error('Error adding property:', error);
         }
+    };
+
+    // Toggle tag on a record
+    const toggleRecordTag = async (recordId: string, tag: string) => {
+        const record = records.find(r => r.id === recordId);
+        if (!record) return;
+        let currentTags: string[] = [];
+        try { currentTags = JSON.parse(record.tags || '[]'); } catch { currentTags = []; }
+        const newTags = currentTags.includes(tag) ? currentTags.filter((t: string) => t !== tag) : [...currentTags, tag];
+        try {
+            await fetch(`${API_BASE}/records/${recordId}/tags`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tags: newTags }),
+                credentials: 'include'
+            });
+            setRecords(prev => prev.map(r => r.id === recordId ? { ...r, tags: JSON.stringify(newTags) } : r));
+        } catch (e) { console.error('Failed to update tags:', e); }
+    };
+
+    // Evaluate formula for calculated fields
+    const evaluateFormula = (formula: string, record: any, properties: Property[]): string | number => {
+        try {
+            let expr = formula;
+            // Replace {PropertyName} with actual values
+            properties.forEach(p => {
+                const val = record.values?.[p.id];
+                const numVal = Number(val);
+                const replacement = !isNaN(numVal) ? String(numVal) : '0';
+                expr = expr.replace(new RegExp(`\\{${p.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`, 'g'), replacement);
+            });
+            // Only allow safe math operations
+            if (/^[\d\s+\-*/().]+$/.test(expr)) {
+                const result = Function('"use strict"; return (' + expr + ')')();
+                return typeof result === 'number' && isFinite(result) ? Math.round(result * 10000) / 10000 : '—';
+            }
+            return '—';
+        } catch { return '—'; }
     };
 
     // Inline edit: save single cell
@@ -1971,13 +2015,14 @@ function AuthenticatedApp() {
                                                                 {sourceEntity.name}
                                                             </th>
                                                         ))}
+                                                        <th className="px-4 py-2.5 text-[10px] font-medium text-[var(--text-tertiary)] uppercase bg-[var(--bg-tertiary)]">Tags</th>
                                                         <th className="px-4 py-2.5 text-right text-[10px] font-medium text-[var(--text-tertiary)] uppercase bg-[var(--bg-tertiary)]">Actions</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-[var(--border-light)]">
                                                     {paged.length === 0 ? (
                                                         <tr>
-                                                            <td colSpan={Math.max(activeEntity.properties.length, 1) + 1 + Object.keys(incomingData).length} className="p-8 text-center text-[var(--text-tertiary)] text-sm">
+                                                            <td colSpan={Math.max(activeEntity.properties.length, 1) + 2 + Object.keys(incomingData).length} className="p-8 text-center text-[var(--text-tertiary)] text-sm">
                                                                 {records.length === 0 
                                                                     ? (activeEntity.properties.length === 0 
                                                                         ? 'Add properties to define your data structure first.'
@@ -1990,16 +2035,21 @@ function AuthenticatedApp() {
                                                             <tr key={record.id} className="hover:bg-[var(--bg-tertiary)] transition-colors group">
                                                                 {activeEntity.properties.map((prop, pIdx) => {
                                                                     const isEditing = inlineEditCell?.recordId === record.id && inlineEditCell?.propId === prop.id;
+                                                                    const isCalculated = !!prop.formula;
+                                                                    const cellValue = isCalculated 
+                                                                        ? evaluateFormula(prop.formula!, record, activeEntity.properties)
+                                                                        : record.values[prop.id];
                                                                     return (
                                                                         <td 
                                                                             key={prop.id || `td-${pIdx}`} 
-                                                                            className="px-4 py-3 text-sm text-[var(--text-secondary)]"
+                                                                            className={`px-4 py-3 text-sm ${isCalculated ? 'text-[var(--accent-primary)] italic' : 'text-[var(--text-secondary)]'}`}
                                                                             onDoubleClick={() => {
-                                                                                if (prop.type === 'text' || prop.type === 'number') {
+                                                                                if (!isCalculated && (prop.type === 'text' || prop.type === 'number')) {
                                                                                     setInlineEditCell({ recordId: record.id, propId: prop.id });
                                                                                     setInlineEditValue(record.values[prop.id] ?? '');
                                                                                 }
                                                                             }}
+                                                                            title={isCalculated ? `Formula: ${prop.formula}` : undefined}
                                                                         >
                                                                             {isEditing ? (
                                                                                 <input
@@ -2015,7 +2065,7 @@ function AuthenticatedApp() {
                                                                                     className="w-full px-2 py-1 text-sm bg-[var(--bg-primary)] border border-[var(--accent-primary)] rounded focus:outline-none text-[var(--text-primary)]"
                                                                                 />
                                                                             ) : (
-                                                                                renderCellValue(prop, record.values[prop.id])
+                                                                                renderCellValue(prop, cellValue)
                                                                             )}
                                                                         </td>
                                                                     );
@@ -2047,6 +2097,57 @@ function AuthenticatedApp() {
                                                                         </td>
                                                                     );
                                                                 })}
+                                                                {/* Tags cell */}
+                                                                <td className="px-3 py-3">
+                                                                    <div className="flex flex-wrap gap-1 items-center">
+                                                                        {(() => {
+                                                                            let tags: string[] = [];
+                                                                            try { tags = JSON.parse(record.tags || '[]'); } catch { tags = []; }
+                                                                            return tags.map((tag: string) => {
+                                                                                const colors: Record<string, string> = {
+                                                                                    verified: 'bg-green-500/15 text-green-600',
+                                                                                    estimated: 'bg-amber-500/15 text-amber-600',
+                                                                                    audited: 'bg-blue-500/15 text-blue-600',
+                                                                                    pending: 'bg-orange-500/15 text-orange-600',
+                                                                                    flagged: 'bg-red-500/15 text-red-600',
+                                                                                    draft: 'bg-gray-500/15 text-gray-500',
+                                                                                };
+                                                                                return (
+                                                                                    <span key={tag} className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${colors[tag] || 'bg-gray-500/15 text-gray-500'}`}>
+                                                                                        {tag}
+                                                                                    </span>
+                                                                                );
+                                                                            });
+                                                                        })()}
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setEditingTagsRecordId(editingTagsRecordId === record.id ? null : record.id);
+                                                                            }}
+                                                                            className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity text-[10px]"
+                                                                        >
+                                                                            +
+                                                                        </button>
+                                                                        {editingTagsRecordId === record.id && (
+                                                                            <div className="absolute z-20 mt-1 p-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-lg flex flex-wrap gap-1">
+                                                                                {TAG_OPTIONS.map(tag => {
+                                                                                    let tags: string[] = [];
+                                                                                    try { tags = JSON.parse(record.tags || '[]'); } catch { tags = []; }
+                                                                                    const active = tags.includes(tag);
+                                                                                    return (
+                                                                                        <button
+                                                                                            key={tag}
+                                                                                            onClick={() => toggleRecordTag(record.id, tag)}
+                                                                                            className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${active ? 'bg-[var(--accent-primary)] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+                                                                                        >
+                                                                                            {tag}
+                                                                                        </button>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
                                                                 <td className="px-4 py-3 text-right">
                                                                     <button
                                                                         onClick={() => handleEditRecord(record)}

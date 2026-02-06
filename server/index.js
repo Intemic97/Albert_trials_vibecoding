@@ -2288,6 +2288,25 @@ app.put('/api/records/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// PUT /api/records/:id/tags - Update record tags
+app.put('/api/records/:id/tags', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { tags } = req.body; // Array of strings
+    try {
+        const record = await db.get(`
+            SELECT r.id FROM records r JOIN entities e ON r.entityId = e.id 
+            WHERE r.id = ? AND e.organizationId = ?
+        `, [id, req.user.orgId]);
+        if (!record) return res.status(404).json({ error: 'Record not found' });
+        
+        await db.run('UPDATE records SET tags = ? WHERE id = ?', [JSON.stringify(tags || []), id]);
+        res.json({ message: 'Tags updated' });
+    } catch (error) {
+        console.error('Error updating tags:', error);
+        res.status(500).json({ error: 'Failed to update tags' });
+    }
+});
+
 // DELETE /api/records/:id
 // DELETE /api/records/:id
 app.delete('/api/records/:id', authenticateToken, async (req, res) => {

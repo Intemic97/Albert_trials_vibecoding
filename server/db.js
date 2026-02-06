@@ -725,6 +725,20 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  // Migration: Add tags column to records table
+  try {
+    await db.exec(`ALTER TABLE records ADD COLUMN tags TEXT DEFAULT '[]'`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add formula column to properties table (for calculated fields)
+  try {
+    await db.exec(`ALTER TABLE properties ADD COLUMN formula TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   // Audit trail table for record changes
   await db.exec(`
     CREATE TABLE IF NOT EXISTS audit_log (

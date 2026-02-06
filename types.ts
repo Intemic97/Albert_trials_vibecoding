@@ -29,6 +29,8 @@ export interface Property {
   defaultValue?: string | number;
   // Unit for numeric properties (e.g. °C, bar, kg, m³/h, ppm)
   unit?: string;
+  // Formula for calculated fields (e.g. "{Temperature} * 1.8 + 32")
+  formula?: string;
 }
 
 export interface Entity {
