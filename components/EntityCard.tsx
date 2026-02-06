@@ -38,9 +38,12 @@ export const EntityCard: React.FC<EntityCardProps> = ({ entity, onClick, onDelet
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (confirm('Are you sure you want to delete this entity?')) {
-                  onDelete(entity);
-                }
+                e.preventDefault();
+                setTimeout(() => {
+                  if (window.confirm('Are you sure you want to delete this entity?')) {
+                    onDelete(entity);
+                  }
+                }, 0);
               }}
               className="text-[var(--text-tertiary)] hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-all duration-200 opacity-0 group-hover:opacity-100 flex-shrink-0 active:scale-90"
             >

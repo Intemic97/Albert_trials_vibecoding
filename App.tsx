@@ -626,9 +626,9 @@ function AuthenticatedApp() {
         try {
             const res = await fetch(`${API_BASE}/entities`, { credentials: 'include' });
             const data = await res.json();
-            // Ensure data is an array before setting
+            // Ensure data is an array and filter out any entities with null/undefined IDs
             if (Array.isArray(data)) {
-                setEntities(data);
+                setEntities(data.filter((e: any) => e && e.id));
             } else {
                 console.error('Expected array from entities API, got:', data);
                 setEntities([]);

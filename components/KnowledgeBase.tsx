@@ -956,13 +956,17 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {currentFolderItems.entities.map((entity) => (
                                                 <div
-                                                    key={entity.id}
+                                                    key={entity.id || `entity-${Math.random()}`}
                                                     draggable
-                                                    onDragStart={() => handleDragStart('entity', entity.id)}
+                                                    onDragStart={(e) => {
+                                                        handleDragStart('entity', entity.id);
+                                                    }}
                                                 >
                                                     <EntityCard
                                                         entity={entity}
-                                                        onClick={(e) => onNavigate(e.id)}
+                                                        onClick={(e) => {
+                                                            if (e.id) onNavigate(e.id);
+                                                        }}
                                                         onDelete={handleDeleteEntity}
                                                     />
                                                 </div>
