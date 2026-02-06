@@ -493,7 +493,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
         <nav className="px-3 py-2">
           {/* Overview - standalone */}
           <div className="space-y-0.5 mb-1">

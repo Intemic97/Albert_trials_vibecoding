@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { 
-    X, MagnifyingGlass, Minus, Plus, ArrowsOut, TreeStructure, Eye, CaretRight, Folder as FolderIcon, Database, Tag, ArrowLeft
+    X, MagnifyingGlass, Minus, Plus, ArrowsOut, TreeStructure, Eye, CaretRight, Folder as FolderIcon, Database, Tag, ArrowLeft, Crosshair
 } from '@phosphor-icons/react';
 import { Entity } from '../types';
+
+// Modular components
+import { GraphMinimap, GraphSearch, GraphControls, FolderCluster } from './knowledge-graph/components';
 
 interface KnowledgeGraphProps {
     entities: Entity[];
@@ -92,6 +95,15 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     
     // Animation state for smooth entrance
     const [isVisible, setIsVisible] = useState(false);
+    
+    // Search highlighting
+    const [highlightedNodeIds, setHighlightedNodeIds] = useState<string[]>([]);
+    
+    // Show minimap
+    const [showMinimap, setShowMinimap] = useState(true);
+    
+    // Show folder clusters
+    const [showFolderClusters, setShowFolderClusters] = useState(true);
     
     // Trigger entrance animation on mount
     useEffect(() => {
@@ -575,6 +587,136 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         setNodes(prev => prev.map(node => ({ ...node, fixed: false })));
     };
     
+    // Fit to content - automatically fits all nodes in view
+    const fitToContent = useCallback(() => {
+        const entityNodes = nodes.filter(n => n.type === 'entity');
+        if (entityNodes.length === 0) return;
+        
+        const width = containerRef.current?.clientWidth || 800;
+        const height = containerRef.current?.clientHeight || 600;
+        const padding = 80;
+        
+        const minX = Math.min(...entityNodes.map(n => n.x)) - 50;
+        const maxX = Math.max(...entityNodes.map(n => n.x)) + 50;
+        const minY = Math.min(...entityNodes.map(n => n.y)) - 50;
+        const maxY = Math.max(...entityNodes.map(n => n.y)) + 50;
+        
+        const contentWidth = maxX - minX;
+        const contentHeight = maxY - minY;
+        
+        const scaleX = (width - padding * 2) / contentWidth;
+        const scaleY = (height - padding * 2) / contentHeight;
+        const newZoom = Math.max(0.3, Math.min(3, Math.min(scaleX, scaleY, 1.5)));
+        
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        
+        setZoom(newZoom);
+        setOffset({
+            x: width / 2 - centerX * newZoom,
+            y: height / 2 - centerY * newZoom,
+        });
+    }, [nodes]);
+    
+    // Center on selected node
+    const centerOnSelected = useCallback(() => {
+        if (!selectedEntity) return;
+        const node = nodes.find(n => n.entityId === selectedEntity);
+        if (!node) return;
+        
+        const width = containerRef.current?.clientWidth || 800;
+        const height = containerRef.current?.clientHeight || 600;
+        
+        setOffset({
+            x: width / 2 - node.x * zoom,
+            y: height / 2 - node.y * zoom,
+        });
+    }, [selectedEntity, nodes, zoom]);
+    
+    // Auto fit when settled
+    useEffect(() => {
+        if (isSettled && nodes.length > 0) {
+            // Small delay to ensure all positions are final
+            const timer = setTimeout(fitToContent, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [isSettled, fitToContent]);
+    
+    // Search function for GraphSearch component
+    const handleSearch = useCallback((query: string) => {
+        if (!query.trim()) return [];
+        const q = query.toLowerCase();
+        
+        interface SearchResult {
+            id: string;
+            name: string;
+            type: 'entity' | 'property';
+            parentName?: string;
+        }
+        
+        const results: SearchResult[] = [];
+        
+        nodes.forEach(node => {
+            if (node.label.toLowerCase().includes(q)) {
+                if (node.type === 'entity') {
+                    results.push({
+                        id: node.id,
+                        name: node.label,
+                        type: 'entity',
+                    });
+                } else {
+                    // Find parent entity name
+                    const parent = nodes.find(n => n.id === node.parentId);
+                    results.push({
+                        id: node.id,
+                        name: node.label,
+                        type: 'property',
+                        parentName: parent?.label,
+                    });
+                }
+            }
+        });
+        
+        return results;
+    }, [nodes]);
+    
+    // Handle search result selection - center on node
+    const handleSearchResultSelect = useCallback((nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (!node) return;
+        
+        const width = containerRef.current?.clientWidth || 800;
+        const height = containerRef.current?.clientHeight || 600;
+        
+        // Center on node
+        setOffset({
+            x: width / 2 - node.x * zoom,
+            y: height / 2 - node.y * zoom,
+        });
+        
+        // Select the node
+        setSelectedNode(node);
+        if (node.entityId) {
+            setSelectedEntity(node.entityId);
+        } else if (node.parentId) {
+            const parent = nodes.find(n => n.id === node.parentId);
+            if (parent?.entityId) {
+                setSelectedEntity(parent.entityId);
+            }
+        }
+        
+        // Highlight just this node
+        setHighlightedNodeIds([nodeId]);
+        
+        // Clear highlight after delay
+        setTimeout(() => setHighlightedNodeIds([]), 3000);
+    }, [nodes, zoom]);
+    
+    // Handle minimap viewport change
+    const handleMinimapViewportChange = useCallback((newOffsetX: number, newOffsetY: number) => {
+        setOffset({ x: newOffsetX, y: newOffsetY });
+    }, []);
+    
     // Get connected nodes for highlighting
     const connectedNodes = useMemo(() => {
         if (!hoveredNode && !selectedEntity) return new Set<string>();
@@ -664,17 +806,36 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                 </div>
                 
                 <div className="flex items-center gap-3">
-                    {/* Search */}
-                    <div className="relative">
-                        <MagnifyingGlass size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search..."
-                            className="w-36 pl-7 pr-2 py-1 text-[11px] bg-white/5 border border-white/10 rounded text-white/80 placeholder-white/30 focus:outline-none focus:border-white/20"
-                        />
-                    </div>
+                    {/* Enhanced Search */}
+                    <GraphSearch
+                        onSearch={handleSearch}
+                        onResultSelect={handleSearchResultSelect}
+                        onHighlight={setHighlightedNodeIds}
+                    />
+                    
+                    {/* Toggle folders */}
+                    <button
+                        onClick={() => setShowFolderClusters(!showFolderClusters)}
+                        className={`px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
+                            showFolderClusters 
+                                ? 'bg-amber-500/20 text-amber-400' 
+                                : 'bg-white/5 text-white/40 hover:bg-white/10'
+                        }`}
+                    >
+                        Folders
+                    </button>
+                    
+                    {/* Toggle minimap */}
+                    <button
+                        onClick={() => setShowMinimap(!showMinimap)}
+                        className={`px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
+                            showMinimap 
+                                ? 'bg-[#419CAF]/20 text-[#419CAF]' 
+                                : 'bg-white/5 text-white/40 hover:bg-white/10'
+                        }`}
+                    >
+                        Minimap
+                    </button>
                     
                     {/* Toggle properties */}
                     <button
@@ -715,6 +876,34 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                         {/* Clean background - no grid for cleaner look */}
                         
                         <g transform={`translate(${offset.x}, ${offset.y}) scale(${zoom})`}>
+                            {/* Folder clusters - background groupings */}
+                            {showFolderClusters && folders.map(folder => {
+                                // Check if folder has entities that are in the current view
+                                const hasEntities = folder.entityIds?.some(entityId => 
+                                    entities.some(e => e.id === entityId)
+                                );
+                                if (!hasEntities) return null;
+                                
+                                const isHighlighted = selectedEntityData && 
+                                    folder.entityIds?.includes(selectedEntityData.id);
+                                
+                                return (
+                                    <FolderCluster
+                                        key={folder.id}
+                                        folder={folder}
+                                        nodes={nodes.map(n => ({
+                                            id: n.id,
+                                            x: n.x,
+                                            y: n.y,
+                                            radius: n.radius,
+                                            type: n.type,
+                                            entityId: n.entityId,
+                                        }))}
+                                        isHighlighted={isHighlighted || false}
+                                    />
+                                );
+                            })}
+                            
                             {/* Edges - subtle lines */}
                             {edges.map(edge => {
                                 const source = nodes.find(n => n.id === edge.source);
@@ -745,9 +934,10 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                 const isSelected = selectedEntity === node.entityId;
                                 const isConnected = connectedNodes.has(node.id);
                                 const isVisible = filteredNodeIds.has(node.id);
+                                const isHighlighted = highlightedNodeIds.includes(node.id);
                                 
-                                const opacity = isVisible ? (isConnected || (!hoveredNode && !selectedEntity) ? 1 : 0.4) : 0.1;
-                                const scale = isHovered ? 1.5 : (isSelected ? 1.3 : (isConnected ? 1.1 : 1));
+                                const opacity = isVisible ? (isConnected || isHighlighted || (!hoveredNode && !selectedEntity) ? 1 : 0.4) : 0.1;
+                                const scale = isHighlighted ? 1.6 : (isHovered ? 1.5 : (isSelected ? 1.3 : (isConnected ? 1.1 : 1)));
                                 
                                 // Radius based on type
                                 const baseRadius = node.type === 'entity' ? 8 : 3;
@@ -789,6 +979,27 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                                 strokeWidth={1}
                                                 strokeOpacity={0.4}
                                             />
+                                        )}
+                                        
+                                        {/* Pulsing highlight for search results */}
+                                        {isHighlighted && (
+                                            <>
+                                                <circle
+                                                    r={baseRadius * scale + 10}
+                                                    fill="none"
+                                                    stroke={node.color}
+                                                    strokeWidth={2}
+                                                    strokeOpacity={0.6}
+                                                    className="animate-ping"
+                                                />
+                                                <circle
+                                                    r={baseRadius * scale + 5}
+                                                    fill="none"
+                                                    stroke={node.color}
+                                                    strokeWidth={2}
+                                                    strokeOpacity={0.8}
+                                                />
+                                            </>
                                         )}
                                         
                                         {/* Label - show on hover or for entities */}
@@ -860,23 +1071,53 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                     
                     {/* Zoom controls */}
                     <div className="absolute bottom-4 left-4 flex items-center gap-0.5 bg-black/40 backdrop-blur-sm rounded p-0.5">
-                        <button onClick={zoomOut} className="p-1.5 hover:bg-white/10 rounded transition-colors">
+                        <button onClick={zoomOut} className="p-1.5 hover:bg-white/10 rounded transition-colors" title="Alejar">
                             <Minus size={12} className="text-white/60" />
                         </button>
                         <span className="px-2 text-[10px] text-white/50 min-w-[40px] text-center">
                             {Math.round(zoom * 100)}%
                         </span>
-                        <button onClick={zoomIn} className="p-1.5 hover:bg-white/10 rounded transition-colors">
+                        <button onClick={zoomIn} className="p-1.5 hover:bg-white/10 rounded transition-colors" title="Acercar">
                             <Plus size={12} className="text-white/60" />
                         </button>
                         <div className="w-px h-3 bg-white/10 mx-0.5" />
-                        <button onClick={resetView} className="p-1.5 hover:bg-white/10 rounded transition-colors">
+                        <button onClick={fitToContent} className="p-1.5 hover:bg-white/10 rounded transition-colors" title="Ajustar a contenido">
+                            <ArrowsOut size={12} className="text-white/60" />
+                        </button>
+                        {selectedEntity && (
+                            <button onClick={centerOnSelected} className="p-1.5 hover:bg-white/10 rounded transition-colors" title="Centrar en selección">
+                                <Crosshair size={12} className="text-white/60" />
+                            </button>
+                        )}
+                        <div className="w-px h-3 bg-white/10 mx-0.5" />
+                        <button onClick={resetView} className="p-1.5 hover:bg-white/10 rounded transition-colors" title="Reiniciar vista">
                             <ArrowsOut size={12} className="text-white/60" />
                         </button>
                     </div>
                     
+                    {/* Minimap */}
+                    {showMinimap && nodes.length > 0 && (
+                        <GraphMinimap
+                            nodes={nodes.map(n => ({
+                                id: n.id,
+                                x: n.x,
+                                y: n.y,
+                                vx: n.vx,
+                                vy: n.vy,
+                                radius: n.radius,
+                                type: n.type,
+                            }))}
+                            viewportWidth={containerRef.current?.clientWidth || 800}
+                            viewportHeight={containerRef.current?.clientHeight || 600}
+                            zoom={zoom}
+                            offsetX={offset.x}
+                            offsetY={offset.y}
+                            onViewportChange={handleMinimapViewportChange}
+                        />
+                    )}
+                    
                     {/* Legend */}
-                    <div className="absolute bottom-4 right-4 flex items-center gap-4 px-3 py-2 bg-black/40 backdrop-blur-sm rounded text-[10px] text-white/60">
+                    <div className="absolute bottom-4 right-4 flex items-center gap-4 px-3 py-2 bg-black/40 backdrop-blur-sm rounded text-[10px] text-white/60" style={{ marginBottom: showMinimap ? '140px' : '0' }}>
                         <div className="flex items-center gap-1.5">
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: NODE_COLORS.entity }} />
                             <span>Entity</span>

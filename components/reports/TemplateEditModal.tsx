@@ -232,7 +232,7 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Monthly Report, Analysis Template..."
-                className="w-full px-3 py-2.5 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                className="w-full px-3 py-2.5 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)]/30 focus:border-[var(--accent-primary)] outline-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
               />
             </div>
             <div>
@@ -244,7 +244,7 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
                     onClick={() => setIcon(value)}
                     className={`p-2.5 rounded-lg border-2 transition-all ${
                       icon === value
-                        ? 'border-teal-500 bg-teal-500/10 text-teal-500'
+                        ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]'
                         : 'border-[var(--border-light)] hover:border-[var(--border-medium)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-tertiary)]'
                     }`}
                     title={label}
@@ -263,7 +263,7 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Brief description of what this template is for..."
               rows={2}
-              className="w-full px-3 py-2.5 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none"
+                className="w-full px-3 py-2.5 border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)]/30 focus:border-[var(--accent-primary)] outline-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none"
             />
           </div>
 
@@ -274,7 +274,7 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
                 <label className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Sections</label>
                 <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Define the structure of your template</p>
               </div>
-              <button onClick={addSection} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-teal-500 hover:text-teal-400 hover:bg-teal-500/10 rounded-lg font-medium transition-colors">
+              <button onClick={addSection} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] hover:bg-[var(--accent-primary)]/10 rounded-lg font-medium transition-colors">
                 <Plus size={16} weight="bold" />
                 Add Section
               </button>
@@ -294,9 +294,9 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
                       value={section.title}
                       onChange={(e) => updateSection(sIdx, { title: e.target.value })}
                       placeholder="Section title..."
-                      className="flex-1 px-3 py-1.5 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                      className="flex-1 px-3 py-1.5 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)]/30 focus:border-[var(--accent-primary)] outline-none text-sm bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                     />
-                    <button onClick={() => addItem(sIdx)} className="p-1.5 text-teal-500 hover:bg-teal-500/10 rounded-lg transition-colors" title="Add item">
+                    <button onClick={() => addItem(sIdx)} className="p-1.5 text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 rounded-lg transition-colors" title="Add item">
                       <Plus size={16} weight="bold" />
                     </button>
                     <button onClick={() => removeSection(sIdx)} className="p-1.5 text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors" title="Remove section">
@@ -315,7 +315,7 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
                             value={section.content || ''}
                             onChange={(e) => updateSection(sIdx, { content: e.target.value })}
                             placeholder="What should this section contain..."
-                            className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm resize-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                            className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)]/30 focus:border-[var(--accent-primary)] outline-none text-sm resize-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                             rows={3}
                           />
                         </div>
@@ -327,7 +327,7 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
                             value={section.generationRules || ''}
                             onChange={(e) => updateSection(sIdx, { generationRules: e.target.value })}
                             placeholder="Special instructions for AI..."
-                            className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm resize-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                            className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)]/30 focus:border-[var(--accent-primary)] outline-none text-sm resize-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                             rows={3}
                           />
                         </div>
@@ -352,7 +352,7 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
                                         value={item.title}
                                         onChange={(e) => updateItem(sIdx, iIdx, { title: e.target.value })}
                                         placeholder="Item title..."
-                                        className="flex-1 px-3 py-1.5 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                                        className="flex-1 px-3 py-1.5 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)]/30 focus:border-[var(--accent-primary)] outline-none text-sm bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                                       />
                                       <button onClick={() => removeItem(sIdx, iIdx)} className="p-1.5 text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg shrink-0 transition-colors" title="Remove item">
                                         <Trash size={14} weight="light" />
@@ -364,14 +364,14 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
                                         onChange={(e) => updateItem(sIdx, iIdx, { content: e.target.value })}
                                         placeholder="Item content..."
                                         rows={2}
-                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-xs resize-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)]/30 focus:border-[var(--accent-primary)] outline-none text-xs resize-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                                       />
                                       <textarea
                                         value={item.generationRules}
                                         onChange={(e) => updateItem(sIdx, iIdx, { generationRules: e.target.value })}
                                         placeholder="AI rules (optional)..."
                                         rows={2}
-                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-xs resize-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                                        className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)]/30 focus:border-[var(--accent-primary)] outline-none text-xs resize-none bg-[var(--bg-input)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                                       />
                                     </div>
                                   </div>
@@ -382,7 +382,7 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
                         ) : (
                           <div className="text-center py-6 border-2 border-dashed border-[var(--border-light)] rounded-lg bg-[var(--bg-tertiary)]/50">
                             <p className="text-sm text-[var(--text-tertiary)]">No items in this section</p>
-                            <button onClick={() => addItem(sIdx)} className="mt-2 text-sm text-teal-500 hover:text-teal-400 font-medium">
+                            <button onClick={() => addItem(sIdx)} className="mt-2 text-sm text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] font-medium">
                               + Add item
                             </button>
                           </div>
@@ -408,7 +408,7 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
             <button
               onClick={handleSubmit}
               disabled={isSaving || !name.trim()}
-              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSaving ? <SpinnerGap size={16} weight="light" className="animate-spin" /> : <FloppyDisk size={16} weight="light" />}
               Save Changes
