@@ -185,7 +185,10 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
             const entityY = centerY + Math.sin(goldenAngle) * Math.min(radius, maxRadius);
             
             const folderName = entityFolderNameMap.get(group.entity.id);
-            const category = detectEntityCategory(group.entity.name, folderName);
+            // Use real entityType if available, fallback to name-based detection
+            const category: EntityCategory = (group.entity as any).entityType && (group.entity as any).entityType !== 'generic'
+                ? (group.entity as any).entityType as EntityCategory
+                : detectEntityCategory(group.entity.name, folderName);
             const categoryColor = ENTITY_CATEGORY_CONFIG[category].color;
             
             newNodes.push({

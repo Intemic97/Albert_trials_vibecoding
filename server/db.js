@@ -60,6 +60,7 @@ async function initDb() {
       description TEXT,
       author TEXT,
       lastEdited TEXT,
+      entityType TEXT DEFAULT 'generic',
       FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
     );
 
@@ -705,6 +706,13 @@ async function initDb() {
   }
   try {
     await db.exec(`ALTER TABLE organizations ADD COLUMN logo TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add entityType column to entities table
+  try {
+    await db.exec(`ALTER TABLE entities ADD COLUMN entityType TEXT DEFAULT 'generic'`);
   } catch (e) {
     // Column already exists, ignore
   }

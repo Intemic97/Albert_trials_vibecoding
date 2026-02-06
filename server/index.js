@@ -1930,12 +1930,12 @@ app.get('/api/entities', authenticateToken, async (req, res) => {
 
 // POST create entity
 app.post('/api/entities', authenticateToken, async (req, res) => {
-    const { id, name, description, author, lastEdited, properties } = req.body;
+    const { id, name, description, author, lastEdited, properties, entityType } = req.body;
 
     try {
         await db.run(
-            'INSERT INTO entities (id, organizationId, name, description, author, lastEdited) VALUES (?, ?, ?, ?, ?, ?)',
-            [id, req.user.orgId, name, description, author, lastEdited]
+            'INSERT INTO entities (id, organizationId, name, description, author, lastEdited, entityType) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [id, req.user.orgId, name, description, author, lastEdited, entityType || 'generic']
         );
 
         if (properties && properties.length > 0) {

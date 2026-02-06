@@ -1,6 +1,6 @@
 import React from 'react';
 import { Trash, Database, User, Calendar, Hash, CaretRight } from '@phosphor-icons/react';
-import { Entity } from '../types';
+import { Entity, ENTITY_TYPE_OPTIONS } from '../types';
 
 interface EntityCardProps {
   entity: Entity;
@@ -14,16 +14,24 @@ export const EntityCard: React.FC<EntityCardProps> = ({ entity, onClick, onDelet
       onClick={() => onClick(entity)}
       className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 cursor-pointer group relative flex flex-col justify-between min-h-[200px] overflow-hidden transition-all duration-300 ease-out hover:shadow-md hover:border-[var(--border-medium)] hover:scale-[1.01] active:scale-[0.99]"
     >
-      <div className="flex-1">
+        <div className="flex-1">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--bg-hover)] transition-all duration-300">
-              <Database size={18} weight="light" className="text-[var(--text-secondary)]" />
+            <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--bg-hover)] transition-all duration-300 text-lg">
+              {entity.entityType && entity.entityType !== 'generic'
+                ? (ENTITY_TYPE_OPTIONS.find(o => o.value === entity.entityType)?.icon || '📋')
+                : <Database size={18} weight="light" className="text-[var(--text-secondary)]" />
+              }
             </div>
             <div className="min-w-0 flex-1">
               <h3 className="text-base font-normal text-[var(--text-primary)] transition-colors truncate" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                 {entity.name}
               </h3>
+              {entity.entityType && entity.entityType !== 'generic' && (
+                <span className="text-[10px] text-[var(--text-tertiary)] font-medium">
+                  {ENTITY_TYPE_OPTIONS.find(o => o.value === entity.entityType)?.label}
+                </span>
+              )}
             </div>
           </div>
           {onDelete && (
