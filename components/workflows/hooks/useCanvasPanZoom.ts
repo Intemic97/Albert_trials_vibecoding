@@ -190,13 +190,13 @@ export const useCanvasPanZoom = (options: UseCanvasPanZoomOptions = {}): UseCanv
     if (nodes.length === 0 || !containerRef.current) return;
     
     const container = containerRef.current;
-    const padding = 100;
+    const padding = 120; // More generous padding
     
-    // Find bounding box
-    const minX = Math.min(...nodes.map(n => n.x)) - 200;
-    const maxX = Math.max(...nodes.map(n => n.x)) + 200;
-    const minY = Math.min(...nodes.map(n => n.y)) - 100;
-    const maxY = Math.max(...nodes.map(n => n.y)) + 100;
+    // Find bounding box (account for node dimensions ~200x80)
+    const minX = Math.min(...nodes.map(n => n.x)) - 100;
+    const maxX = Math.max(...nodes.map(n => n.x)) + 300; // Node width ~200px + margin
+    const minY = Math.min(...nodes.map(n => n.y)) - 50;
+    const maxY = Math.max(...nodes.map(n => n.y)) + 130; // Node height ~80px + margin
     
     const contentWidth = maxX - minX;
     const contentHeight = maxY - minY;
@@ -206,7 +206,9 @@ export const useCanvasPanZoom = (options: UseCanvasPanZoomOptions = {}): UseCanv
     
     const scaleX = containerWidth / contentWidth;
     const scaleY = containerHeight / contentHeight;
-    const newScale = Math.max(minScale, Math.min(maxScale, Math.min(scaleX, scaleY, 1)));
+    // Cap at 0.75 (75%) so workflows don't appear too large by default
+    // This gives users a comfortable overview with room to zoom in
+    const newScale = Math.max(minScale, Math.min(0.75, Math.min(scaleX, scaleY)));
     
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;

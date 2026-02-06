@@ -273,6 +273,28 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   }, [screenToCanvas, addNode, selectNode]);
   
   // =========================================================================
+  // AUTO FIT: Fit to content when workflow loads with nodes
+  // =========================================================================
+  const hasFittedRef = useRef(false);
+  
+  useEffect(() => {
+    // Only fit once when nodes first appear
+    if (nodes.length > 0 && !hasFittedRef.current && canvasRef.current) {
+      // Small delay to ensure canvas is fully rendered
+      const timer = setTimeout(() => {
+        fitToContent(nodes, canvasRef);
+        hasFittedRef.current = true;
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+    
+    // Reset flag when workflow is cleared (new workflow)
+    if (nodes.length === 0) {
+      hasFittedRef.current = false;
+    }
+  }, [nodes, fitToContent]);
+  
+  // =========================================================================
   // KEYBOARD SHORTCUTS
   // =========================================================================
   useEffect(() => {

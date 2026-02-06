@@ -29,7 +29,10 @@ import {
   DiscordLogo,
   MicrosoftTeamsLogo,
   TelegramLogo,
-  GoogleLogo
+  GoogleLogo,
+  Factory,
+  Cpu,
+  WifiHigh
 } from '@phosphor-icons/react';
 import { DraggableItem, NodeType } from './types';
 
@@ -54,6 +57,11 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   { type: 'esios', label: 'Energy Prices', icon: Lightning, description: 'Fetch prices from Red Eléctrica', category: 'Data' },
   { type: 'climatiq', label: 'Emission Factors', icon: Leaf, description: 'Search CO2 emission factors', category: 'Data' },
   { type: 'manualInput', label: 'Manual Data Input', icon: PencilSimple, description: 'Define a variable with a value', category: 'Data' },
+  
+  // OT / Industrial Data Sources
+  { type: 'opcua', label: 'OPC UA Input', icon: Factory, description: 'Read data from PLCs and SCADA via OPC UA', category: 'Data' },
+  { type: 'mqtt', label: 'MQTT Subscriber', icon: WifiHigh, description: 'Subscribe to MQTT topics for IoT sensor data', category: 'Data' },
+  { type: 'modbus', label: 'Modbus Input', icon: Cpu, description: 'Read data from Modbus devices (PLCs, sensors)', category: 'Data' },
   
   // Logic
   { type: 'condition', label: 'If / Else', icon: WarningCircle, description: 'Branch based on conditions', category: 'Logic' },
@@ -125,8 +133,9 @@ export const NODE_ICONS: Record<NodeType, React.ElementType> = {
   dataVisualization: ChartBar,
   webhook: Globe,
   sapFetch: Database,
-  opcua: Database,
-  mqtt: Database,
+  opcua: Factory,
+  mqtt: WifiHigh,
+  modbus: Cpu,
   agent: Robot,
   limsFetch: Flask,
   statisticalAnalysis: TrendUp,

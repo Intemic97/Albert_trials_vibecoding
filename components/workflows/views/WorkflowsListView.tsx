@@ -243,17 +243,19 @@ export const WorkflowsListView: React.FC<WorkflowsListViewProps> = ({
                         </div>
                     ))}
 
-                    {/* Create New Card */}
-                    <div
-                        data-tutorial="create-workflow"
-                        onClick={onCreateNew}
-                        className="border border-dashed border-[var(--border-medium)] rounded-lg flex flex-col items-center justify-center min-h-[200px] text-[var(--text-tertiary)] cursor-pointer group hover:border-[#256A65] hover:text-[#256A65] transition-colors"
-                    >
-                        <div className="p-4 bg-[var(--bg-tertiary)] rounded-full mb-3 group-hover:bg-[#256A65]/10 transition-colors">
-                            <FlowArrow size={24} weight="light" />
+                    {/* Create New Card - Only show when no workflows exist (onboarding) */}
+                    {workflows.length === 0 && (
+                        <div
+                            data-tutorial="create-workflow"
+                            onClick={onCreateNew}
+                            className="border border-dashed border-[var(--border-medium)] rounded-lg flex flex-col items-center justify-center min-h-[200px] text-[var(--text-tertiary)] cursor-pointer group hover:border-[#256A65] hover:text-[#256A65] transition-colors"
+                        >
+                            <div className="p-4 bg-[var(--bg-tertiary)] rounded-full mb-3 group-hover:bg-[#256A65]/10 transition-colors">
+                                <FlowArrow size={24} weight="light" />
+                            </div>
+                            <span className="font-medium">Create new workflow</span>
                         </div>
-                        <span className="font-medium">Create new workflow</span>
-                    </div>
+                    )}
 
                     {filteredWorkflows.length === 0 && searchQuery !== '' && (
                         <div className="col-span-full text-center py-12 text-[var(--text-secondary)]">
