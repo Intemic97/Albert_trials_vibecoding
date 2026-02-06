@@ -152,22 +152,16 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     // All properties use the same gray color
     const getPropertyColor = (): string => NODE_COLORS.property;
     
-    // Initialize graph with sphere-like layout
+    // Initialize graph - ALL nodes start at center for smooth bloom animation
     useEffect(() => {
         const width = containerRef.current?.clientWidth || 800;
         const height = containerRef.current?.clientHeight || 600;
         const centerX = width / 2;
         const centerY = height / 2;
-        const baseRadius = Math.min(width, height) * 0.35;
         
         const newNodes: GraphNode[] = [];
         const newEdges: GraphEdge[] = [];
         
-        // Calculate total properties for layout
-        let totalProps = 0;
-        entities.forEach(e => totalProps += (e.properties?.length || 0));
-        
-        // Create entity nodes in concentric circles based on number of properties
         const entityGroups: { entity: Entity; propCount: number }[] = entities.map(e => ({
             entity: e,
             propCount: e.properties?.length || 0
@@ -179,14 +173,14 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
             folder.entityIds?.forEach(eid => entityFolderNameMap.set(eid, folder.name));
         });
         
-        // Start entities in a natural spiral - already somewhat spaced
+        // ALL entities start at center with tiny random jitter
+        // The physics will smoothly expand them outward (bloom effect)
         entityGroups.forEach((group, i) => {
-            const goldenAngle = i * 2.39996; // Golden angle for organic distribution
-            // Start with moderate spacing - animation will fine-tune positions gently
-            const initialRadius = 60 + (i * 40); // More spaced initial placement
-            const maxRadius = baseRadius * 0.8;
-            const entityX = centerX + Math.cos(goldenAngle) * Math.min(initialRadius, maxRadius);
-            const entityY = centerY + Math.sin(goldenAngle) * Math.min(initialRadius, maxRadius);
+            // Tiny jitter (2-5px) so forces have a direction to push
+            const jitterAngle = (i / entityGroups.length) * 2 * Math.PI;
+            const jitter = 3 + Math.random() * 3;
+            const entityX = centerX + Math.cos(jitterAngle) * jitter;
+            const entityY = centerY + Math.sin(jitterAngle) * jitter;
             
             const folderName = entityFolderNameMap.get(group.entity.id);
             const category = detectEntityCategory(group.entity.name, folderName);
@@ -206,33 +200,31 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                 category,
             });
             
-            // Create property nodes in orbital rings around entity
+            // Properties start ON TOP of their parent entity (at center too)
             if (showProperties && group.entity.properties) {
                 const props = group.entity.properties;
                 const numProps = props.length;
-                
-                // Multiple orbital rings if many properties
                 const propsPerRing = 8;
-                const numRings = Math.ceil(numProps / propsPerRing);
                 
                 props.forEach((prop, j) => {
                     const ringIndex = Math.floor(j / propsPerRing);
                     const posInRing = j % propsPerRing;
                     const propsInThisRing = Math.min(propsPerRing, numProps - ringIndex * propsPerRing);
                     
-                    const orbitRadius = 20 + ringIndex * 12; // Closer to entity
-                    const angleOffset = ringIndex * 0.3; // Offset each ring
+                    const orbitRadius = 20 + ringIndex * 12;
+                    const angleOffset = ringIndex * 0.3;
                     const propAngle = angleOffset + (posInRing / propsInThisRing) * 2 * Math.PI;
                     
                     const propColor = getPropertyColor();
                     
+                    // Start at parent position - will orbit outward smoothly
                     const propNode: GraphNode = {
                         id: `prop-${group.entity.id}-${prop.name}`,
                         type: 'property',
                         label: prop.name,
                         color: propColor,
-                        x: entityX + Math.cos(propAngle) * orbitRadius,
-                        y: entityY + Math.sin(propAngle) * orbitRadius,
+                        x: entityX,
+                        y: entityY,
                         vx: 0,
                         vy: 0,
                         radius: 3,
@@ -320,9 +312,9 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         setIsSettled(false); // Reset to allow new settling
     }, [entities, showProperties]);
     
-    // Fluid physics simulation with link-based clustering
+    // Smooth bloom physics - nodes expand from center outward
     useEffect(() => {
-        if (nodes.length === 0 || edges.length === 0) return;
+        if (nodes.length === 0) return;
         if (isSettled) return;
         
         const width = containerRef.current?.clientWidth || 800;
@@ -332,12 +324,11 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         
         let frameCount = 0;
         let animating = true;
-        const maxFrames = 300; // More frames for very smooth animation
+        const maxFrames = 400; // Longer animation for smoother bloom
         
         // Build adjacency map for connected entities
         const connectedEntities = new Map<string, Set<string>>();
         edges.forEach(edge => {
-            // Only consider entity-to-entity connections (relations)
             if (edge.source.startsWith('entity-') && edge.target.startsWith('entity-')) {
                 if (!connectedEntities.has(edge.source)) connectedEntities.set(edge.source, new Set());
                 if (!connectedEntities.has(edge.target)) connectedEntities.set(edge.target, new Set());
@@ -360,10 +351,14 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                 return;
             }
             
-            // Very gentle easing - starts extremely slow
-            const progress = frameCount / maxFrames;
-            // Cubic ease-out for very gentle start
-            const forceMultiplier = Math.min(1, progress * progress * 3);
+            // Smooth S-curve easing for bloom: slow start, smooth middle, gentle stop
+            const t = frameCount / maxFrames;
+            // Smooth S-curve: 3t² - 2t³ (Hermite interpolation)
+            const ease = t * t * (3 - 2 * t);
+            // Force starts very low, builds smoothly, then fades
+            const forceMultiplier = ease;
+            // Property orbit lerp factor: starts at 0, reaches 1
+            const orbitLerp = Math.min(1, t * 2.5); // Properties reach target at ~40% of animation
             
             setNodes(prev => {
                 const updated = prev.map(node => ({ ...node }));
@@ -376,7 +371,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                     }
                 });
                 
-                // Calculate territories (space needed by each entity including its properties)
+                // Calculate territories
                 const entityTerritories = new Map<string, number>();
                 updated.forEach(node => {
                     if (node.type === 'entity') {
@@ -397,8 +392,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                     let fx = 0, fy = 0;
                     const nodeTerritory = entityTerritories.get(node.id) || MIN_SEPARATION / 2;
                     const connections = connectedEntities.get(node.id);
-                    
-                    // Get this node's folder
                     const nodeFolder = entityFolderMap.get(node.id);
                     
                     updated.forEach((other, j) => {
@@ -407,70 +400,74 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                         const otherTerritory = entityTerritories.get(other.id) || MIN_SEPARATION / 2;
                         const dx = node.x - other.x;
                         const dy = node.y - other.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                        const dist = Math.sqrt(dx * dx + dy * dy) || 0.5;
                         
                         const isConnected = connections?.has(other.id);
                         const otherFolder = entityFolderMap.get(other.id);
                         const sameFolder = nodeFolder && otherFolder && nodeFolder === otherFolder;
                         
-                        if (isConnected) {
-                            // ATTRACTION: Gently pull connected entities together
-                            const idealDist = nodeTerritory + otherTerritory + 30;
-                            if (dist > idealDist) {
-                                const pullStrength = (dist - idealDist) * LINK_ATTRACTION * forceMultiplier;
-                                fx -= (dx / dist) * pullStrength;
-                                fy -= (dy / dist) * pullStrength;
-                            }
-                        }
-                        
-                        // FOLDER ATTRACTION: Pull entities in same folder closer together
-                        if (sameFolder && !isConnected) {
-                            const idealFolderDist = nodeTerritory + otherTerritory + 50;
-                            if (dist > idealFolderDist) {
-                                const pullStrength = (dist - idealFolderDist) * FOLDER_ATTRACTION * forceMultiplier;
-                                fx -= (dx / dist) * pullStrength;
-                                fy -= (dy / dist) * pullStrength;
-                            }
-                        }
-                        
-                        // REPULSION: Very gentle push when too close
+                        // REPULSION: Always push apart (this is what creates the bloom)
+                        // Stronger at the start when nodes are packed together
                         const minDist = nodeTerritory + otherTerritory;
                         if (dist < minDist) {
                             const overlap = minDist - dist;
-                            const pushStrength = overlap * COLLISION_STRENGTH * forceMultiplier;
+                            // Stronger collision response for smooth separation
+                            const pushStrength = overlap * 0.4 * forceMultiplier;
                             fx += (dx / dist) * pushStrength;
                             fy += (dy / dist) * pushStrength;
-                        } else if (!isConnected && !sameFolder && dist < minDist * 1.5) {
-                            // Very gentle repulsion for unconnected entities not in same folder
-                            const gentlePush = REPULSION * forceMultiplier / (dist * dist + 500);
+                        } else if (!isConnected && !sameFolder) {
+                            // General repulsion for unrelated nodes
+                            const gentlePush = REPULSION * forceMultiplier / (dist * dist + 300);
                             fx += (dx / dist) * gentlePush;
                             fy += (dy / dist) * gentlePush;
                         }
+                        
+                        // ATTRACTION: Only kicks in after nodes have expanded enough (t > 0.2)
+                        if (t > 0.2) {
+                            const attractionPhase = Math.min(1, (t - 0.2) / 0.5);
+                            
+                            if (isConnected) {
+                                const idealDist = nodeTerritory + otherTerritory + 30;
+                                if (dist > idealDist) {
+                                    const pullStrength = (dist - idealDist) * LINK_ATTRACTION * attractionPhase;
+                                    fx -= (dx / dist) * pullStrength;
+                                    fy -= (dy / dist) * pullStrength;
+                                }
+                            }
+                            
+                            if (sameFolder && !isConnected) {
+                                const idealFolderDist = nodeTerritory + otherTerritory + 50;
+                                if (dist > idealFolderDist) {
+                                    const pullStrength = (dist - idealFolderDist) * FOLDER_ATTRACTION * attractionPhase;
+                                    fx -= (dx / dist) * pullStrength;
+                                    fy -= (dy / dist) * pullStrength;
+                                }
+                            }
+                        }
                     });
                     
-                    // Very gentle center pull
+                    // Very gentle center pull (keeps everything on screen)
                     fx += (centerX - node.x) * CENTER_PULL * forceMultiplier;
                     fy += (centerY - node.y) * CENTER_PULL * forceMultiplier;
                     
-                    // Apply velocity with consistent damping for smooth movement
-                    node.vx = (node.vx + fx * 0.05) * DAMPING;
-                    node.vy = (node.vy + fy * 0.05) * DAMPING;
+                    // Apply velocity with high damping for buttery smooth movement
+                    node.vx = (node.vx + fx * 0.04) * DAMPING;
+                    node.vy = (node.vy + fy * 0.04) * DAMPING;
                     
-                    // Smooth position update
                     node.x += node.vx;
                     node.y += node.vy;
                     
-                    // Very soft bounds (elastic, subtle)
+                    // Soft bounds
                     const padding = nodeTerritory + 50;
-                    if (node.x < padding) node.vx += (padding - node.x) * 0.02;
-                    if (node.x > width - padding) node.vx -= (node.x - (width - padding)) * 0.02;
-                    if (node.y < padding) node.vy += (padding - node.y) * 0.02;
-                    if (node.y > height - padding) node.vy -= (node.y - (height - padding)) * 0.02;
+                    if (node.x < padding) node.vx += (padding - node.x) * 0.015;
+                    if (node.x > width - padding) node.vx -= (node.x - (width - padding)) * 0.015;
+                    if (node.y < padding) node.vy += (padding - node.y) * 0.015;
+                    if (node.y > height - padding) node.vy -= (node.y - (height - padding)) * 0.015;
                     
                     entityMap.set(node.id, node);
                 });
                 
-                // Very smoothly update property positions around their parent entities
+                // Smoothly update property positions - lerp toward orbit position
                 updated.forEach(node => {
                     if (node.fixed) return;
                     if (node.parentId && node.orbitRadius && node.orbitAngle !== undefined) {
@@ -478,9 +475,12 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                         if (parent) {
                             const targetX = parent.x + Math.cos(node.orbitAngle) * node.orbitRadius;
                             const targetY = parent.y + Math.sin(node.orbitAngle) * node.orbitRadius;
-                            // Very smooth interpolation - properties follow gently
-                            node.x += (targetX - node.x) * 0.15;
-                            node.y += (targetY - node.y) * 0.15;
+                            // Properties smoothly expand to orbit using orbitLerp
+                            // At start (orbitLerp=0) they're at parent, at end (orbitLerp=1) they're at orbit
+                            const lerpedTargetX = parent.x + (targetX - parent.x) * orbitLerp;
+                            const lerpedTargetY = parent.y + (targetY - parent.y) * orbitLerp;
+                            node.x += (lerpedTargetX - node.x) * 0.12;
+                            node.y += (lerpedTargetY - node.y) * 0.12;
                         }
                     }
                 });
