@@ -2082,6 +2082,33 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
         }
     };
 
+    const updateParameter = (updated: ParameterConfig) => {
+        if (!selectedSimulation) return;
+
+        const updatedSim = {
+            ...selectedSimulation,
+            parameters: selectedSimulation.parameters.map(p => p.id === updated.id ? updated : p),
+            updatedAt: new Date().toISOString()
+        };
+
+        setSelectedSimulation(updatedSim);
+        setSimulations(prev => prev.map(s => s.id === updatedSim.id ? updatedSim : s));
+        setEditingParam(null);
+
+        if (selectedSimulation.id !== 'demo-experiment') {
+            try {
+                fetch(`${API_BASE}/simulations/${selectedSimulation.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(updatedSim)
+                });
+            } catch (error) {
+                console.error('Error updating parameter:', error);
+            }
+        }
+    };
+
     const removeParameter = (paramId: string) => {
         if (!selectedSimulation) return;
 
@@ -3686,6 +3713,60 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                             >
                                                 <Plus size={16} />
                                                 Add Parameter
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Edit Parameter Form */}
+                                    {editingParam && (
+                                        <div className="p-4 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="text-sm font-medium text-[var(--text-primary)]">Edit Parameter</h4>
+                                                <button onClick={() => setEditingParam(null)} className="p-1 hover:bg-[var(--bg-tertiary)] rounded">
+                                                    <X size={14} className="text-[var(--text-tertiary)]" />
+                                                </button>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-xs text-[var(--text-tertiary)] mb-1">Label</label>
+                                                    <input type="text" value={editingParam.label} onChange={(e) => setEditingParam({...editingParam, label: e.target.value})} className="w-full px-2.5 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-[var(--text-tertiary)] mb-1">Variable Name</label>
+                                                    <input type="text" value={editingParam.variableName} onChange={(e) => setEditingParam({...editingParam, variableName: e.target.value})} className="w-full px-2.5 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] font-mono focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-4 gap-2">
+                                                <div>
+                                                    <label className="block text-xs text-[var(--text-tertiary)] mb-1">Min</label>
+                                                    <input type="number" value={editingParam.config.min} onChange={(e) => setEditingParam({...editingParam, config: {...editingParam.config, min: Number(e.target.value)}})} className="w-full px-2 py-1.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-[var(--text-tertiary)] mb-1">Max</label>
+                                                    <input type="number" value={editingParam.config.max} onChange={(e) => setEditingParam({...editingParam, config: {...editingParam.config, max: Number(e.target.value)}})} className="w-full px-2 py-1.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-[var(--text-tertiary)] mb-1">Step</label>
+                                                    <input type="number" value={editingParam.config.step} onChange={(e) => setEditingParam({...editingParam, config: {...editingParam.config, step: Number(e.target.value)}})} className="w-full px-2 py-1.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-[var(--text-tertiary)] mb-1">Default</label>
+                                                    <input type="number" value={editingParam.config.defaultValue} onChange={(e) => setEditingParam({...editingParam, config: {...editingParam.config, defaultValue: Number(e.target.value)}})} className="w-full px-2 py-1.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="block text-xs text-[var(--text-tertiary)] mb-1">Unit</label>
+                                                    <input type="text" value={editingParam.config.unit || ''} onChange={(e) => setEditingParam({...editingParam, config: {...editingParam.config, unit: e.target.value}})} placeholder="%" className="w-full px-2 py-1.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-[var(--text-tertiary)] mb-1">Prefix</label>
+                                                    <input type="text" value={editingParam.config.prefix || ''} onChange={(e) => setEditingParam({...editingParam, config: {...editingParam.config, prefix: e.target.value}})} placeholder="$" className="w-full px-2 py-1.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]" />
+                                                </div>
+                                            </div>
+                                            <button onClick={() => updateParameter(editingParam)} disabled={!editingParam.label || !editingParam.variableName} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                                                <Check size={16} />
+                                                Save Changes
                                             </button>
                                         </div>
                                     )}
