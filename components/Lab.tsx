@@ -2738,9 +2738,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
 
                         {/* AI Agent Tab */}
                         {activeTab === 'agent' && (
-                            <div className="flex flex-col h-full">
-                                {/* Chat Messages */}
-                                <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+                            <div className="p-3 space-y-3">
                                     {chatMessages.length === 0 && (
                                         <div className="flex flex-col items-center justify-center py-8 px-4">
                                             <p className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-5">
@@ -2782,7 +2780,6 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                         </div>
                                     )}
                                     <div ref={chatEndRef} />
-                                </div>
                             </div>
                         )}
                     </div>
