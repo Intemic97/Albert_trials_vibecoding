@@ -1038,7 +1038,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ inputs, usePrefect: false })
+                    body: JSON.stringify({ inputs })
                 });
 
                 if (res.ok) {
