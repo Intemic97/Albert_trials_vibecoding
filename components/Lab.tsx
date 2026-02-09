@@ -112,15 +112,24 @@ interface Simulation {
     updatedAt: string;
 }
 
+interface ChatAction {
+    type: string;
+    label: string;
+    status: 'done' | 'pending' | 'error';
+}
+
+interface ChatResultSummary {
+    metrics: Array<{ label: string; value: string }>;
+}
+
 interface ChatMessage {
     id: string;
     role: 'user' | 'assistant' | 'system';
     content: string;
     timestamp: string;
-    action?: {
-        type: 'set_parameter' | 'run_simulation' | 'compare_scenarios';
-        data: any;
-    };
+    action?: { type: string; data: any };
+    actions?: ChatAction[];
+    resultSummary?: ChatResultSummary;
 }
 
 interface LabProps {
@@ -588,18 +597,64 @@ const VisualizationCard: React.FC<{
 const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
     const isUser = message.role === 'user';
     
+    if (isUser) {
+        return (
+            <div className="flex justify-end">
+                <div className="max-w-[85%] px-3.5 py-2.5 rounded-2xl rounded-br-md text-sm bg-[var(--accent-primary)] text-white">
+                    {message.content}
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${
-                isUser 
-                    ? 'bg-[var(--accent-primary)] text-white rounded-br-sm' 
-                    : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-bl-sm'
-            }`}>
-                {message.content}
-                {message.action && (
-                    <div className="mt-2 pt-2 border-t border-white/20 text-xs opacity-80">
-                        {message.action.type === 'set_parameter' && '✓ Parameter adjusted'}
-                        {message.action.type === 'run_simulation' && '▶ Experiment executed'}
+        <div className="flex justify-start gap-2">
+            <div className="max-w-[90%] space-y-2">
+                {/* Text */}
+                {message.content && (
+                    <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-md text-sm bg-[var(--bg-tertiary)]/70 text-[var(--text-primary)] border border-[var(--border-light)]/50">
+                        {message.content}
+                    </div>
+                )}
+
+                {/* Action chips */}
+                {message.actions && message.actions.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 px-1">
+                        {message.actions.map((action, i) => (
+                            <span
+                                key={i}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium ${
+                                    action.status === 'done'
+                                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                                        : action.status === 'error'
+                                        ? 'bg-red-500/15 text-red-400 border border-red-500/20'
+                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] border border-[var(--border-light)]'
+                                }`}
+                            >
+                                {action.status === 'done' ? (
+                                    <Check size={10} weight="bold" />
+                                ) : action.status === 'error' ? (
+                                    <X size={10} weight="bold" />
+                                ) : (
+                                    <SpinnerGap size={10} className="animate-spin" />
+                                )}
+                                {action.label}
+                            </span>
+                        ))}
+                    </div>
+                )}
+
+                {/* Result summary card */}
+                {message.resultSummary && (
+                    <div className="mx-1 p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-light)] shadow-sm">
+                        <div className="grid grid-cols-2 gap-2">
+                            {message.resultSummary.metrics.map((m, i) => (
+                                <div key={i} className="text-center p-1.5">
+                                    <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wide">{m.label}</div>
+                                    <div className="text-sm font-semibold text-[var(--text-primary)]">{m.value}</div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
@@ -1185,18 +1240,20 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
             if (res.ok) {
                 const data = await res.json();
                 
+                const msgId = generateUUID();
                 const assistantMessage: ChatMessage = {
-                    id: generateUUID(),
+                    id: msgId,
                     role: 'assistant',
                     content: data.message,
                     timestamp: new Date().toISOString(),
-                    action: data.actions?.[0] || data.action || undefined
                 };
                 
                 setChatMessages(prev => [...prev, assistantMessage]);
                 
-                // Execute actions array (new format) or single action (legacy)
+                // Execute actions and build feedback
                 const actions = data.actions || (data.action ? [data.action] : []);
+                const executedActions: ChatAction[] = [];
+                let didRunSimulation = false;
                 
                 for (const action of actions) {
                     if (action.type === 'set_parameter') {
@@ -1206,15 +1263,18 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                             p => p.variableName === variable
                         );
                         if (param && value !== undefined) {
-                            setParameterValues(prev => ({
-                                ...prev,
-                                [param.id]: value
-                            }));
+                            setParameterValues(prev => ({ ...prev, [param.id]: value }));
+                            executedActions.push({
+                                type: 'set_parameter',
+                                label: `${param.label} → ${value}${param.config.unit ? ' ' + param.config.unit : ''}`,
+                                status: 'done'
+                            });
                         }
                     } else if (action.type === 'run_simulation') {
-                        // Small delay so parameter changes take effect first
-                        await new Promise(r => setTimeout(r, 100));
+                        await new Promise(r => setTimeout(r, 150));
                         await runSimulation();
+                        didRunSimulation = true;
+                        executedActions.push({ type: 'run_simulation', label: 'Simulación ejecutada', status: 'done' });
                     } else if (action.type === 'create_visualization' && selectedSimulation) {
                         const viz: VisualizationConfig = {
                             id: generateUUID(),
@@ -1238,7 +1298,32 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                         };
                         setSelectedSimulation(updatedSim);
                         setSimulations(prev => prev.map(s => s.id === updatedSim.id ? updatedSim : s));
+                        executedActions.push({ type: 'create_visualization', label: `Widget: ${action.title || 'Nuevo'}`, status: 'done' });
                     }
+                }
+                
+                // Build result summary if simulation ran
+                let resultSummary: ChatResultSummary | undefined;
+                if (didRunSimulation && lastResult) {
+                    const fmt = (n: any) => typeof n === 'number' ? n.toLocaleString() : String(n || '-');
+                    const fmtM = (n: any) => typeof n === 'number' ? '$' + (n / 1e6).toFixed(1) + 'M' : '-';
+                    resultSummary = {
+                        metrics: [
+                            { label: 'Producción', value: fmt(lastResult.produccion_mensual) + ' ton' },
+                            { label: 'Ingresos', value: fmtM(lastResult.ingresos) },
+                            { label: 'Beneficio', value: fmtM(lastResult.beneficio) },
+                            { label: 'Margen', value: (lastResult.margen || 0) + '%' },
+                        ].filter(m => m.value !== '- ton' && m.value !== '-')
+                    };
+                }
+                
+                // Update message with action feedback + results
+                if (executedActions.length > 0 || resultSummary) {
+                    setChatMessages(prev => prev.map(m => 
+                        m.id === msgId 
+                            ? { ...m, actions: executedActions, resultSummary } 
+                            : m
+                    ));
                 }
             }
         } catch (error) {
@@ -2624,21 +2709,21 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                             <div className="w-12 h-12 rounded-xl bg-[var(--accent-primary)]/10 flex items-center justify-center mx-auto mb-3">
                                                 <Robot size={24} className="text-[var(--accent-primary)]" />
                                             </div>
-                                            <p className="text-sm font-medium text-[var(--text-primary)] mb-1">AI Process Engineer</p>
+                                            <p className="text-sm font-medium text-[var(--text-primary)] mb-1">Ingeniero de Procesos AI</p>
                                             <p className="text-xs text-[var(--text-tertiary)] max-w-[220px] mx-auto">
-                                                Ask me to adjust parameters, run simulations, explain results, or create visualizations.
+                                                Ajusto parametros, ejecuto simulaciones y analizo resultados en tiempo real.
                                             </p>
                                             <div className="mt-4 space-y-1.5">
                                                 {[
-                                                    'Sube el precio de resina un 20%',
-                                                    'Ejecuta con eficiencia al 95%',
-                                                    'Compara escenario base vs crisis',
-                                                    'Que pasa si bajo capacidad a 300?',
+                                                    'Maximiza beneficio sin subir precio',
+                                                    'Que pasa si la resina sube a 2000?',
+                                                    'Ejecuta con maxima capacidad y eficiencia',
+                                                    'Simula un escenario de crisis de crudo',
                                                 ].map((suggestion, i) => (
                                                     <button
                                                         key={i}
                                                         onClick={() => { setChatInput(suggestion); }}
-                                                        className="block w-full text-left px-3 py-2 text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+                                                        className="block w-full text-left px-3 py-2 text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)]/60 rounded-lg hover:bg-[var(--bg-hover)] border border-[var(--border-light)]/30 transition-colors"
                                                     >
                                                         {suggestion}
                                                     </button>
