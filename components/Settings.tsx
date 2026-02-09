@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { User, Envelope, Plus, X, Check, Lightning, Crown, Sparkle, CreditCard, ArrowSquareOut, SpinnerGap, LinkSimple, LinkBreak, Copy, CheckCircle, WarningCircle, Sun, Moon, Monitor, Shield, Clock } from '@phosphor-icons/react';
-import { UserAvatar } from './ProfileMenu';
+import React, { useState, useEffect, useRef } from 'react';
+import { User, Envelope, Plus, X, Check, Lightning, Crown, Sparkle, CreditCard, ArrowSquareOut, SpinnerGap, LinkSimple, LinkBreak, Copy, CheckCircle, WarningCircle, Sun, Moon, Monitor, Shield, Camera } from '@phosphor-icons/react';
+import { UserAvatar, OrganizationLogo } from './ProfileMenu';
 import { PageHeader } from './PageHeader';
 import { API_BASE } from '../config';
 import { useTheme } from '../context/ThemeContext';
 import { ActivityLog } from './ActivityLog';
+import { useAuth } from '../context/AuthContext';
 
 // Slack icon component
 const SlackIcon = () => (
@@ -54,6 +55,7 @@ interface OrgUser {
 
 export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial }) => {
     const { mode, setMode, isDark } = useTheme();
+    const { organizations, refreshOrganizations, user } = useAuth();
     const [activeTab, setActiveTab] = useState<'general' | 'team' | 'integrations' | 'activity'>('general');
     const [users, setUsers] = useState<OrgUser[]>([]);
     const [pendingInvitations, setPendingInvitations] = useState<{ id: string; email: string; invitedByName: string; createdAt: string }[]>([]);
@@ -63,6 +65,11 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
     const [tutorialEnabled, setTutorialEnabled] = useState(() => {
         return !localStorage.getItem('intemic_tutorial_completed');
     });
+    
+    // Organization logo state
+    const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+    const logoInputRef = useRef<HTMLInputElement>(null);
+    const currentOrg = organizations.find(o => o.id === user?.orgId);
     
     // Slack Integration State
     const [slackConnected, setSlackConnected] = useState(false);
@@ -127,7 +134,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
             description: 'Para equipos en crecimiento',
             icon: <Lightning weight="light" className="w-6 h-6" />,
             popular: true,
-            gradient: 'from-teal-500 to-emerald-600',
+            gradient: 'from-[#256A65] to-emerald-600',
             features: [
                 { text: 'Workflows ilimitados', included: true },
                 { text: '5.000 ejecuciones/mes', included: true },
@@ -459,15 +466,62 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
         setTimeout(() => setFeedback(null), 3000);
     };
 
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploadingLogo(true);
+        try {
+            // First upload the file
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const uploadRes = await fetch(`${API_BASE}/upload`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+
+            if (uploadRes.ok) {
+                const uploadData = await uploadRes.json();
+                
+                // Then update the organization with the new logo
+                const updateRes = await fetch(`${API_BASE}/organizations/current/logo`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ logo: uploadData.filename }),
+                    credentials: 'include'
+                });
+
+                if (updateRes.ok) {
+                    await refreshOrganizations();
+                    setFeedback({ type: 'success', message: 'Workspace logo updated successfully!' });
+                } else {
+                    setFeedback({ type: 'error', message: 'Failed to update workspace logo' });
+                }
+            } else {
+                setFeedback({ type: 'error', message: 'Failed to upload image' });
+            }
+        } catch (error) {
+            console.error('Logo upload error:', error);
+            setFeedback({ type: 'error', message: 'An error occurred while uploading' });
+        } finally {
+            setIsUploadingLogo(false);
+            // Reset input
+            if (logoInputRef.current) {
+                logoInputRef.current.value = '';
+            }
+        }
+        setTimeout(() => setFeedback(null), 3000);
+    };
+
     const fetchUsers = async () => {
         try {
-            const [usersRes, invitationsRes] = await Promise.all([
-                fetch(`${API_BASE}/organization/users`, { credentials: 'include' }),
-                fetch(`${API_BASE}/organization/pending-invitations`, { credentials: 'include' })
-            ]);
-            
-            if (usersRes.ok) {
-                const data = await usersRes.json();
+            const res = await fetch(`${API_BASE}/organization/users`, {
+                credentials: 'include'
+            });
+            if (res.ok) {
+                const data = await res.json();
                 if (Array.isArray(data)) {
                     setUsers(data);
                 } else {
@@ -558,7 +612,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
     return (
         <div className="flex flex-col h-full bg-[var(--bg-primary)]" data-tutorial="settings-content">
             {/* Header */}
-            <PageHeader title="Settings" subtitle="Manage organization and preferences" />
+            <PageHeader title="Settings" subtitle="Manage workspace and preferences" />
 
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-5xl mx-auto">
@@ -588,15 +642,17 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                             <div className="flex items-center justify-between">
                                 <div>
                                     <h2 className="text-lg font-normal text-slate-800">Team Members</h2>
-                                    <p className="text-[var(--text-secondary)] text-sm">Manage who has access to this organization.</p>
+                                    <p className="text-[var(--text-secondary)] text-sm">Manage who has access to this workspace.</p>
                                 </div>
-                                <button
-                                    onClick={() => setIsInviting(true)}
-                                    className="flex items-center btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
-                                >
-                                    <Plus size={16} weight="light" className="mr-2" />
-                                    Invite Member
-                                </button>
+                                {currentOrg?.role === 'admin' && (
+                                    <button
+                                        onClick={() => setIsInviting(true)}
+                                        className="flex items-center btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                        <Plus size={16} weight="light" className="mr-2" />
+                                        Invite Member
+                                    </button>
+                                )}
                             </div>
 
                             {feedback && (
@@ -613,6 +669,9 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             <th className="px-6 py-4 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">User</th>
                                             <th className="px-6 py-4 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Role</th>
                                             <th className="px-6 py-4 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Email</th>
+                                            {currentOrg?.role === 'admin' && (
+                                                <th className="px-6 py-4 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Actions</th>
+                                            )}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -640,68 +699,26 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                 <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
                                                     {user.email}
                                                 </td>
+                                                {/* Only show delete button if current user is admin */}
+                                                {currentOrg?.role === 'admin' && (
+                                                    <td className="px-6 py-4">
+                                                        <button 
+                                                            className="text-[var(--text-tertiary)] hover:text-red-600 transition-colors"
+                                                            onClick={() => {
+                                                                // TODO: Implement user removal
+                                                                console.log('Remove user:', user.id);
+                                                            }}
+                                                        >
+                                                            <span className="sr-only">Remove</span>
+                                                            <X size={16} weight="light" />
+                                                        </button>
+                                                    </td>
+                                                )}
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
-
-                            {/* Pending Invitations Section */}
-                            {pendingInvitations.length > 0 && (
-                                <div className="mt-6">
-                                    <h3 className="text-base font-normal text-[var(--text-primary)] mb-3 flex items-center gap-2">
-                                        <Clock size={18} weight="light" className="text-amber-500" />
-                                        Pending Invitations
-                                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                                            {pendingInvitations.length}
-                                        </span>
-                                    </h3>
-                                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] overflow-hidden">
-                                        <table className="w-full text-left">
-                                            <thead className="bg-amber-50/50 border-b border-[var(--border-light)]">
-                                                <tr>
-                                                    <th className="px-6 py-3 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Email</th>
-                                                    <th className="px-6 py-3 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Invited By</th>
-                                                    <th className="px-6 py-3 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Sent</th>
-                                                    <th className="px-6 py-3 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider text-right">Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {pendingInvitations.map((inv) => (
-                                                    <tr key={inv.id} className="hover:bg-amber-50/30 transition-colors">
-                                                        <td className="px-6 py-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
-                                                                    <Envelope size={14} weight="light" className="text-amber-600" />
-                                                                </div>
-                                                                <span className="text-sm text-[var(--text-primary)]">{inv.email}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
-                                                            {inv.invitedByName || 'Unknown'}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-sm text-[var(--text-tertiary)]">
-                                                            {new Date(inv.createdAt).toLocaleDateString('es-ES', {
-                                                                day: 'numeric',
-                                                                month: 'short',
-                                                                year: 'numeric'
-                                                            })}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-right">
-                                                            <button
-                                                                onClick={() => cancelInvitation(inv.id)}
-                                                                className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
-                                                            >
-                                                                Cancel
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     )}
 
@@ -800,14 +817,82 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                 </div>
                             </div>
 
-                            {/* Company Information Section */}
+                            {/* Workspace Branding Section */}
                             <div className="mt-8 mb-5">
+                                <h2 className="text-base font-normal text-[var(--text-primary)] tracking-tight mb-0.5">Workspace</h2>
+                                <p className="text-xs text-[var(--text-secondary)] font-light">Manage your workspace's branding and identity.</p>
+                            </div>
+
+                            <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-6 mb-6">
+                                <div className="flex items-center gap-6">
+                                    {/* Logo Preview */}
+                                    <div className="relative group">
+                                        <div className="w-20 h-20 rounded-xl overflow-hidden bg-[var(--bg-tertiary)] flex items-center justify-center border-2 border-[var(--border-light)]">
+                                            {(currentOrg as any)?.logo ? (
+                                                <img 
+                                                    src={`${API_BASE}/files/${(currentOrg as any).logo}`}
+                                                    alt={currentOrg?.name || 'Workspace'}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <OrganizationLogo name={currentOrg?.name} size="lg" />
+                                            )}
+                                        </div>
+                                        <input
+                                            type="file"
+                                            ref={logoInputRef}
+                                            onChange={handleLogoUpload}
+                                            accept="image/*"
+                                            className="hidden"
+                                        />
+                                        <button
+                                            onClick={() => logoInputRef.current?.click()}
+                                            disabled={isUploadingLogo}
+                                            className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                        >
+                                            {isUploadingLogo ? (
+                                                <SpinnerGap size={24} weight="light" className="text-white animate-spin" />
+                                            ) : (
+                                                <Camera size={24} weight="light" className="text-white" />
+                                            )}
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Logo Info */}
+                                    <div className="flex-1">
+                                        <h3 className="font-medium text-[var(--text-primary)] mb-1">{currentOrg?.name || 'Workspace'}</h3>
+                                        <p className="text-sm text-[var(--text-secondary)] mb-3">
+                                            Upload your workspace logo. It will appear in the sidebar and other places.
+                                        </p>
+                                        <button
+                                            onClick={() => logoInputRef.current?.click()}
+                                            disabled={isUploadingLogo}
+                                            className="text-sm text-[var(--accent-primary)] hover:underline flex items-center gap-1.5"
+                                        >
+                                            {isUploadingLogo ? (
+                                                <>
+                                                    <SpinnerGap size={14} weight="light" className="animate-spin" />
+                                                    Uploading...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Camera size={14} weight="light" />
+                                                    Change logo
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Company Information Section */}
+                            <div className="mb-5">
                                 <h2 className="text-base font-normal text-[var(--text-primary)] tracking-tight mb-0.5">Company Information</h2>
                                 <p className="text-xs text-[var(--text-secondary)] font-light">Manage your company's core information.</p>
                             </div>
 
                             {feedback && (
-                                <div className={`p-4 rounded-lg text-sm font-medium ${feedback.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                                <div className={`p-4 rounded-lg text-sm font-medium mb-4 ${feedback.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
                                     }`}>
                                     {feedback.message}
                                 </div>
@@ -816,8 +901,8 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                             <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-6">
                                 <div className="flex justify-between items-center mb-6">
                                     <div>
-                                        <h3 className="font-medium text-slate-800">Company Profile</h3>
-                                        <p className="text-sm text-[var(--text-secondary)] font-light">Update your organization details. You can use them in Reports for faster document generation</p>
+                                        <h3 className="font-medium text-[var(--text-primary)]">Company Profile</h3>
+                                        <p className="text-sm text-[var(--text-secondary)] font-light">Update your company details. You can use them in Reports for faster document generation</p>
                                     </div>
                                     <button
                                         onClick={updateCompanyInfo}
@@ -842,7 +927,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             type="text"
                                             value={companyInfo.name}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, name: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                         />
                                     </div>
 
@@ -852,7 +937,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             type="text"
                                             value={companyInfo.industry}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, industry: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                         />
                                     </div>
 
@@ -861,7 +946,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                         <select
                                             value={companyInfo.employees}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, employees: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                         >
                                             <option value="">Select...</option>
                                             <option value="1-10">1-10</option>
@@ -878,7 +963,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             type="url"
                                             value={companyInfo.website}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, website: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                         />
                                     </div>
 
@@ -888,7 +973,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             type="url"
                                             value={companyInfo.linkedinUrl}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, linkedinUrl: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                         />
                                     </div>
 
@@ -898,7 +983,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             type="text"
                                             value={companyInfo.headquarters}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, headquarters: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                         />
                                     </div>
 
@@ -908,7 +993,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             type="text"
                                             value={companyInfo.foundingYear}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, foundingYear: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                         />
                                     </div>
 
@@ -918,7 +1003,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             rows={4}
                                             value={companyInfo.overview}
                                             onChange={(e) => setCompanyInfo({ ...companyInfo, overview: e.target.value })}
-                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                                            className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:outline-none text-[var(--text-primary)]"
                                             placeholder="Brief overview of your company..."
                                         />
                                     </div>
@@ -1006,7 +1091,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                             {/* Pricing Cards */}
                             {isLoadingSubscription ? (
                                 <div className="flex items-center justify-center py-16">
-                                    <SpinnerGap weight="light" className="w-8 h-8 text-teal-500 animate-spin" />
+                                    <SpinnerGap weight="light" className="w-8 h-8 text-[var(--accent-primary)] animate-spin" />
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1019,9 +1104,9 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                 key={plan.id}
                                                 className={`relative bg-[var(--bg-card)] rounded-2xl border-2 transition-all duration-300 overflow-hidden ${
                                                     isCurrentPlan 
-                                                        ? 'border-teal-500 shadow-lg shadow-teal-500/10' 
+                                                        ? 'border-[var(--accent-primary)] shadow-lg shadow-[var(--accent-primary)]/10' 
                                                         : plan.popular 
-                                                            ? 'border-teal-200 hover:border-teal-400 hover:shadow-lg' 
+                                                            ? 'border-[var(--accent-primary)]/30 hover:border-[var(--accent-primary)]/60 hover:shadow-lg' 
                                                             : 'border-[var(--border-light)] hover:border-[var(--border-medium)] hover:shadow-md'
                                                 }`}
                                             >
@@ -1194,21 +1279,23 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                                     </p>
                                                                 )}
                                                             </div>
-                                                            <button
-                                                                onClick={disconnectSlack}
-                                                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                            >
-                                                                <LinkBreak size={14} weight="light" />
-                                                                Disconnect
-                                                            </button>
+                                                            {currentOrg?.role === 'admin' && (
+                                                                <button
+                                                                    onClick={disconnectSlack}
+                                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-500/10 rounded-lg transition-colors"
+                                                                >
+                                                                    <LinkBreak size={14} weight="light" />
+                                                                    Disconnect
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
 
                                                     {/* Usage Instructions */}
-                                                    <div className="bg-teal-50 border border-teal-100 rounded-lg p-4">
-                                                        <h4 className="text-sm font-medium text-teal-800 mb-2">How to use</h4>
-                                                        <ul className="text-sm text-teal-700 space-y-1">
-                                                            <li>• Mention the app: <code className="bg-teal-100 px-1 rounded">@YourApp how many customers do we have?</code></li>
+                                                    <div className="bg-[var(--accent-primary)]/5 border border-[var(--accent-primary)]/10 rounded-lg p-4">
+                                                        <h4 className="text-sm font-medium text-[var(--text-primary)] mb-2">How to use</h4>
+                                                        <ul className="text-sm text-[var(--text-secondary)] space-y-1">
+                                                            <li>• Mention the app: <code className="bg-[var(--bg-tertiary)] px-1 rounded">@YourApp how many customers do we have?</code></li>
                                                             <li>• Or send a direct message to the app</li>
                                                             <li>• The Database Assistant will analyze your data and respond</li>
                                                         </ul>
@@ -1222,7 +1309,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                         <ol className="text-sm text-[var(--text-secondary)] space-y-2">
                                                             <li className="flex gap-2">
                                                                 <span className="flex-shrink-0 w-5 h-5 bg-[var(--bg-selected)] rounded-full flex items-center justify-center text-xs font-medium">1</span>
-                                                                <span>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">api.slack.com/apps</a> and create a new app</span>
+                                                                <span>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-primary)] hover:underline">api.slack.com/apps</a> and create a new app</span>
                                                             </li>
                                                             <li className="flex gap-2">
                                                                 <span className="flex-shrink-0 w-5 h-5 bg-[var(--bg-selected)] rounded-full flex items-center justify-center text-xs font-medium">2</span>
@@ -1277,7 +1364,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                             value={slackBotToken}
                                                             onChange={(e) => setSlackBotToken(e.target.value)}
                                                             placeholder="xoxb-..."
-                                                            className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+                                                            className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg text-sm focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] outline-none transition-all"
                                                         />
                                                     </div>
 
@@ -1348,7 +1435,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             required
                                             value={inviteEmail}
                                             onChange={(e) => setInviteEmail(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-2 rounded-lg border border-[var(--border-medium)] focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+                                            className="w-full pl-10 pr-4 py-2 rounded-lg border border-[var(--border-medium)] focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] outline-none transition-all"
                                             placeholder="colleague@company.com"
                                         />
                                     </div>

@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
-import { ProfileMenu, UserAvatar } from './ProfileMenu';
+import { ProfileMenu, UserAvatar, OrganizationLogo } from './ProfileMenu';
 import { NotificationBell, NotificationCenter, useNotificationCenter } from './NotificationCenter';
 import {
   SquaresFour,
@@ -21,11 +22,13 @@ import {
   CaretUp,
   CaretLeft,
   CaretRight,
+  CaretUpDown,
   Checks,
   ClipboardText,
   Flask,
   MagnifyingGlass,
-  ChatCircle
+  ChatCircle,
+  Factory
 } from '@phosphor-icons/react';
 
 interface SidebarProps {
@@ -47,6 +50,7 @@ const viewToRoute: Record<string, string> = {
   'copilots': '/copilots',
   'logs': '/logs',
   'connections': '/connections',
+  'industrial': '/industrial',
   'documentation': '/documentation',
   'settings': '/settings',
   'admin': '/admin',
@@ -57,6 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
   const navigate = useNavigate();
   const notificationCenter = useNotificationCenter();
   const searchRef = useRef<HTMLInputElement>(null);
+  const notificationBellRef = useRef<HTMLButtonElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchScope, setSearchScope] = useState<'workflows' | 'chats' | 'knowledge'>('workflows');
   const [isSearching, setIsSearching] = useState(false);
@@ -71,12 +76,87 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
     const saved = localStorage.getItem('sidebar-collapsed');
     return saved === 'true';
   });
+  const [otAlertCount, setOtAlertCount] = useState(0);
+  const wsRef = useRef<WebSocket | null>(null);
   const currentOrg = organizations.find(org => org.id === user?.orgId);
+
+  // Fetch OT alert count
+  const fetchOtAlertCount = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/ot-alerts?acknowledged=false&limit=100`, {
+        credentials: 'include'
+      });
+      if (res.ok) {
+        const alerts = await res.json();
+        setOtAlertCount(Array.isArray(alerts) ? alerts.length : 0);
+      }
+    } catch (error) {
+      // Silently fail - OT alerts might not be configured
+    }
+  }, []);
+
+  // Subscribe to OT alerts - polling only in development, WebSocket in production
+  useEffect(() => {
+    if (!user?.orgId) return;
+
+    fetchOtAlertCount();
+    
+    // Refresh every 30 seconds (primary method in development)
+    const interval = setInterval(fetchOtAlertCount, 30000);
+
+    // Only attempt WebSocket in production (not localhost)
+    const enableWebSocket = window.location.hostname !== 'localhost';
+    
+    if (enableWebSocket) {
+      const wsUrl = window.location.protocol === 'https:'
+        ? `wss://${window.location.hostname}${window.location.port ? `:${window.location.port}` : ''}/ws`
+        : `ws://${window.location.hostname}:3001/ws`;
+
+      try {
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          ws.send(JSON.stringify({
+            type: 'subscribe_ot_alerts',
+            orgId: user.orgId,
+            user: { id: user.id, name: user.name || 'User', email: user.email }
+          }));
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            if (message.type === 'ot_alert') {
+              // New alert received, refresh count
+              fetchOtAlertCount();
+            }
+          } catch (e) {
+            // Ignore parse errors
+          }
+        };
+
+        ws.onerror = () => {};
+        ws.onclose = () => {};
+      } catch (e) {
+        // WebSocket not available - rely on polling
+      }
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [user?.orgId, user?.id, user?.name, user?.email, fetchOtAlertCount]);
 
   // Persist collapsed state
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', String(isCollapsed));
   }, [isCollapsed]);
+
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -145,7 +225,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
     };
   }, [searchQuery]);
 
-  const NavItem = ({ icon: Icon, label, view, active = false, onClick, onNavigate: onNavCb, badge }: { icon: any, label: string, view?: string, active?: boolean, onClick?: () => void, onNavigate?: () => void, badge?: string }) => {
+  const NavItem = ({ icon: Icon, label, view, active = false, onClick, onNavigate: onNavCb, badge }: { icon: any, label: string, view?: string, active?: boolean, onClick?: () => void, onNavigate?: () => void, badge?: number }) => {
     const route = view ? viewToRoute[view] || `/${view}` : '#';
     
     const baseClasses = `flex items-center ${isCollapsed ? 'justify-center px-2' : 'px-3'} py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out w-full text-left group relative`;
@@ -165,7 +245,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
     // Tooltip for collapsed state
     const tooltip = isCollapsed ? (
       <span className="absolute left-full ml-2 px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md text-xs text-[var(--text-primary)] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
-        {label}{badge ? ` (${badge})` : ''}
+        {label}
+        {badge !== undefined && badge > 0 && ` (${badge})`}
+      </span>
+    ) : null;
+    
+    // Badge element
+    const badgeElement = badge !== undefined && badge > 0 ? (
+      <span className={`${isCollapsed ? 'absolute -top-1 -right-1' : 'ml-auto'} min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-medium rounded-full ${
+        badge > 0 ? 'bg-red-500 text-white' : 'bg-gray-500 text-white'
+      }`}>
+        {badge > 99 ? '99+' : badge}
       </span>
     ) : null;
     
@@ -178,7 +268,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         >
           <Icon size={isCollapsed ? 18 : 16} weight="light" className={iconClasses} />
           {!isCollapsed && <span className="transition-colors duration-200 ease-in-out">{label}</span>}
-          {badgeElement}
+          {!isCollapsed && badgeElement}
+          {isCollapsed && badgeElement}
           {tooltip}
         </button>
       );
@@ -189,7 +280,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         <div className={`${baseClasses} ${activeClasses}`} title={isCollapsed ? label : undefined}>
           <Icon size={isCollapsed ? 18 : 16} weight="light" className={iconClasses} />
           {!isCollapsed && <span className="transition-colors duration-200 ease-in-out">{label}</span>}
-          {badgeElement}
+          {!isCollapsed && badgeElement}
+          {isCollapsed && badgeElement}
           {tooltip}
         </div>
       );
@@ -211,7 +303,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
       >
         <Icon size={isCollapsed ? 18 : 16} weight="light" className={iconClasses} />
         {!isCollapsed && <span className="transition-colors duration-200 ease-in-out">{label}</span>}
-        {badgeElement}
+        {!isCollapsed && badgeElement}
+        {isCollapsed && badgeElement}
         {tooltip}
       </Link>
     );
@@ -230,14 +323,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
   );
 
   return (
-    <div data-tutorial="sidebar" className={`${isCollapsed ? 'w-16' : 'w-60'} bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] h-screen flex flex-col sticky top-0 font-sans z-40 transition-all duration-300`}>
-      {/* Collapse Toggle Button */}
-      <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-20 w-6 h-6 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:border-[var(--accent-primary)] transition-colors z-50 shadow-sm"
-      >
-        {isCollapsed ? <CaretRight size={12} weight="bold" /> : <CaretLeft size={12} weight="bold" />}
-      </button>
+    <>
+      {/* Collapse Toggle Button - rendered via portal to avoid z-index stacking context issues */}
+      {createPortal(
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="fixed w-6 h-6 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:border-[var(--accent-primary)] transition-all duration-300 z-[100] shadow-sm"
+          style={{ 
+            top: 80, 
+            left: isCollapsed ? 52 : 228 // w-16 (64px) - 12px or w-60 (240px) - 12px
+          }}
+        >
+          {isCollapsed ? <CaretRight size={12} weight="bold" /> : <CaretLeft size={12} weight="bold" />}
+        </button>,
+        document.body
+      )}
+      <div data-tutorial="sidebar" className={`${isCollapsed ? 'w-16' : 'w-60'} bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] h-screen flex flex-col sticky top-0 font-sans z-40 transition-all duration-300 overflow-x-hidden`}>
 
       {/* Header */}
       <div className={`${isCollapsed ? 'px-3' : 'px-6'} pt-5 pb-5 border-b border-[var(--sidebar-border)]`}>
@@ -260,12 +361,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
               {/* Notification Bell */}
               <div className="relative">
                 <NotificationBell 
+                  ref={notificationBellRef}
                   onClick={notificationCenter.toggle} 
                   unreadCount={notificationCenter.unreadCount} 
                 />
                 <NotificationCenter 
                   isOpen={notificationCenter.isOpen} 
-                  onClose={notificationCenter.close} 
+                  onClose={notificationCenter.close}
+                  triggerRef={notificationBellRef}
                 />
               </div>
             </>
@@ -293,11 +396,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
                 }
                 if (e.key === 'Escape') {
                   setShowResults(false);
+                  setSearchQuery('');
                 }
               }}
+              onBlur={() => {
+                // Small delay to allow click events on results
+                setTimeout(() => setShowResults(false), 200);
+              }}
               placeholder="Search"
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-[var(--bg-input)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] focus:border-[var(--border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] transition-all duration-200"
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-[var(--bg-input)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] focus:border-[var(--border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] transition-all duration-200"
             />
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setShowResults(false);
+                  searchRef.current?.focus();
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+              >
+                <X size={14} weight="light" />
+              </button>
+            )}
           {showResults && (
             <div className="absolute left-0 right-0 mt-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-lg text-sm z-20 overflow-hidden">
               <div className="px-3 py-2 text-xs font-medium text-[var(--text-secondary)] border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
@@ -380,31 +500,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
         <nav className="px-3 py-2">
-          <SectionLabel label="Company" />
-          <div className="space-y-0.5">
+          {/* Overview - standalone */}
+          <div className="space-y-0.5 mb-1">
             <NavItem icon={House} label="Overview" view="overview" active={activeView === 'overview'} />
-            <NavItem icon={SquaresFour} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
           </div>
 
-          <SectionLabel label="Data Modeling" />
+          <SectionLabel label="Build" />
           <div className="space-y-0.5">
             <NavItem icon={FlowArrow} label="Workflows" view="workflows" active={activeView === 'workflows'} />
             <NavItem icon={Database} label="Knowledge Base" view="database" active={activeView === 'database'} />
+            <NavItem icon={Plug} label="Connections" view="connections" active={activeView === 'connections'} badge={otAlertCount} />
+          </div>
+
+          <SectionLabel label="Analyze" />
+          <div className="space-y-0.5">
+            <NavItem icon={SquaresFour} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
+            <NavItem icon={Flask} label="Lab" view="lab" active={activeView === 'lab'} />
             <NavItem icon={Sparkle} label="Copilots" view="copilots" active={activeView === 'copilots'} />
-            <NavItem icon={Flask} label="Lab" view="lab" active={activeView === 'lab'} badge="beta" />
           </div>
 
           <SectionLabel label="Reports" />
           <div className="space-y-0.5">
             <NavItem icon={FileText} label="Templates" view="templates" active={activeView === 'templates'} />
             <NavItem icon={Checks} label="Documents" view="documents" active={activeView === 'documents'} />
-          </div>
-
-          <SectionLabel label="Operations" />
-          <div className="space-y-0.5">
-            <NavItem icon={Plug} label="Connections" view="connections" active={activeView === 'connections'} />
           </div>
 
         </nav>
@@ -472,35 +592,47 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
           <NavItem icon={GearSix} label="Settings" view="settings" active={activeView === 'settings'} />
         </div>
         
-        {/* Profile */}
+        {/* Organization Switcher */}
         {isCollapsed ? (
           <ProfileMenu
             onNavigate={onNavigate}
             menuPlacement="top-right"
+            initialView="organizations"
             triggerClassName="w-full flex items-center justify-center p-2 rounded-lg hover:bg-[var(--sidebar-bg-hover)] transition-colors duration-200 ease-in-out"
-            triggerContent={<UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="sm" />}
+            triggerContent={<OrganizationLogo name={currentOrg?.name} logo={(currentOrg as any)?.logo} size="sm" />}
           />
         ) : (
-          <ProfileMenu
-            onNavigate={onNavigate}
-            menuPlacement="top-right"
-            triggerClassName="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--sidebar-bg-hover)] transition-colors duration-200 ease-in-out text-left border border-transparent hover:border-[var(--sidebar-border)]"
-            triggerContent={(
-              <>
-                <UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="md" />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-normal text-[var(--sidebar-text)] truncate">{user?.name || 'User'}</div>
-                  {currentOrg && (
-                    <div className="text-xs text-[var(--text-tertiary)] truncate">
-                      {currentOrg.name}
+          <div className="flex items-center justify-between w-full px-2 py-2 rounded-lg hover:bg-[var(--sidebar-bg-hover)] transition-colors duration-200 ease-in-out">
+            {/* Main area - opens full menu */}
+            <ProfileMenu
+              onNavigate={onNavigate}
+              menuPlacement="top-right"
+              triggerClassName="flex items-center gap-3 min-w-0 flex-1"
+              triggerContent={(
+                <>
+                  <OrganizationLogo name={currentOrg?.name} logo={(currentOrg as any)?.logo} size="md" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-normal text-[var(--sidebar-text)] truncate uppercase tracking-wide">
+                      {currentOrg?.name || 'Organization'}
                     </div>
-                  )}
-                </div>
-              </>
-            )}
-          />
+                  </div>
+                </>
+              )}
+            />
+            {/* Switch button - opens directly to organizations */}
+            <ProfileMenu
+              onNavigate={onNavigate}
+              menuPlacement="top-right"
+              initialView="organizations"
+              triggerClassName="p-1.5 rounded hover:bg-[var(--sidebar-bg-active)] transition-colors duration-200 ease-in-out flex-shrink-0"
+              triggerContent={
+                <CaretUpDown size={16} weight="light" className="text-[var(--sidebar-icon)]" />
+              }
+            />
+          </div>
         )}
       </div>
     </div>
+    </>
   );
 };

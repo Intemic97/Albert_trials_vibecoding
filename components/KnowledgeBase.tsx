@@ -4,9 +4,10 @@ import {
     Database, Plus, MagnifyingGlass, Funnel, X, FileText, Folder, FolderPlus, 
     UploadSimple, Table, SpinnerGap, File, DownloadSimple, Trash, Eye, 
     Link as LinkIcon, Copy, Check, PencilSimple, Calendar, Tag, CaretRight,
-    FolderOpen, House, GridFour, List, SortAscending, DotsThree, TreeStructure
+    FolderOpen, House, GridFour, List, SortAscending, DotsThree, TreeStructure,
+    Factory, Gear, Thermometer, Flask, Lightning, ShieldCheck
 } from '@phosphor-icons/react';
-import { Entity } from '../types';
+import { Entity, EntityType, ENTITY_TYPE_OPTIONS } from '../types';
 import { EntityCard } from './EntityCard';
 import { PageHeader } from './PageHeader';
 import { Breadcrumbs, BreadcrumbItem, FolderTree, FolderNode } from './ui';
@@ -76,6 +77,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     const [newFolderColor, setNewFolderColor] = useState('#3b82f6');
     const [newEntityName, setNewEntityName] = useState('');
     const [newEntityDescription, setNewEntityDescription] = useState('');
+    const [newEntityType, setNewEntityType] = useState<EntityType>('generic');
     const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
     
     // Upload state
@@ -365,6 +367,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             id: Math.random().toString(36).substr(2, 9),
             name: newEntityName,
             description: newEntityDescription,
+            entityType: newEntityType,
             author: user?.name || user?.email?.split('@')[0] || 'User',
             lastEdited: 'Just now',
             properties: []
@@ -387,6 +390,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                 
                 setNewEntityName('');
                 setNewEntityDescription('');
+                setNewEntityType('generic');
                 setIsCreatingEntity(false);
                 
                 // Save current folder and reload
@@ -953,13 +957,17 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {currentFolderItems.entities.map((entity) => (
                                                 <div
-                                                    key={entity.id}
+                                                    key={entity.id || `entity-${Math.random()}`}
                                                     draggable
-                                                    onDragStart={() => handleDragStart('entity', entity.id)}
+                                                    onDragStart={(e) => {
+                                                        handleDragStart('entity', entity.id);
+                                                    }}
                                                 >
                                                     <EntityCard
                                                         entity={entity}
-                                                        onClick={(e) => onNavigate(e.id)}
+                                                        onClick={(e) => {
+                                                            if (e.id) onNavigate(e.id);
+                                                        }}
                                                         onDelete={handleDeleteEntity}
                                                     />
                                                 </div>
@@ -1230,6 +1238,35 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                         />
                                     </div>
                                     
+                                    {/* Entity Type Selector */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Type</label>
+                                        <div className="grid grid-cols-4 gap-1.5">
+                                            {ENTITY_TYPE_OPTIONS.map(opt => {
+                                                const IconMap: Record<string, React.ElementType> = {
+                                                    Database, Factory, Gear, Thermometer, Flask, Lightning, ShieldCheck
+                                                };
+                                                const Icon = IconMap[opt.iconName] || Database;
+                                                return (
+                                                    <button
+                                                        key={opt.value}
+                                                        type="button"
+                                                        onClick={() => setNewEntityType(opt.value)}
+                                                        className={`flex flex-col items-center gap-1.5 px-2 py-2.5 rounded-lg border text-xs transition-all ${
+                                                            newEntityType === opt.value
+                                                                ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/10 text-[var(--text-primary)]'
+                                                                : 'border-[var(--border-light)] hover:border-[var(--border-medium)] text-[var(--text-secondary)]'
+                                                        }`}
+                                                        title={opt.description}
+                                                    >
+                                                        <Icon size={18} weight="light" />
+                                                        <span className="font-medium truncate w-full text-center" style={{ fontSize: '10px' }}>{opt.label}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                    
                                     {uploadMode === 'manual' ? (
                                         <div>
                                             <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Description</label>
@@ -1237,7 +1274,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                 value={newEntityDescription}
                                                 onChange={(e) => setNewEntityDescription(e.target.value)}
                                                 placeholder="Brief description"
-                                                rows={3}
+                                                rows={2}
                                                 className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] resize-none"
                                             />
                                         </div>

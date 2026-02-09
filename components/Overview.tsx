@@ -105,34 +105,40 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
         }
     };
 
-    // Generate chart data from daily executions
+    // Generate chart data from daily executions - always show last 7 days
     const getChartData = () => {
-        if (!overviewStats || !overviewStats.dailyExecutions.length) {
-            // Generate mock data for empty state
-            const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-            const mockData = dayNames.map(day => ({
-                date: day,
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        
+        // Generate last 7 days ending with today
+        const last7Days: { date: string; dateKey: string; executions: number }[] = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateKey = d.toISOString().split('T')[0]; // YYYY-MM-DD
+            // Format as "28 Jan" or just "28" if same month
+            const dayNum = d.getDate();
+            const isToday = i === 0;
+            const label = isToday ? `${dayNum} (today)` : `${dayNum}`;
+            last7Days.push({
+                date: label,
+                dateKey,
                 executions: 0
-            }));
-            return {
-                type: 'area' as const,
-                title: 'Workflow Executions',
-                description: 'Last 7 days',
-                data: mockData,
-                xAxisKey: 'date',
-                dataKey: ['executions'],
-                colors: ['#419CAF']
-            };
+            });
         }
         
-        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const data = overviewStats.dailyExecutions.map(row => {
-            const date = new Date(row.date);
-            return {
-                date: dayNames[date.getDay()],
-                executions: row.count
-            };
-        });
+        // Fill in actual data from backend
+        if (overviewStats?.dailyExecutions?.length) {
+            overviewStats.dailyExecutions.forEach(row => {
+                const dateKey = row.date.split('T')[0];
+                const dayData = last7Days.find(d => d.dateKey === dateKey);
+                if (dayData) {
+                    dayData.executions = row.count;
+                }
+            });
+        }
+        
+        // Remove dateKey from final data
+        const data = last7Days.map(({ date, executions }) => ({ date, executions }));
         
         return {
             type: 'area' as const,
@@ -148,12 +154,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
     // Calculate chart stats
     const chartStats = {
         total: overviewStats?.dailyExecutions?.reduce((sum, d) => sum + d.count, 0) || 0,
-        average: overviewStats?.dailyExecutions?.length 
-            ? Math.round(overviewStats.dailyExecutions.reduce((sum, d) => sum + d.count, 0) / overviewStats.dailyExecutions.length)
-            : 0,
-        max: overviewStats?.dailyExecutions?.length
-            ? Math.max(...overviewStats.dailyExecutions.map(d => d.count))
-            : 0
+        daysWithActivity: overviewStats?.dailyExecutions?.filter(d => d.count > 0).length || 0
     };
 
     const overviewChartConfig = getChartData();
@@ -279,22 +280,17 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                     <h2 className="text-sm font-medium text-[var(--text-primary)]">Workflow Activity</h2>
                                     <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Last 7 days</p>
                                 </div>
-                                <div className="flex items-center gap-4">
-                                    {/* Mini Stats */}
-                                    <div className="flex items-center gap-4 pr-4 border-r border-[var(--border-light)]">
-                                        <div className="text-right">
-                                            <p className="text-lg font-semibold text-[var(--text-primary)]">{chartStats.total}</p>
-                                            <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wide">Total</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-lg font-semibold text-[var(--text-primary)]">{chartStats.average}</p>
-                                            <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wide">Avg/day</p>
-                                        </div>
+                                <div className="flex items-center gap-3 text-sm">
+                                    <div className="text-right">
+                                        <span className="font-semibold text-[var(--text-primary)]">{chartStats.total}</span>
+                                        <span className="text-[var(--text-tertiary)] ml-1">executions</span>
                                     </div>
-                                    <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
-                                        <span className="inline-block w-2 h-2 rounded-full bg-[#419CAF]"></span>
-                                        Executions
-                                    </div>
+                                    {chartStats.daysWithActivity > 0 && (
+                                        <>
+                                            <span className="text-[var(--text-tertiary)]">·</span>
+                                            <span className="text-[var(--text-tertiary)]">{chartStats.daysWithActivity} active day{chartStats.daysWithActivity !== 1 ? 's' : ''}</span>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                             

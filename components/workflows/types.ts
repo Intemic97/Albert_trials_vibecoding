@@ -32,6 +32,11 @@ export type NodeType =
   | 'sapFetch' 
   | 'opcua' 
   | 'mqtt' 
+  | 'modbus'
+  | 'scada'
+  | 'mes'
+  | 'dataHistorian'
+  | 'timeSeriesAggregator'
   | 'agent' 
   | 'limsFetch' 
   | 'statisticalAnalysis' 
@@ -160,6 +165,46 @@ export interface NodeConfig {
   pdfTemplate?: string;
   pdfReportData?: string;
   pdfOutputPath?: string;
+  // For OPC UA nodes:
+  opcuaConnectionId?: string;
+  opcuaNodeIds?: string[];
+  opcuaPollingInterval?: number;
+  // For MQTT nodes:
+  mqttConnectionId?: string;
+  mqttTopics?: string[];
+  mqttQos?: number;
+  // For Modbus nodes:
+  modbusConnectionId?: string;
+  modbusAddresses?: string[];
+  modbusFunctionCode?: number;
+  // For SCADA nodes:
+  scadaConnectionId?: string;
+  scadaTags?: string[];
+  scadaPollingInterval?: number;
+  // For MES nodes:
+  mesConnectionId?: string;
+  mesEndpoint?: string;
+  mesQuery?: string;
+  // For Data Historian nodes:
+  dataHistorianConnectionId?: string;
+  dataHistorianTags?: string[];
+  dataHistorianStartTime?: string;
+  dataHistorianEndTime?: string;
+  dataHistorianAggregation?: string;
+  // For Time-Series Aggregator nodes:
+  timeSeriesAggregationType?: 'avg' | 'min' | 'max' | 'sum' | 'count';
+  timeSeriesInterval?: string; // e.g., "5m", "1h", "1d"
+  timeSeriesFields?: string[];
+  // Alert configuration
+  alerts?: {
+    enabled: boolean;
+    cooldown?: number; // milliseconds
+    thresholds?: Record<string, {
+      min?: number;
+      max?: number;
+      operator: 'gt' | 'lt' | 'range' | 'warning_gt' | 'warning_lt';
+    }>;
+  };
 }
 
 export interface WorkflowNode {

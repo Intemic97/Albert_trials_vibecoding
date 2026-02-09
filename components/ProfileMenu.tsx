@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
-import { User, SignOut, CaretRight, Buildings, GearSix, Camera, X, SpinnerGap, ShieldCheck, Plus } from '@phosphor-icons/react';
+import { User, SignOut, CaretRight, Camera, X, SpinnerGap, ShieldCheck, Plus, CaretUpDown, Cube } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 
 interface ProfileMenuProps {
@@ -9,6 +9,7 @@ interface ProfileMenuProps {
     triggerContent?: React.ReactNode;
     triggerClassName?: string;
     menuPlacement?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+    initialView?: 'main' | 'organizations';
 }
 
 // Reusable Avatar component
@@ -46,11 +47,41 @@ export const UserAvatar: React.FC<{
     );
 };
 
-export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerContent, triggerClassName = '', menuPlacement = 'bottom-right' }) => {
+// Organization Logo component
+export const OrganizationLogo: React.FC<{ 
+    name?: string; 
+    logo?: string; 
+    size?: 'sm' | 'md' | 'lg';
+    className?: string;
+}> = ({ name, logo, size = 'md', className = '' }) => {
+    const sizeClasses = {
+        sm: 'w-6 h-6',
+        md: 'w-8 h-8',
+        lg: 'w-10 h-10'
+    };
+
+    if (logo) {
+        return (
+            <img 
+                src={logo.startsWith('http') ? logo : `${API_BASE}/files/${logo}`}
+                alt={name || 'Organization'}
+                className={`${sizeClasses[size]} rounded-md object-cover ${className}`}
+            />
+        );
+    }
+
+    return (
+        <div className={`${sizeClasses[size]} rounded-md bg-[var(--bg-tertiary)] text-[var(--sidebar-icon)] flex items-center justify-center ${className}`}>
+            <Cube size={size === 'sm' ? 14 : size === 'md' ? 18 : 22} weight="light" />
+        </div>
+    );
+};
+
+export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerContent, triggerClassName = '', menuPlacement = 'bottom-right', initialView = 'main' }) => {
     const { user, logout, organizations, switchOrganization, updateProfile, refreshOrganizations } = useAuth();
     // console.log('[ProfileMenu] user.isAdmin:', user?.isAdmin);
     const [isOpen, setIsOpen] = useState(false);
-    const [view, setView] = useState<'main' | 'organizations'>('main');
+    const [view, setView] = useState<'main' | 'organizations'>(initialView);
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [editName, setEditName] = useState('');
     const [editRole, setEditRole] = useState('');
@@ -62,10 +93,10 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
     const fileInputRef = useRef<HTMLInputElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
 
-    // Reset view when closing
+    // Reset view when closing - reset to initialView
     useEffect(() => {
-        if (!isOpen) setTimeout(() => setView('main'), 200);
-    }, [isOpen]);
+        if (!isOpen) setTimeout(() => setView(initialView), 200);
+    }, [isOpen, initialView]);
 
     // Initialize edit form when modal opens
     useEffect(() => {
@@ -172,7 +203,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
         if (isOpen && triggerRef.current) {
             const rect = triggerRef.current.getBoundingClientRect();
             const windowHeight = window.innerHeight;
-            const menuHeight = 300; // approximate height
+            const menuHeight = view === 'organizations' ? 220 : 280; // approximate heights
             
             let position: { top: number; left?: number; right?: number };
             let top: number;
@@ -180,18 +211,17 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
             // Position menu to the right of the trigger
             const left = rect.right + 8;
             
-            // Position menu so its BOTTOM aligns with the trigger's BOTTOM
-            // This makes it appear "attached" to the profile button from below
+            // Position menu so its BOTTOM aligns with the trigger's BOTTOM (near bottom of screen)
             top = rect.bottom - menuHeight;
             
-            // If menu would go above screen, position it below the trigger instead
+            // Ensure menu doesn't go above screen
             if (top < 8) {
-                top = rect.bottom + 8;
+                top = 8;
             }
             
-            // If menu would go below screen, cap it
-            if (top + menuHeight > windowHeight - 8) {
-                top = windowHeight - menuHeight - 8;
+            // Ensure menu doesn't go below screen - keep it aligned near bottom
+            if (top + menuHeight > windowHeight - 16) {
+                top = windowHeight - menuHeight - 16;
             }
             
             position = { 
@@ -203,7 +233,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
         } else {
             setMenuPosition(null);
         }
-    }, [isOpen, menuPlacement]);
+    }, [isOpen, menuPlacement, view]);
 
     return (
         <>
@@ -235,15 +265,19 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
 
                     {view === 'main' ? (
                         <>
-                            {/* Header */}
+                            {/* Header with user info */}
                             <div className="px-4 py-3 border-b border-[var(--sidebar-border)]">
-                                <div className="flex items-center gap-3">
+                                <button 
+                                    onClick={openProfileModal}
+                                    className="w-full flex items-center gap-3 hover:opacity-80 transition-opacity"
+                                >
                                     <UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="sm" />
-                                    <div className="min-w-0 flex-1">
+                                    <div className="min-w-0 flex-1 text-left">
                                         <h3 className="font-normal text-[var(--sidebar-text)] text-sm truncate">{user?.name || 'User'}</h3>
                                         <p className="text-xs text-[var(--text-tertiary)] truncate">{user?.email || 'user@example.com'}</p>
                                     </div>
-                                </div>
+                                    <CaretRight size={14} weight="light" className="text-[var(--sidebar-icon)]" />
+                                </button>
                             </div>
 
                             {/* Menu Items */}
@@ -253,31 +287,13 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left group text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
                                 >
                                     <div className="flex items-center">
-                                        <Buildings size={16} weight="light" className="mr-3 transition-colors duration-200 ease-in-out text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]" />
+                                        <OrganizationLogo name={currentOrg?.name} logo={(currentOrg as any)?.logo} size="sm" className="mr-3" />
                                         <div className="text-left">
-                                            <span className="text-sm">Change organization</span>
+                                            <span className="text-sm">Change workspace</span>
                                             <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{currentOrg?.name || 'Select'}</p>
                                         </div>
                                     </div>
                                     <CaretRight size={16} weight="light" className="text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)] transition-colors duration-200 ease-in-out" />
-                                </button>
-
-                                <button 
-                                    onClick={openProfileModal}
-                                    className="w-full flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left group text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
-                                >
-                                    <User size={16} weight="light" className="mr-3 transition-colors duration-200 ease-in-out text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]" />
-                                    <span className="transition-colors duration-200 ease-in-out">My Profile</span>
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setIsOpen(false);
-                                        onNavigate?.('settings');
-                                    }}
-                                    className="w-full flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left group text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
-                                >
-                                    <GearSix size={16} weight="light" className="mr-3 transition-colors duration-200 ease-in-out text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]" />
-                                    <span className="transition-colors duration-200 ease-in-out">Settings</span>
                                 </button>
                                 
                                 {/* Admin Panel - Only visible for admins */}
@@ -317,7 +333,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                 >
                                     <CaretRight className="rotate-180" size={16} weight="light" />
                                 </button>
-                                <h3 className="font-normal text-[var(--sidebar-text)] text-sm">Organizations</h3>
+                                <h3 className="font-normal text-[var(--sidebar-text)] text-sm">Workspace</h3>
                             </div>
 
                             <div className="px-3 py-2 space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
@@ -331,12 +347,12 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                             }`}
                                     >
                                         <div className="flex items-center">
-                                            <div className={`w-7 h-7 rounded-md flex items-center justify-center text-xs mr-3 font-normal transition-colors duration-200 ease-in-out ${user?.orgId === org.id
-                                                ? 'bg-white/20 text-white'
-                                                : 'bg-[var(--bg-tertiary)] text-[var(--sidebar-icon)] group-hover:bg-[var(--bg-selected)] group-hover:text-white'
-                                                }`}>
-                                                {org.name.substring(0, 2).toUpperCase()}
-                                            </div>
+                                            <OrganizationLogo 
+                                                name={org.name} 
+                                                logo={(org as any)?.logo} 
+                                                size="sm" 
+                                                className={`mr-3 ${user?.orgId === org.id ? 'opacity-100' : 'opacity-80 group-hover:opacity-100'}`} 
+                                            />
                                             <div className="text-left">
                                                 <span className="transition-colors duration-200 ease-in-out">{org.name}</span>
                                                 <p className="text-xs text-[var(--text-tertiary)] mt-0.5 capitalize">{org.role}</p>
@@ -349,7 +365,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                 ))}
                             </div>
                             
-                            {/* Create Organization Button */}
+                            {/* Create Workspace Button */}
                             <div className="px-3 py-2 border-t border-[var(--sidebar-border)]">
                                 <button
                                     onClick={() => {
@@ -359,7 +375,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     className="w-full flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left group text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
                                 >
                                     <Plus size={16} weight="light" className="mr-3 transition-colors duration-200 ease-in-out text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]" />
-                                    <span className="transition-colors duration-200 ease-in-out">Create Organization</span>
+                                    <span className="transition-colors duration-200 ease-in-out">Create Workspace</span>
                                 </button>
                             </div>
                         </>
@@ -481,13 +497,13 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
             </div>
         )}
 
-        {/* Create Organization Modal */}
+        {/* Create Workspace Modal */}
         {showCreateOrgModal && (
             <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowCreateOrgModal(false)}>
                 <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-lg w-[400px] max-w-full mx-4" onClick={e => e.stopPropagation()}>
                     {/* Header */}
                     <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
-                        <h2 className="text-sm font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Create Organization</h2>
+                        <h2 className="text-sm font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Create Workspace</h2>
                         <button 
                             onClick={() => setShowCreateOrgModal(false)}
                             className="p-1 hover:bg-[var(--bg-hover)] rounded-md transition-colors"
@@ -499,12 +515,12 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                     {/* Content */}
                     <div className="p-5">
                         <p className="text-xs text-[var(--text-secondary)] mb-4">
-                            Create a new organization and become its admin. You can invite team members after creation.
+                            Create a new workspace and become its admin. You can invite team members after creation.
                         </p>
                         
                         <div>
                             <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                                Organization Name
+                                Workspace Name
                             </label>
                             <input
                                 type="text"
@@ -536,7 +552,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                             className="px-3 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-sm text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
                             {isCreatingOrg && <SpinnerGap size={16} weight="bold" className="animate-spin" />}
-                            Create Organization
+                            Create Workspace
                         </button>
                     </div>
                 </div>

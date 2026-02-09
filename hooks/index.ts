@@ -79,3 +79,13 @@ export {
 
 // Real-time Cursors
 export { useCollaborativeCursors } from './useCollaborativeCursors';
+
+// ============================================================================
+// WORKFLOW EXECUTION
+// ============================================================================
+
+// Execution Progress Tracking
+export { 
+  useExecutionProgress,
+  type ExecutionProgress,
+} from './useExecutionProgress';

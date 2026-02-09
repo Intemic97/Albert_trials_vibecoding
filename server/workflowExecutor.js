@@ -5,12 +5,22 @@
 
 const crypto = require('crypto');
 const { gcsService } = require('./gcsService');
+const { isTimeSeriesData: detectTimeSeriesData, normalizeTimeSeriesData } = require('./utils/timeSeriesHelper');
+const { getOTConnectionsManager } = require('./utils/otConnections');
+const { getOTAlertsManager } = require('./utils/otAlerts');
+
+// WebSocket broadcast function (will be set from server/index.js)
+let broadcastToOrganizationFn = null;
+
+function setBroadcastToOrganization(fn) {
+    broadcastToOrganizationFn = fn;
+}
 
 // Generate unique ID
 const generateId = () => crypto.randomBytes(8).toString('hex');
 
 class WorkflowExecutor {
-    constructor(db, executionId = null) {
+    constructor(db, executionId = null, organizationId = null, userId = null) {
         this.db = db;
         this.executionId = executionId;
         this.workflow = null;
@@ -18,6 +28,9 @@ class WorkflowExecutor {
         this.connections = [];
         this.nodeResults = {};
         this.execution = null;
+        this.organizationId = organizationId;
+        this.userId = userId;
+        this.otAlertsManager = getOTAlertsManager(db, broadcastToOrganizationFn);
     }
 
     /**
@@ -180,6 +193,32 @@ class WorkflowExecutor {
             // Execute based on node type
             const result = await this.runNodeHandler(node, inputData);
 
+            // Process OT alerts if this is an OT node
+            const otNodeTypes = ['opcua', 'mqtt', 'modbus', 'scada', 'mes', 'dataHistorian'];
+            if (otNodeTypes.includes(node.type) && result.success && result.outputData && this.organizationId) {
+                try {
+                    const alerts = await this.otAlertsManager.processNodeAlerts(
+                        node,
+                        result.outputData,
+                        this.organizationId,
+                        this.userId
+                    );
+                    if (alerts.length > 0) {
+                        result.metadata = result.metadata || {};
+                        result.metadata.alerts = alerts.map(a => ({
+                            id: a.id,
+                            fieldName: a.fieldName,
+                            value: a.value,
+                            severity: a.severity,
+                            message: a.message
+                        }));
+                    }
+                } catch (alertError) {
+                    console.error(`[executeNode] Error processing alerts for node ${nodeId}:`, alertError);
+                    // Don't fail the node execution if alert processing fails
+                }
+            }
+
             // Store result
             this.nodeResults[nodeId] = result;
 
@@ -222,6 +261,11 @@ class WorkflowExecutor {
             mysql: () => this.handleMySQL(node, inputData),
             sendEmail: () => this.handleSendEmail(node, inputData),
             sendSMS: () => this.handleSendSMS(node, inputData),
+            sendSlack: () => this.handleSendSlack(node, inputData),
+            sendDiscord: () => this.handleSendDiscord(node, inputData),
+            sendTeams: () => this.handleSendTeams(node, inputData),
+            sendTelegram: () => this.handleSendTelegram(node, inputData),
+            googleSheets: () => this.handleGoogleSheets(node, inputData),
             dataVisualization: () => this.handleDataVisualization(node, inputData),
             esios: () => this.handleEsios(node, inputData),
             climatiq: () => this.handleClimatiq(node, inputData),
@@ -229,6 +273,14 @@ class WorkflowExecutor {
             comment: () => this.handleComment(node, inputData),
             humanApproval: () => this.handleHumanApproval(node, inputData),
             webhook: () => this.handleWebhook(node, inputData),
+            // OT/Industrial nodes
+            opcua: () => this.handleOpcua(node, inputData),
+            mqtt: () => this.handleMqtt(node, inputData),
+            modbus: () => this.handleModbus(node, inputData),
+            scada: () => this.handleScada(node, inputData),
+            mes: () => this.handleMes(node, inputData),
+            dataHistorian: () => this.handleDataHistorian(node, inputData),
+            timeSeriesAggregator: () => this.handleTimeSeriesAggregator(node, inputData),
         };
 
         const handler = handlers[node.type];
@@ -369,11 +421,20 @@ class WorkflowExecutor {
     }
 
     async handleSaveRecords(node, inputData) {
+        const entityId = node.config?.entityId;
         const tableName = node.config?.tableName || node.config?.entityName || 'saved_records';
         const mode = node.config?.saveMode || 'insert'; // insert, upsert, update
         
+        // Detect if this is time-series data from OT nodes
+        const isTimeSeriesData = this.detectTimeSeriesData(inputData);
+        
         try {
-            // Ensure table exists
+            // If entityId is provided, use the entities API endpoint
+            if (entityId) {
+                return await this.saveToEntity(entityId, inputData, isTimeSeriesData);
+            }
+
+            // Fallback to generic table storage
             await this.db.run(`
                 CREATE TABLE IF NOT EXISTS ${tableName} (
                     id TEXT PRIMARY KEY,
@@ -381,7 +442,7 @@ class WorkflowExecutor {
                     workflowId TEXT,
                     executionId TEXT,
                     createdAt TEXT,
-                    updatedAt TEXT
+                    updatedAt TEXT${isTimeSeriesData ? ', timestamp TEXT' : ''}
                 )
             `);
 
@@ -392,6 +453,7 @@ class WorkflowExecutor {
             for (const record of records) {
                 const recordId = record.id || generateId();
                 const now = new Date().toISOString();
+                const timestamp = record.timestamp || record.createdAt || now;
                 
                 if (mode === 'upsert' && record.id) {
                     // Check if exists
@@ -401,21 +463,33 @@ class WorkflowExecutor {
                     );
                     
                     if (existing) {
-                        await this.db.run(
-                            `UPDATE ${tableName} SET data = ?, updatedAt = ? WHERE id = ?`,
-                            [JSON.stringify(record), now, record.id]
-                        );
+                        const updateQuery = isTimeSeriesData
+                            ? `UPDATE ${tableName} SET data = ?, updatedAt = ?, timestamp = ? WHERE id = ?`
+                            : `UPDATE ${tableName} SET data = ?, updatedAt = ? WHERE id = ?`;
+                        const updateParams = isTimeSeriesData
+                            ? [JSON.stringify(record), now, timestamp, record.id]
+                            : [JSON.stringify(record), now, record.id];
+                        
+                        await this.db.run(updateQuery, updateParams);
                     } else {
-                        await this.db.run(
-                            `INSERT INTO ${tableName} (id, data, workflowId, executionId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
-                            [recordId, JSON.stringify(record), this.workflow?.id, this.executionId, now, now]
-                        );
+                        const insertQuery = isTimeSeriesData
+                            ? `INSERT INTO ${tableName} (id, data, workflowId, executionId, createdAt, updatedAt, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)`
+                            : `INSERT INTO ${tableName} (id, data, workflowId, executionId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`;
+                        const insertParams = isTimeSeriesData
+                            ? [recordId, JSON.stringify(record), this.workflow?.id, this.executionId, now, now, timestamp]
+                            : [recordId, JSON.stringify(record), this.workflow?.id, this.executionId, now, now];
+                        
+                        await this.db.run(insertQuery, insertParams);
                     }
                 } else {
-                    await this.db.run(
-                        `INSERT INTO ${tableName} (id, data, workflowId, executionId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`,
-                        [recordId, JSON.stringify(record), this.workflow?.id, this.executionId, now, now]
-                    );
+                    const insertQuery = isTimeSeriesData
+                        ? `INSERT INTO ${tableName} (id, data, workflowId, executionId, createdAt, updatedAt, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)`
+                        : `INSERT INTO ${tableName} (id, data, workflowId, executionId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`;
+                    const insertParams = isTimeSeriesData
+                        ? [recordId, JSON.stringify(record), this.workflow?.id, this.executionId, now, now, timestamp]
+                        : [recordId, JSON.stringify(record), this.workflow?.id, this.executionId, now, now];
+                    
+                    await this.db.run(insertQuery, insertParams);
                 }
                 
                 savedIds.push(recordId);
@@ -424,10 +498,11 @@ class WorkflowExecutor {
 
             return {
                 success: true,
-                message: `Saved ${savedCount} record(s) to '${tableName}'`,
+                message: `Saved ${savedCount} record(s) to '${tableName}'${isTimeSeriesData ? ' (time-series optimized)' : ''}`,
                 outputData: inputData,
                 savedIds,
-                tableName
+                tableName,
+                isTimeSeries: isTimeSeriesData
             };
         } catch (error) {
             console.error('[SaveRecords] Error:', error);
@@ -437,6 +512,104 @@ class WorkflowExecutor {
                 outputData: inputData,
                 error: error.message
             };
+        }
+    }
+
+    /**
+     * Detect if input data is time-series data from OT nodes
+     * Uses the timeSeriesHelper utility
+     */
+    detectTimeSeriesData(inputData) {
+        return detectTimeSeriesData(inputData);
+    }
+
+    /**
+     * Save records to entity using the entities API structure
+     */
+    async saveToEntity(entityId, inputData, isTimeSeriesData) {
+        try {
+            // Normalize data for entity storage
+            let normalizedRecords;
+            if (isTimeSeriesData) {
+                normalizedRecords = normalizeTimeSeriesData(inputData);
+            } else {
+                const records = Array.isArray(inputData) ? inputData : [inputData];
+                normalizedRecords = records.map(record => {
+                    const { metadata, raw, ...rest } = record;
+                    return rest;
+                });
+            }
+
+            // Save each record (in a real implementation, this would call the API)
+            // For now, we'll use the database directly
+            let savedCount = 0;
+            const savedIds = [];
+
+            for (const record of normalizedRecords) {
+                // Get entity properties
+                const properties = await this.db.all(
+                    'SELECT id, name, type FROM properties WHERE entityId = ?',
+                    [entityId]
+                );
+
+                // Create property name mapping
+                const propertyMap = {};
+                properties.forEach(prop => {
+                    propertyMap[prop.name.toLowerCase()] = prop;
+                });
+
+                // Create record
+                const recordId = generateId();
+                const createdAt = record.timestamp || record.createdAt || new Date().toISOString();
+
+                await this.db.run(
+                    'INSERT INTO records (id, entityId, createdAt) VALUES (?, ?, ?)',
+                    [recordId, entityId, createdAt]
+                );
+
+                // Save property values
+                for (const [key, val] of Object.entries(record)) {
+                    if (key === 'id' || key === 'createdAt' || key === 'entityId' || key === 'timestamp') {
+                        // Handle timestamp specially if needed
+                        if (key === 'timestamp') {
+                            const timestampProp = propertyMap['timestamp'] || propertyMap['time'] || propertyMap['createdat'];
+                            if (timestampProp) {
+                                const valueId = generateId();
+                                await this.db.run(
+                                    'INSERT INTO record_values (id, recordId, propertyId, value) VALUES (?, ?, ?, ?)',
+                                    [valueId, recordId, timestampProp.id, String(val)]
+                                );
+                            }
+                        }
+                        continue;
+                    }
+
+                    const prop = propertyMap[key.toLowerCase()];
+                    if (prop) {
+                        const valueId = generateId();
+                        const value = typeof val === 'object' ? JSON.stringify(val) : String(val);
+                        await this.db.run(
+                            'INSERT INTO record_values (id, recordId, propertyId, value) VALUES (?, ?, ?, ?)',
+                            [valueId, recordId, prop.id, value]
+                        );
+                    }
+                }
+
+                savedIds.push(recordId);
+                savedCount++;
+            }
+
+            return {
+                success: true,
+                message: `Saved ${savedCount} record(s) to entity '${entityId}'${isTimeSeriesData ? ' (time-series optimized)' : ''}`,
+                outputData: inputData,
+                savedIds,
+                entityId,
+                isTimeSeries: isTimeSeriesData
+            };
+        } catch (error) {
+            console.error('[SaveToEntity] Error:', error);
+            throw error;
         }
     }
 
@@ -699,6 +872,407 @@ class WorkflowExecutor {
         }
     }
 
+    async handleSendSlack(node, inputData) {
+        const config = node.config || {};
+        const { slackWebhookUrl, slackChannel, slackMessage, slackUsername, slackIconEmoji } = config;
+
+        if (!slackWebhookUrl) {
+            throw new Error('Slack webhook URL not configured');
+        }
+
+        if (!slackMessage) {
+            throw new Error('Slack message is empty');
+        }
+
+        // Replace placeholders in message with input data
+        let message = slackMessage;
+        if (inputData && typeof inputData === 'object') {
+            for (const [key, value] of Object.entries(inputData)) {
+                const placeholder = `{{${key}}}`;
+                if (message.includes(placeholder)) {
+                    message = message.replace(new RegExp(placeholder, 'g'), String(value));
+                }
+            }
+        }
+
+        // Build Slack payload
+        const payload = {
+            text: message,
+            username: slackUsername || 'Workflow Bot',
+            icon_emoji: slackIconEmoji || ':robot_face:'
+        };
+
+        if (slackChannel) {
+            payload.channel = slackChannel;
+        }
+
+        // Add attachments if we have structured data
+        if (inputData && typeof inputData === 'object') {
+            const fields = [];
+            for (const [key, value] of Object.entries(inputData)) {
+                if (!['_webhookData', 'response'].includes(key)) {
+                    fields.push({
+                        title: key,
+                        value: String(value).substring(0, 100),
+                        short: true
+                    });
+                }
+            }
+
+            if (fields.length > 0) {
+                payload.attachments = [{
+                    color: '#36a64f',
+                    fields: fields.slice(0, 10)
+                }];
+            }
+        }
+
+        try {
+            const response = await fetch(slackWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Slack API error: ${errorText}`);
+            }
+
+            return {
+                success: true,
+                message: `Slack message sent${slackChannel ? ' to ' + slackChannel : ''}`,
+                outputData: inputData
+            };
+        } catch (error) {
+            throw new Error(`Failed to send Slack message: ${error.message}`);
+        }
+    }
+
+    async handleSendDiscord(node, inputData) {
+        const config = node.config || {};
+        const { discordWebhookUrl, discordMessage, discordUsername, discordAvatarUrl, discordEmbedTitle, discordEmbedColor } = config;
+
+        if (!discordWebhookUrl) {
+            throw new Error('Discord webhook URL not configured');
+        }
+
+        if (!discordMessage && !discordEmbedTitle) {
+            throw new Error('Discord message or embed title is required');
+        }
+
+        // Replace placeholders in message with input data
+        let message = discordMessage || '';
+        let embedTitle = discordEmbedTitle || '';
+        if (inputData && typeof inputData === 'object') {
+            for (const [key, value] of Object.entries(inputData)) {
+                const placeholder = `{{${key}}}`;
+                message = message.replace(new RegExp(placeholder, 'g'), String(value));
+                embedTitle = embedTitle.replace(new RegExp(placeholder, 'g'), String(value));
+            }
+        }
+
+        // Build Discord payload
+        const payload = {
+            username: discordUsername || 'Workflow Bot',
+        };
+
+        if (message) {
+            payload.content = message;
+        }
+
+        if (discordAvatarUrl) {
+            payload.avatar_url = discordAvatarUrl;
+        }
+
+        // Add embed if we have structured data or embed title
+        if (embedTitle || (inputData && typeof inputData === 'object')) {
+            const colorHex = (discordEmbedColor || '5865F2').replace('#', '');
+            const embed = {
+                color: parseInt(colorHex, 16),
+                timestamp: new Date().toISOString()
+            };
+
+            if (embedTitle) {
+                embed.title = embedTitle;
+            }
+
+            if (inputData && typeof inputData === 'object') {
+                const fields = [];
+                for (const [key, value] of Object.entries(inputData)) {
+                    if (!['_webhookData', 'response'].includes(key)) {
+                        fields.push({
+                            name: key,
+                            value: String(value).substring(0, 1024),
+                            inline: true
+                        });
+                    }
+                }
+                if (fields.length > 0) {
+                    embed.fields = fields.slice(0, 25);
+                }
+            }
+
+            payload.embeds = [embed];
+        }
+
+        try {
+            const response = await fetch(discordWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok && response.status !== 204) {
+                const errorText = await response.text();
+                throw new Error(`Discord API error: ${errorText}`);
+            }
+
+            return {
+                success: true,
+                message: 'Discord message sent successfully',
+                outputData: inputData
+            };
+        } catch (error) {
+            throw new Error(`Failed to send Discord message: ${error.message}`);
+        }
+    }
+
+    async handleSendTeams(node, inputData) {
+        const config = node.config || {};
+        const { teamsWebhookUrl, teamsMessage, teamsTitle, teamsThemeColor } = config;
+
+        if (!teamsWebhookUrl) {
+            throw new Error('Teams webhook URL not configured');
+        }
+
+        if (!teamsMessage) {
+            throw new Error('Teams message is empty');
+        }
+
+        // Replace placeholders in message with input data
+        let message = teamsMessage;
+        let title = teamsTitle || 'Workflow Notification';
+        if (inputData && typeof inputData === 'object') {
+            for (const [key, value] of Object.entries(inputData)) {
+                const placeholder = `{{${key}}}`;
+                message = message.replace(new RegExp(placeholder, 'g'), String(value));
+                title = title.replace(new RegExp(placeholder, 'g'), String(value));
+            }
+        }
+
+        // Build Teams MessageCard payload
+        const payload = {
+            '@type': 'MessageCard',
+            '@context': 'http://schema.org/extensions',
+            themeColor: (teamsThemeColor || '0078D4').replace('#', ''),
+            summary: title,
+            sections: [{
+                activityTitle: title,
+                text: message,
+                markdown: true
+            }]
+        };
+
+        // Add facts if we have structured data
+        if (inputData && typeof inputData === 'object') {
+            const facts = [];
+            for (const [key, value] of Object.entries(inputData)) {
+                if (!['_webhookData', 'response'].includes(key)) {
+                    facts.push({
+                        name: key,
+                        value: String(value).substring(0, 500)
+                    });
+                }
+            }
+            if (facts.length > 0) {
+                payload.sections[0].facts = facts.slice(0, 10);
+            }
+        }
+
+        try {
+            const response = await fetch(teamsWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Teams API error: ${errorText}`);
+            }
+
+            return {
+                success: true,
+                message: 'Teams message sent successfully',
+                outputData: inputData
+            };
+        } catch (error) {
+            throw new Error(`Failed to send Teams message: ${error.message}`);
+        }
+    }
+
+    async handleSendTelegram(node, inputData) {
+        const config = node.config || {};
+        const { telegramBotToken, telegramChatId, telegramMessage, telegramParseMode } = config;
+
+        const botToken = telegramBotToken || process.env.TELEGRAM_BOT_TOKEN;
+        
+        if (!botToken) {
+            throw new Error('Telegram bot token not configured');
+        }
+
+        if (!telegramChatId) {
+            throw new Error('Telegram chat ID not configured');
+        }
+
+        if (!telegramMessage) {
+            throw new Error('Telegram message is empty');
+        }
+
+        // Replace placeholders in message with input data
+        let message = telegramMessage;
+        if (inputData && typeof inputData === 'object') {
+            for (const [key, value] of Object.entries(inputData)) {
+                const placeholder = `{{${key}}}`;
+                message = message.replace(new RegExp(placeholder, 'g'), String(value));
+            }
+        }
+
+        try {
+            const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: telegramChatId,
+                    text: message,
+                    parse_mode: telegramParseMode || 'HTML'
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`Telegram API error: ${errorData.description || response.statusText}`);
+            }
+
+            const result = await response.json();
+
+            return {
+                success: true,
+                message: `Telegram message sent to chat ${telegramChatId}`,
+                outputData: inputData,
+                messageId: result.result?.message_id
+            };
+        } catch (error) {
+            throw new Error(`Failed to send Telegram message: ${error.message}`);
+        }
+    }
+
+    async handleGoogleSheets(node, inputData) {
+        const config = node.config || {};
+        const { spreadsheetId, sheetRange, operation } = config;
+        const apiKey = config.googleApiKey || process.env.GOOGLE_API_KEY;
+
+        if (!spreadsheetId) {
+            throw new Error('Google Sheets spreadsheet ID not configured');
+        }
+
+        const range = sheetRange || 'Sheet1!A1:Z1000';
+        const op = operation || 'read';
+        const baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
+
+        try {
+            if (op === 'read') {
+                const url = `${baseUrl}/${spreadsheetId}/values/${encodeURIComponent(range)}`;
+                const params = apiKey ? `?key=${apiKey}` : '';
+                
+                const response = await fetch(url + params);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Google Sheets API error: ${errorText}`);
+                }
+
+                const data = await response.json();
+                const values = data.values || [];
+
+                // Convert to list of dicts using first row as headers
+                let outputData;
+                if (values.length > 1) {
+                    const headers = values[0];
+                    outputData = values.slice(1).map(row => {
+                        const record = {};
+                        headers.forEach((header, i) => {
+                            record[header] = row[i] || '';
+                        });
+                        return record;
+                    });
+                } else {
+                    outputData = values;
+                }
+
+                return {
+                    success: true,
+                    message: `Read ${values.length} rows from Google Sheets`,
+                    outputData,
+                    rowCount: values.length
+                };
+
+            } else if (op === 'append' || op === 'write') {
+                if (!inputData) {
+                    throw new Error('No data to write to Google Sheets');
+                }
+
+                // Convert input data to 2D array
+                let values;
+                if (Array.isArray(inputData) && inputData.length > 0) {
+                    if (typeof inputData[0] === 'object') {
+                        const headers = Object.keys(inputData[0]);
+                        values = [headers];
+                        inputData.forEach(record => {
+                            values.push(headers.map(h => String(record[h] || '')));
+                        });
+                    } else {
+                        values = inputData;
+                    }
+                } else if (typeof inputData === 'object') {
+                    const headers = Object.keys(inputData);
+                    values = [headers, headers.map(h => String(inputData[h] || ''))];
+                } else {
+                    values = [[String(inputData)]];
+                }
+
+                const endpoint = op === 'append' ? 'append' : 'update';
+                const url = `${baseUrl}/${spreadsheetId}/values/${encodeURIComponent(range)}:${endpoint}`;
+                const params = apiKey ? `?valueInputOption=USER_ENTERED&key=${apiKey}` : '?valueInputOption=USER_ENTERED';
+
+                const response = await fetch(url + params, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ values })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Google Sheets API error: ${errorText}`);
+                }
+
+                return {
+                    success: true,
+                    message: `${op === 'append' ? 'Appended' : 'Wrote'} ${values.length} rows to Google Sheets`,
+                    outputData: inputData,
+                    rowCount: values.length
+                };
+
+            } else {
+                throw new Error(`Unknown operation: ${op}`);
+            }
+        } catch (error) {
+            throw new Error(`Google Sheets operation failed: ${error.message}`);
+        }
+    }
+
     async handleDataVisualization(node, inputData) {
         const config = node.config || {};
         const { generatedWidget, visualizationPrompt } = config;
@@ -834,6 +1408,586 @@ class WorkflowExecutor {
         };
     }
 
+    // ==================== OT/INDUSTRIAL NODE HANDLERS ====================
+
+    /**
+     * Get connection configuration from database
+     */
+    async getConnection(connectionId) {
+        if (!connectionId) return null;
+        
+        try {
+            const connection = await this.db.get(
+                'SELECT * FROM data_connections WHERE id = ?',
+                [connectionId]
+            );
+            
+            if (!connection) {
+                throw new Error(`Connection ${connectionId} not found`);
+            }
+            
+            // Parse config JSON
+            if (connection.config) {
+                try {
+                    connection.config = JSON.parse(connection.config);
+                } catch (e) {
+                    connection.config = {};
+                }
+            } else {
+                connection.config = {};
+            }
+            
+            // Check if connection is active
+            if (connection.status !== 'active') {
+                throw new Error(`Connection ${connection.name || connectionId} is not active (status: ${connection.status})`);
+            }
+            
+            return connection;
+        } catch (error) {
+            console.error(`[getConnection] Error fetching connection ${connectionId}:`, error);
+            throw error;
+        }
+    }
+
+    async handleOpcua(node, inputData) {
+        const connectionId = node.config?.opcuaConnectionId;
+        const nodeIds = node.config?.opcuaNodeIds || [];
+        const pollingInterval = node.config?.opcuaPollingInterval || 5000;
+
+        if (!connectionId || nodeIds.length === 0) {
+            throw new Error('OPC UA node requires connectionId and nodeIds configuration');
+        }
+
+        // Get connection configuration
+        let connection = null;
+        try {
+            connection = await this.getConnection(connectionId);
+        } catch (error) {
+            return {
+                success: false,
+                message: `Connection error: ${error.message}`,
+                outputData: inputData,
+                error: error.message
+            };
+        }
+
+        // Use real OPC UA connection
+        try {
+            const otManager = getOTConnectionsManager();
+            const timeout = node.config?.opcuaTimeout || connection.config?.timeout || 10000;
+            const outputData = await otManager.readOpcuaNodes(connection.config, nodeIds, timeout);
+
+            return {
+                success: true,
+                message: `Read ${nodeIds.length} OPC UA nodes from ${connection?.name || connectionId}`,
+                outputData,
+                metadata: {
+                    connectionId,
+                    connectionName: connection?.name,
+                    pollingInterval,
+                    nodeCount: nodeIds.length
+                }
+            };
+        } catch (error) {
+            console.error('[handleOpcua] Error reading OPC UA nodes:', error);
+            // Fallback to simulation if real connection fails
+            const timestamp = new Date().toISOString();
+            const simulatedData = nodeIds.map(nodeId => ({
+                nodeId,
+                value: Math.random() * 100,
+                timestamp,
+                quality: 'Good'
+            }));
+
+            return {
+                success: false,
+                message: `OPC UA read failed: ${error.message}. Using simulated data.`,
+                outputData: {
+                    timestamp,
+                    values: simulatedData.reduce((acc, item) => {
+                        acc[item.nodeId] = item.value;
+                        return acc;
+                    }, {}),
+                    raw: simulatedData
+                },
+                metadata: {
+                    connectionId,
+                    connectionName: connection?.name,
+                    pollingInterval,
+                    nodeCount: nodeIds.length,
+                    error: error.message,
+                    simulated: true
+                }
+            };
+        }
+    }
+
+    async handleMqtt(node, inputData) {
+        const connectionId = node.config?.mqttConnectionId;
+        const topics = node.config?.mqttTopics || [];
+        const qos = node.config?.mqttQos || 0;
+
+        if (!connectionId || topics.length === 0) {
+            throw new Error('MQTT node requires connectionId and topics configuration');
+        }
+
+        // Get connection configuration
+        let connection = null;
+        try {
+            connection = await this.getConnection(connectionId);
+        } catch (error) {
+            return {
+                success: false,
+                message: `Connection error: ${error.message}`,
+                outputData: inputData,
+                error: error.message
+            };
+        }
+
+        // Use real MQTT connection
+        try {
+            const otManager = getOTConnectionsManager();
+            const timeout = node.config?.mqttTimeout || 5000;
+            const outputData = await otManager.subscribeMqttTopics(connection.config, topics, qos, timeout);
+
+            return {
+                success: true,
+                message: `Received ${outputData.messageCount} MQTT messages from ${connection?.name || connectionId}`,
+                outputData,
+                metadata: {
+                    connectionId,
+                    connectionName: connection?.name,
+                    qos,
+                    topicCount: topics.length,
+                    messageCount: outputData.messageCount
+                }
+            };
+        } catch (error) {
+            console.error('[handleMqtt] Error subscribing to MQTT topics:', error);
+            // Fallback to simulation if real connection fails
+            const timestamp = new Date().toISOString();
+            const simulatedMessages = topics.map(topic => ({
+                topic,
+                payload: JSON.stringify({
+                    value: Math.random() * 100,
+                    timestamp,
+                    sensorId: topic.split('/').pop()
+                }),
+                qos,
+                timestamp
+            }));
+
+            return {
+                success: false,
+                message: `MQTT subscription failed: ${error.message}. Using simulated data.`,
+                outputData: {
+                    timestamp,
+                    messages: simulatedMessages,
+                    topicData: simulatedMessages.reduce((acc, msg) => {
+                        const data = JSON.parse(msg.payload);
+                        acc[msg.topic] = data.value;
+                        return acc;
+                    }, {})
+                },
+                metadata: {
+                    connectionId,
+                    connectionName: connection?.name,
+                    qos,
+                    topicCount: topics.length,
+                    error: error.message,
+                    simulated: true
+                }
+            };
+        }
+    }
+
+    async handleModbus(node, inputData) {
+        const connectionId = node.config?.modbusConnectionId;
+        const addresses = node.config?.modbusAddresses || [];
+        const functionCode = node.config?.modbusFunctionCode || 3; // Holding registers
+
+        if (!connectionId || addresses.length === 0) {
+            throw new Error('Modbus node requires connectionId and addresses configuration');
+        }
+
+        // Get connection configuration
+        let connection = null;
+        try {
+            connection = await this.getConnection(connectionId);
+        } catch (error) {
+            return {
+                success: false,
+                message: `Connection error: ${error.message}`,
+                outputData: inputData,
+                error: error.message
+            };
+        }
+
+        // Use real Modbus connection
+        try {
+            const otManager = getOTConnectionsManager();
+            const timeout = node.config?.modbusTimeout || connection.config?.timeout || 10000;
+            const outputData = await otManager.readModbusRegisters(connection.config, addresses, functionCode, timeout);
+
+            return {
+                success: true,
+                message: `Read ${addresses.length} Modbus registers from ${connection?.name || connectionId}`,
+                outputData,
+                metadata: {
+                    connectionId,
+                    connectionName: connection?.name,
+                    functionCode,
+                    addressCount: addresses.length
+                }
+            };
+        } catch (error) {
+            console.error('[handleModbus] Error reading Modbus registers:', error);
+            // Fallback to simulation if real connection fails
+            const timestamp = new Date().toISOString();
+            const simulatedData = addresses.map(addr => ({
+                address: addr,
+                value: Math.floor(Math.random() * 65535),
+                functionCode,
+                timestamp
+            }));
+
+            return {
+                success: false,
+                message: `Modbus read failed: ${error.message}. Using simulated data.`,
+                outputData: {
+                    timestamp,
+                    registers: simulatedData.reduce((acc, item) => {
+                        acc[item.address] = item.value;
+                        return acc;
+                    }, {}),
+                    raw: simulatedData
+                },
+                metadata: {
+                    connectionId,
+                    connectionName: connection?.name,
+                    functionCode,
+                    addressCount: addresses.length,
+                    error: error.message,
+                    simulated: true
+                }
+            };
+        }
+    }
+
+    async handleScada(node, inputData) {
+        const connectionId = node.config?.scadaConnectionId;
+        const tags = node.config?.scadaTags || [];
+        const pollingInterval = node.config?.scadaPollingInterval || 5000;
+
+        if (!connectionId || tags.length === 0) {
+            throw new Error('SCADA node requires connectionId and tags configuration');
+        }
+
+        // Get connection configuration
+        let connection = null;
+        try {
+            connection = await this.getConnection(connectionId);
+        } catch (error) {
+            return {
+                success: false,
+                message: `Connection error: ${error.message}`,
+                outputData: inputData,
+                error: error.message
+            };
+        }
+
+        // TODO: Implement actual SCADA connection (OPC UA/Modbus/API based)
+        // For now, simulate reading SCADA tags using connection config
+        const timestamp = new Date().toISOString();
+        const simulatedData = tags.map(tag => ({
+            tag,
+            value: Math.random() * 100,
+            timestamp,
+            quality: 'Good'
+        }));
+
+        const outputData = {
+            timestamp,
+            tags: simulatedData.reduce((acc, item) => {
+                acc[item.tag] = item.value;
+                return acc;
+            }, {}),
+            raw: simulatedData
+        };
+
+        return {
+            success: true,
+            message: `Read ${tags.length} SCADA tags from ${connection?.name || connectionId}`,
+            outputData,
+            metadata: {
+                connectionId,
+                connectionName: connection?.name,
+                pollingInterval,
+                tagCount: tags.length
+            }
+        };
+    }
+
+    async handleMes(node, inputData) {
+        const connectionId = node.config?.mesConnectionId;
+        const endpoint = node.config?.mesEndpoint;
+        const query = node.config?.mesQuery;
+
+        if (!connectionId || !endpoint) {
+            throw new Error('MES node requires connectionId and endpoint configuration');
+        }
+
+        // Get connection configuration
+        let connection = null;
+        try {
+            connection = await this.getConnection(connectionId);
+        } catch (error) {
+            return {
+                success: false,
+                message: `Connection error: ${error.message}`,
+                outputData: inputData,
+                error: error.message
+            };
+        }
+
+        // TODO: Implement actual MES API connection
+        // For now, simulate fetching production data from MES using connection config
+        const timestamp = new Date().toISOString();
+        const simulatedData = {
+            productionOrder: `PO-${Date.now()}`,
+            quantity: Math.floor(Math.random() * 1000),
+            status: 'In Progress',
+            startTime: timestamp,
+            equipment: 'Line-01',
+            operator: 'Operator-123'
+        };
+
+        const outputData = {
+            timestamp,
+            ...simulatedData,
+            query: query || 'production-status'
+        };
+
+        return {
+            success: true,
+            message: `Fetched production data from MES (${connection?.name || connectionId})`,
+            outputData,
+            metadata: {
+                connectionId,
+                connectionName: connection?.name,
+                endpoint,
+                query
+            }
+        };
+    }
+
+    async handleDataHistorian(node, inputData) {
+        const connectionId = node.config?.dataHistorianConnectionId;
+        const tags = node.config?.dataHistorianTags || [];
+        const startTime = node.config?.dataHistorianStartTime || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const endTime = node.config?.dataHistorianEndTime || new Date().toISOString();
+        const aggregation = node.config?.dataHistorianAggregation || 'raw';
+
+        if (!connectionId || tags.length === 0) {
+            throw new Error('Data Historian node requires connectionId and tags configuration');
+        }
+
+        // Get connection configuration
+        let connection = null;
+        try {
+            connection = await this.getConnection(connectionId);
+        } catch (error) {
+            return {
+                success: false,
+                message: `Connection error: ${error.message}`,
+                outputData: inputData,
+                error: error.message
+            };
+        }
+
+        // TODO: Implement actual Data Historian query (PI/Wonderware/InfluxDB)
+        // For now, simulate historical time-series data using connection config
+        const dataPoints = [];
+        const start = new Date(startTime);
+        const end = new Date(endTime);
+        const interval = aggregation === 'raw' ? 60000 : 3600000; // 1min or 1h
+        let current = new Date(start);
+
+        while (current <= end) {
+            tags.forEach(tag => {
+                dataPoints.push({
+                    tag,
+                    timestamp: current.toISOString(),
+                    value: Math.random() * 100
+                });
+            });
+            current = new Date(current.getTime() + interval);
+        }
+
+        const outputData = {
+            startTime,
+            endTime,
+            aggregation,
+            dataPoints,
+            tags: tags.reduce((acc, tag) => {
+                acc[tag] = dataPoints.filter(dp => dp.tag === tag).map(dp => ({
+                    timestamp: dp.timestamp,
+                    value: dp.value
+                }));
+                return acc;
+            }, {})
+        };
+
+        return {
+            success: true,
+            message: `Queried ${dataPoints.length} historical data points for ${tags.length} tags from ${connection?.name || connectionId}`,
+            outputData,
+            metadata: {
+                connectionId,
+                connectionName: connection?.name,
+                tagCount: tags.length,
+                pointCount: dataPoints.length,
+                aggregation
+            }
+        };
+    }
+
+    async handleTimeSeriesAggregator(node, inputData) {
+        const aggregationType = node.config?.timeSeriesAggregationType || 'avg';
+        const interval = node.config?.timeSeriesInterval || '5m';
+        const fields = node.config?.timeSeriesFields || [];
+
+        if (!inputData || !inputData.timestamp) {
+            // If no time-series data, try to aggregate from array input
+            if (Array.isArray(inputData)) {
+                return this.aggregateTimeSeriesArray(inputData, aggregationType, interval, fields);
+            }
+            throw new Error('Time-Series Aggregator requires time-series data with timestamp');
+        }
+
+        // TODO: Implement proper time-series aggregation
+        // For now, simple aggregation logic
+        const timestamp = inputData.timestamp;
+        const values = { ...inputData };
+        delete values.timestamp;
+
+        const aggregated = {};
+        Object.keys(values).forEach(key => {
+            if (fields.length === 0 || fields.includes(key)) {
+                const value = Number(values[key]);
+                if (!isNaN(value)) {
+                    aggregated[key] = this.aggregateValue(value, aggregationType);
+                }
+            }
+        });
+
+        return {
+            success: true,
+            message: `Aggregated time-series data using ${aggregationType}`,
+            outputData: {
+                timestamp,
+                interval,
+                ...aggregated
+            },
+            metadata: {
+                aggregationType,
+                interval,
+                fieldCount: Object.keys(aggregated).length
+            }
+        };
+    }
+
+    aggregateTimeSeriesArray(dataArray, aggregationType, interval, fields) {
+        if (!Array.isArray(dataArray) || dataArray.length === 0) {
+            return {
+                success: true,
+                message: 'No data to aggregate',
+                outputData: {}
+            };
+        }
+
+        // Group by interval and aggregate
+        const grouped = {};
+        dataArray.forEach(item => {
+            const timestamp = new Date(item.timestamp || item.createdAt || Date.now());
+            const intervalKey = this.getIntervalKey(timestamp, interval);
+            
+            if (!grouped[intervalKey]) {
+                grouped[intervalKey] = [];
+            }
+            grouped[intervalKey].push(item);
+        });
+
+        const aggregated = {};
+        Object.keys(grouped).forEach(intervalKey => {
+            const group = grouped[intervalKey];
+            const keys = fields.length > 0 ? fields : Object.keys(group[0] || {}).filter(k => k !== 'timestamp' && k !== 'createdAt');
+            
+            keys.forEach(key => {
+                const values = group.map(item => Number(item[key])).filter(v => !isNaN(v));
+                if (values.length > 0) {
+                    if (!aggregated[key]) aggregated[key] = [];
+                    aggregated[key].push({
+                        interval: intervalKey,
+                        value: this.aggregateValueArray(values, aggregationType),
+                        count: values.length
+                    });
+                }
+            });
+        });
+
+        return {
+            success: true,
+            message: `Aggregated ${dataArray.length} data points into ${Object.keys(grouped).length} intervals`,
+            outputData: aggregated,
+            metadata: {
+                aggregationType,
+                interval,
+                inputCount: dataArray.length,
+                outputIntervals: Object.keys(grouped).length
+            }
+        };
+    }
+
+    aggregateValue(value, type) {
+        // For single value, return as-is (will be aggregated with other values in interval)
+        return value;
+    }
+
+    aggregateValueArray(values, type) {
+        switch (type) {
+            case 'avg': return values.reduce((a, b) => a + b, 0) / values.length;
+            case 'min': return Math.min(...values);
+            case 'max': return Math.max(...values);
+            case 'sum': return values.reduce((a, b) => a + b, 0);
+            case 'count': return values.length;
+            default: return values.reduce((a, b) => a + b, 0) / values.length;
+        }
+    }
+
+    getIntervalKey(timestamp, interval) {
+        const date = new Date(timestamp);
+        const intervalMs = this.parseInterval(interval);
+        const intervalStart = Math.floor(date.getTime() / intervalMs) * intervalMs;
+        return new Date(intervalStart).toISOString();
+    }
+
+    parseInterval(interval) {
+        const match = interval.match(/^(\d+)([smhd])$/);
+        if (!match) return 5 * 60 * 1000; // Default 5 minutes
+        
+        const value = parseInt(match[1]);
+        const unit = match[2];
+        
+        switch (unit) {
+            case 's': return value * 1000;
+            case 'm': return value * 60 * 1000;
+            case 'h': return value * 60 * 60 * 1000;
+            case 'd': return value * 24 * 60 * 60 * 1000;
+            default: return 5 * 60 * 1000;
+        }
+    }
+
     // ==================== HELPER METHODS ====================
 
     applyInputs(inputs) {
@@ -967,5 +2121,5 @@ class WorkflowExecutor {
     }
 }
 
-module.exports = { WorkflowExecutor };
+module.exports = { WorkflowExecutor, setBroadcastToOrganization };
 

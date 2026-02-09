@@ -329,19 +329,29 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
 
     const handleDeleteTemplate = async (templateId: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!confirm('Are you sure you want to delete this template?')) return;
+        e.preventDefault();
+        
+        // Use setTimeout to escape the click event chain before showing confirm
+        setTimeout(async () => {
+            if (!window.confirm('Are you sure you want to delete this template?')) return;
 
-        try {
-            const res = await fetch(`${API_BASE}/report-templates/${templateId}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-            if (res.ok) {
-                setTemplates(prev => prev.filter(t => t.id !== templateId));
+            try {
+                const res = await fetch(`${API_BASE}/report-templates/${templateId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                if (res.ok) {
+                    setTemplates(prev => prev.filter(t => t.id !== templateId));
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    console.error('Delete failed:', res.status, errData);
+                    window.alert(`Failed to delete template: ${errData.error || res.statusText}`);
+                }
+            } catch (error) {
+                console.error('Error deleting template:', error);
+                window.alert('Failed to delete template. Please try again.');
             }
-        } catch (error) {
-            console.error('Error deleting template:', error);
-        }
+        }, 0);
     };
 
     const handleSaveTemplate = async (templateData: Omit<ReportTemplate, 'id' | 'createdAt' | 'updatedAt'>) => {

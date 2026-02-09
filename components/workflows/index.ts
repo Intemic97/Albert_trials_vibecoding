@@ -198,3 +198,6 @@ export { NodeConfigPanels } from './NodeConfigPanels';
 
 // Data Preview Panel - Panel de previsualización de datos
 export { DataPreviewSidePanel } from './DataPreviewSidePanel';
+
+// Execution Status Indicator - Indicador de estado de ejecución en tiempo real
+export { ExecutionStatusIndicator, ExecutionProgressBar } from './ExecutionStatusIndicator';

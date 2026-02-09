@@ -107,6 +107,27 @@ class PrefectClient {
     }
 
     /**
+     * Cancel a running execution
+     */
+    async cancelExecution(executionId) {
+        try {
+            console.log(`[PrefectClient] Cancelling execution: ${executionId}`);
+            
+            const response = await this.makeRequest(`/api/executions/${executionId}/cancel`, {
+                method: 'POST'
+            });
+
+            console.log(`[PrefectClient] Execution cancelled: ${executionId}`);
+
+            return response;
+
+        } catch (error) {
+            console.error('[PrefectClient] Error cancelling execution:', error.message);
+            throw new Error(`Failed to cancel execution: ${error.message}`);
+        }
+    }
+
+    /**
      * Check if Prefect service is available
      */
     async isAvailable() {

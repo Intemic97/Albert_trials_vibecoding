@@ -249,7 +249,7 @@ async function getOrganizations(req, res) {
     const db = await openDb();
     try {
         const orgs = await db.all(`
-            SELECT o.id, o.name, uo.role 
+            SELECT o.id, o.name, o.logo, uo.role 
             FROM organizations o
             JOIN user_organizations uo ON o.id = uo.organizationId
             WHERE uo.userId = ?

@@ -60,6 +60,7 @@ async function initDb() {
       description TEXT,
       author TEXT,
       lastEdited TEXT,
+      entityType TEXT DEFAULT 'generic',
       FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
     );
 
@@ -70,6 +71,7 @@ async function initDb() {
       type TEXT,
       defaultValue TEXT,
       relatedEntityId TEXT,
+      unit TEXT,
       FOREIGN KEY(entityId) REFERENCES entities(id) ON DELETE CASCADE
     );
 
@@ -703,6 +705,58 @@ async function initDb() {
   } catch (e) {
     // Column already exists, ignore
   }
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN logo TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add entityType column to entities table
+  try {
+    await db.exec(`ALTER TABLE entities ADD COLUMN entityType TEXT DEFAULT 'generic'`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add unit column to properties table
+  try {
+    await db.exec(`ALTER TABLE properties ADD COLUMN unit TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add tags column to records table
+  try {
+    await db.exec(`ALTER TABLE records ADD COLUMN tags TEXT DEFAULT '[]'`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migration: Add formula column to properties table (for calculated fields)
+  try {
+    await db.exec(`ALTER TABLE properties ADD COLUMN formula TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Audit trail table for record changes
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT NOT NULL,
+      entityId TEXT NOT NULL,
+      recordId TEXT,
+      action TEXT NOT NULL,
+      field TEXT,
+      oldValue TEXT,
+      newValue TEXT,
+      userId TEXT,
+      userName TEXT,
+      timestamp TEXT NOT NULL,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY(entityId) REFERENCES entities(id) ON DELETE CASCADE
+    );
+  `);
 
   // Create copilot_chats table for storing chat history
   await db.exec(`
@@ -822,6 +876,35 @@ async function initDb() {
     await db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(userId)`);
     await db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(createdAt)`);
     await db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)`);
+  } catch (e) {
+    // Indexes might already exist
+  }
+
+  // Create ot_alerts table for OT/Industrial alerts
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS ot_alerts (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT,
+      nodeId TEXT,
+      nodeType TEXT,
+      fieldName TEXT,
+      value REAL,
+      threshold TEXT,
+      severity TEXT,
+      message TEXT,
+      metadata TEXT,
+      createdAt TEXT,
+      acknowledgedAt TEXT,
+      acknowledgedBy TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Create indexes for ot_alerts
+  try {
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_ot_alerts_org ON ot_alerts(organizationId)`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_ot_alerts_created ON ot_alerts(createdAt)`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_ot_alerts_severity ON ot_alerts(severity)`);
   } catch (e) {
     // Indexes might already exist
   }

@@ -37,6 +37,7 @@ const Documentation = React.lazy(() => import('./components/Documentation').then
 const SharedDashboard = React.lazy(() => import('./components/SharedDashboard').then(m => ({ default: m.SharedDashboard })));
 const PublicWorkflowForm = React.lazy(() => import('./components/PublicWorkflowForm').then(m => ({ default: m.PublicWorkflowForm })));
 const InteractiveTutorial = React.lazy(() => import('./components/InteractiveTutorial').then(m => ({ default: m.InteractiveTutorial })));
+const IndustrialDashboard = React.lazy(() => import('./components/IndustrialDashboard').then(m => ({ default: m.IndustrialDashboard })));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -158,6 +159,7 @@ function AuthenticatedApp() {
         if (path.startsWith('/copilots')) return 'copilots';
         if (path.startsWith('/logs')) return 'logs';
         if (path.startsWith('/connections')) return 'connections';
+        if (path.startsWith('/industrial')) return 'industrial';
         if (path.startsWith('/documentation')) return 'documentation';
         if (path.startsWith('/settings')) return 'settings';
         if (path.startsWith('/admin')) return 'admin';
@@ -222,6 +224,25 @@ function AuthenticatedApp() {
     const [newPropName, setNewPropName] = useState('');
     const [newPropType, setNewPropType] = useState<PropertyType>('text');
     const [newPropRelationId, setNewPropRelationId] = useState<string>('');
+    const [newPropUnit, setNewPropUnit] = useState<string>('');
+    
+    // Records table state
+    const [recordSearch, setRecordSearch] = useState('');
+    const [recordSortKey, setRecordSortKey] = useState<string | null>(null);
+    const [recordSortDir, setRecordSortDir] = useState<'asc' | 'desc'>('asc');
+    const [recordPage, setRecordPage] = useState(0);
+    const recordsPerPage = 25;
+    // Advanced filters: { propertyId: { op: '>', value: '100' } }
+    const [recordFilters, setRecordFilters] = useState<Record<string, { op: string; value: string }>>({});
+    const [showFilters, setShowFilters] = useState(false);
+    // Inline editing
+    const [inlineEditCell, setInlineEditCell] = useState<{ recordId: string; propId: string } | null>(null);
+    const [inlineEditValue, setInlineEditValue] = useState('');
+    // Tags
+    const [editingTagsRecordId, setEditingTagsRecordId] = useState<string | null>(null);
+
+    // Predefined tag options
+    const TAG_OPTIONS = ['verified', 'estimated', 'audited', 'pending', 'flagged', 'draft'] as const;
 
     // New Entity State
     const [isCreatingEntity, setIsCreatingEntity] = useState(false);
@@ -617,6 +638,13 @@ function AuthenticatedApp() {
             fetchRelatedData();
             fetchIncomingData();
         }
+        // Reset table state when entity changes
+        setRecordSearch('');
+        setRecordSortKey(null);
+        setRecordPage(0);
+        setRecordFilters({});
+        setShowFilters(false);
+        setInlineEditCell(null);
     }, [activeEntityId, activeTab]);
 
     const fetchEntities = async () => {
@@ -624,9 +652,9 @@ function AuthenticatedApp() {
         try {
             const res = await fetch(`${API_BASE}/entities`, { credentials: 'include' });
             const data = await res.json();
-            // Ensure data is an array before setting
+            // Ensure data is an array and filter out any entities with null/undefined IDs
             if (Array.isArray(data)) {
-                setEntities(data);
+                setEntities(data.filter((e: any) => e && e.id));
             } else {
                 console.error('Expected array from entities API, got:', data);
                 setEntities([]);
@@ -753,6 +781,8 @@ function AuthenticatedApp() {
             type: newPropType,
             relatedEntityId: newPropType === 'relation' ? newPropRelationId : undefined,
             defaultValue: newPropType === 'number' ? 0 : '',
+            unit: newPropType === 'number' ? newPropUnit || undefined : undefined,
+            formula: undefined, // Can be set later via property editor
         };
 
         try {
@@ -770,11 +800,78 @@ function AuthenticatedApp() {
             setNewPropName('');
             setNewPropType('text');
             setNewPropRelationId('');
+            setNewPropUnit('');
             setIsAddingProp(false);
 
         } catch (error) {
             console.error('Error adding property:', error);
         }
+    };
+
+    // Toggle tag on a record
+    const toggleRecordTag = async (recordId: string, tag: string) => {
+        const record = records.find(r => r.id === recordId);
+        if (!record) return;
+        let currentTags: string[] = [];
+        try { currentTags = JSON.parse(record.tags || '[]'); } catch { currentTags = []; }
+        const newTags = currentTags.includes(tag) ? currentTags.filter((t: string) => t !== tag) : [...currentTags, tag];
+        try {
+            await fetch(`${API_BASE}/records/${recordId}/tags`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tags: newTags }),
+                credentials: 'include'
+            });
+            setRecords(prev => prev.map(r => r.id === recordId ? { ...r, tags: JSON.stringify(newTags) } : r));
+        } catch (e) { console.error('Failed to update tags:', e); }
+    };
+
+    // Evaluate formula for calculated fields
+    const evaluateFormula = (formula: string, record: any, properties: Property[]): string | number => {
+        try {
+            let expr = formula;
+            // Replace {PropertyName} with actual values
+            properties.forEach(p => {
+                const val = record.values?.[p.id];
+                const numVal = Number(val);
+                const replacement = !isNaN(numVal) ? String(numVal) : '0';
+                expr = expr.replace(new RegExp(`\\{${p.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`, 'g'), replacement);
+            });
+            // Only allow safe math operations
+            if (/^[\d\s+\-*/().]+$/.test(expr)) {
+                const result = Function('"use strict"; return (' + expr + ')')();
+                return typeof result === 'number' && isFinite(result) ? Math.round(result * 10000) / 10000 : '—';
+            }
+            return '—';
+        } catch { return '—'; }
+    };
+
+    // Inline edit: save single cell
+    const saveInlineEdit = async () => {
+        if (!inlineEditCell || !activeEntityId) return;
+        const { recordId, propId } = inlineEditCell;
+        try {
+            // Find current record values
+            const record = records.find(r => r.id === recordId);
+            if (!record) return;
+            const updatedValues: Record<string, any> = {};
+            activeEntity?.properties.forEach(p => {
+                updatedValues[p.name] = p.id === propId ? inlineEditValue : (record.values[p.id] ?? '');
+            });
+            await fetch(`${API_BASE}/records/${recordId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ values: updatedValues }),
+                credentials: 'include'
+            });
+            // Update local state immediately
+            setRecords(prev => prev.map(r => 
+                r.id === recordId ? { ...r, values: { ...r.values, [propId]: inlineEditValue } } : r
+            ));
+        } catch (error) {
+            console.error('Inline edit failed:', error);
+        }
+        setInlineEditCell(null);
     };
 
     const deleteProperty = async (propId: string) => {
@@ -1095,7 +1192,14 @@ function AuthenticatedApp() {
     };
 
     const renderCellValue = (prop: Property, value: any) => {
-        if (!value) return '-';
+        if (value === undefined || value === null || value === '') return '-';
+
+        // Number with unit
+        if (prop.type === 'number' && prop.unit) {
+            const num = Number(value);
+            const formatted = isNaN(num) ? value : num.toLocaleString(undefined, { maximumFractionDigits: 4 });
+            return <span>{formatted} <span className="text-[var(--text-tertiary)] text-xs">{prop.unit}</span></span>;
+        }
 
         if (prop.type === 'json') {
             return (
@@ -1253,7 +1357,7 @@ function AuthenticatedApp() {
                 />
             )}
 
-            <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+            <div className="flex-1 flex flex-col min-h-screen overflow-hidden z-30">
                 {!hideSidebarForRoutes && (
                     <TopNav activeView={currentView} />
                 )}
@@ -1309,6 +1413,9 @@ function AuthenticatedApp() {
                     } />
                     <Route path="/connections" element={
                         <Connections />
+                    } />
+                    <Route path="/industrial" element={
+                        <Suspense fallback={<PageLoader />}><IndustrialDashboard /></Suspense>
                     } />
                     <Route path="/documentation" element={
                         <Documentation />
@@ -1367,7 +1474,7 @@ function AuthenticatedApp() {
                                 <div className="flex items-center">
                                     <button
                                         onClick={() => {
-                                            setActiveEntityId(null);
+                                            // Navigate first, useEffect will clear activeEntityId
                                             navigate('/database');
                                         }}
                                         className="mr-4 p-2 hover:bg-[var(--bg-tertiary)] rounded-full transition-colors text-[var(--text-secondary)]"
@@ -1603,6 +1710,18 @@ function AuthenticatedApp() {
                                                                     </select>
                                                                 </div>
                                                             )}
+                                                            {newPropType === 'number' && (
+                                                                <div className="w-24">
+                                                                    <label className="block text-[10px] text-[var(--text-tertiary)] mb-1">Unit</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={newPropUnit}
+                                                                        onChange={(e) => setNewPropUnit(e.target.value)}
+                                                                        placeholder="°C, bar, kg..."
+                                                                        className="w-full px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-sm text-[var(--text-primary)] focus:ring-1 focus:ring-[#419CAF] focus:outline-none"
+                                                                    />
+                                                                </div>
+                                                            )}
                                                             <div className="flex gap-2">
                                                                 <button
                                                                     onClick={handleAddProperty}
@@ -1627,51 +1746,268 @@ function AuthenticatedApp() {
 
                                     {/* DATA RECORDS - Always visible */}
                                     <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] overflow-hidden">
-                                        <div className="px-4 py-3 border-b border-[var(--border-light)] flex justify-between items-center">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium text-[var(--text-primary)]">Records</span>
-                                                <span className="text-xs text-[var(--text-tertiary)]">({records.length})</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => {
-                                                        resetImportState();
-                                                        setIsImportModalOpen(true);
-                                                    }}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded text-sm font-medium transition-colors border border-[var(--border-light)]"
-                                                >
-                                                    <Download size={14} className="rotate-180" />
-                                                    Import more data
-                                                </button>
-                                                <div className="relative group/addrecord">
+                                        {/* Records toolbar: search, completeness, actions */}
+                                        <div className="px-4 py-3 border-b border-[var(--border-light)] space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-sm font-medium text-[var(--text-primary)]">Records</span>
+                                                    <span className="text-xs text-[var(--text-tertiary)]">({records.length})</span>
+                                                    {/* Data completeness badge */}
+                                                    {records.length > 0 && activeEntity.properties.length > 0 && (() => {
+                                                        const totalCells = records.length * activeEntity.properties.length;
+                                                        const filledCells = records.reduce((sum, r) => {
+                                                            return sum + activeEntity.properties.filter(p => {
+                                                                const v = r.values?.[p.id];
+                                                                return v !== undefined && v !== null && v !== '';
+                                                            }).length;
+                                                        }, 0);
+                                                        const pct = Math.round((filledCells / totalCells) * 100);
+                                                        const color = pct >= 90 ? 'text-green-600 bg-green-500/10' : pct >= 60 ? 'text-amber-600 bg-amber-500/10' : 'text-red-600 bg-red-500/10';
+                                                        return (
+                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${color}`} title={`${filledCells}/${totalCells} fields filled`}>
+                                                                {pct}% complete
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {/* Export CSV */}
+                                                    {records.length > 0 && (
+                                                        <button
+                                                            onClick={() => {
+                                                                const headers = activeEntity.properties.map(p => p.unit ? `${p.name} (${p.unit})` : p.name);
+                                                                const rows = records.map(r => 
+                                                                    activeEntity.properties.map(p => {
+                                                                        const v = r.values?.[p.id];
+                                                                        if (v === undefined || v === null) return '';
+                                                                        const str = String(v);
+                                                                        return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str.replace(/"/g, '""')}"` : str;
+                                                                    })
+                                                                );
+                                                                const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+                                                                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                                                                const link = document.createElement('a');
+                                                                link.href = URL.createObjectURL(blob);
+                                                                link.download = `${activeEntity.name.replace(/\s+/g, '_')}_records.csv`;
+                                                                link.click();
+                                                            }}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded text-xs font-medium transition-colors border border-[var(--border-light)]"
+                                                        >
+                                                            <Download size={14} />
+                                                            Export CSV
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={() => {
-                                                            setEditingRecordId(null);
-                                                            setNewRecordValues({});
-                                                            setIsAddingRecord(true);
+                                                            resetImportState();
+                                                            setIsImportModalOpen(true);
                                                         }}
-                                                        disabled={activeEntity.properties.length === 0}
-                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#419CAF] hover:bg-[#3a8a9d] text-white rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded text-xs font-medium transition-colors border border-[var(--border-light)]"
                                                     >
-                                                        <Plus size={14} />
-                                                        Add Record
+                                                        <Download size={14} className="rotate-180" />
+                                                        Import
                                                     </button>
-                                                    {activeEntity.properties.length === 0 && (
-                                                        <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-[var(--bg-selected)] text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/addrecord:opacity-100 transition-opacity pointer-events-none z-50">
-                                                            Add properties first
-                                                        </div>
-                                                    )}
+                                                    <div className="relative group/addrecord">
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingRecordId(null);
+                                                                setNewRecordValues({});
+                                                                setIsAddingRecord(true);
+                                                            }}
+                                                            disabled={activeEntity.properties.length === 0}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#419CAF] hover:bg-[#3a8a9d] text-white rounded text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        >
+                                                            <Plus size={14} />
+                                                            Add Record
+                                                        </button>
+                                                        {activeEntity.properties.length === 0 && (
+                                                            <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-[var(--bg-selected)] text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/addrecord:opacity-100 transition-opacity pointer-events-none z-50">
+                                                                Add properties first
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
+                                            {/* Search bar */}
+                                            {records.length > 0 && (
+                                                <div className="relative">
+                                                    <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+                                                    <input
+                                                        type="text"
+                                                        value={recordSearch}
+                                                        onChange={(e) => { setRecordSearch(e.target.value); setRecordPage(0); }}
+                                                        placeholder="Search records..."
+                                                        className="w-full pl-9 pr-8 py-1.5 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)]"
+                                                    />
+                                                    {recordSearch && (
+                                                        <button onClick={() => setRecordSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">
+                                                            <X size={12} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {/* Advanced Filters */}
+                                            {records.length > 0 && (
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <button
+                                                        onClick={() => setShowFilters(!showFilters)}
+                                                        className={`flex items-center gap-1 px-2 py-1 text-[10px] rounded border transition-colors ${
+                                                            Object.keys(recordFilters).length > 0 
+                                                                ? 'border-[var(--accent-primary)] text-[var(--accent-primary)] bg-[var(--accent-primary)]/5'
+                                                                : 'border-[var(--border-light)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                                                        }`}
+                                                    >
+                                                        <Funnel size={10} />
+                                                        Filters {Object.keys(recordFilters).length > 0 && `(${Object.keys(recordFilters).length})`}
+                                                    </button>
+                                                    {/* Active filter chips */}
+                                                    {Object.entries(recordFilters).map(([propId, filter]) => {
+                                                        const prop = activeEntity.properties.find(p => p.id === propId);
+                                                        return (
+                                                            <span key={propId} className="inline-flex items-center gap-1 px-2 py-0.5 bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] text-[10px] rounded-full">
+                                                                {prop?.name} {filter.op} {filter.value}
+                                                                <button onClick={() => setRecordFilters(prev => { const next = { ...prev }; delete next[propId]; return next; })} className="hover:text-red-500">
+                                                                    <X size={8} />
+                                                                </button>
+                                                            </span>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                            {/* Filter form */}
+                                            {showFilters && (
+                                                <div className="flex items-end gap-2 p-3 bg-[var(--bg-tertiary)] rounded-lg">
+                                                    <div className="flex-1">
+                                                        <label className="block text-[10px] text-[var(--text-tertiary)] mb-1">Property</label>
+                                                        <select id="filter-prop" className="w-full px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-xs text-[var(--text-primary)]">
+                                                            {activeEntity.properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div className="w-20">
+                                                        <label className="block text-[10px] text-[var(--text-tertiary)] mb-1">Operator</label>
+                                                        <select id="filter-op" className="w-full px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-xs text-[var(--text-primary)]">
+                                                            <option value="contains">contains</option>
+                                                            <option value="=">=</option>
+                                                            <option value="!=">!=</option>
+                                                            <option value=">">&gt;</option>
+                                                            <option value="<">&lt;</option>
+                                                            <option value=">=">&gt;=</option>
+                                                            <option value="<=">&lt;=</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <label className="block text-[10px] text-[var(--text-tertiary)] mb-1">Value</label>
+                                                        <input id="filter-value" type="text" placeholder="Value..." className="w-full px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-light)] rounded text-xs text-[var(--text-primary)]" />
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            const propEl = document.getElementById('filter-prop') as HTMLSelectElement;
+                                                            const opEl = document.getElementById('filter-op') as HTMLSelectElement;
+                                                            const valEl = document.getElementById('filter-value') as HTMLInputElement;
+                                                            if (propEl && opEl && valEl && valEl.value) {
+                                                                setRecordFilters(prev => ({ ...prev, [propEl.value]: { op: opEl.value, value: valEl.value } }));
+                                                                valEl.value = '';
+                                                                setRecordPage(0);
+                                                            }
+                                                        }}
+                                                        className="px-3 py-1 bg-[var(--accent-primary)] text-white text-xs rounded font-medium hover:opacity-90"
+                                                    >
+                                                        Add
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="overflow-auto max-h-[500px] custom-scrollbar">
+                                            {/* Compute filtered, sorted, paginated records */}
+                                            {(() => {
+                                                // Search filter
+                                                let displayRecords = records;
+                                                if (recordSearch.trim()) {
+                                                    const q = recordSearch.toLowerCase();
+                                                    displayRecords = displayRecords.filter(r => 
+                                                        activeEntity.properties.some(p => {
+                                                            const v = r.values?.[p.id];
+                                                            return v && String(v).toLowerCase().includes(q);
+                                                        })
+                                                    );
+                                                }
+                                                // Advanced filters
+                                                Object.entries(recordFilters).forEach(([propId, filter]) => {
+                                                    displayRecords = displayRecords.filter(r => {
+                                                        const v = r.values?.[propId];
+                                                        if (v === undefined || v === null) return false;
+                                                        const strV = String(v).toLowerCase();
+                                                        const numV = Number(v);
+                                                        const numF = Number(filter.value);
+                                                        switch (filter.op) {
+                                                            case 'contains': return strV.includes(filter.value.toLowerCase());
+                                                            case '=': return strV === filter.value.toLowerCase() || (!isNaN(numV) && !isNaN(numF) && numV === numF);
+                                                            case '!=': return strV !== filter.value.toLowerCase();
+                                                            case '>': return !isNaN(numV) && !isNaN(numF) && numV > numF;
+                                                            case '<': return !isNaN(numV) && !isNaN(numF) && numV < numF;
+                                                            case '>=': return !isNaN(numV) && !isNaN(numF) && numV >= numF;
+                                                            case '<=': return !isNaN(numV) && !isNaN(numF) && numV <= numF;
+                                                            default: return true;
+                                                        }
+                                                    });
+                                                });
+                                                // Sort
+                                                if (recordSortKey) {
+                                                    displayRecords = [...displayRecords].sort((a, b) => {
+                                                        const va = a.values?.[recordSortKey] ?? '';
+                                                        const vb = b.values?.[recordSortKey] ?? '';
+                                                        const numA = Number(va), numB = Number(vb);
+                                                        const cmp = (!isNaN(numA) && !isNaN(numB)) ? numA - numB : String(va).localeCompare(String(vb));
+                                                        return recordSortDir === 'asc' ? cmp : -cmp;
+                                                    });
+                                                }
+                                                // Paginate
+                                                const totalFiltered = displayRecords.length;
+                                                const totalPages = Math.ceil(totalFiltered / recordsPerPage);
+                                                const paged = displayRecords.slice(recordPage * recordsPerPage, (recordPage + 1) * recordsPerPage);
+                                                
+                                                return (
+                                                    <>
                                             <table className="w-full text-left border-collapse">
                                                 <thead className="sticky top-0 z-10">
                                                     <tr className="bg-[var(--bg-tertiary)] border-b border-[var(--border-light)]">
                                                         {activeEntity.properties.map((prop, pIdx) => (
-                                                            <th key={prop.id || `th-${pIdx}`} className="px-4 py-2.5 text-[10px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider bg-[var(--bg-tertiary)]">
-                                                                {prop.name}
+                                                            <th 
+                                                                key={prop.id || `th-${pIdx}`} 
+                                                                className="px-4 py-2.5 text-[10px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider bg-[var(--bg-tertiary)] cursor-pointer hover:text-[var(--text-primary)] select-none"
+                                                                onClick={() => {
+                                                                    if (recordSortKey === prop.id) {
+                                                                        setRecordSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                                                                    } else {
+                                                                        setRecordSortKey(prop.id);
+                                                                        setRecordSortDir('asc');
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <div className="flex items-center gap-1">
+                                                                    <span>{prop.name}{prop.unit ? ` (${prop.unit})` : ''}</span>
+                                                                    {recordSortKey === prop.id && (
+                                                                        <span className="text-[var(--accent-primary)]">{recordSortDir === 'asc' ? '↑' : '↓'}</span>
+                                                                    )}
+                                                                    {/* Sparkline for numeric columns */}
+                                                                    {prop.type === 'number' && records.length > 1 && (() => {
+                                                                        const vals = records.map(r => Number(r.values?.[prop.id])).filter(n => !isNaN(n));
+                                                                        if (vals.length < 2) return null;
+                                                                        const min = Math.min(...vals);
+                                                                        const max = Math.max(...vals);
+                                                                        const range = max - min || 1;
+                                                                        const w = 40, h = 12;
+                                                                        const points = vals.slice(-20).map((v, i, arr) => 
+                                                                            `${(i / (arr.length - 1)) * w},${h - ((v - min) / range) * h}`
+                                                                        ).join(' ');
+                                                                        return (
+                                                                            <svg width={w} height={h} className="ml-1 opacity-60">
+                                                                                <polyline points={points} fill="none" stroke="var(--accent-primary)" strokeWidth="1" />
+                                                                            </svg>
+                                                                        );
+                                                                    })()}
+                                                                </div>
                                                             </th>
                                                         ))}
                                                         {Object.values(incomingData).map(({ sourceEntity, sourceProperty }) => (
@@ -1679,26 +2015,61 @@ function AuthenticatedApp() {
                                                                 {sourceEntity.name}
                                                             </th>
                                                         ))}
+                                                        <th className="px-4 py-2.5 text-[10px] font-medium text-[var(--text-tertiary)] uppercase bg-[var(--bg-tertiary)]">Tags</th>
                                                         <th className="px-4 py-2.5 text-right text-[10px] font-medium text-[var(--text-tertiary)] uppercase bg-[var(--bg-tertiary)]">Actions</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-[var(--border-light)]">
-                                                    {records.length === 0 ? (
+                                                    {paged.length === 0 ? (
                                                         <tr>
-                                                            <td colSpan={Math.max(activeEntity.properties.length, 1) + 1 + Object.keys(incomingData).length} className="p-8 text-center text-[var(--text-tertiary)] text-sm">
-                                                                {activeEntity.properties.length === 0 
-                                                                    ? 'Add properties to define your data structure first.'
-                                                                    : 'No records yet. Click "Add Record" to create one.'}
+                                                            <td colSpan={Math.max(activeEntity.properties.length, 1) + 2 + Object.keys(incomingData).length} className="p-8 text-center text-[var(--text-tertiary)] text-sm">
+                                                                {records.length === 0 
+                                                                    ? (activeEntity.properties.length === 0 
+                                                                        ? 'Add properties to define your data structure first.'
+                                                                        : 'No records yet. Click "Add Record" to create one.')
+                                                                    : `No records match "${recordSearch}"`}
                                                             </td>
                                                         </tr>
                                                     ) : (
-                                                        records.map(record => (
+                                                        paged.map(record => (
                                                             <tr key={record.id} className="hover:bg-[var(--bg-tertiary)] transition-colors group">
-                                                                {activeEntity.properties.map((prop, pIdx) => (
-                                                                    <td key={prop.id || `td-${pIdx}`} className="px-4 py-3 text-sm text-[var(--text-secondary)]">
-                                                                        {renderCellValue(prop, record.values[prop.id])}
-                                                                    </td>
-                                                                ))}
+                                                                {activeEntity.properties.map((prop, pIdx) => {
+                                                                    const isEditing = inlineEditCell?.recordId === record.id && inlineEditCell?.propId === prop.id;
+                                                                    const isCalculated = !!prop.formula;
+                                                                    const cellValue = isCalculated 
+                                                                        ? evaluateFormula(prop.formula!, record, activeEntity.properties)
+                                                                        : record.values[prop.id];
+                                                                    return (
+                                                                        <td 
+                                                                            key={prop.id || `td-${pIdx}`} 
+                                                                            className={`px-4 py-3 text-sm ${isCalculated ? 'text-[var(--accent-primary)] italic' : 'text-[var(--text-secondary)]'}`}
+                                                                            onDoubleClick={() => {
+                                                                                if (!isCalculated && (prop.type === 'text' || prop.type === 'number')) {
+                                                                                    setInlineEditCell({ recordId: record.id, propId: prop.id });
+                                                                                    setInlineEditValue(record.values[prop.id] ?? '');
+                                                                                }
+                                                                            }}
+                                                                            title={isCalculated ? `Formula: ${prop.formula}` : undefined}
+                                                                        >
+                                                                            {isEditing ? (
+                                                                                <input
+                                                                                    autoFocus
+                                                                                    type={prop.type === 'number' ? 'number' : 'text'}
+                                                                                    value={inlineEditValue}
+                                                                                    onChange={(e) => setInlineEditValue(e.target.value)}
+                                                                                    onBlur={saveInlineEdit}
+                                                                                    onKeyDown={(e) => {
+                                                                                        if (e.key === 'Enter') saveInlineEdit();
+                                                                                        if (e.key === 'Escape') setInlineEditCell(null);
+                                                                                    }}
+                                                                                    className="w-full px-2 py-1 text-sm bg-[var(--bg-primary)] border border-[var(--accent-primary)] rounded focus:outline-none text-[var(--text-primary)]"
+                                                                                />
+                                                                            ) : (
+                                                                                renderCellValue(prop, cellValue)
+                                                                            )}
+                                                                        </td>
+                                                                    );
+                                                                })}
                                                                 {Object.values(incomingData).map(({ sourceEntity, sourceProperty, records: sourceRecords }) => {
                                                                     const linkedRecords = sourceRecords.filter(r => {
                                                                         const val = r.values[sourceProperty.id];
@@ -1726,6 +2097,57 @@ function AuthenticatedApp() {
                                                                         </td>
                                                                     );
                                                                 })}
+                                                                {/* Tags cell */}
+                                                                <td className="px-3 py-3">
+                                                                    <div className="flex flex-wrap gap-1 items-center">
+                                                                        {(() => {
+                                                                            let tags: string[] = [];
+                                                                            try { tags = JSON.parse(record.tags || '[]'); } catch { tags = []; }
+                                                                            return tags.map((tag: string) => {
+                                                                                const colors: Record<string, string> = {
+                                                                                    verified: 'bg-green-500/15 text-green-600',
+                                                                                    estimated: 'bg-amber-500/15 text-amber-600',
+                                                                                    audited: 'bg-blue-500/15 text-blue-600',
+                                                                                    pending: 'bg-orange-500/15 text-orange-600',
+                                                                                    flagged: 'bg-red-500/15 text-red-600',
+                                                                                    draft: 'bg-gray-500/15 text-gray-500',
+                                                                                };
+                                                                                return (
+                                                                                    <span key={tag} className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${colors[tag] || 'bg-gray-500/15 text-gray-500'}`}>
+                                                                                        {tag}
+                                                                                    </span>
+                                                                                );
+                                                                            });
+                                                                        })()}
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setEditingTagsRecordId(editingTagsRecordId === record.id ? null : record.id);
+                                                                            }}
+                                                                            className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity text-[10px]"
+                                                                        >
+                                                                            +
+                                                                        </button>
+                                                                        {editingTagsRecordId === record.id && (
+                                                                            <div className="absolute z-20 mt-1 p-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-lg flex flex-wrap gap-1">
+                                                                                {TAG_OPTIONS.map(tag => {
+                                                                                    let tags: string[] = [];
+                                                                                    try { tags = JSON.parse(record.tags || '[]'); } catch { tags = []; }
+                                                                                    const active = tags.includes(tag);
+                                                                                    return (
+                                                                                        <button
+                                                                                            key={tag}
+                                                                                            onClick={() => toggleRecordTag(record.id, tag)}
+                                                                                            className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${active ? 'bg-[var(--accent-primary)] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+                                                                                        >
+                                                                                            {tag}
+                                                                                        </button>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
                                                                 <td className="px-4 py-3 text-right">
                                                                     <button
                                                                         onClick={() => handleEditRecord(record)}
@@ -1745,6 +2167,37 @@ function AuthenticatedApp() {
                                                     )}
                                                 </tbody>
                                             </table>
+                                                    {/* Pagination footer */}
+                                                    {totalPages > 1 && (
+                                                        <div className="px-4 py-2.5 border-t border-[var(--border-light)] bg-[var(--bg-tertiary)] flex items-center justify-between text-xs text-[var(--text-tertiary)]">
+                                                            <span>
+                                                                {recordPage * recordsPerPage + 1}-{Math.min((recordPage + 1) * recordsPerPage, totalFiltered)} of {totalFiltered}
+                                                                {totalFiltered !== records.length && ` (filtered from ${records.length})`}
+                                                            </span>
+                                                            <div className="flex items-center gap-1">
+                                                                <button
+                                                                    onClick={() => setRecordPage(p => Math.max(0, p - 1))}
+                                                                    disabled={recordPage === 0}
+                                                                    className="px-2 py-1 rounded hover:bg-[var(--bg-hover)] disabled:opacity-30 transition-colors"
+                                                                >
+                                                                    Previous
+                                                                </button>
+                                                                <span className="px-2 font-medium text-[var(--text-secondary)]">
+                                                                    {recordPage + 1} / {totalPages}
+                                                                </span>
+                                                                <button
+                                                                    onClick={() => setRecordPage(p => Math.min(totalPages - 1, p + 1))}
+                                                                    disabled={recordPage >= totalPages - 1}
+                                                                    className="px-2 py-1 rounded hover:bg-[var(--bg-hover)] disabled:opacity-30 transition-colors"
+                                                                >
+                                                                    Next
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    </>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                 </div>

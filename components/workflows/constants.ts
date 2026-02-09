@@ -24,7 +24,15 @@ import {
   ChartBar, 
   FilePdf, 
   ChatCircle, 
-  Flask 
+  Flask,
+  SlackLogo,
+  DiscordLogo,
+  MicrosoftTeamsLogo,
+  TelegramLogo,
+  GoogleLogo,
+  Factory,
+  Cpu,
+  WifiHigh
 } from '@phosphor-icons/react';
 import { DraggableItem, NodeType } from './types';
 
@@ -50,6 +58,11 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   { type: 'climatiq', label: 'Emission Factors', icon: Leaf, description: 'Search CO2 emission factors', category: 'Data' },
   { type: 'manualInput', label: 'Manual Data Input', icon: PencilSimple, description: 'Define a variable with a value', category: 'Data' },
   
+  // OT / Industrial Data Sources
+  { type: 'opcua', label: 'OPC UA Input', icon: Factory, description: 'Read data from PLCs and SCADA via OPC UA', category: 'Data' },
+  { type: 'mqtt', label: 'MQTT Subscriber', icon: WifiHigh, description: 'Subscribe to MQTT topics for IoT sensor data', category: 'Data' },
+  { type: 'modbus', label: 'Modbus Input', icon: Cpu, description: 'Read data from Modbus devices (PLCs, sensors)', category: 'Data' },
+  
   // Logic
   { type: 'condition', label: 'If / Else', icon: WarningCircle, description: 'Branch based on conditions', category: 'Logic' },
   { type: 'join', label: 'Join', icon: GitMerge, description: 'Combine data from two sources', category: 'Logic' },
@@ -65,6 +78,11 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   // Actions
   { type: 'sendEmail', label: 'Send Email', icon: Envelope, description: 'Send an email notification', category: 'Actions' },
   { type: 'sendSMS', label: 'Send SMS', icon: DeviceMobile, description: 'Send an SMS text message via Twilio', category: 'Actions' },
+  { type: 'sendSlack', label: 'Send Slack', icon: SlackLogo, description: 'Send a message to Slack channel', category: 'Actions' },
+  { type: 'sendDiscord', label: 'Send Discord', icon: DiscordLogo, description: 'Send a message to Discord channel', category: 'Actions' },
+  { type: 'sendTeams', label: 'Send Teams', icon: MicrosoftTeamsLogo, description: 'Send a message to Microsoft Teams', category: 'Actions' },
+  { type: 'sendTelegram', label: 'Send Telegram', icon: TelegramLogo, description: 'Send a message to Telegram', category: 'Actions' },
+  { type: 'googleSheets', label: 'Google Sheets', icon: GoogleLogo, description: 'Read/write data from Google Sheets', category: 'Data' },
   { type: 'dataVisualization', label: 'Data Visualization', icon: ChartBar, description: 'Generate charts from data using AI', category: 'Actions' },
   { type: 'pdfReport', label: 'PDF Report Generator', icon: FilePdf, description: 'Generate structured PDF reports from data', category: 'Actions' },
   { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },
@@ -115,8 +133,9 @@ export const NODE_ICONS: Record<NodeType, React.ElementType> = {
   dataVisualization: ChartBar,
   webhook: Globe,
   sapFetch: Database,
-  opcua: Database,
-  mqtt: Database,
+  opcua: Factory,
+  mqtt: WifiHigh,
+  modbus: Cpu,
   agent: Robot,
   limsFetch: Flask,
   statisticalAnalysis: TrendUp,

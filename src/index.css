@@ -53,6 +53,7 @@
   
   /* Accents */
   --accent-primary: #2383E2;
+  --accent-primary-hover: #1a6fc0;
   --accent-success: #0F766E;
   --accent-warning: #D97706;
   --accent-error: #DC2626;
@@ -112,6 +113,7 @@
   
   /* Accents */
   --accent-primary: #529CCA;
+  --accent-primary-hover: #6ab0d8;
   --accent-success: #2DD4BF;
   --accent-warning: #FBBF24;
   --accent-error: #F87171;
@@ -307,6 +309,26 @@ h1, h2, h3, h4, h5, h6 {
 .react-resizable-handle.resizing {
   opacity: 1 !important;
   background-color: rgba(59, 130, 246, 0.8) !important;
+}
+
+/* Force dark mode inputs */
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background-color: var(--bg-input) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-light) !important;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--text-tertiary) !important;
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus {
+  border-color: var(--border-focus) !important;
 }
 
 /* Custom scrollbar */
