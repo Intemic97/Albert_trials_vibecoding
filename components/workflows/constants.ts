@@ -64,6 +64,7 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   { type: 'mqtt', label: 'MQTT Subscriber', icon: WifiHigh, description: 'Subscribe to MQTT topics for IoT sensor data', category: 'Data' },
   { type: 'modbus', label: 'Modbus Input', icon: Cpu, description: 'Read data from Modbus devices (PLCs, sensors)', category: 'Data' },
   { type: 'osiPi', label: 'OSIsoft PI', icon: Pi, description: 'Fetch time-series data from AVEVA PI Web API', category: 'Data' },
+  { type: 'franmit', label: 'FranMIT', icon: Flask, description: 'Connect to FranMIT reactor simulation API', category: 'Other' },
   
   // Logic
   { type: 'condition', label: 'If / Else', icon: WarningCircle, description: 'Branch based on conditions', category: 'Logic' },
@@ -144,6 +145,7 @@ export const NODE_ICONS: Record<NodeType, React.ElementType> = {
   alertAgent: Bell,
   pdfReport: FilePdf,
   osiPi: Pi,
+  franmit: Flask,
 };
 
 /**

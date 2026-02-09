@@ -360,6 +360,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [osiPiWebIds, setOsiPiWebIds] = useState<string[]>(['', '']);
     const [showOsiPiApiKey, setShowOsiPiApiKey] = useState<boolean>(false);
 
+    // FranMIT Node State
+    const [configuringFranmitNodeId, setConfiguringFranmitNodeId] = useState<string | null>(null);
+    const [franmitApiSecretId, setFranmitApiSecretId] = useState<string>('');
+    const [franmitReactorVolume, setFranmitReactorVolume] = useState<string>('');
+    const [franmitReactionVolume, setFranmitReactionVolume] = useState<string>('');
+    const [franmitCatalystScaleFactor, setFranmitCatalystScaleFactor] = useState<string>('');
+    const [showFranmitApiSecret, setShowFranmitApiSecret] = useState<boolean>(false);
+
     // Unsaved Changes Confirmation
     const [showExitConfirmation, setShowExitConfirmation] = useState<boolean>(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
@@ -1929,6 +1937,40 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 : n
         ));
         setConfiguringOsiPiNodeId(null);
+    };
+
+    // FranMIT Node Functions
+    const openFranmitConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'franmit') {
+            setConfiguringFranmitNodeId(nodeId);
+            setFranmitApiSecretId(node.config?.franmitApiSecretId || '');
+            setFranmitReactorVolume(node.config?.franmitReactorVolume || '');
+            setFranmitReactionVolume(node.config?.franmitReactionVolume || '');
+            setFranmitCatalystScaleFactor(node.config?.franmitCatalystScaleFactor || '');
+            setShowFranmitApiSecret(false);
+        }
+    };
+
+    const saveFranmitConfig = () => {
+        if (!configuringFranmitNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringFranmitNodeId
+                ? {
+                    ...n,
+                    label: franmitApiSecretId ? `FranMIT Node` : 'FranMIT Node',
+                    config: {
+                        ...n.config,
+                        franmitApiSecretId,
+                        franmitReactorVolume,
+                        franmitReactionVolume,
+                        franmitCatalystScaleFactor,
+                    }
+                }
+                : n
+        ));
+        setConfiguringFranmitNodeId(null);
     };
 
     const openEmailConfig = (nodeId: string) => {
@@ -4745,6 +4787,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'opcua':
             case 'mqtt':
                 return true; // Estos tipos siempre están configurados
+            case 'franmit':
+                return !!node.config?.franmitApiSecretId;
             default:
                 return false;
         }
@@ -4831,6 +4875,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'agent': return 'text-purple-600';
             case 'opcua': return 'text-indigo-600';
             case 'mqtt': return 'text-cyan-600';
+            case 'franmit': return 'text-teal-600';
             default: return 'text-[var(--text-secondary)]';
         }
     };
@@ -5823,6 +5868,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openPdfConfig(node.id);
                                             } else if (node.type === 'osiPi') {
                                                 openOsiPiConfig(node.id);
+                                            } else if (node.type === 'franmit') {
+                                                openFranmitConfig(node.id);
                                             } else if (node.type === 'trigger' && (node.label === 'Schedule' || node.label.startsWith('Schedule:') || node.config?.scheduleInterval)) {
                                                 openScheduleConfig(node.id);
                                             }
@@ -6012,6 +6059,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     openHumanApprovalConfig(node.id);
                                                                 } else if (node.type === 'osiPi') {
                                                                     openOsiPiConfig(node.id);
+                                                                } else if (node.type === 'franmit') {
+                                                                    openFranmitConfig(node.id);
                                                                 }
                                                             }}
                                                             className="absolute top-2 right-2 p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
@@ -7356,6 +7405,118 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </button>
                                     </div>
                                     </div>
+                            </NodeConfigSidePanel>
+                        )}
+
+                        {/* FranMIT Configuration Panel */}
+                        {configuringFranmitNodeId && (
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringFranmitNodeId}
+                                onClose={() => setConfiguringFranmitNodeId(null)}
+                                title="Franmit Node"
+                                description="Franmit Node"
+                                icon={FlaskConical}
+                                width="w-[500px]"
+                                footer={
+                                    <>
+                                        <button
+                                            onClick={() => setConfiguringFranmitNodeId(null)}
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveFranmitConfig}
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save
+                                        </button>
+                                    </>
+                                }
+                            >
+                                <div className="space-y-5">
+                                    {/* API Credentials Secret ID */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                            API Credentials Secret ID
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                type={showFranmitApiSecret ? 'text' : 'password'}
+                                                value={franmitApiSecretId}
+                                                onChange={(e) => setFranmitApiSecretId(e.target.value)}
+                                                placeholder="Enter secret ID..."
+                                                className="w-full px-3 py-1.5 pr-10 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowFranmitApiSecret(!showFranmitApiSecret)}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+                                                title={showFranmitApiSecret ? 'Hide' : 'Show'}
+                                            >
+                                                <Eye size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Parameters Section */}
+                                    <div className="border-t border-[var(--border-light)] pt-4">
+                                        <h4 className="text-xs font-medium text-[var(--text-secondary)] mb-3 text-center">Parameters</h4>
+
+                                        {/* Reactor Volume */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Reactor Volume (m³)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={franmitReactorVolume}
+                                                onChange={(e) => setFranmitReactorVolume(e.target.value)}
+                                                placeholder="Reactor Volume"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                        </div>
+
+                                        {/* Reaction Volume */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Reaction Volume (m³)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={franmitReactionVolume}
+                                                onChange={(e) => setFranmitReactionVolume(e.target.value)}
+                                                placeholder="Reaction Volume"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                        </div>
+
+                                        {/* Catalyst Scale Factor */}
+                                        <div>
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Catalyst Scale Factor
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={franmitCatalystScaleFactor}
+                                                onChange={(e) => setFranmitCatalystScaleFactor(e.target.value)}
+                                                placeholder="Catalyst Scale Factor"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Feedback Link */}
+                                    <div className="pt-3 border-t border-[var(--border-light)]">
+                                        <button
+                                            onClick={() => openFeedbackPopup('franmit', 'FranMIT')}
+                                            className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
+                                        >
+                                            <MessageSquare size={12} />
+                                            What would you like this node to do?
+                                        </button>
+                                    </div>
+                                </div>
                             </NodeConfigSidePanel>
                         )}
 

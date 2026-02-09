@@ -42,7 +42,8 @@ export type NodeType =
   | 'statisticalAnalysis' 
   | 'alertAgent' 
   | 'pdfReport'
-  | 'osiPi';
+  | 'osiPi'
+  | 'franmit';
 
 export type NodeStatus = 'idle' | 'running' | 'completed' | 'error' | 'waiting';
 
@@ -202,6 +203,11 @@ export interface NodeConfig {
   osiPiGranularityValue?: string;
   osiPiGranularityUnit?: 'seconds' | 'minutes' | 'hours' | 'days';
   osiPiWebIds?: string[];
+  // For FranMIT nodes:
+  franmitApiSecretId?: string;
+  franmitReactorVolume?: string;
+  franmitReactionVolume?: string;
+  franmitCatalystScaleFactor?: string;
   // Alert configuration
   alerts?: {
     enabled: boolean;
