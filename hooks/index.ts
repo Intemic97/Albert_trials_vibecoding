@@ -89,3 +89,10 @@ export {
   useExecutionProgress,
   type ExecutionProgress,
 } from './useExecutionProgress';
+
+// Workflow Execution (API-based, replaces frontend execution)
+export {
+  useWorkflowExecution,
+  type ExecutionState,
+  type NodeStatus,
+} from './useWorkflowExecution';
