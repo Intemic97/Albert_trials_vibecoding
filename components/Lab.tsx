@@ -2886,6 +2886,8 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                     <div 
                                         key={viz.id} 
                                         className={`relative group transition-all duration-200 cursor-grab active:cursor-grabbing ${
+                                            (viz.position?.w || 1) >= 2 ? 'lg:col-span-2' : ''
+                                        } ${
                                             draggedVizId === viz.id ? 'opacity-50 scale-95' : ''
                                         } ${dragOverVizId === viz.id ? 'ring-2 ring-[var(--accent-primary)] ring-offset-2' : ''}`}
                                         draggable
@@ -2932,6 +2934,18 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                                         >
                                                             <Copy size={14} />
                                                             Duplicate
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                const currentW = viz.position?.w || 1;
+                                                                const newW = currentW >= 2 ? 1 : 2;
+                                                                updateVisualization({ ...viz, position: { ...viz.position, w: newW } });
+                                                                setVizMenuOpen(null);
+                                                            }}
+                                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                                        >
+                                                            <ArrowsClockwise size={14} />
+                                                            {(viz.position?.w || 1) >= 2 ? 'Half width' : 'Full width'}
                                                         </button>
                                                         <div className="border-t border-[var(--border-light)] my-1" />
                                                         <button
