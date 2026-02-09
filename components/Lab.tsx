@@ -597,47 +597,42 @@ const VisualizationCard: React.FC<{
 const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
     const isUser = message.role === 'user';
     
-    if (isUser) {
-        return (
-            <div className="flex justify-end">
-                <div className="max-w-[85%] px-3.5 py-2.5 rounded-2xl rounded-br-md text-sm bg-[var(--accent-primary)] text-white">
+    return (
+        <div className={`flex gap-2.5 ${isUser ? 'justify-end' : 'justify-start'}`}>
+            {/* Assistant avatar */}
+            {!isUser && (
+                <div className="w-7 h-7 rounded-lg bg-[var(--accent-primary)]/15 flex items-center justify-center shrink-0 mt-0.5">
+                    <Robot size={14} className="text-[var(--accent-primary)]" weight="fill" />
+                </div>
+            )}
+
+            <div className={`max-w-[82%] ${!isUser ? 'space-y-2' : ''}`}>
+                {/* Message bubble */}
+                <div className={`rounded-2xl text-[13px] leading-relaxed ${
+                    isUser 
+                        ? 'bg-slate-800 text-white px-4 py-2.5 rounded-br-md' 
+                        : 'bg-[var(--bg-card)] border border-[var(--border-light)] shadow-sm px-4 py-3 rounded-bl-md'
+                }`} style={{ lineHeight: '1.55' }}>
                     {message.content}
                 </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="flex justify-start gap-2">
-            <div className="max-w-[90%] space-y-2">
-                {/* Text */}
-                {message.content && (
-                    <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-md text-sm bg-[var(--bg-tertiary)]/70 text-[var(--text-primary)] border border-[var(--border-light)]/50">
-                        {message.content}
-                    </div>
-                )}
 
                 {/* Action chips */}
-                {message.actions && message.actions.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 px-1">
+                {!isUser && message.actions && message.actions.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
                         {message.actions.map((action, i) => (
                             <span
                                 key={i}
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium ${
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium ${
                                     action.status === 'done'
-                                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                                        ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/15'
                                         : action.status === 'error'
-                                        ? 'bg-red-500/15 text-red-400 border border-red-500/20'
+                                        ? 'bg-red-500/10 text-red-400 border border-red-500/15'
                                         : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] border border-[var(--border-light)]'
                                 }`}
                             >
-                                {action.status === 'done' ? (
-                                    <Check size={10} weight="bold" />
-                                ) : action.status === 'error' ? (
-                                    <X size={10} weight="bold" />
-                                ) : (
-                                    <SpinnerGap size={10} className="animate-spin" />
-                                )}
+                                {action.status === 'done' && <Check size={9} weight="bold" />}
+                                {action.status === 'error' && <X size={9} weight="bold" />}
+                                {action.status === 'pending' && <SpinnerGap size={9} className="animate-spin" />}
                                 {action.label}
                             </span>
                         ))}
@@ -645,19 +640,27 @@ const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
                 )}
 
                 {/* Result summary card */}
-                {message.resultSummary && (
-                    <div className="mx-1 p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-light)] shadow-sm">
-                        <div className="grid grid-cols-2 gap-2">
+                {!isUser && message.resultSummary && (
+                    <div className="p-2.5 rounded-xl bg-[var(--bg-tertiary)]/50 border border-[var(--border-light)]">
+                        <p className="text-[9px] uppercase tracking-wider text-[var(--text-tertiary)] mb-2 font-medium">Resultado</p>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                             {message.resultSummary.metrics.map((m, i) => (
-                                <div key={i} className="text-center p-1.5">
-                                    <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wide">{m.label}</div>
-                                    <div className="text-sm font-semibold text-[var(--text-primary)]">{m.value}</div>
+                                <div key={i} className="flex justify-between items-baseline">
+                                    <span className="text-[10px] text-[var(--text-tertiary)]">{m.label}</span>
+                                    <span className="text-[11px] font-semibold text-[var(--text-primary)] tabular-nums">{m.value}</span>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
             </div>
+
+            {/* User avatar */}
+            {isUser && (
+                <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 mt-0.5">
+                    <User size={14} className="text-white" weight="light" />
+                </div>
+            )}
         </div>
     );
 };
@@ -2705,25 +2708,21 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                 {/* Chat Messages */}
                                 <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
                                     {chatMessages.length === 0 && (
-                                        <div className="text-center py-8">
-                                            <div className="w-12 h-12 rounded-xl bg-[var(--accent-primary)]/10 flex items-center justify-center mx-auto mb-3">
-                                                <Robot size={24} className="text-[var(--accent-primary)]" />
-                                            </div>
-                                            <p className="text-sm font-medium text-[var(--text-primary)] mb-1">Ingeniero de Procesos AI</p>
-                                            <p className="text-xs text-[var(--text-tertiary)] max-w-[220px] mx-auto">
-                                                Ajusto parametros, ejecuto simulaciones y analizo resultados en tiempo real.
+                                        <div className="flex flex-col items-center justify-center py-10 px-4">
+                                            <p className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-6">
+                                                Simulador AI
                                             </p>
-                                            <div className="mt-4 space-y-1.5">
+                                            <div className="w-full space-y-2">
                                                 {[
                                                     'Maximiza beneficio sin subir precio',
                                                     'Que pasa si la resina sube a 2000?',
-                                                    'Ejecuta con maxima capacidad y eficiencia',
-                                                    'Simula un escenario de crisis de crudo',
+                                                    'Ejecuta con maxima capacidad',
+                                                    'Simula escenario de crisis',
                                                 ].map((suggestion, i) => (
                                                     <button
                                                         key={i}
                                                         onClick={() => { setChatInput(suggestion); }}
-                                                        className="block w-full text-left px-3 py-2 text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)]/60 rounded-lg hover:bg-[var(--bg-hover)] border border-[var(--border-light)]/30 transition-colors"
+                                                        className="block w-full text-left px-4 py-2.5 text-xs text-[var(--text-primary)] bg-[var(--bg-tertiary)] rounded-xl hover:bg-[var(--bg-hover)] border border-[var(--border-light)] transition-all shadow-sm hover:shadow"
                                                     >
                                                         {suggestion}
                                                     </button>
@@ -2735,9 +2734,16 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                         <ChatMessageBubble key={msg.id} message={msg} />
                                     ))}
                                     {isChatLoading && (
-                                        <div className="flex justify-start">
-                                            <div className="px-3 py-2 bg-[var(--bg-tertiary)] rounded-xl rounded-bl-sm">
-                                                <SpinnerGap size={16} className="animate-spin text-[var(--text-tertiary)]" />
+                                        <div className="flex gap-2.5">
+                                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-600 to-teal-700 flex items-center justify-center shrink-0">
+                                                <Robot size={14} className="text-white" weight="light" />
+                                            </div>
+                                            <div className="px-4 py-3 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-2xl rounded-bl-md shadow-sm">
+                                                <div className="flex gap-1">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--text-tertiary)] animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--text-tertiary)] animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--text-tertiary)] animate-bounce" style={{ animationDelay: '300ms' }} />
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -2745,22 +2751,23 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                 </div>
                                 
                                 {/* Chat Input */}
-                                <div className="p-3 border-t border-[var(--border-light)]">
-                                    <div className="flex gap-2">
+                                <div className="p-3 border-t border-[var(--border-light)] bg-[var(--bg-card)]">
+                                    <div className="relative">
                                         <input
                                             type="text"
                                             value={chatInput}
                                             onChange={(e) => setChatInput(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleChatSubmit()}
-                                            placeholder="Ej: Sube precio resina a 1800..."
-                                            className="flex-1 px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
+                                            placeholder="Ajusta parametros, ejecuta, analiza..."
+                                            className="w-full pl-4 pr-10 py-3 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-xl text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/40 focus:border-transparent transition-all"
+                                            disabled={isChatLoading}
                                         />
                                         <button
                                             onClick={handleChatSubmit}
                                             disabled={!chatInput.trim() || isChatLoading}
-                                            className="p-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-colors disabled:opacity-50"
+                                            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                                         >
-                                            <PaperPlaneTilt size={16} />
+                                            <PaperPlaneTilt size={14} weight="fill" />
                                         </button>
                                     </div>
                                 </div>
