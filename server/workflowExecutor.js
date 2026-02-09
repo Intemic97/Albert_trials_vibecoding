@@ -281,6 +281,7 @@ class WorkflowExecutor {
             mes: () => this.handleMes(node, inputData),
             dataHistorian: () => this.handleDataHistorian(node, inputData),
             timeSeriesAggregator: () => this.handleTimeSeriesAggregator(node, inputData),
+            jsCode: () => this.handleJsCode(node, inputData),
         };
 
         const handler = handlers[node.type];
@@ -635,6 +636,48 @@ class WorkflowExecutor {
             message: `Added field '${fieldName}'`,
             outputData: { ...inputData, [fieldName]: fieldValue }
         };
+    }
+
+    async handleJsCode(node, inputData) {
+        const code = node.config?.jsCode || node.config?.code || '';
+        if (!code) {
+            return { success: true, message: 'No code configured', outputData: inputData };
+        }
+
+        try {
+            // Build a safe execution context with inputs from previous nodes
+            const inputs = {};
+            if (inputData && typeof inputData === 'object') {
+                if (Array.isArray(inputData)) {
+                    inputs._data = inputData;
+                } else {
+                    Object.assign(inputs, inputData);
+                }
+            }
+            // Also gather all node results so the code can access any variable
+            for (const [nodeId, result] of Object.entries(this.nodeResults || {})) {
+                if (result?.outputData && typeof result.outputData === 'object' && !Array.isArray(result.outputData)) {
+                    Object.assign(inputs, result.outputData);
+                }
+            }
+
+            // Execute with Function constructor (sandboxed enough for local dev)
+            const fn = new Function('inputs', `
+                ${code}
+                return typeof output !== 'undefined' ? output : (typeof result !== 'undefined' ? result : inputs);
+            `);
+
+            const output = fn(inputs);
+
+            return {
+                success: true,
+                message: 'JavaScript code executed successfully',
+                outputData: output
+            };
+        } catch (error) {
+            console.error('[JsCode] Error executing code:', error.message);
+            throw new Error(`JavaScript execution error: ${error.message}`);
+        }
     }
 
     async handleCondition(node, inputData) {
