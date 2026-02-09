@@ -1079,18 +1079,29 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                         result = data.result || data;
                     }
 
-                    // Flatten outputData from workflow nodes so visualizations can read properties directly
-                    if (result && typeof result === 'object') {
-                        const flatResult: Record<string, any> = {};
-                        let hasOutputData = false;
+                    // Extract the most meaningful outputData from workflow results
+                    if (result && typeof result === 'object' && !Array.isArray(result)) {
+                        // Strategy: find the richest outputData (most keys, has arrays)
+                        // This is typically the calculation/output node, not the simple input nodes
+                        let bestOutput: any = null;
+                        let bestScore = 0;
+                        
                         Object.values(result).forEach((nodeResult: any) => {
-                            if (nodeResult?.outputData) {
-                                hasOutputData = true;
-                                Object.assign(flatResult, nodeResult.outputData);
+                            if (nodeResult?.outputData && typeof nodeResult.outputData === 'object') {
+                                const od = nodeResult.outputData;
+                                // Score: number of keys + bonus for arrays (which are chart-ready data)
+                                const keys = Array.isArray(od) ? 0 : Object.keys(od).length;
+                                const arrayBonus = Array.isArray(od) ? 0 : Object.values(od).filter(v => Array.isArray(v)).length * 10;
+                                const score = keys + arrayBonus;
+                                if (score > bestScore) {
+                                    bestScore = score;
+                                    bestOutput = od;
+                                }
                             }
                         });
-                        if (hasOutputData) {
-                            result = flatResult;
+                        
+                        if (bestOutput && !Array.isArray(bestOutput)) {
+                            result = bestOutput;
                         }
                     }
                 } else {
