@@ -3,9 +3,25 @@
  * Manages real connections to OPC UA, MQTT, and Modbus devices
  */
 
-const { OPCUAClient, MessageSecurityMode, SecurityPolicy } = require('node-opcua');
-const mqtt = require('mqtt');
-const ModbusRTU = require('modbus-serial');
+let OPCUAClient, MessageSecurityMode, SecurityPolicy, mqtt, ModbusRTU;
+
+try {
+    ({ OPCUAClient, MessageSecurityMode, SecurityPolicy } = require('node-opcua'));
+} catch (e) {
+    console.warn('[OT] node-opcua not installed — OPC UA connections will be unavailable');
+}
+
+try {
+    mqtt = require('mqtt');
+} catch (e) {
+    console.warn('[OT] mqtt not installed — MQTT connections will be unavailable');
+}
+
+try {
+    ModbusRTU = require('modbus-serial');
+} catch (e) {
+    console.warn('[OT] modbus-serial not installed — Modbus connections will be unavailable');
+}
 
 class OTConnectionsManager {
     constructor() {
@@ -18,6 +34,7 @@ class OTConnectionsManager {
      * Get or create OPC UA client
      */
     async getOpcuaClient(connectionConfig) {
+        if (!OPCUAClient) throw new Error('OPC UA is not available — node-opcua package is not installed');
         const { endpoint, securityMode, securityPolicy, username, password } = connectionConfig;
         const cacheKey = `${endpoint}_${username || 'anonymous'}`;
 
@@ -116,6 +133,7 @@ class OTConnectionsManager {
      * Get or create MQTT client
      */
     async getMqttClient(connectionConfig) {
+        if (!mqtt) throw new Error('MQTT is not available — mqtt package is not installed');
         const { broker, port, protocol, username, password, clientId } = connectionConfig;
         const cacheKey = `${broker}_${port}_${clientId || 'default'}`;
 
@@ -242,6 +260,7 @@ class OTConnectionsManager {
      * Get or create Modbus client
      */
     async getModbusClient(connectionConfig) {
+        if (!ModbusRTU) throw new Error('Modbus is not available — modbus-serial package is not installed');
         const { host, port, unitId, type } = connectionConfig;
         const cacheKey = `${host}_${port}_${unitId || 1}`;
 
