@@ -2542,7 +2542,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                     <div className="flex border-b border-[var(--border-light)]">
                         {[
                             { id: 'parameters', label: 'Parameters', icon: Sliders },
-                            { id: 'agent', label: 'AI Agent', icon: Robot },
+                            { id: 'agent', label: 'Agent', icon: Robot },
                         ].map(tab => (
                             <button
                                 key={tab.id}
