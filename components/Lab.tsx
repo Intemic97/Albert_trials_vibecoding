@@ -2591,9 +2591,9 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                     </div>
                     
                     {/* Tab Content */}
-                    <div className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${activeTab === 'agent' ? '' : 'p-4'} custom-scrollbar`}>
+                    <div className="flex-1 min-h-0 overflow-hidden">{/* No scroll here - each tab controls its own */}
                         {activeTab === 'parameters' && (
-                            <div className="space-y-6">
+                            <div className="h-full overflow-y-auto p-4 space-y-6 custom-scrollbar">
                                 {Object.entries(groupedParameters).map(([group, params]) => (
                                     <div key={group}>
                                         {Object.keys(groupedParameters).length > 1 && (
@@ -2630,7 +2630,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                         )}
                         
                         {activeTab === 'scenarios' && (
-                            <div className="space-y-2">
+                            <div className="h-full overflow-y-auto p-4 space-y-2 custom-scrollbar">
                                 {selectedSimulation.savedScenarios.map(scenario => (
                                     <button
                                         key={scenario.id}
@@ -2658,7 +2658,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                         )}
                         
                         {activeTab === 'history' && (
-                            <div className="space-y-3">
+                            <div className="h-full overflow-y-auto p-4 space-y-3 custom-scrollbar">
                                 {/* Mini Sparkline Chart */}
                                 {runHistory.length > 1 && (
                                     <div className="p-3 bg-[var(--bg-tertiary)] rounded-xl mb-4">
@@ -2763,12 +2763,13 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                             </div>
                         )}
 
-                        {/* AI Agent Tab */}
+                        {/* AI Agent Tab - full height with chat at bottom */}
                         {activeTab === 'agent' && (
-                            <div className="p-3 space-y-3">
+                            <div className="flex flex-col h-full">
+                                <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3 custom-scrollbar">
                                     {chatMessages.length === 0 && (
-                                        <div className="flex flex-col items-center justify-center py-8 px-4">
-                                            <p className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-5">
+                                        <div className="flex flex-col items-center justify-center py-6 px-4">
+                                            <p className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-4">
                                                 Simulador AI
                                             </p>
                                             <div className="w-full space-y-2">
@@ -2807,6 +2808,28 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                         </div>
                                     )}
                                     <div ref={chatEndRef} />
+                                </div>
+                                {/* Chat input inside Agent tab */}
+                                <div className="p-3 border-t border-[var(--border-light)] shrink-0">
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={chatInput}
+                                            onChange={(e) => setChatInput(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleChatSubmit()}
+                                            placeholder="Escribe lo que quieres simular..."
+                                            className="w-full pl-4 pr-10 py-3 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-xl text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/40 focus:border-transparent transition-all"
+                                            disabled={isChatLoading}
+                                        />
+                                        <button
+                                            onClick={handleChatSubmit}
+                                            disabled={!chatInput.trim() || isChatLoading}
+                                            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                        >
+                                            {isChatLoading ? <SpinnerGap size={14} className="animate-spin" /> : <PaperPlaneTilt size={14} weight="fill" />}
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -2814,38 +2837,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                 </div>
 
                 {/* Right Panel - Visualizations */}
-                <div id="visualization-area" className="flex-1 flex flex-col overflow-hidden">
-                    {/* Command Bar - AI Agent Input */}
-                    <div className="px-6 pt-5 pb-3 shrink-0">
-                        <div className="relative max-w-2xl">
-                            <div className="absolute left-3.5 top-1/2 -translate-y-1/2">
-                                <Robot size={16} className="text-[var(--text-tertiary)]" />
-                            </div>
-                            <input
-                                type="text"
-                                value={chatInput}
-                                onChange={(e) => setChatInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        handleChatSubmit();
-                                    }
-                                }}
-                                placeholder="Simula escenarios, ajusta parametros, analiza resultados..."
-                                className="w-full pl-10 pr-12 py-3 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 focus:border-[var(--accent-primary)]/50 transition-all shadow-sm"
-                                disabled={isChatLoading}
-                            />
-                            <button
-                                onClick={handleChatSubmit}
-                                disabled={!chatInput.trim() || isChatLoading}
-                                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                            >
-                                {isChatLoading ? <SpinnerGap size={15} className="animate-spin" /> : <PaperPlaneTilt size={15} weight="fill" />}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Scrollable visualizations */}
-                    <div className="flex-1 overflow-y-auto px-6 pb-6 custom-scrollbar">
+                <div id="visualization-area" className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                     {/* Header with Add Button */}
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-sm font-medium text-[var(--text-tertiary)] uppercase tracking-wider">
@@ -3041,7 +3033,6 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                             </p>
                         </div>
                     )}
-                    </div>{/* end scrollable viz */}
                 </div>
             </div>
 
