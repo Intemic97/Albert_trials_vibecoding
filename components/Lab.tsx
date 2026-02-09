@@ -16,7 +16,7 @@ import {
     CaretUp, ChartBar, ChartPie, Gauge, NumberSquareOne, FlowArrow,
     FolderOpen, Clock, DotsThree, Export, Share, Info,
     ArrowCounterClockwise, FileCsv, FileImage, Keyboard, DotsSixVertical,
-    Lightning, Tag, Calendar
+    Lightning, Tag, Calendar, User
 } from '@phosphor-icons/react';
 import { PageHeader } from './PageHeader';
 import { API_BASE } from '../config';
