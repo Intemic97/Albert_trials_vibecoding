@@ -453,13 +453,9 @@ const VisualizationCard: React.FC<{
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
                         <XAxis dataKey={dataMapping.xAxis} tick={{ fontSize: 10 }} stroke="var(--text-tertiary)" />
                         <YAxis tick={{ fontSize: 10 }} stroke="var(--text-tertiary)" />
-                        <Tooltip 
-                            contentStyle={{ 
-                                backgroundColor: 'var(--bg-card)', 
-                                border: '1px solid var(--border-light)',
-                                borderRadius: '8px',
-                                fontSize: '12px'
-                            }} 
+                        <Tooltip
+                            contentStyle={{ background: 'rgba(30,30,30,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px', color: '#e5e5e5', backdropFilter: 'blur(8px)' }}
+                            itemStyle={{ color: '#e5e5e5' }}
                         />
                         {dataMapping.yAxis?.map((key, i) => (
                             <Line 
@@ -481,13 +477,9 @@ const VisualizationCard: React.FC<{
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
                         <XAxis dataKey={dataMapping.xAxis} tick={{ fontSize: 10 }} stroke="var(--text-tertiary)" />
                         <YAxis tick={{ fontSize: 10 }} stroke="var(--text-tertiary)" />
-                        <Tooltip 
-                            contentStyle={{ 
-                                backgroundColor: 'var(--bg-card)', 
-                                border: '1px solid var(--border-light)',
-                                borderRadius: '8px',
-                                fontSize: '12px'
-                            }} 
+                        <Tooltip
+                            contentStyle={{ background: 'rgba(30,30,30,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px', color: '#e5e5e5', backdropFilter: 'blur(8px)' }}
+                            itemStyle={{ color: '#e5e5e5' }}
                         />
                         {dataMapping.yAxis?.map((key, i) => (
                             <Bar 
@@ -507,13 +499,9 @@ const VisualizationCard: React.FC<{
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
                         <XAxis dataKey={dataMapping.xAxis} tick={{ fontSize: 10 }} stroke="var(--text-tertiary)" />
                         <YAxis tick={{ fontSize: 10 }} stroke="var(--text-tertiary)" />
-                        <Tooltip 
-                            contentStyle={{ 
-                                backgroundColor: 'var(--bg-card)', 
-                                border: '1px solid var(--border-light)',
-                                borderRadius: '8px',
-                                fontSize: '12px'
-                            }} 
+                        <Tooltip
+                            contentStyle={{ background: 'rgba(30,30,30,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px', color: '#e5e5e5', backdropFilter: 'blur(8px)' }}
+                            itemStyle={{ color: '#e5e5e5' }}
                         />
                         {dataMapping.yAxis?.map((key, i) => (
                             <Area 
@@ -545,13 +533,16 @@ const VisualizationCard: React.FC<{
                                 <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                             ))}
                         </Pie>
-                        <Tooltip 
+                        <Tooltip
                             contentStyle={{ 
-                                backgroundColor: 'var(--bg-card)', 
-                                border: '1px solid var(--border-light)',
+                                background: 'rgba(30,30,30,0.95)',
+                                border: '1px solid rgba(255,255,255,0.1)',
                                 borderRadius: '8px',
-                                fontSize: '12px'
-                            }} 
+                                fontSize: '12px',
+                                color: '#e5e5e5',
+                                backdropFilter: 'blur(8px)'
+                            }}
+                            itemStyle={{ color: '#e5e5e5' }}
                         />
                     </PieChart>
                 </ResponsiveContainer>
