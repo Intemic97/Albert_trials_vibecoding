@@ -2938,7 +2938,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                 />
                             </div>
 
-                            {/* Data Source */}
+                            {/* Data Source - from workflow results */}
                             <div>
                                 <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                     Data Source
@@ -2948,57 +2948,65 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                         type="text"
                                         value={newVisualization.source}
                                         onChange={(e) => setNewVisualization(prev => ({ ...prev, source: e.target.value }))}
-                                        placeholder="Type or select from entities below..."
+                                        placeholder={lastResult ? "Select a field from workflow results..." : "Run the experiment first to see available fields..."}
                                         className="w-full px-3 py-2.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#419CAF]"
                                     />
                                 </div>
-                                {/* Entity suggestions */}
-                                {entities && entities.length > 0 && (
+                                {/* Workflow result field suggestions */}
+                                {lastResult && typeof lastResult === 'object' && (
                                     <div className="mt-3">
+                                        <p className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-2">
+                                            Workflow Output Fields
+                                        </p>
                                         <div className="flex flex-wrap gap-1.5">
-                                            {entities.slice(0, 6).map(entity => (
-                                                <button
-                                                    key={entity.id}
-                                                    type="button"
-                                                    onClick={() => setNewVisualization(prev => ({ 
-                                                        ...prev, 
-                                                        source: entity.name,
-                                                        title: prev.title || entity.name
-                                                    }))}
-                                                    className={`px-2.5 py-1 text-xs rounded-md transition-all ${
-                                                        newVisualization.source === entity.name
-                                                            ? 'bg-[#419CAF] text-white'
-                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
-                                                    }`}
-                                                >
-                                                    {entity.name}
-                                                </button>
-                                            ))}
-                                            {entities.length > 6 && (
-                                                <span className="px-2.5 py-1 text-xs text-[var(--text-tertiary)]">
-                                                    +{entities.length - 6} more
-                                                </span>
-                                            )}
+                                            {Object.entries(lastResult).map(([key, value]) => {
+                                                const isArray = Array.isArray(value);
+                                                const isNumber = typeof value === 'number';
+                                                const tag = isArray ? 'array' : isNumber ? 'number' : typeof value;
+                                                return (
+                                                    <button
+                                                        key={key}
+                                                        type="button"
+                                                        onClick={() => setNewVisualization(prev => ({ 
+                                                            ...prev, 
+                                                            source: key,
+                                                            title: prev.title || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                                                        }))}
+                                                        className={`px-2.5 py-1 text-xs rounded-md transition-all ${
+                                                            newVisualization.source === key
+                                                                ? 'bg-[#419CAF] text-white'
+                                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
+                                                        }`}
+                                                    >
+                                                        {key} <span className="opacity-50 ml-1">({tag})</span>
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
-                                        {/* Show entity properties if one is selected */}
-                                        {newVisualization.source && entities.find(e => e.name === newVisualization.source)?.properties && (
+                                        {/* Show array item keys if an array field is selected */}
+                                        {newVisualization.source && Array.isArray(lastResult[newVisualization.source]) && lastResult[newVisualization.source][0] && (
                                             <div className="mt-3 p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-light)]">
                                                 <p className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-2">
-                                                    Properties
+                                                    Available Keys (for axes)
                                                 </p>
                                                 <div className="flex flex-wrap gap-1">
-                                                    {entities.find(e => e.name === newVisualization.source)?.properties?.map((prop: any, idx: number) => (
+                                                    {Object.keys(lastResult[newVisualization.source][0]).map((k: string) => (
                                                         <span 
-                                                            key={idx}
+                                                            key={k}
                                                             className="px-2 py-0.5 text-[10px] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded border border-[var(--border-light)]"
                                                         >
-                                                            {prop.name}
+                                                            {k}
                                                         </span>
                                                     ))}
                                                 </div>
                                             </div>
                                         )}
                                     </div>
+                                )}
+                                {!lastResult && (
+                                    <p className="mt-2 text-xs text-[var(--text-tertiary)]">
+                                        Run the experiment first to see available data fields from the workflow output.
+                                    </p>
                                 )}
                             </div>
 
