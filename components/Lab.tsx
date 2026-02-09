@@ -2442,8 +2442,62 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                     </div>
                 </div>
                 
-                <div className="flex items-center gap-2">
-                    {/* Export Button */}
+                <div className="flex items-center gap-1">
+                    {/* Bookmark */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowQuickBookmark(!showQuickBookmark)}
+                            className={`p-2 rounded-lg transition-colors ${
+                                bookmarkSaved 
+                                    ? 'text-emerald-500' 
+                                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
+                            }`}
+                            title="Save scenario (⌘S)"
+                        >
+                            <BookmarkSimple size={16} weight={bookmarkSaved ? 'fill' : 'regular'} />
+                        </button>
+                        {showQuickBookmark && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setShowQuickBookmark(false)} />
+                                <div className="absolute right-0 top-full mt-2 w-64 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-xl z-50 p-3">
+                                    <p className="text-xs text-[var(--text-tertiary)] mb-2">Guardar escenario actual</p>
+                                    <input
+                                        type="text"
+                                        value={quickBookmarkName}
+                                        onChange={(e) => setQuickBookmarkName(e.target.value)}
+                                        placeholder="Nombre del escenario..."
+                                        className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm mb-2"
+                                        autoFocus
+                                        onKeyDown={(e) => e.key === 'Enter' && saveQuickBookmark()}
+                                    />
+                                    <button
+                                        onClick={saveQuickBookmark}
+                                        disabled={!quickBookmarkName.trim()}
+                                        className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[var(--accent-primary)] text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                                    >
+                                        <BookmarkSimple size={14} />
+                                        Guardar
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    {/* History */}
+                    <button
+                        onClick={() => setActiveTab('history')}
+                        className={`p-2 rounded-lg transition-colors ${
+                            activeTab === 'history'
+                                ? 'text-[var(--accent-primary)]' 
+                                : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
+                        }`}
+                        title="Run history"
+                    >
+                        <Clock size={16} />
+                    </button>
+                    
+                    <div className="w-px h-5 bg-[var(--border-light)] mx-1" />
+                    
+                    {/* Export */}
                     <button
                         onClick={() => setShowExportModal(true)}
                         disabled={!lastResult}
@@ -2503,30 +2557,6 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                 {tab.label}
                             </button>
                         ))}
-                        <div className="flex items-center border-l border-[var(--border-light)]">
-                            <button
-                                onClick={() => setActiveTab('scenarios')}
-                                title="Saved Scenarios"
-                                className={`flex items-center justify-center px-3 py-3 transition-colors ${
-                                    activeTab === 'scenarios'
-                                        ? 'text-[var(--accent-primary)] border-b-2 border-[var(--accent-primary)]'
-                                        : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-                                }`}
-                            >
-                                <BookmarkSimple size={14} />
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('history')}
-                                title="Run History"
-                                className={`flex items-center justify-center px-3 py-3 transition-colors ${
-                                    activeTab === 'history'
-                                        ? 'text-[var(--accent-primary)] border-b-2 border-[var(--accent-primary)]'
-                                        : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-                                }`}
-                            >
-                                <Clock size={14} />
-                            </button>
-                        </div>
                     </div>
                     
                     {/* Tab Content */}
