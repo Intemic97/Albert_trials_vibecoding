@@ -1059,14 +1059,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
             values[param.id] = param.config.defaultValue;
         });
         setParameterValues(values);
-        
-        // Initialize chat with welcome message
-        setChatMessages([{
-            id: generateUUID(),
-            role: 'assistant',
-                            content: `Hi! I'm your assistant for "${sim.name}". I can help you:\n\n• Adjust parameters ("increase revenue to 200k")\n• Run experiments ("run with these values")\n• Analyze results ("what's the best scenario?")\n\nHow can I help you?`,
-            timestamp: new Date().toISOString()
-        }]);
+        setChatMessages([]);
     };
 
     // ========================================================================
