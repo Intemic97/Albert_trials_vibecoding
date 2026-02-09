@@ -2541,7 +2541,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
             {/* Main Content */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Left Panel - Parameters & Chat */}
-                <div className="w-80 border-r border-[var(--border-light)] flex flex-col bg-[var(--bg-card)]">
+                <div className="w-80 border-r border-[var(--border-light)] flex flex-col bg-[var(--bg-card)] h-full overflow-hidden">
                     {/* Tabs: Parameters + AI Agent (full), Bookmark + History (icon-only) */}
                     <div className="flex border-b border-[var(--border-light)]">
                         {[
@@ -2564,7 +2564,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                     </div>
                     
                     {/* Tab Content */}
-                    <div className={`flex-1 min-h-0 overflow-y-auto ${activeTab === 'agent' ? '' : 'p-4'} custom-scrollbar`}>
+                    <div className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${activeTab === 'agent' ? '' : 'p-4'} custom-scrollbar`}>
                         {activeTab === 'parameters' && (
                             <div className="space-y-6">
                                 {Object.entries(groupedParameters).map(([group, params]) => (
