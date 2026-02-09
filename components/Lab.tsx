@@ -305,15 +305,24 @@ const KPICard: React.FC<{
     const formatValue = (val: any) => {
         if (val === null || val === undefined) return '—';
         const num = typeof val === 'number' ? val : parseFloat(val);
-        if (isNaN(num)) return val;
+        if (isNaN(num)) return String(val);
         
+        // Smart abbreviation for large numbers
+        const abbrev = (n: number, prefix = ''): string => {
+            const abs = Math.abs(n);
+            if (abs >= 1e9) return `${prefix}${(n / 1e9).toFixed(1)}B`;
+            if (abs >= 1e6) return `${prefix}${(n / 1e6).toFixed(1)}M`;
+            if (abs >= 1e4) return `${prefix}${(n / 1e3).toFixed(1)}K`;
+            return `${prefix}${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`;
+        };
+
         switch (format) {
             case 'currency':
-                return `$${num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+                return abbrev(num, '$');
             case 'percent':
                 return `${num.toFixed(1)}%`;
             default:
-                return num.toLocaleString();
+                return abbrev(num);
         }
     };
 
@@ -2057,31 +2066,6 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
         }
     };
 
-    const updateParameter = (paramId: string, updates: Partial<ParameterConfig>) => {
-        if (!selectedSimulation) return;
-
-        const updatedSim = {
-            ...selectedSimulation,
-            parameters: selectedSimulation.parameters.map(p => 
-                p.id === paramId ? { ...p, ...updates } : p
-            ),
-            updatedAt: new Date().toISOString()
-        };
-
-        setSelectedSimulation(updatedSim);
-        setSimulations(prev => prev.map(s => s.id === updatedSim.id ? updatedSim : s));
-        setEditingParam(null);
-
-        if (selectedSimulation.id !== 'demo-experiment') {
-            fetch(`${API_BASE}/simulations/${selectedSimulation.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(updatedSim)
-            }).catch(console.error);
-        }
-    };
-
     const updateParameter = (updated: ParameterConfig) => {
         if (!selectedSimulation) return;
 
@@ -2566,9 +2550,9 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex overflow-hidden" style={{ minHeight: 0 }}>
+            <div className="flex-1 flex overflow-hidden min-h-0">
                 {/* Left Panel - Parameters & Chat */}
-                <div className="w-80 border-r border-[var(--border-light)] flex flex-col bg-[var(--bg-card)]" style={{ height: '100%' }}>
+                <div className="w-80 min-h-0 flex flex-col shrink-0 overflow-hidden bg-[var(--bg-card)] border-r border-[var(--border-light)]">
                     {/* Tabs: Parameters + AI Agent (full), Bookmark + History (icon-only) */}
                     <div className="flex border-b border-[var(--border-light)]">
                         {[
@@ -2590,10 +2574,10 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                         ))}
                     </div>
                     
-                    {/* Tab Content */}
-                    <div className="flex-1 min-h-0 overflow-hidden">{/* No scroll here - each tab controls its own */}
+                    {/* Tab Content - must not grow past available space */}
+                    <div className="flex-1 min-h-0 overflow-hidden relative">
                         {activeTab === 'parameters' && (
-                            <div className="h-full overflow-y-auto p-4 space-y-6 custom-scrollbar">
+                            <div className="absolute inset-0 overflow-y-auto p-4 space-y-6 custom-scrollbar">
                                 {Object.entries(groupedParameters).map(([group, params]) => (
                                     <div key={group}>
                                         {Object.keys(groupedParameters).length > 1 && (
@@ -2630,7 +2614,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                         )}
                         
                         {activeTab === 'scenarios' && (
-                            <div className="h-full overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                            <div className="absolute inset-0 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                                 {selectedSimulation.savedScenarios.map(scenario => (
                                     <button
                                         key={scenario.id}
@@ -2658,14 +2642,14 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                         )}
                         
                         {activeTab === 'history' && (
-                            <div className="h-full overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                            <div className="absolute inset-0 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                                 {/* Mini Sparkline Chart */}
                                 {runHistory.length > 1 && (
                                     <div className="p-3 bg-[var(--bg-tertiary)] rounded-xl mb-4">
                                         <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
                                             Result Trend
                                         </p>
-                                        <ResponsiveContainer width="100%" height={60}>
+                                        <ResponsiveContainer width="100%" height={60} minWidth={100} minHeight={60}>
                                             <AreaChart data={runHistory.slice(0, 20).reverse().map((run, idx) => ({
                                                 idx,
                                                 value: run.result?.revenue || run.result?.result || 0
@@ -2765,8 +2749,8 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
 
                         {/* AI Agent Tab - full height with chat at bottom */}
                         {activeTab === 'agent' && (
-                            <div className="flex flex-col h-full">
-                                <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+                            <div className="absolute inset-0 flex flex-col min-h-0 overflow-hidden" style={{ height: '100%' }}>
+                                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 space-y-3 custom-scrollbar" style={{ minHeight: 0 }}>
                                     {chatMessages.length === 0 && (
                                         <div className="flex flex-col items-center justify-center py-6 px-4">
                                             <p className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-4">
@@ -3496,15 +3480,6 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
 
                             {configTab === 'parameters' && (
                                 <div className="space-y-4">
-                                    {/* Add Parameter Button */}
-                                    <button
-                                        onClick={() => setShowAddParam(true)}
-                                        className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-[var(--border-light)] hover:border-[var(--accent-primary)] rounded-xl text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"
-                                    >
-                                        <Plus size={16} />
-                                        Add Parameter
-                                    </button>
-
                                     {/* Parameter List */}
                                     {selectedSimulation.parameters.map((param, idx) => (
                                         <div 
@@ -3567,6 +3542,15 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                             </p>
                                         </div>
                                     )}
+
+                                    {/* Add Parameter Button - at bottom */}
+                                    <button
+                                        onClick={() => setShowAddParam(true)}
+                                        className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-[var(--border-light)] hover:border-[var(--accent-primary)] rounded-xl text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"
+                                    >
+                                        <Plus size={16} />
+                                        Add Parameter
+                                    </button>
 
                                     {/* Add Parameter Form */}
                                     {showAddParam && (

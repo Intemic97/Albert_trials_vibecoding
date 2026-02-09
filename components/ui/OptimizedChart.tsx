@@ -3,7 +3,7 @@
  * Memoized wrapper for recharts with performance optimizations
  */
 
-import React, { memo, useMemo, useCallback } from 'react';
+import React, { memo, useMemo, useCallback, useRef, useEffect, useState } from 'react';
 import {
     ResponsiveContainer,
     BarChart,
@@ -296,6 +296,24 @@ export const OptimizedChart = memo<OptimizedChartProps>(({
     animate = true,
     className = ''
 }) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [hasValidSize, setHasValidSize] = useState(false);
+
+    useEffect(() => {
+        const updateSize = () => {
+            if (!containerRef.current) return;
+            const w = containerRef.current.offsetWidth;
+            const h = containerRef.current.offsetHeight;
+            setHasValidSize(w > 10 && h > 10);
+        };
+
+        updateSize();
+        const observer = new ResizeObserver(updateSize);
+        if (containerRef.current) observer.observe(containerRef.current);
+
+        return () => observer.disconnect();
+    }, [height]);
+
     // Memoize processed data
     const processedData = useMemo(() => {
         if (!data || data.length === 0) return [];
@@ -350,10 +368,16 @@ export const OptimizedChart = memo<OptimizedChartProps>(({
     };
 
     return (
-        <div className={className} style={{ height }}>
-            <ResponsiveContainer width="100%" height="100%">
-                {renderChart()}
-            </ResponsiveContainer>
+        <div ref={containerRef} className={className} style={{ height, minHeight: height }}>
+            {hasValidSize ? (
+                <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={100}>
+                    {renderChart()}
+                </ResponsiveContainer>
+            ) : (
+                <div className="h-full flex items-center justify-center text-[var(--text-tertiary)] text-sm">
+                    Loading chart...
+                </div>
+            )}
         </div>
     );
 });

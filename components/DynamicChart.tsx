@@ -676,7 +676,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                 }
                 
                 return (
-                    <ResponsiveContainer width="100%" height={height}>
+                    <ResponsiveContainer width="100%" height={height} minWidth={100} minHeight={100}>
                         <RadialBarChart
                             cx="50%"
                             cy="50%"
@@ -728,7 +728,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                 ];
                 
                 return (
-                    <ResponsiveContainer width="100%" height={height}>
+                    <ResponsiveContainer width="100%" height={height} minWidth={100} minHeight={100}>
                         <RadialBarChart
                             cx="50%"
                             cy="90%"
@@ -772,7 +772,8 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
     };
 
     // Loading state
-    if (!isReady || !data || data.length === 0) {
+    const hasValidSize = dimensions.width > 10 && dimensions.height > 10;
+    if (!isReady || !hasValidSize || !data || data.length === 0) {
         return (
             <div 
                 ref={containerRef} 

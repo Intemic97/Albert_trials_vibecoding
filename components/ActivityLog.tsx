@@ -288,7 +288,7 @@ export const ActivityLog: React.FC = () => {
                             Activity Trend
                         </p>
                         {stats.dailyActivity.length > 0 && (
-                            <ResponsiveContainer width="100%" height={40}>
+                            <ResponsiveContainer width="100%" height={40} minWidth={100} minHeight={40}>
                                 <AreaChart data={stats.dailyActivity}>
                                     <defs>
                                         <linearGradient id="activityGradient" x1="0" y1="0" x2="0" y2="1">

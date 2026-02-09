@@ -58,7 +58,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     // Navigation state
     const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [viewMode, setViewMode] = useState<ViewMode>('grid');
+    const [viewMode, setViewMode] = useState<ViewMode>('list');
     const [sortBy, setSortBy] = useState<SortBy>('name');
     const [showKnowledgeGraph, setShowKnowledgeGraph] = useState(false);
     

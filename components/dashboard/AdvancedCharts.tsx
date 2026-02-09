@@ -669,7 +669,7 @@ export const BubbleChart: React.FC<BubbleChartProps> = ({
     }, [data, xKey, yKey, sizeKey, colorKey]);
 
     return (
-        <ResponsiveContainer width="100%" height={height}>
+        <ResponsiveContainer width="100%" height={height} minWidth={100} minHeight={100}>
             <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
                 <XAxis 

@@ -1034,11 +1034,11 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
     }
 
     return (
-        <div className="flex flex-col h-screen bg-[var(--bg-primary)]">
+        <div className="flex flex-col h-full bg-[var(--bg-primary)]">
             {/* Header */}
-            <header className="bg-[var(--bg-card)] border-b border-[var(--border-light)] shadow-sm z-10 shrink-0">
-                <div className="px-6 py-4">
-                    <div className="flex items-center justify-between mb-4">
+            <header className="bg-[var(--bg-card)]/95 border-b border-[var(--border-light)] backdrop-blur-sm z-10 shrink-0">
+                <div className="px-6 py-3">
+                    <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={() => navigate('/documents')}
@@ -1070,8 +1070,8 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                     </div>
 
                     {/* Status Progress */}
-                    <div className="flex items-center gap-2 mb-4 p-3 bg-[var(--bg-tertiary)] rounded-lg">
-                        <span className="text-sm text-[var(--text-secondary)] mr-2">Status:</span>
+                    <div className="flex items-center gap-2 mb-3 p-2.5 bg-[var(--bg-tertiary)]/70 border border-[var(--border-light)] rounded-xl">
+                        <span className="text-xs text-[var(--text-secondary)] mr-1.5 uppercase tracking-wide">Status</span>
                         {(['draft', 'review', 'ready_to_send'] as const).map((status, idx) => {
                             const config = statusConfig[status];
                             const StatusIcon = config.icon;
@@ -1112,7 +1112,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                             disabled={isDisabled}
                                             className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                                                 isDisabled
-                                                    ? 'bg-[var(--bg-tertiary)] text-slate-300 cursor-not-allowed'
+                                                    ? 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed'
                                                     : isActive 
                                                         ? `${config.bg} ${config.color} ring-2 ring-offset-2 ring-[var(--accent-primary)]/30`
                                                         : isPast
@@ -1125,9 +1125,9 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                         </button>
                                         {/* Tooltip for disabled buttons */}
                                         {isDisabled && disabledReason && (
-                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-[var(--bg-card)] text-[var(--text-primary)] text-xs rounded-lg border border-[var(--border-light)] shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                                                 {disabledReason}
-                                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[var(--bg-card)]" />
                                             </div>
                                         )}
                                     </div>
@@ -1151,9 +1151,9 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                     <button
                                         onClick={() => !isDisabled && setActiveTab(tab.id)}
                                         disabled={isDisabled}
-                                        className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                                        className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                                             isDisabled
-                                                ? 'border-transparent text-slate-300 cursor-not-allowed'
+                                                ? 'border-transparent text-[var(--text-tertiary)] cursor-not-allowed'
                                                 : activeTab === tab.id
                                                     ? 'border-[var(--accent-primary)] text-[var(--accent-primary)]'
                                                     : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -1169,9 +1169,9 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                     </button>
                                     {/* Tooltip for disabled Review tab */}
                                     {isDisabled && tab.id === 'review' && (
-                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-[var(--bg-card)] text-[var(--text-primary)] text-xs rounded-lg border border-[var(--border-light)] shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                                             {report.status === 'draft' ? 'Change status to Review first' : 'Document is ready to send'}
-                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[var(--bg-card)]" />
                                         </div>
                                     )}
                                 </div>
@@ -1187,7 +1187,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 <aside className="w-72 bg-[var(--bg-card)] border-r border-[var(--border-light)] overflow-y-auto shrink-0">
                     <div className="p-4">
                         <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-sm font-normal text-[var(--text-primary)]">SECTIONS</h3>
+                            <h3 className="text-xs font-medium tracking-wider text-[var(--text-tertiary)] uppercase">Sections</h3>
                             <button
                                 onClick={handleOpenTemplateModal}
                                 className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 rounded-lg transition-colors"
@@ -1288,7 +1288,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                 </aside>
 
                 {/* Main Content Area */}
-                <main className="flex-1 overflow-y-auto p-6" id="main-content-area">
+                <main className="flex-1 overflow-y-auto p-6 bg-[var(--bg-primary)] custom-scrollbar" id="main-content-area">
                     {/* Preview Tab */}
                     {activeTab === 'preview' && (
                         <div className="flex gap-6 h-full">

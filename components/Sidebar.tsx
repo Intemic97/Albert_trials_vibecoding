@@ -53,6 +53,7 @@ const viewToRoute: Record<string, string> = {
   'connections': '/connections',
   'industrial': '/industrial',
   'documentation': '/documentation',
+  'import-use-case': '/import-use-case',
   'settings': '/settings',
   'admin': '/admin',
 };
@@ -226,7 +227,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
     };
   }, [searchQuery]);
 
-  const NavItem = ({ icon: Icon, label, view, active = false, onClick, onNavigate: onNavCb, badge }: { icon: any, label: string, view?: string, active?: boolean, onClick?: () => void, onNavigate?: () => void, badge?: number }) => {
+  const NavItem = ({ icon: Icon, label, view, active = false, onClick, onNavigate: onNavCb, badge, betaTag }: { icon: any, label: string, view?: string, active?: boolean, onClick?: () => void, onNavigate?: () => void, badge?: number, betaTag?: boolean }) => {
     const route = view ? viewToRoute[view] || `/${view}` : '#';
     
     const baseClasses = `flex items-center ${isCollapsed ? 'justify-center px-2' : 'px-3'} py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out w-full text-left group relative`;
@@ -262,7 +263,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         >
           <Icon size={isCollapsed ? 18 : 16} weight="light" className={iconClasses} />
           {!isCollapsed && <span className="transition-colors duration-200 ease-in-out">{label}</span>}
-          {!isCollapsed && badgeElement}
+          {!isCollapsed && betaTag && <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/20 leading-none">Beta</span>}
+          {!isCollapsed && !betaTag && badgeElement}
           {isCollapsed && badgeElement}
           {tooltip}
         </button>
@@ -274,7 +276,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         <div className={`${baseClasses} ${activeClasses}`} title={isCollapsed ? label : undefined}>
           <Icon size={isCollapsed ? 18 : 16} weight="light" className={iconClasses} />
           {!isCollapsed && <span className="transition-colors duration-200 ease-in-out">{label}</span>}
-          {!isCollapsed && badgeElement}
+          {!isCollapsed && betaTag && <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/20 leading-none">Beta</span>}
+          {!isCollapsed && !betaTag && badgeElement}
           {isCollapsed && badgeElement}
           {tooltip}
         </div>
@@ -297,7 +300,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
       >
         <Icon size={isCollapsed ? 18 : 16} weight="light" className={iconClasses} />
         {!isCollapsed && <span className="transition-colors duration-200 ease-in-out">{label}</span>}
-        {!isCollapsed && badgeElement}
+        {!isCollapsed && betaTag && <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/20 leading-none">Beta</span>}
+        {!isCollapsed && !betaTag && badgeElement}
         {isCollapsed && badgeElement}
         {tooltip}
       </Link>
@@ -512,7 +516,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
           <div className="space-y-0.5">
             <NavItem icon={SquaresFour} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
             <NavItem icon={Sparkle} label="Copilots" view="copilots" active={activeView === 'copilots'} />
-            <NavItem icon={Flask} label="Lab" view="lab" active={activeView === 'lab'} />
+            <NavItem icon={Flask} label="Lab" view="lab" active={activeView === 'lab'} betaTag />
           </div>
 
           <SectionLabel label="Reports" />
@@ -563,6 +567,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
                     label="Documentation" 
                     view="documentation"
                     active={activeView === 'documentation'}
+                  />
+                </div>
+                <div onClick={() => setShowHelpDropdown(false)}>
+                  <NavItem
+                    icon={ClipboardText}
+                    label="Import Package"
+                    view="import-use-case"
+                    active={activeView === 'import-use-case'}
                   />
                 </div>
                 <NavItem 

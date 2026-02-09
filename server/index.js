@@ -8,6 +8,7 @@ const pdfParse = require('pdf-parse');
 const XLSX = require('xlsx');
 const { WebSocketServer } = require('ws');
 const { initDb, openDb } = require('./db');
+const { importUseCasePackage, validateUseCasePackage } = require('./useCaseImporter');
 const { WorkflowExecutor, setBroadcastToOrganization } = require('./workflowExecutor');
 const { gcsService } = require('./gcsService');
 const { prefectClient } = require('./prefectClient');
@@ -597,6 +598,7 @@ const upload = multer({
         // Allow common file types and all images
         const allowedTypes = [
             'application/pdf',
+            'application/json',
             'application/msword',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'application/vnd.ms-excel',
@@ -4402,6 +4404,65 @@ app.delete('/api/widgets/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Error deleting widget:', error);
         res.status(500).json({ error: 'Failed to delete widget' });
+    }
+});
+
+// ==================== USE CASE PACKAGE IMPORT ====================
+
+// POST /api/use-case/import - Subir un package JSON para importar como use case (entidades, workflow, simulación, dashboard)
+app.post('/api/use-case/import', authenticateToken, async (req, res) => {
+    try {
+        let packageObj = req.body;
+        if (!packageObj || typeof packageObj !== 'object') {
+            return res.status(400).json({ error: 'Body must be a JSON object (use case package)' });
+        }
+        const dryRun = String(req.query.dryRun || req.body?.dryRun || '').toLowerCase() === 'true';
+        const result = await importUseCasePackage(db, req.user.orgId, packageObj, req.user.sub, { dryRun });
+        res.json({
+            message: dryRun ? 'Validación/dry run completado' : 'Use case importado',
+            ...result
+        });
+    } catch (error) {
+        console.error('Error importing use case:', error);
+        res.status(500).json({ error: error.message || 'Error al importar use case' });
+    }
+});
+
+// POST /api/use-case/import-file - Mismo import pero subiendo un archivo .json (multipart)
+app.post('/api/use-case/import-file', authenticateToken, upload.single('package'), async (req, res) => {
+    try {
+        if (!req.file || !req.file.path) {
+            return res.status(400).json({ error: 'Envía un archivo con field name "package" (JSON)' });
+        }
+        const raw = fs.readFileSync(req.file.path, 'utf8');
+        let packageObj;
+        try {
+            packageObj = JSON.parse(raw);
+        } catch (e) {
+            return res.status(400).json({ error: 'El archivo no es un JSON válido' });
+        }
+        const dryRun = String(req.query.dryRun || '').toLowerCase() === 'true';
+        const result = await importUseCasePackage(db, req.user.orgId, packageObj, req.user.sub, { dryRun });
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+        res.json({
+            message: dryRun ? 'Validación/dry run completado' : 'Use case importado',
+            ...result
+        });
+    } catch (error) {
+        console.error('Error importing use case from file:', error);
+        res.status(500).json({ error: error.message || 'Error al importar use case' });
+    }
+});
+
+// POST /api/use-case/validate - Validar package sin importar
+app.post('/api/use-case/validate', authenticateToken, async (req, res) => {
+    try {
+        const packageObj = req.body;
+        const validation = validateUseCasePackage(packageObj);
+        res.json(validation);
+    } catch (error) {
+        console.error('Error validating use case:', error);
+        res.status(500).json({ error: error.message || 'Error validando use case' });
     }
 });
 

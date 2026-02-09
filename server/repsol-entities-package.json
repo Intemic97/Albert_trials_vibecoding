@@ -1,0 +1,230 @@
+{
+  "name": "Entities Repsol - Planta Plastico",
+  "version": "1.0.0",
+  "exportedAt": "2026-02-09T23:22:18.061Z",
+  "entities": [
+    {
+      "id": "ent_extrusoras",
+      "name": "Extrusoras",
+      "description": "Líneas de extrusión de polietileno y polipropileno de la planta.",
+      "author": "System",
+      "lastEdited": "Today",
+      "properties": [
+        {
+          "id": "p_ext_nombre",
+          "name": "Nombre Línea",
+          "type": "text",
+          "defaultValue": ""
+        },
+        {
+          "id": "p_ext_tipo",
+          "name": "Tipo Polímero",
+          "type": "text",
+          "defaultValue": "HDPE"
+        },
+        {
+          "id": "p_ext_capacidad",
+          "name": "Capacidad (ton/h)",
+          "type": "number",
+          "defaultValue": "0"
+        },
+        {
+          "id": "p_ext_temp_operacion",
+          "name": "Temp Operación (°C)",
+          "type": "number",
+          "defaultValue": "0"
+        },
+        {
+          "id": "p_ext_presion",
+          "name": "Presión (bar)",
+          "type": "number",
+          "defaultValue": "0"
+        },
+        {
+          "id": "p_ext_estado",
+          "name": "Estado",
+          "type": "text",
+          "defaultValue": "Operativa"
+        },
+        {
+          "id": "p_ext_eficiencia",
+          "name": "Eficiencia (%)",
+          "type": "number",
+          "defaultValue": "0"
+        },
+        {
+          "id": "p_ext_horas_op",
+          "name": "Horas Operación",
+          "type": "number",
+          "defaultValue": "0"
+        }
+      ]
+    },
+    {
+      "id": "ent_materia_prima",
+      "name": "Materia Prima",
+      "description": "Inventario de resinas, aditivos y materias primas derivadas del petróleo.",
+      "author": "System",
+      "lastEdited": "Today",
+      "properties": [
+        {
+          "id": "p_mp_nombre",
+          "name": "Material",
+          "type": "text",
+          "defaultValue": ""
+        },
+        {
+          "id": "p_mp_tipo",
+          "name": "Tipo",
+          "type": "text",
+          "defaultValue": "Resina"
+        },
+        {
+          "id": "p_mp_stock",
+          "name": "Stock (ton)",
+          "type": "number",
+          "defaultValue": "0"
+        },
+        {
+          "id": "p_mp_precio",
+          "name": "Precio (USD/ton)",
+          "type": "number",
+          "defaultValue": "0"
+        },
+        {
+          "id": "p_mp_proveedor",
+          "name": "Proveedor",
+          "type": "text",
+          "defaultValue": ""
+        },
+        {
+          "id": "p_mp_lead_time",
+          "name": "Lead Time (días)",
+          "type": "number",
+          "defaultValue": "0"
+        },
+        {
+          "id": "p_mp_punto_reorden",
+          "name": "Punto Reorden (ton)",
+          "type": "number",
+          "defaultValue": "0"
+        }
+      ]
+    },
+    {
+      "id": "ent_produccion",
+      "name": "Producción Diaria",
+      "description": "Registro diario de producción de cada línea de extrusión.",
+      "author": "System",
+      "lastEdited": "Today",
+      "properties": [
+        {
+          "id": "p_prod_fecha",
+          "name": "Fecha",
+          "type": "text",
+          "defaultValue": ""
+        },
+        {
+          "id": "p_prod_linea",
+          "name": "Línea",
+          "type": "relation",
+          "relatedEntityId": "ent_extrusoras"
+        },
+        {
+          "id": "p_prod_producto",
+          "name": "Producto",
+          "type": "text",
+          "defaultValue": ""
+        },
+        {
+          "id": "p_prod_toneladas",
+          "name": "Producción (ton)",
+          "type": "number",
+          "defaultValue": "0"
+        },
+        {
+          "id": "p_prod_scrap",
+          "name": "Scrap (%)",
+          "type": "number",
+          "defaultValue": "0"
+        },
+        {
+          "id": "p_prod_energia",
+          "name": "Energía (kWh)",
+          "type": "number",
+          "defaultValue": "0"
+        },
+        {
+          "id": "p_prod_calidad",
+          "name": "Calidad",
+          "type": "text",
+          "defaultValue": "A"
+        },
+        {
+          "id": "p_prod_turno",
+          "name": "Turno",
+          "type": "text",
+          "defaultValue": "Día"
+        }
+      ]
+    },
+    {
+      "id": "ent_ordenes",
+      "name": "Órdenes de Producción",
+      "description": "Órdenes activas y planificadas de producción de plástico.",
+      "author": "System",
+      "lastEdited": "Today",
+      "properties": [
+        {
+          "id": "p_ord_codigo",
+          "name": "Código Orden",
+          "type": "text",
+          "defaultValue": ""
+        },
+        {
+          "id": "p_ord_cliente",
+          "name": "Cliente",
+          "type": "text",
+          "defaultValue": ""
+        },
+        {
+          "id": "p_ord_producto",
+          "name": "Producto",
+          "type": "text",
+          "defaultValue": ""
+        },
+        {
+          "id": "p_ord_cantidad",
+          "name": "Cantidad (ton)",
+          "type": "number",
+          "defaultValue": "0"
+        },
+        {
+          "id": "p_ord_fecha_entrega",
+          "name": "Fecha Entrega",
+          "type": "text",
+          "defaultValue": ""
+        },
+        {
+          "id": "p_ord_estado",
+          "name": "Estado",
+          "type": "text",
+          "defaultValue": "Pendiente"
+        },
+        {
+          "id": "p_ord_precio_ton",
+          "name": "Precio (USD/ton)",
+          "type": "number",
+          "defaultValue": "0"
+        },
+        {
+          "id": "p_ord_prioridad",
+          "name": "Prioridad",
+          "type": "text",
+          "defaultValue": "Normal"
+        }
+      ]
+    }
+  ],
+  "records": []
+}

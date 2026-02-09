@@ -34,6 +34,7 @@ const AdminPanel = React.lazy(() => import('./components/AdminPanel').then(m => 
 const LogsAndAlerts = React.lazy(() => import('./components/LogsAndAlerts').then(m => ({ default: m.LogsAndAlerts })));
 const Connections = React.lazy(() => import('./components/Connections').then(m => ({ default: m.Connections })));
 const Documentation = React.lazy(() => import('./components/Documentation').then(m => ({ default: m.Documentation })));
+const UseCaseImport = React.lazy(() => import('./components/UseCaseImport').then(m => ({ default: m.UseCaseImport })));
 const SharedDashboard = React.lazy(() => import('./components/SharedDashboard').then(m => ({ default: m.SharedDashboard })));
 const PublicWorkflowForm = React.lazy(() => import('./components/PublicWorkflowForm').then(m => ({ default: m.PublicWorkflowForm })));
 const InteractiveTutorial = React.lazy(() => import('./components/InteractiveTutorial').then(m => ({ default: m.InteractiveTutorial })));
@@ -161,6 +162,7 @@ function AuthenticatedApp() {
         if (path.startsWith('/connections')) return 'connections';
         if (path.startsWith('/industrial')) return 'industrial';
         if (path.startsWith('/documentation')) return 'documentation';
+        if (path.startsWith('/import-use-case')) return 'import-use-case';
         if (path.startsWith('/settings')) return 'settings';
         if (path.startsWith('/admin')) return 'admin';
         return 'overview';
@@ -183,6 +185,7 @@ function AuthenticatedApp() {
             'copilots': '/copilots',
             'logs': '/logs',
             'documentation': '/documentation',
+            'import-use-case': '/import-use-case',
             'settings': '/settings',
             'admin': '/admin',
         };
@@ -1362,6 +1365,7 @@ function AuthenticatedApp() {
                     <TopNav activeView={currentView} />
                 )}
                 <main id="main-content" className="flex-1 flex flex-col min-h-0 overflow-hidden relative bg-[var(--bg-primary)] transition-colors duration-200" tabIndex={-1}>
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 <Suspense fallback={<PageLoader />}>
                 <Routes>
                     <Route path="/" element={<Navigate to="/overview" replace />} />
@@ -1420,6 +1424,9 @@ function AuthenticatedApp() {
                     <Route path="/documentation" element={
                         <Documentation />
                     } />
+                    <Route path="/import-use-case" element={
+                        <UseCaseImport />
+                    } />
                     <Route path="/settings" element={
                         <Settings onViewChange={handleNavigate} onShowTutorial={() => setShowTutorial(true)} />
                     } />
@@ -1427,34 +1434,40 @@ function AuthenticatedApp() {
                         <AdminPanel onNavigate={handleNavigate} />
                     } />
                     <Route path="/lab" element={
-                        <Lab 
-                            entities={entities} 
-                            onNavigate={(entityId) => {
-                                if (!entityId) return;
-                                setActiveEntityId(entityId);
-                                navigate(`/database/${entityId}`);
-                            }}
-                        />
+                        <div className="h-full flex flex-col min-h-0 overflow-hidden">
+                            <Lab 
+                                entities={entities} 
+                                onNavigate={(entityId) => {
+                                    if (!entityId) return;
+                                    setActiveEntityId(entityId);
+                                    navigate(`/database/${entityId}`);
+                                }}
+                            />
+                        </div>
                     } />
                     <Route path="/lab/:simulationId" element={
-                        <Lab 
-                            entities={entities} 
-                            onNavigate={(entityId) => {
-                                if (!entityId) return;
-                                setActiveEntityId(entityId);
-                                navigate(`/database/${entityId}`);
-                            }}
-                        />
+                        <div className="h-full flex flex-col min-h-0 overflow-hidden">
+                            <Lab 
+                                entities={entities} 
+                                onNavigate={(entityId) => {
+                                    if (!entityId) return;
+                                    setActiveEntityId(entityId);
+                                    navigate(`/database/${entityId}`);
+                                }}
+                            />
+                        </div>
                     } />
                     <Route path="/lab/:simulationId/scenarios/:scenarioId" element={
-                        <Lab 
-                            entities={entities} 
-                            onNavigate={(entityId) => {
-                                if (!entityId) return;
-                                setActiveEntityId(entityId);
-                                navigate(`/database/${entityId}`);
-                            }}
-                        />
+                        <div className="h-full flex flex-col min-h-0 overflow-hidden">
+                            <Lab 
+                                entities={entities} 
+                                onNavigate={(entityId) => {
+                                    if (!entityId) return;
+                                    setActiveEntityId(entityId);
+                                    navigate(`/database/${entityId}`);
+                                }}
+                            />
+                        </div>
                     } />
                     <Route path="/database" element={
                         <KnowledgeBase 
@@ -2015,14 +2028,12 @@ function AuthenticatedApp() {
                                                                 {sourceEntity.name}
                                                             </th>
                                                         ))}
-                                                        <th className="px-4 py-2.5 text-[10px] font-medium text-[var(--text-tertiary)] uppercase bg-[var(--bg-tertiary)]">Tags</th>
-                                                        <th className="px-4 py-2.5 text-right text-[10px] font-medium text-[var(--text-tertiary)] uppercase bg-[var(--bg-tertiary)]">Actions</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-[var(--border-light)]">
                                                     {paged.length === 0 ? (
                                                         <tr>
-                                                            <td colSpan={Math.max(activeEntity.properties.length, 1) + 2 + Object.keys(incomingData).length} className="p-8 text-center text-[var(--text-tertiary)] text-sm">
+                                                            <td colSpan={Math.max(activeEntity.properties.length, 1) + Object.keys(incomingData).length} className="p-8 text-center text-[var(--text-tertiary)] text-sm">
                                                                 {records.length === 0 
                                                                     ? (activeEntity.properties.length === 0 
                                                                         ? 'Add properties to define your data structure first.'
@@ -2097,71 +2108,6 @@ function AuthenticatedApp() {
                                                                         </td>
                                                                     );
                                                                 })}
-                                                                {/* Tags cell */}
-                                                                <td className="px-3 py-3">
-                                                                    <div className="flex flex-wrap gap-1 items-center">
-                                                                        {(() => {
-                                                                            let tags: string[] = [];
-                                                                            try { tags = JSON.parse(record.tags || '[]'); } catch { tags = []; }
-                                                                            return tags.map((tag: string) => {
-                                                                                const colors: Record<string, string> = {
-                                                                                    verified: 'bg-green-500/15 text-green-600',
-                                                                                    estimated: 'bg-amber-500/15 text-amber-600',
-                                                                                    audited: 'bg-blue-500/15 text-blue-600',
-                                                                                    pending: 'bg-orange-500/15 text-orange-600',
-                                                                                    flagged: 'bg-red-500/15 text-red-600',
-                                                                                    draft: 'bg-gray-500/15 text-gray-500',
-                                                                                };
-                                                                                return (
-                                                                                    <span key={tag} className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${colors[tag] || 'bg-gray-500/15 text-gray-500'}`}>
-                                                                                        {tag}
-                                                                                    </span>
-                                                                                );
-                                                                            });
-                                                                        })()}
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                setEditingTagsRecordId(editingTagsRecordId === record.id ? null : record.id);
-                                                                            }}
-                                                                            className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity text-[10px]"
-                                                                        >
-                                                                            +
-                                                                        </button>
-                                                                        {editingTagsRecordId === record.id && (
-                                                                            <div className="absolute z-20 mt-1 p-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-lg flex flex-wrap gap-1">
-                                                                                {TAG_OPTIONS.map(tag => {
-                                                                                    let tags: string[] = [];
-                                                                                    try { tags = JSON.parse(record.tags || '[]'); } catch { tags = []; }
-                                                                                    const active = tags.includes(tag);
-                                                                                    return (
-                                                                                        <button
-                                                                                            key={tag}
-                                                                                            onClick={() => toggleRecordTag(record.id, tag)}
-                                                                                            className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${active ? 'bg-[var(--accent-primary)] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
-                                                                                        >
-                                                                                            {tag}
-                                                                                        </button>
-                                                                                    );
-                                                                                })}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-4 py-3 text-right">
-                                                                    <button
-                                                                        onClick={() => handleEditRecord(record)}
-                                                                        className="p-1.5 text-[var(--text-tertiary)] hover:text-[#419CAF] hover:bg-[#419CAF]/10 rounded transition-colors opacity-0 group-hover:opacity-100 mr-1"
-                                                                    >
-                                                                        <PencilSimple size={14} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => deleteRecord(record.id)}
-                                                                        className="p-1.5 text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                                                    >
-                                                                        <Trash size={14} />
-                                                                    </button>
-                                                                </td>
                                                             </tr>
                                                         ))
                                                     )}
@@ -2892,6 +2838,7 @@ function AuthenticatedApp() {
                     } />
                 </Routes>
                 </Suspense>
+                </div>
                 </main>
             </div>
         </div>
