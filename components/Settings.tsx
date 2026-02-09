@@ -517,9 +517,11 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
 
     const fetchUsers = async () => {
         try {
-            const res = await fetch(`${API_BASE}/organization/users`, {
-                credentials: 'include'
-            });
+            const [res, invitationsRes] = await Promise.all([
+                fetch(`${API_BASE}/organization/users`, { credentials: 'include' }),
+                fetch(`${API_BASE}/organization/pending-invitations`, { credentials: 'include' })
+            ]);
+
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data)) {
@@ -588,9 +590,8 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                     setIsInviting(false);
                     setInviteEmail('');
                 }
-                if (data.added) {
-                    fetchUsers();
-                }
+                // Refresh users + pending invitations list
+                fetchUsers();
             } else {
                 setFeedback({ type: 'error', message: data.error || 'Failed to send invite' });
             }
@@ -647,7 +648,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                 {currentOrg?.role === 'admin' && (
                                     <button
                                         onClick={() => setIsInviting(true)}
-                                        className="flex items-center btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
+                                        className="flex items-center px-4 py-2 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
                                     >
                                         <Plus size={16} weight="light" className="mr-2" />
                                         Invite Member
@@ -719,6 +720,54 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                     </tbody>
                                 </table>
                             </div>
+
+                            {/* Pending Invitations */}
+                            {pendingInvitations.length > 0 && (
+                                <div>
+                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">Pending Invitations</h3>
+                                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] overflow-hidden">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-[var(--bg-tertiary)]/50 border-b border-[var(--border-light)]">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Email</th>
+                                                    <th className="px-6 py-3 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Invited by</th>
+                                                    <th className="px-6 py-3 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Date</th>
+                                                    <th className="px-6 py-3 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Status</th>
+                                                    {currentOrg?.role === 'admin' && (
+                                                        <th className="px-6 py-3 text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">Actions</th>
+                                                    )}
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {pendingInvitations.map((inv) => (
+                                                    <tr key={inv.id} className="hover:bg-[var(--bg-tertiary)]/50 transition-colors">
+                                                        <td className="px-6 py-3 text-sm text-[var(--text-primary)]">{inv.email}</td>
+                                                        <td className="px-6 py-3 text-sm text-[var(--text-secondary)]">{inv.invitedByName}</td>
+                                                        <td className="px-6 py-3 text-sm text-[var(--text-secondary)]">
+                                                            {new Date(inv.createdAt).toLocaleDateString()}
+                                                        </td>
+                                                        <td className="px-6 py-3">
+                                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                                                Pending
+                                                            </span>
+                                                        </td>
+                                                        {currentOrg?.role === 'admin' && (
+                                                            <td className="px-6 py-3">
+                                                                <button
+                                                                    onClick={() => cancelInvitation(inv.id)}
+                                                                    className="text-xs text-red-500 hover:text-red-700 transition-colors"
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </td>
+                                                        )}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 

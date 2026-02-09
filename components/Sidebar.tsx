@@ -28,7 +28,8 @@ import {
   Flask,
   MagnifyingGlass,
   ChatCircle,
-  Factory
+  Factory,
+  X
 } from '@phosphor-icons/react';
 
 interface SidebarProps {
