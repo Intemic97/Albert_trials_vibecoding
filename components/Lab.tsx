@@ -2539,9 +2539,9 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex overflow-hidden h-0 min-h-0">
                 {/* Left Panel - Parameters & Chat */}
-                <div className="w-80 border-r border-[var(--border-light)] flex flex-col bg-[var(--bg-card)] h-full overflow-hidden">
+                <div className="w-80 border-r border-[var(--border-light)] flex flex-col bg-[var(--bg-card)] shrink-0">
                     {/* Tabs: Parameters + AI Agent (full), Bookmark + History (icon-only) */}
                     <div className="flex border-b border-[var(--border-light)]">
                         {[
