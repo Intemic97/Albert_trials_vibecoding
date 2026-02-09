@@ -694,6 +694,37 @@ app.post('/api/auth/switch-org', authenticateToken, switchOrganization);
 app.get('/api/organization/users', authenticateToken, getOrganizationUsers);
 app.post('/api/organization/invite', authenticateToken, inviteUser);
 
+// Remove user from organization (admin only)
+app.delete('/api/organization/users/:userId', authenticateToken, async (req, res) => {
+    try {
+        const db = await openDb();
+        const { userId } = req.params;
+        const orgId = req.user.orgId;
+        
+        // Check if requester is admin
+        const requesterRole = await db.get(
+            'SELECT role FROM user_organizations WHERE userId = ? AND organizationId = ?',
+            [req.user.sub, orgId]
+        );
+        if (!requesterRole || requesterRole.role !== 'admin') {
+            return res.status(403).json({ error: 'Only admins can remove users' });
+        }
+        
+        // Prevent removing yourself
+        if (userId === req.user.sub) {
+            return res.status(400).json({ error: 'Cannot remove yourself' });
+        }
+        
+        // Remove user from this organization
+        await db.run('DELETE FROM user_organizations WHERE userId = ? AND organizationId = ?', [userId, orgId]);
+        
+        res.json({ message: 'User removed from workspace' });
+    } catch (error) {
+        console.error('Error removing user:', error);
+        res.status(500).json({ error: 'Failed to remove user' });
+    }
+});
+
 // Get pending invitations for current organization
 app.get('/api/organization/pending-invitations', authenticateToken, async (req, res) => {
     const orgId = req.user.orgId;
@@ -1611,25 +1642,35 @@ app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, 
     }
 });
 
-// File Upload Endpoint
-app.post('/api/upload', authenticateToken, upload.single('file'), (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
+// File Upload Endpoint - with proper multer error handling
+app.post('/api/upload', authenticateToken, (req, res) => {
+    upload.single('file')(req, res, (err) => {
+        if (err) {
+            console.error('[Upload] Multer error:', err.message);
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(413).json({ error: 'File too large. Max 50MB.' });
+            }
+            return res.status(400).json({ error: err.message || 'Upload failed' });
         }
         
-        // Return file info
-        res.json({
-            filename: req.file.filename,
-            originalName: req.file.originalname,
-            size: req.file.size,
-            mimetype: req.file.mimetype,
-            url: `/api/files/${req.file.filename}`
-        });
-    } catch (error) {
-        console.error('Error uploading file:', error);
-        res.status(500).json({ error: 'Failed to upload file' });
-    }
+        try {
+            if (!req.file) {
+                return res.status(400).json({ error: 'No file uploaded' });
+            }
+            
+            // Return file info
+            res.json({
+                filename: req.file.filename,
+                originalName: req.file.originalname,
+                size: req.file.size,
+                mimetype: req.file.mimetype,
+                url: `/api/files/${req.file.filename}`
+            });
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            res.status(500).json({ error: 'Failed to upload file' });
+        }
+    });
 });
 
 // File Serve Endpoint

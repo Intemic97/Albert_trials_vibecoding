@@ -705,8 +705,23 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                         <button 
                                                             className="text-[var(--text-tertiary)] hover:text-red-600 transition-colors"
                                                             onClick={() => {
-                                                                // TODO: Implement user removal
-                                                                console.log('Remove user:', user.id);
+                                                                setTimeout(async () => {
+                                                                    if (!window.confirm(`Remove ${user.name || user.email} from this workspace?`)) return;
+                                                                    try {
+                                                                        const res = await fetch(`${API_BASE}/organization/users/${user.id}`, {
+                                                                            method: 'DELETE',
+                                                                            credentials: 'include',
+                                                                        });
+                                                                        if (res.ok) {
+                                                                            setUsers((prev: any[]) => prev.filter((u: any) => u.id !== user.id));
+                                                                        } else {
+                                                                            const err = await res.json().catch(() => ({}));
+                                                                            window.alert(err.error || 'Failed to remove user');
+                                                                        }
+                                                                    } catch (err) {
+                                                                        window.alert('Failed to remove user');
+                                                                    }
+                                                                }, 0);
                                                             }}
                                                         >
                                                             <span className="sr-only">Remove</span>
