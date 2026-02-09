@@ -4686,36 +4686,71 @@ app.delete('/api/simulations/:id', authenticateToken, async (req, res) => {
 // Simulation Chat Assistant
 app.post('/api/simulations/chat', authenticateToken, async (req, res) => {
     try {
-        const { simulationName, parameters, lastResult, userQuery } = req.body;
+        const { simulationName, parameters, lastResult, userQuery, calculationCode, conversationHistory } = req.body;
         
-        // Build context for the AI
+        // Build rich context
         const parameterContext = parameters.map(p => 
-            `- ${p.name}: ${p.currentValue}${p.unit || ''} (rango: ${p.min ?? 'sin min'} - ${p.max ?? 'sin max'})`
+            `- ${p.name} (variable: "${p.variable}"): ${p.currentValue}${p.unit ? ' ' + p.unit : ''} (min: ${p.min ?? '-'}, max: ${p.max ?? '-'})`
         ).join('\n');
         
-        const resultContext = lastResult 
-            ? `Último resultado de la simulación:\n${JSON.stringify(lastResult, null, 2)}`
-            : 'No hay resultados previos de simulación.';
-        
-        const systemPrompt = `Eres un asistente de simulaciones interactivas. 
-Tu rol es ayudar al usuario a entender y ajustar los parámetros de la simulación "${simulationName}".
+        const resultSummary = lastResult 
+            ? Object.entries(lastResult)
+                .filter(([_, v]) => typeof v === 'number' || typeof v === 'string')
+                .map(([k, v]) => `- ${k}: ${typeof v === 'number' ? v.toLocaleString() : v}`)
+                .join('\n')
+            : 'No hay resultados. El usuario debe ejecutar la simulación primero.';
 
-Parámetros disponibles:
+        const arrayFields = lastResult
+            ? Object.entries(lastResult)
+                .filter(([_, v]) => Array.isArray(v))
+                .map(([k, v]) => `- ${k}: ${v.length} items`)
+                .join('\n')
+            : '';
+        
+        const systemPrompt = `Eres un ingeniero de procesos senior especializado en plantas petroquímicas de producción de plástico.
+Ayudas a un ingeniero de Repsol/Shell/Pemex a analizar simulaciones de producción.
+
+SIMULACIÓN: "${simulationName}"
+
+PARÁMETROS DISPONIBLES (puedes ajustarlos):
 ${parameterContext}
 
-${resultContext}
+ÚLTIMO RESULTADO (valores escalares):
+${resultSummary}
+${arrayFields ? `\nDATOS DISPONIBLES PARA GRÁFICOS:\n${arrayFields}` : ''}
+${calculationCode ? `\nFÓRMULAS DE CÁLCULO:\n${calculationCode.substring(0, 800)}` : ''}
 
-Puedes realizar las siguientes acciones:
-1. Ajustar parámetros: Responde con { "action": { "type": "set_parameter", "data": { "variable": "nombre_variable", "value": nuevo_valor } } }
-2. Ejecutar simulación: Responde con { "action": { "type": "run_simulation", "data": {} } }
-3. Simplemente responder preguntas sobre los resultados o sugerir cambios.
+INSTRUCCIONES:
+- Responde SIEMPRE en español
+- Sé conciso y técnico (como hablarías con otro ingeniero)
+- Cuando el usuario pida cambiar parámetros, incluye las acciones en el JSON
+- Puedes ajustar múltiples parámetros y ejecutar en un solo mensaje
+- Si el usuario pide una visualización, créala con create_visualization
 
-Responde siempre en español y de forma concisa. Si el usuario pide cambiar un parámetro, incluye la acción correspondiente.`;
+DEBES responder SIEMPRE con JSON válido con esta estructura exacta:
+{
+  "message": "Tu respuesta aquí (texto para el usuario)",
+  "actions": [
+    // Array de acciones (puede estar vacío si solo respondes)
+    // Tipos disponibles:
+    // { "type": "set_parameter", "variable": "nombre_variable", "value": 1500 }
+    // { "type": "run_simulation" }
+    // { "type": "create_visualization", "vizType": "kpi|line|bar|pie|table", "source": "campo_del_resultado", "title": "Título", "format": "number|currency|percent", "xAxis": "key", "yAxis": ["key1","key2"], "labelKey": "key", "valueKey": "key" }
+  ]
+}`;
 
-        // Call OpenAI or return a simulated response
         const openaiKey = process.env.OPENAI_API_KEY;
         
         if (openaiKey) {
+            // Build messages with conversation history
+            const messages = [{ role: 'system', content: systemPrompt }];
+            if (conversationHistory && Array.isArray(conversationHistory)) {
+                conversationHistory.slice(-6).forEach(msg => {
+                    messages.push({ role: msg.role === 'user' ? 'user' : 'assistant', content: msg.content });
+                });
+            }
+            messages.push({ role: 'user', content: userQuery });
+
             const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -4723,67 +4758,62 @@ Responde siempre en español y de forma concisa. Si el usuario pide cambiar un p
                     'Authorization': `Bearer ${openaiKey}`
                 },
                 body: JSON.stringify({
-                    model: 'gpt-4o-mini',
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userQuery }
-                    ],
-                    temperature: 0.7,
-                    max_tokens: 500
+                    model: 'gpt-4o',
+                    messages,
+                    temperature: 0.4,
+                    max_tokens: 1000,
+                    response_format: { type: 'json_object' }
                 })
             });
             
             if (openaiRes.ok) {
                 const data = await openaiRes.json();
-                const content = data.choices[0]?.message?.content || '';
+                const content = data.choices[0]?.message?.content || '{}';
                 
-                // Try to extract action from response
-                let action = null;
                 try {
-                    const actionMatch = content.match(/\{[\s\S]*"action"[\s\S]*\}/);
-                    if (actionMatch) {
-                        const parsed = JSON.parse(actionMatch[0]);
-                        action = parsed.action;
-                    }
-                } catch (e) {}
-                
-                // Clean message (remove JSON if present)
-                const cleanMessage = content.replace(/\{[\s\S]*"action"[\s\S]*\}/g, '').trim();
-                
-                return res.json({
-                    message: cleanMessage || content,
-                    action
-                });
+                    const parsed = JSON.parse(content);
+                    return res.json({
+                        message: parsed.message || 'Procesado.',
+                        actions: parsed.actions || []
+                    });
+                } catch (e) {
+                    return res.json({ message: content, actions: [] });
+                }
             }
         }
         
-        // Fallback: Simple pattern matching for common queries
+        // Fallback: pattern matching (when no OpenAI key)
         const query = userQuery.toLowerCase();
         let message = '';
-        let action = null;
+        const actions = [];
         
         if (query.includes('ejecuta') || query.includes('corre') || query.includes('run')) {
             message = 'Ejecutando la simulación con los parámetros actuales...';
-            action = { type: 'run_simulation', data: {} };
-        } else if (query.includes('sube') || query.includes('aumenta')) {
-            const param = parameters[0];
-            if (param) {
-                const newValue = Math.min(param.currentValue * 1.2, param.max || param.currentValue * 2);
-                message = `Aumentando ${param.name} a ${newValue.toLocaleString()}${param.unit || ''}.`;
-                action = { type: 'set_parameter', data: { variable: param.variable, value: newValue } };
+            actions.push({ type: 'run_simulation' });
+        } else if (query.match(/(?:sube|aumenta|pon).*(?:resina|precio|capacidad|eficiencia|venta|dias)/i)) {
+            // Try to match parameter and value
+            for (const param of parameters) {
+                const nameLC = (param.name || '').toLowerCase();
+                const varLC = (param.variable || '').toLowerCase();
+                if (query.includes(nameLC) || query.includes(varLC)) {
+                    const numMatch = query.match(/\d+/);
+                    if (numMatch) {
+                        const newValue = parseInt(numMatch[0]);
+                        message = `Ajustando ${param.name} a ${newValue}${param.unit ? ' ' + param.unit : ''}.`;
+                        actions.push({ type: 'set_parameter', variable: param.variable, value: newValue });
+                        actions.push({ type: 'run_simulation' });
+                    }
+                    break;
+                }
             }
-        } else if (query.includes('baja') || query.includes('reduce')) {
-            const param = parameters[0];
-            if (param) {
-                const newValue = Math.max(param.currentValue * 0.8, param.min || 0);
-                message = `Reduciendo ${param.name} a ${newValue.toLocaleString()}${param.unit || ''}.`;
-                action = { type: 'set_parameter', data: { variable: param.variable, value: newValue } };
+            if (!message) {
+                message = 'No pude identificar qué parámetro quieres cambiar. Intenta ser más específico.';
             }
         } else {
-            message = `Actualmente tienes ${parameters.length} parámetros configurados. Puedes pedirme que ajuste cualquier valor o que ejecute la simulación para ver los resultados.`;
+            message = `Tienes ${parameters.length} parámetros configurados. Puedo ajustar valores, ejecutar simulaciones, o explicar resultados.`;
         }
         
-        res.json({ message, action });
+        res.json({ message, actions });
     } catch (error) {
         console.error('Error in simulation chat:', error);
         res.status(500).json({ error: 'Failed to process chat message' });

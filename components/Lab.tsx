@@ -107,6 +107,7 @@ interface Simulation {
     visualizations: VisualizationConfig[];
     savedScenarios: SavedScenario[];
     runs: SimulationRun[];
+    calculationCode?: string;
     createdAt: string;
     updatedAt: string;
 }
@@ -638,7 +639,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
     // UI State
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showConfigPanel, setShowConfigPanel] = useState(false);
-    const [activeTab, setActiveTab] = useState<'parameters' | 'scenarios' | 'history'>('parameters');
+    const [activeTab, setActiveTab] = useState<'parameters' | 'agent' | 'scenarios' | 'history'>('parameters');
     const [isChatExpanded, setIsChatExpanded] = useState(false);
     const [showAddVisualization, setShowAddVisualization] = useState(false);
     const [vizMenuOpen, setVizMenuOpen] = useState<string | null>(null); // Track which viz menu is open
@@ -1039,6 +1040,22 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
         return null;
     };
 
+    // Extract raw data arrays from workflow execution results
+    const extractWorkflowData = (results: any): Record<string, any> => {
+        if (!results || typeof results !== 'object') return {};
+        const extracted: Record<string, any> = {};
+        Object.entries(results).forEach(([nodeId, nodeResult]: [string, any]) => {
+            if (nodeResult?.outputData) {
+                if (Array.isArray(nodeResult.outputData) && nodeResult.outputData.length > 0) {
+                    extracted[nodeId] = nodeResult.outputData;
+                } else if (typeof nodeResult.outputData === 'object') {
+                    Object.assign(extracted, nodeResult.outputData);
+                }
+            }
+        });
+        return extracted;
+    };
+
     const runSimulation = async () => {
         if (!selectedSimulation) return;
         
@@ -1050,62 +1067,55 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
             
             // Check if this is the demo experiment
             if (selectedSimulation.id === 'demo-experiment') {
-                // Use mock calculation
-                await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
+                await new Promise(resolve => setTimeout(resolve, 500));
                 result = runDemoSimulation();
+            } else if (selectedSimulation.calculationCode) {
+                // === CLIENT-SIDE CALCULATION ENGINE ===
+                // Step 1: Execute workflow to get raw data from DB
+                let workflowData: Record<string, any> = {};
+                if (selectedSimulation.workflowId) {
+                    try {
+                        const inputs: Record<string, any> = {};
+                        selectedSimulation.parameters.forEach(param => {
+                            inputs[param.nodeId] = parameterValues[param.id];
+                        });
+                        const res = await fetch(`${API_BASE}/workflow/${selectedSimulation.workflowId}/execute`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ inputs, usePrefect: false })
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            workflowData = extractWorkflowData(data.result || {});
+                        }
+                    } catch (e) {
+                        console.warn('Workflow execution failed, running calculation with params only:', e);
+                    }
+                }
+
+                // Step 2: Run calculationCode client-side with params + data
+                try {
+                    const calcFn = new Function('params', 'data', selectedSimulation.calculationCode);
+                    result = calcFn(parameterValues, workflowData);
+                } catch (calcError) {
+                    console.error('Calculation error:', calcError);
+                }
             } else {
-                // Real workflow execution
-                // Map parameter values using nodeId (backend expects node IDs, not variable names)
+                // === FALLBACK: raw workflow execution ===
                 const inputs: Record<string, any> = {};
                 selectedSimulation.parameters.forEach(param => {
                     inputs[param.nodeId] = parameterValues[param.id];
                 });
-
                 const res = await fetch(`${API_BASE}/workflow/${selectedSimulation.workflowId}/execute`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({ inputs, usePrefect: false })
                 });
-
                 if (res.ok) {
                     const data = await res.json();
-
-                    if (data.backgroundExecution && data.executionId) {
-                        // Background execution (Prefect) - poll until complete
-                        result = await pollExecution(data.executionId);
-                    } else {
-                        // Synchronous execution - extract results
-                        result = data.result || data;
-                    }
-
-                    // Extract the most meaningful outputData from workflow results
-                    if (result && typeof result === 'object' && !Array.isArray(result)) {
-                        // Strategy: find the richest outputData (most keys, has arrays)
-                        // This is typically the calculation/output node, not the simple input nodes
-                        let bestOutput: any = null;
-                        let bestScore = 0;
-                        
-                        Object.values(result).forEach((nodeResult: any) => {
-                            if (nodeResult?.outputData && typeof nodeResult.outputData === 'object') {
-                                const od = nodeResult.outputData;
-                                // Score: number of keys + bonus for arrays (which are chart-ready data)
-                                const keys = Array.isArray(od) ? 0 : Object.keys(od).length;
-                                const arrayBonus = Array.isArray(od) ? 0 : Object.values(od).filter(v => Array.isArray(v)).length * 10;
-                                const score = keys + arrayBonus;
-                                if (score > bestScore) {
-                                    bestScore = score;
-                                    bestOutput = od;
-                                }
-                            }
-                        });
-                        
-                        if (bestOutput && !Array.isArray(bestOutput)) {
-                            result = bestOutput;
-                        }
-                    }
-                } else {
-                    console.error('Workflow execution failed:', res.status, await res.text());
+                    result = extractWorkflowData(data.result || {});
                 }
             }
             
@@ -1148,7 +1158,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
         setIsChatLoading(true);
 
         try {
-            // Build context for the AI
+            // Build rich context for AI agent
             const context = {
                 simulationName: selectedSimulation.name,
                 parameters: selectedSimulation.parameters.map(p => ({
@@ -1160,6 +1170,8 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                     unit: p.config.unit
                 })),
                 lastResult,
+                calculationCode: selectedSimulation.calculationCode || '',
+                conversationHistory: chatMessages.slice(-6).map(m => ({ role: m.role, content: m.content })),
                 userQuery: chatInput.trim()
             };
 
@@ -1178,25 +1190,54 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                     role: 'assistant',
                     content: data.message,
                     timestamp: new Date().toISOString(),
-                    action: data.action
+                    action: data.actions?.[0] || data.action || undefined
                 };
                 
                 setChatMessages(prev => [...prev, assistantMessage]);
                 
-                // Execute action if present
-                if (data.action) {
-                    if (data.action.type === 'set_parameter') {
+                // Execute actions array (new format) or single action (legacy)
+                const actions = data.actions || (data.action ? [data.action] : []);
+                
+                for (const action of actions) {
+                    if (action.type === 'set_parameter') {
+                        const variable = action.variable || action.data?.variable;
+                        const value = action.value ?? action.data?.value;
                         const param = selectedSimulation.parameters.find(
-                            p => p.variableName === data.action.data.variable
+                            p => p.variableName === variable
                         );
-                        if (param) {
+                        if (param && value !== undefined) {
                             setParameterValues(prev => ({
                                 ...prev,
-                                [param.id]: data.action.data.value
+                                [param.id]: value
                             }));
                         }
-                    } else if (data.action.type === 'run_simulation') {
+                    } else if (action.type === 'run_simulation') {
+                        // Small delay so parameter changes take effect first
+                        await new Promise(r => setTimeout(r, 100));
                         await runSimulation();
+                    } else if (action.type === 'create_visualization' && selectedSimulation) {
+                        const viz: VisualizationConfig = {
+                            id: generateUUID(),
+                            type: action.vizType || 'kpi',
+                            title: action.title || 'Widget',
+                            dataMapping: {
+                                source: action.source || '',
+                                format: action.format || 'number',
+                                ...(action.xAxis && { xAxis: action.xAxis }),
+                                ...(action.yAxis && { yAxis: action.yAxis }),
+                                ...(action.labelKey && { labelKey: action.labelKey }),
+                                ...(action.valueKey && { valueKey: action.valueKey }),
+                            },
+                            position: { x: 0, y: 0, w: 1, h: 1 },
+                            color: CHART_COLORS[selectedSimulation.visualizations.length % CHART_COLORS.length]
+                        };
+                        const updatedSim = {
+                            ...selectedSimulation,
+                            visualizations: [...selectedSimulation.visualizations, viz],
+                            updatedAt: new Date().toISOString()
+                        };
+                        setSelectedSimulation(updatedSim);
+                        setSimulations(prev => prev.map(s => s.id === updatedSim.id ? updatedSim : s));
                     }
                 }
             }
@@ -2314,140 +2355,6 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                 </div>
                 
                 <div className="flex items-center gap-2">
-                    {/* Date Range Selector */}
-                    <div className="relative">
-                        <button
-                            onClick={() => setShowDatePicker(!showDatePicker)}
-                            className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
-                        >
-                            <Calendar size={14} className="text-[var(--text-tertiary)]" />
-                            <span>
-                                {new Date(dateRange.start).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} - {new Date(dateRange.end).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
-                            </span>
-                            <CaretDown size={12} className="text-[var(--text-tertiary)]" />
-                        </button>
-                        
-                        {showDatePicker && (
-                            <>
-                                <div className="fixed inset-0 z-40" onClick={() => setShowDatePicker(false)} />
-                                <div className="absolute right-0 top-full mt-2 w-72 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-xl z-50 overflow-hidden">
-                                    {/* Presets */}
-                                    <div className="p-3 border-b border-[var(--border-light)]">
-                                        <p className="text-xs font-medium text-[var(--text-tertiary)] mb-2">Quick Select</p>
-                                        <div className="grid grid-cols-4 gap-1.5">
-                                            {[
-                                                { id: '7d', label: '7D', days: 7 },
-                                                { id: '14d', label: '14D', days: 14 },
-                                                { id: '30d', label: '30D', days: 30 },
-                                                { id: '90d', label: '90D', days: 90 },
-                                            ].map(preset => (
-                                                <button
-                                                    key={preset.id}
-                                                    onClick={() => {
-                                                        const end = new Date();
-                                                        const start = new Date(Date.now() - preset.days * 24 * 60 * 60 * 1000);
-                                                        setDateRange({
-                                                            start: start.toISOString().split('T')[0],
-                                                            end: end.toISOString().split('T')[0]
-                                                        });
-                                                        setDatePreset(preset.id);
-                                                    }}
-                                                    className={`px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                                                        datePreset === preset.id
-                                                            ? 'bg-[var(--accent-primary)] text-white'
-                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-selected)]'
-                                                    }`}
-                                                >
-                                                    {preset.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Custom Range */}
-                                    <div className="p-3">
-                                        <p className="text-xs font-medium text-[var(--text-tertiary)] mb-2">Custom Range</p>
-                                        <div className="flex gap-2 items-center">
-                                            <input
-                                                type="date"
-                                                value={dateRange.start}
-                                                onChange={(e) => {
-                                                    setDateRange(prev => ({ ...prev, start: e.target.value }));
-                                                    setDatePreset('custom');
-                                                }}
-                                                className="flex-1 px-2 py-1.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)]"
-                                            />
-                                            <span className="text-xs text-[var(--text-tertiary)]">→</span>
-                                            <input
-                                                type="date"
-                                                value={dateRange.end}
-                                                onChange={(e) => {
-                                                    setDateRange(prev => ({ ...prev, end: e.target.value }));
-                                                    setDatePreset('custom');
-                                                }}
-                                                className="flex-1 px-2 py-1.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)]"
-                                            />
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Apply */}
-                                    <div className="p-3 border-t border-[var(--border-light)] bg-[var(--bg-tertiary)]">
-                                        <button
-                                            onClick={() => setShowDatePicker(false)}
-                                            className="w-full px-3 py-2 bg-[var(--accent-primary)] text-white rounded-lg text-sm font-medium hover:bg-[var(--accent-primary-hover)] transition-colors"
-                                        >
-                                            Apply Range
-                                        </button>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                    
-                    <div className="w-px h-6 bg-[var(--border-light)]" />
-                    
-                    {/* Quick Bookmark */}
-                    <div className="relative">
-                        <button
-                            onClick={() => setShowQuickBookmark(!showQuickBookmark)}
-                            className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
-                                bookmarkSaved 
-                                    ? 'text-emerald-500 bg-emerald-500/10' 
-                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
-                            }`}
-                            title="Quick save (⌘S)"
-                        >
-                            {bookmarkSaved ? <Check size={16} /> : <Tag size={16} />}
-                            <span className="hidden sm:inline">{bookmarkSaved ? 'Saved!' : 'Bookmark'}</span>
-                        </button>
-                        
-                        {showQuickBookmark && (
-                            <>
-                                <div className="fixed inset-0 z-40" onClick={() => setShowQuickBookmark(false)} />
-                                <div className="absolute right-0 top-full mt-2 w-64 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-xl z-50 p-3">
-                                    <p className="text-xs text-[var(--text-tertiary)] mb-2">Quick save current parameters</p>
-                                    <input
-                                        type="text"
-                                        value={quickBookmarkName}
-                                        onChange={(e) => setQuickBookmarkName(e.target.value)}
-                                        placeholder="Bookmark name..."
-                                        className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm mb-2"
-                                        autoFocus
-                                        onKeyDown={(e) => e.key === 'Enter' && saveQuickBookmark()}
-                                    />
-                                    <button
-                                        onClick={saveQuickBookmark}
-                                        disabled={!quickBookmarkName.trim()}
-                                        className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[var(--accent-primary)] text-white rounded-lg text-sm font-medium disabled:opacity-50"
-                                    >
-                                        <BookmarkSimple size={14} />
-                                        Save
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                    
                     {/* Export Button */}
                     <button
                         onClick={() => setShowExportModal(true)}
@@ -2489,12 +2396,11 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
             <div className="flex-1 flex overflow-hidden">
                 {/* Left Panel - Parameters & Chat */}
                 <div className="w-80 border-r border-[var(--border-light)] flex flex-col bg-[var(--bg-card)]">
-                    {/* Tabs */}
+                    {/* Tabs: Parameters + AI Agent (full), Bookmark + History (icon-only) */}
                     <div className="flex border-b border-[var(--border-light)]">
                         {[
                             { id: 'parameters', label: 'Parameters', icon: Sliders },
-                            { id: 'scenarios', label: 'Scenarios', icon: BookmarkSimple },
-                            { id: 'history', label: 'History', icon: Clock }
+                            { id: 'agent', label: 'AI Agent', icon: Robot },
                         ].map(tab => (
                             <button
                                 key={tab.id}
@@ -2509,10 +2415,34 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                 {tab.label}
                             </button>
                         ))}
+                        <div className="flex items-center border-l border-[var(--border-light)]">
+                            <button
+                                onClick={() => setActiveTab('scenarios')}
+                                title="Saved Scenarios"
+                                className={`flex items-center justify-center px-3 py-3 transition-colors ${
+                                    activeTab === 'scenarios'
+                                        ? 'text-[var(--accent-primary)] border-b-2 border-[var(--accent-primary)]'
+                                        : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                                }`}
+                            >
+                                <BookmarkSimple size={14} />
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('history')}
+                                title="Run History"
+                                className={`flex items-center justify-center px-3 py-3 transition-colors ${
+                                    activeTab === 'history'
+                                        ? 'text-[var(--accent-primary)] border-b-2 border-[var(--accent-primary)]'
+                                        : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                                }`}
+                            >
+                                <Clock size={14} />
+                            </button>
+                        </div>
                     </div>
                     
                     {/* Tab Content */}
-                    <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                    <div className={`flex-1 overflow-y-auto ${activeTab === 'agent' ? '' : 'p-4'} custom-scrollbar`}>
                         {activeTab === 'parameters' && (
                             <div className="space-y-6">
                                 {Object.entries(groupedParameters).map(([group, params]) => (
@@ -2683,63 +2613,74 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                 )}
                             </div>
                         )}
-                    </div>
-                    
-                    {/* Chat Section - Collapsible */}
-                    <div className="border-t border-[var(--border-light)]">
-                        <button
-                            onClick={() => setIsChatExpanded(!isChatExpanded)}
-                            className="w-full p-3 flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors"
-                        >
-                            <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-lg bg-[var(--accent-primary)]/10 flex items-center justify-center">
-                                    <Robot size={14} className="text-[var(--accent-primary)]" />
-                                </div>
-                                <span className="text-sm font-medium text-[var(--text-primary)]">AI Assistant</span>
-                            </div>
-                            <div className={`transform transition-transform ${isChatExpanded ? 'rotate-180' : ''}`}>
-                                <CaretDown size={16} className="text-[var(--text-tertiary)]" />
-                            </div>
-                        </button>
-                        
-                        {/* Collapsible Chat Content */}
-                        <div className={`overflow-hidden transition-all duration-300 ${
-                            isChatExpanded ? 'max-h-[400px]' : 'max-h-0'
-                        }`}>
-                            <div className="h-48 overflow-y-auto p-3 space-y-3 custom-scrollbar border-t border-[var(--border-light)]">
-                                {chatMessages.map(msg => (
-                                    <ChatMessageBubble key={msg.id} message={msg} />
-                                ))}
-                                {isChatLoading && (
-                                    <div className="flex justify-start">
-                                        <div className="px-3 py-2 bg-[var(--bg-tertiary)] rounded-xl rounded-bl-sm">
-                                            <SpinnerGap size={16} className="animate-spin text-[var(--text-tertiary)]" />
+
+                        {/* AI Agent Tab */}
+                        {activeTab === 'agent' && (
+                            <div className="flex flex-col h-full" style={{ minHeight: '400px' }}>
+                                {/* Chat Messages */}
+                                <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+                                    {chatMessages.length === 0 && (
+                                        <div className="text-center py-8">
+                                            <div className="w-12 h-12 rounded-xl bg-[var(--accent-primary)]/10 flex items-center justify-center mx-auto mb-3">
+                                                <Robot size={24} className="text-[var(--accent-primary)]" />
+                                            </div>
+                                            <p className="text-sm font-medium text-[var(--text-primary)] mb-1">AI Process Engineer</p>
+                                            <p className="text-xs text-[var(--text-tertiary)] max-w-[220px] mx-auto">
+                                                Ask me to adjust parameters, run simulations, explain results, or create visualizations.
+                                            </p>
+                                            <div className="mt-4 space-y-1.5">
+                                                {[
+                                                    'Sube el precio de resina un 20%',
+                                                    'Ejecuta con eficiencia al 95%',
+                                                    'Compara escenario base vs crisis',
+                                                    'Que pasa si bajo capacidad a 300?',
+                                                ].map((suggestion, i) => (
+                                                    <button
+                                                        key={i}
+                                                        onClick={() => { setChatInput(suggestion); }}
+                                                        className="block w-full text-left px-3 py-2 text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+                                                    >
+                                                        {suggestion}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
+                                    )}
+                                    {chatMessages.map(msg => (
+                                        <ChatMessageBubble key={msg.id} message={msg} />
+                                    ))}
+                                    {isChatLoading && (
+                                        <div className="flex justify-start">
+                                            <div className="px-3 py-2 bg-[var(--bg-tertiary)] rounded-xl rounded-bl-sm">
+                                                <SpinnerGap size={16} className="animate-spin text-[var(--text-tertiary)]" />
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div ref={chatEndRef} />
+                                </div>
+                                
+                                {/* Chat Input */}
+                                <div className="p-3 border-t border-[var(--border-light)]">
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={chatInput}
+                                            onChange={(e) => setChatInput(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleChatSubmit()}
+                                            placeholder="Ej: Sube precio resina a 1800..."
+                                            className="flex-1 px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
+                                        />
+                                        <button
+                                            onClick={handleChatSubmit}
+                                            disabled={!chatInput.trim() || isChatLoading}
+                                            className="p-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-colors disabled:opacity-50"
+                                        >
+                                            <PaperPlaneTilt size={16} />
+                                        </button>
                                     </div>
-                                )}
-                                <div ref={chatEndRef} />
-                            </div>
-                            
-                            <div className="p-3 border-t border-[var(--border-light)]">
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={chatInput}
-                                        onChange={(e) => setChatInput(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleChatSubmit()}
-                                        placeholder="Ask something..."
-                                        className="flex-1 px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
-                                    />
-                                    <button
-                                        onClick={handleChatSubmit}
-                                        disabled={!chatInput.trim() || isChatLoading}
-                                        className="p-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-colors disabled:opacity-50"
-                                    >
-                                        <PaperPlaneTilt size={16} />
-                                    </button>
                                 </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
 
