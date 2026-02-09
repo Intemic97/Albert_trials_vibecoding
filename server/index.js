@@ -634,10 +634,29 @@ app.use(cookieParser());
 
 let db;
 
+// Architecture layers (Phase 1-3 of refactor)
+const { initRepositories } = require('./repositories');
+const { initServices } = require('./services');
+let repos, services;
+
 // Initialize DB and start server
 initDb().then(database => {
     db = database;
     console.log('Database initialized');
+
+    // Initialize repository and service layers
+    repos = initRepositories(db);
+    services = initServices(repos, {
+        prefectClient,
+        workflowExecutor: null, // Will be set after WorkflowExecutor init
+        pollingService: null,   // Will be set after polling init
+    });
+    console.log('[Architecture] Repository layer initialized (8 repositories)');
+    console.log('[Architecture] Service layer initialized (5 services)');
+
+    // Make repos/services available to routes (during migration)
+    app.locals.repos = repos;
+    app.locals.services = services;
 
     server.listen(PORT, () => {
         console.log(`Server running on http://localhost:${PORT}`);
