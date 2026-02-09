@@ -2784,40 +2784,41 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                         )}
                     </div>
 
-                    {/* Chat Input - always visible at bottom of sidebar */}
-                    <div className="p-3 border-t border-[var(--border-light)] bg-[var(--bg-card)] shrink-0">
-                        <div className="relative">
+                </div>
+
+                {/* Right Panel - Visualizations */}
+                <div id="visualization-area" className="flex-1 flex flex-col overflow-hidden">
+                    {/* Command Bar - AI Agent Input */}
+                    <div className="px-6 pt-5 pb-3 shrink-0">
+                        <div className="relative max-w-2xl">
+                            <div className="absolute left-3.5 top-1/2 -translate-y-1/2">
+                                <Robot size={16} className="text-[var(--text-tertiary)]" />
+                            </div>
                             <input
                                 type="text"
                                 value={chatInput}
                                 onChange={(e) => setChatInput(e.target.value)}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && !e.shiftKey) {
-                                        if (activeTab !== 'agent') setActiveTab('agent');
                                         handleChatSubmit();
                                     }
                                 }}
-                                onFocus={() => { if (activeTab !== 'agent') setActiveTab('agent'); }}
-                                placeholder="Escribe lo que quieres simular..."
-                                className="w-full pl-4 pr-10 py-3 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-xl text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/40 focus:border-transparent transition-all"
+                                placeholder="Simula escenarios, ajusta parametros, analiza resultados..."
+                                className="w-full pl-10 pr-12 py-3 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/30 focus:border-[var(--accent-primary)]/50 transition-all shadow-sm"
                                 disabled={isChatLoading}
                             />
                             <button
-                                onClick={() => {
-                                    if (activeTab !== 'agent') setActiveTab('agent');
-                                    handleChatSubmit();
-                                }}
+                                onClick={handleChatSubmit}
                                 disabled={!chatInput.trim() || isChatLoading}
-                                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                             >
-                                <PaperPlaneTilt size={14} weight="fill" />
+                                {isChatLoading ? <SpinnerGap size={15} className="animate-spin" /> : <PaperPlaneTilt size={15} weight="fill" />}
                             </button>
                         </div>
                     </div>
-                </div>
 
-                {/* Right Panel - Visualizations */}
-                <div id="visualization-area" className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                    {/* Scrollable visualizations */}
+                    <div className="flex-1 overflow-y-auto px-6 pb-6 custom-scrollbar">
                     {/* Header with Add Button */}
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-sm font-medium text-[var(--text-tertiary)] uppercase tracking-wider">
@@ -3013,6 +3014,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                             </p>
                         </div>
                     )}
+                    </div>{/* end scrollable viz */}
                 </div>
             </div>
 
