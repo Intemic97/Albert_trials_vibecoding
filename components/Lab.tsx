@@ -2738,12 +2738,12 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
 
                         {/* AI Agent Tab */}
                         {activeTab === 'agent' && (
-                            <div className="flex flex-col h-full" style={{ minHeight: '400px' }}>
+                            <div className="flex flex-col h-full">
                                 {/* Chat Messages */}
                                 <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
                                     {chatMessages.length === 0 && (
-                                        <div className="flex flex-col items-center justify-center py-10 px-4">
-                                            <p className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-6">
+                                        <div className="flex flex-col items-center justify-center py-8 px-4">
+                                            <p className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-5">
                                                 Simulador AI
                                             </p>
                                             <div className="w-full space-y-2">
@@ -2783,30 +2783,39 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                     )}
                                     <div ref={chatEndRef} />
                                 </div>
-                                
-                                {/* Chat Input */}
-                                <div className="p-3 border-t border-[var(--border-light)] bg-[var(--bg-card)]">
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            value={chatInput}
-                                            onChange={(e) => setChatInput(e.target.value)}
-                                            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleChatSubmit()}
-                                            placeholder="Escribe lo que quieres simular..."
-                                            className="w-full pl-4 pr-10 py-3 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-xl text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/40 focus:border-transparent transition-all"
-                                            disabled={isChatLoading}
-                                        />
-                                        <button
-                                            onClick={handleChatSubmit}
-                                            disabled={!chatInput.trim() || isChatLoading}
-                                            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                                        >
-                                            <PaperPlaneTilt size={14} weight="fill" />
-                                        </button>
-                                    </div>
-                                </div>
                             </div>
                         )}
+                    </div>
+
+                    {/* Chat Input - always visible at bottom of sidebar */}
+                    <div className="p-3 border-t border-[var(--border-light)] bg-[var(--bg-card)] shrink-0">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={chatInput}
+                                onChange={(e) => setChatInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        if (activeTab !== 'agent') setActiveTab('agent');
+                                        handleChatSubmit();
+                                    }
+                                }}
+                                onFocus={() => { if (activeTab !== 'agent') setActiveTab('agent'); }}
+                                placeholder="Escribe lo que quieres simular..."
+                                className="w-full pl-4 pr-10 py-3 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-xl text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/40 focus:border-transparent transition-all"
+                                disabled={isChatLoading}
+                            />
+                            <button
+                                onClick={() => {
+                                    if (activeTab !== 'agent') setActiveTab('agent');
+                                    handleChatSubmit();
+                                }}
+                                disabled={!chatInput.trim() || isChatLoading}
+                                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                                <PaperPlaneTilt size={14} weight="fill" />
+                            </button>
+                        </div>
                     </div>
                 </div>
 
