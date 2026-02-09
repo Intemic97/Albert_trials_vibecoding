@@ -2564,7 +2564,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                     </div>
                     
                     {/* Tab Content */}
-                    <div className={`flex-1 overflow-y-auto ${activeTab === 'agent' ? '' : 'p-4'} custom-scrollbar`}>
+                    <div className={`flex-1 min-h-0 overflow-y-auto ${activeTab === 'agent' ? '' : 'p-4'} custom-scrollbar`}>
                         {activeTab === 'parameters' && (
                             <div className="space-y-6">
                                 {Object.entries(groupedParameters).map(([group, params]) => (
