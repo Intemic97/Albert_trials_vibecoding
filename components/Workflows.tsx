@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { FlowArrow as Workflow, Lightning as Zap, Play, CheckCircle, WarningCircle as AlertCircle, ArrowRight, ArrowLeft, X, FloppyDisk as Save, FolderOpen, Trash, PlayCircle, Check, XCircle, Database, Wrench, MagnifyingGlass as Search, CaretDoubleLeft as ChevronsLeft, CaretDoubleRight as ChevronsRight, Sparkle as Sparkles, Code, PencilSimple as Edit, SignOut as LogOut, ChatCircle as MessageSquare, Globe, Leaf, Share as Share2, UserCheck, GitMerge, FileXls as FileSpreadsheet, FileText, UploadSimple as Upload, Columns, DotsSixVertical as GripVertical, Users, Envelope as Mail, BookOpen, Copy, Eye, Clock, ClockCounterClockwise as History, ArrowsOut as Maximize2, MagnifyingGlassPlus as ZoomIn, MagnifyingGlassMinus as ZoomOut, Robot as Bot, DeviceMobile as Smartphone, ChartBar as BarChart3, User, Calendar, CaretRight as ChevronRight, CaretDown as ChevronDown, CaretUp as ChevronUp, Plus, Folder, ShieldCheck as Shield, Terminal, Tag, DotsThreeVertical as MoreVertical, WebhooksLogo as Webhook, Flask as FlaskConical, TrendUp, Bell, FilePdf, Bug } from '@phosphor-icons/react';
+import { FlowArrow as Workflow, Lightning as Zap, Play, CheckCircle, WarningCircle as AlertCircle, ArrowRight, ArrowLeft, X, FloppyDisk as Save, FolderOpen, Trash, PlayCircle, Check, XCircle, Database, Wrench, MagnifyingGlass as Search, CaretDoubleLeft as ChevronsLeft, CaretDoubleRight as ChevronsRight, Sparkle as Sparkles, Code, PencilSimple as Edit, SignOut as LogOut, ChatCircle as MessageSquare, Globe, Leaf, Share as Share2, UserCheck, GitMerge, FileXls as FileSpreadsheet, FileText, UploadSimple as Upload, Columns, DotsSixVertical as GripVertical, Users, Envelope as Mail, BookOpen, Copy, Eye, Clock, ClockCounterClockwise as History, ArrowsOut as Maximize2, MagnifyingGlassPlus as ZoomIn, MagnifyingGlassMinus as ZoomOut, Robot as Bot, DeviceMobile as Smartphone, ChartBar as BarChart3, User, Calendar, CaretRight as ChevronRight, CaretDown as ChevronDown, CaretUp as ChevronUp, Plus, Folder, ShieldCheck as Shield, Terminal, Tag, DotsThreeVertical as MoreVertical, WebhooksLogo as Webhook, Flask as FlaskConical, TrendUp, Bell, FilePdf, Bug, Pi } from '@phosphor-icons/react';
 import { NodeConfigSidePanel } from './NodeConfigSidePanel';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { PromptInput } from './PromptInput';
@@ -350,6 +350,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [mqttClientId, setMqttClientId] = useState<string>('');
     const [mqttQos, setMqttQos] = useState<'0' | '1' | '2'>('0');
     const [mqttCleanSession, setMqttCleanSession] = useState<boolean>(true);
+
+    // OSIsoft PI Node State
+    const [configuringOsiPiNodeId, setConfiguringOsiPiNodeId] = useState<string | null>(null);
+    const [osiPiHost, setOsiPiHost] = useState<string>('');
+    const [osiPiApiKey, setOsiPiApiKey] = useState<string>('');
+    const [osiPiGranularityValue, setOsiPiGranularityValue] = useState<string>('5');
+    const [osiPiGranularityUnit, setOsiPiGranularityUnit] = useState<'seconds' | 'minutes' | 'hours' | 'days'>('seconds');
+    const [osiPiWebIds, setOsiPiWebIds] = useState<string[]>(['', '']);
+    const [showOsiPiApiKey, setShowOsiPiApiKey] = useState<boolean>(false);
 
     // Unsaved Changes Confirmation
     const [showExitConfirmation, setShowExitConfirmation] = useState<boolean>(false);
@@ -1883,6 +1892,43 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 : n
         ));
         setConfiguringMqttNodeId(null);
+    };
+
+    // OSIsoft PI Node Functions
+    const openOsiPiConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'osiPi') {
+            setConfiguringOsiPiNodeId(nodeId);
+            setOsiPiHost(node.config?.osiPiHost || '');
+            setOsiPiApiKey(node.config?.osiPiApiKey || '');
+            setOsiPiGranularityValue(node.config?.osiPiGranularityValue || '5');
+            setOsiPiGranularityUnit(node.config?.osiPiGranularityUnit || 'seconds');
+            setOsiPiWebIds(node.config?.osiPiWebIds?.length ? [...node.config.osiPiWebIds] : ['', '']);
+            setShowOsiPiApiKey(false);
+        }
+    };
+
+    const saveOsiPiConfig = () => {
+        if (!configuringOsiPiNodeId || !osiPiHost.trim()) return;
+
+        const filteredWebIds = osiPiWebIds.filter(id => id.trim() !== '');
+        setNodes(prev => prev.map(n =>
+            n.id === configuringOsiPiNodeId
+                ? {
+                    ...n,
+                    label: osiPiHost ? `OSIsoft PI: ${new URL(osiPiHost).hostname || osiPiHost}` : 'OSIsoft PI',
+                    config: {
+                        ...n.config,
+                        osiPiHost,
+                        osiPiApiKey,
+                        osiPiGranularityValue,
+                        osiPiGranularityUnit,
+                        osiPiWebIds: filteredWebIds,
+                    }
+                }
+                : n
+        ));
+        setConfiguringOsiPiNodeId(null);
     };
 
     const openEmailConfig = (nodeId: string) => {
@@ -5775,6 +5821,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openExcelConfig(node.id);
                                             } else if (node.type === 'pdfInput') {
                                                 openPdfConfig(node.id);
+                                            } else if (node.type === 'osiPi') {
+                                                openOsiPiConfig(node.id);
                                             } else if (node.type === 'trigger' && (node.label === 'Schedule' || node.label.startsWith('Schedule:') || node.config?.scheduleInterval)) {
                                                 openScheduleConfig(node.id);
                                             }
@@ -5962,6 +6010,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     openClimatiqConfig(node.id);
                                                                 } else if (node.type === 'humanApproval') {
                                                                     openHumanApprovalConfig(node.id);
+                                                                } else if (node.type === 'osiPi') {
+                                                                    openOsiPiConfig(node.id);
                                                                 }
                                                             }}
                                                             className="absolute top-2 right-2 p-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
@@ -7147,6 +7197,164 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             <MessageSquare size={12} />
                                             What would you like this node to do?
                                         </button>
+                                    </div>
+                            </NodeConfigSidePanel>
+                        )}
+
+                        {/* OSIsoft PI Configuration Panel */}
+                        {configuringOsiPiNodeId && (
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringOsiPiNodeId}
+                                onClose={() => setConfiguringOsiPiNodeId(null)}
+                                title="OSIsoft PI"
+                                description="AVEVA PI Connector"
+                                icon={Pi}
+                                width="w-[500px]"
+                                footer={
+                                    <>
+                                        <button
+                                            onClick={() => setConfiguringOsiPiNodeId(null)}
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveOsiPiConfig}
+                                            disabled={!osiPiHost.trim() || !osiPiApiKey.trim() || osiPiWebIds.filter(id => id.trim()).length === 0}
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save
+                                        </button>
+                                    </>
+                                }
+                            >
+                                <div className="space-y-5">
+                                    {/* Host */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                            Host
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={osiPiHost}
+                                            onChange={(e) => setOsiPiHost(e.target.value)}
+                                            placeholder="https://myserver/piwebapi/"
+                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                        />
+                                    </div>
+
+                                    {/* API Key Secret */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                            API Key Secret
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                type={showOsiPiApiKey ? 'text' : 'password'}
+                                                value={osiPiApiKey}
+                                                onChange={(e) => setOsiPiApiKey(e.target.value)}
+                                                placeholder="########"
+                                                className="w-full px-3 py-1.5 pr-10 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowOsiPiApiKey(!showOsiPiApiKey)}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+                                                title={showOsiPiApiKey ? 'Hide' : 'Show'}
+                                            >
+                                                <Eye size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Data Collection Section */}
+                                    <div className="border-t border-[var(--border-light)] pt-4">
+                                        <h4 className="text-xs font-medium text-[var(--text-secondary)] mb-3 text-center">Data collection</h4>
+                                        
+                                        {/* Granularity */}
+                                        <div>
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2 flex items-center gap-1">
+                                                Granularity
+                                                <span className="text-[var(--text-tertiary)] cursor-help" title="Polling interval for data collection from PI Web API">
+                                                    <AlertCircle size={12} />
+                                                </span>
+                                            </label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={osiPiGranularityValue}
+                                                    onChange={(e) => setOsiPiGranularityValue(e.target.value)}
+                                                    placeholder="Value"
+                                                    className="flex-1 px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                                />
+                                                <select
+                                                    value={osiPiGranularityUnit}
+                                                    onChange={(e) => setOsiPiGranularityUnit(e.target.value as 'seconds' | 'minutes' | 'hours' | 'days')}
+                                                    className="px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] bg-[var(--bg-card)]"
+                                                >
+                                                    <option value="seconds">seconds</option>
+                                                    <option value="minutes">minutes</option>
+                                                    <option value="hours">hours</option>
+                                                    <option value="days">days</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Web IDs */}
+                                    <div>
+                                        <h4 className="text-xs font-medium text-[var(--text-primary)] mb-3">Web IDs</h4>
+                                        <div className="space-y-2">
+                                            {osiPiWebIds.map((webId, index) => (
+                                                <div key={index} className="flex items-center gap-2">
+                                                    <span className="text-[10px] text-[var(--text-tertiary)] w-8 flex-shrink-0">Id {index + 1}</span>
+                                                    <input
+                                                        type="text"
+                                                        value={webId}
+                                                        onChange={(e) => {
+                                                            const newWebIds = [...osiPiWebIds];
+                                                            newWebIds[index] = e.target.value;
+                                                            setOsiPiWebIds(newWebIds);
+                                                        }}
+                                                        placeholder="Web Id"
+                                                        className="flex-1 px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                                    />
+                                                    {osiPiWebIds.length > 1 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const newWebIds = osiPiWebIds.filter((_, i) => i !== index);
+                                                                setOsiPiWebIds(newWebIds);
+                                                            }}
+                                                            className="p-1 text-[var(--text-tertiary)] hover:text-red-500 transition-colors"
+                                                            title="Remove"
+                                                        >
+                                                            <Trash size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setOsiPiWebIds([...osiPiWebIds, ''])}
+                                            className="mt-2 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline transition-colors"
+                                        >
+                                            Add web id
+                                        </button>
+                                    </div>
+
+                                    {/* Feedback Link */}
+                                    <div className="pt-3 border-t border-[var(--border-light)]">
+                                        <button
+                                            onClick={() => openFeedbackPopup('osiPi', 'OSIsoft PI')}
+                                            className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
+                                        >
+                                            <MessageSquare size={12} />
+                                            What would you like this node to do?
+                                        </button>
+                                    </div>
                                     </div>
                             </NodeConfigSidePanel>
                         )}
@@ -9235,8 +9443,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 setSplitColumnsOutputB(prev => prev.filter(c => c !== draggedColumn));
                                 
                                 // Add to Output A if not already there
-                                if (!splitColumnsOutputA.includes(draggedColumn)) {
-                                    setSplitColumnsOutputA(prev => [...prev, draggedColumn]);
+                                    if (!splitColumnsOutputA.includes(draggedColumn)) {
+                                            setSplitColumnsOutputA(prev => [...prev, draggedColumn]);
                                 }
                                 setDraggedColumn(null);
                             };
@@ -9250,8 +9458,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 setSplitColumnsOutputA(prev => prev.filter(c => c !== draggedColumn));
                                 
                                 // Add to Output B if not already there
-                                if (!splitColumnsOutputB.includes(draggedColumn)) {
-                                    setSplitColumnsOutputB(prev => [...prev, draggedColumn]);
+                                    if (!splitColumnsOutputB.includes(draggedColumn)) {
+                                            setSplitColumnsOutputB(prev => [...prev, draggedColumn]);
                                 }
                                 setDraggedColumn(null);
                             };
@@ -9362,7 +9570,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                                 className="opacity-0 group-hover:opacity-100 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-opacity"
                                                                             >
                                                                                 → B
-                                                                            </button>
+                                                                                </button>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -9413,7 +9621,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                                 className="opacity-0 group-hover:opacity-100 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-opacity"
                                                                             >
                                                                                 ← A
-                                                                            </button>
+                                                                                </button>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -9648,7 +9856,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         {/* Save Records Configuration Modal */}
                         {configuringSaveNodeId && (
                             <NodeConfigSidePanel
-                                isOpen={!!configuringSaveNodeId}
+                                    isOpen={!!configuringSaveNodeId}
                                 onClose={() => setConfiguringSaveNodeId(null)}
                                 title="Save to Database"
                                 icon={Database}

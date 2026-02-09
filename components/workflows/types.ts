@@ -41,7 +41,8 @@ export type NodeType =
   | 'limsFetch' 
   | 'statisticalAnalysis' 
   | 'alertAgent' 
-  | 'pdfReport';
+  | 'pdfReport'
+  | 'osiPi';
 
 export type NodeStatus = 'idle' | 'running' | 'completed' | 'error' | 'waiting';
 
@@ -195,6 +196,12 @@ export interface NodeConfig {
   timeSeriesAggregationType?: 'avg' | 'min' | 'max' | 'sum' | 'count';
   timeSeriesInterval?: string; // e.g., "5m", "1h", "1d"
   timeSeriesFields?: string[];
+  // For OSIsoft PI nodes:
+  osiPiHost?: string;
+  osiPiApiKey?: string;
+  osiPiGranularityValue?: string;
+  osiPiGranularityUnit?: 'seconds' | 'minutes' | 'hours' | 'days';
+  osiPiWebIds?: string[];
   // Alert configuration
   alerts?: {
     enabled: boolean;

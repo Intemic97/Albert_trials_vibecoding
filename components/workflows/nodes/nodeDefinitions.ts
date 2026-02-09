@@ -35,6 +35,7 @@ import {
   MicrosoftTeamsLogo,
   TelegramLogo,
   GoogleLogo,
+  Pi,
 } from '@phosphor-icons/react';
 import { NodeType, NodeStatus } from '../types';
 
@@ -527,6 +528,20 @@ export const NODE_DEFINITIONS: Record<NodeType, NodeDefinition> = {
     configFields: ['connectionId', 'tags', 'startTime', 'endTime', 'aggregation'],
     validationRules: {
       requiredConfig: ['connectionId', 'tags'],
+    },
+  },
+  osiPi: {
+    type: 'osiPi',
+    label: 'OSIsoft PI',
+    description: 'Fetch time-series data from AVEVA PI Web API',
+    category: 'data',
+    icon: Pi,
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-50',
+    borderColor: 'border-indigo-200',
+    configFields: ['host', 'apiKey', 'granularity', 'webIds'],
+    validationRules: {
+      requiredConfig: ['osiPiHost', 'osiPiApiKey', 'osiPiWebIds'],
     },
   },
   timeSeriesAggregator: {

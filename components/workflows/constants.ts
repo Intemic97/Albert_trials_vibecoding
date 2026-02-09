@@ -32,7 +32,8 @@ import {
   GoogleLogo,
   Factory,
   Cpu,
-  WifiHigh
+  WifiHigh,
+  Pi
 } from '@phosphor-icons/react';
 import { DraggableItem, NodeType } from './types';
 
@@ -62,6 +63,7 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   { type: 'opcua', label: 'OPC UA Input', icon: Factory, description: 'Read data from PLCs and SCADA via OPC UA', category: 'Data' },
   { type: 'mqtt', label: 'MQTT Subscriber', icon: WifiHigh, description: 'Subscribe to MQTT topics for IoT sensor data', category: 'Data' },
   { type: 'modbus', label: 'Modbus Input', icon: Cpu, description: 'Read data from Modbus devices (PLCs, sensors)', category: 'Data' },
+  { type: 'osiPi', label: 'OSIsoft PI', icon: Pi, description: 'Fetch time-series data from AVEVA PI Web API', category: 'Data' },
   
   // Logic
   { type: 'condition', label: 'If / Else', icon: WarningCircle, description: 'Branch based on conditions', category: 'Logic' },
@@ -141,6 +143,7 @@ export const NODE_ICONS: Record<NodeType, React.ElementType> = {
   statisticalAnalysis: TrendUp,
   alertAgent: Bell,
   pdfReport: FilePdf,
+  osiPi: Pi,
 };
 
 /**
