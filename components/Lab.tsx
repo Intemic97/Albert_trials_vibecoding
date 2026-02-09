@@ -2788,7 +2788,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                             value={chatInput}
                                             onChange={(e) => setChatInput(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleChatSubmit()}
-                                            placeholder="Ajusta parametros, ejecuta, analiza..."
+                                            placeholder="Escribe lo que quieres simular..."
                                             className="w-full pl-4 pr-10 py-3 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-xl text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/40 focus:border-transparent transition-all"
                                             disabled={isChatLoading}
                                         />
