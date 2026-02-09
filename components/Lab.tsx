@@ -985,6 +985,33 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
     // SIMULATION EXECUTION
     // ========================================================================
 
+    const pollExecution = async (executionId: string, maxAttempts = 60): Promise<any> => {
+        const POLL_INTERVAL = 2000; // 2 seconds
+        for (let i = 0; i < maxAttempts; i++) {
+            await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+            try {
+                const pollRes = await fetch(`${API_BASE}/executions/${executionId}`, {
+                    credentials: 'include'
+                });
+                if (pollRes.ok) {
+                    const execData = await pollRes.json();
+                    if (execData.status === 'completed') {
+                        return execData.nodeResults || execData.finalOutput || execData;
+                    }
+                    if (execData.status === 'failed' || execData.status === 'cancelled') {
+                        console.error('Workflow execution failed:', execData.error);
+                        return null;
+                    }
+                    // Still running, continue polling
+                }
+            } catch (e) {
+                console.error('Error polling execution:', e);
+            }
+        }
+        console.error('Polling timed out for execution:', executionId);
+        return null;
+    };
+
     const runSimulation = async () => {
         if (!selectedSimulation) return;
         
@@ -1001,20 +1028,46 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                 result = runDemoSimulation();
             } else {
                 // Real workflow execution
-                const inputData: Record<string, any> = {};
+                // Map parameter values using nodeId (backend expects node IDs, not variable names)
+                const inputs: Record<string, any> = {};
                 selectedSimulation.parameters.forEach(param => {
-                    inputData[param.variableName] = parameterValues[param.id];
+                    inputs[param.nodeId] = parameterValues[param.id];
                 });
 
-                const res = await fetch(`${API_BASE}/workflows/${selectedSimulation.workflowId}/execute`, {
+                const res = await fetch(`${API_BASE}/workflow/${selectedSimulation.workflowId}/execute`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ inputData })
+                    body: JSON.stringify({ inputs, usePrefect: false })
                 });
 
                 if (res.ok) {
-                    result = await res.json();
+                    const data = await res.json();
+
+                    if (data.backgroundExecution && data.executionId) {
+                        // Background execution (Prefect) - poll until complete
+                        result = await pollExecution(data.executionId);
+                    } else {
+                        // Synchronous execution - extract results
+                        result = data.result || data;
+                    }
+
+                    // Flatten outputData from workflow nodes so visualizations can read properties directly
+                    if (result && typeof result === 'object') {
+                        const flatResult: Record<string, any> = {};
+                        let hasOutputData = false;
+                        Object.values(result).forEach((nodeResult: any) => {
+                            if (nodeResult?.outputData) {
+                                hasOutputData = true;
+                                Object.assign(flatResult, nodeResult.outputData);
+                            }
+                        });
+                        if (hasOutputData) {
+                            result = flatResult;
+                        }
+                    }
+                } else {
+                    console.error('Workflow execution failed:', res.status, await res.text());
                 }
             }
             
