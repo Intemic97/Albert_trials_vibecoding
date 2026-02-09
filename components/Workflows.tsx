@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { FlowArrow as Workflow, Lightning as Zap, Play, CheckCircle, WarningCircle as AlertCircle, ArrowRight, ArrowLeft, X, FloppyDisk as Save, FolderOpen, Trash, PlayCircle, Check, XCircle, Database, Wrench, MagnifyingGlass as Search, CaretDoubleLeft as ChevronsLeft, CaretDoubleRight as ChevronsRight, Sparkle as Sparkles, Code, PencilSimple as Edit, SignOut as LogOut, ChatCircle as MessageSquare, Globe, Leaf, Share as Share2, UserCheck, GitMerge, FileXls as FileSpreadsheet, FileText, UploadSimple as Upload, Columns, DotsSixVertical as GripVertical, Users, Envelope as Mail, BookOpen, Copy, Eye, Clock, ClockCounterClockwise as History, ArrowsOut as Maximize2, MagnifyingGlassPlus as ZoomIn, MagnifyingGlassMinus as ZoomOut, Robot as Bot, DeviceMobile as Smartphone, ChartBar as BarChart3, User, Calendar, CaretRight as ChevronRight, CaretDown as ChevronDown, CaretUp as ChevronUp, Plus, Folder, ShieldCheck as Shield, Terminal, Tag, DotsThreeVertical as MoreVertical, WebhooksLogo as Webhook, Flask as FlaskConical, TrendUp, Bell, FilePdf, ArrowClockwise } from '@phosphor-icons/react';
+import { FlowArrow as Workflow, Lightning as Zap, Play, CheckCircle, WarningCircle as AlertCircle, ArrowRight, ArrowLeft, X, FloppyDisk as Save, FolderOpen, Trash, PlayCircle, Check, XCircle, Database, Wrench, MagnifyingGlass as Search, CaretDoubleLeft as ChevronsLeft, CaretDoubleRight as ChevronsRight, Sparkle as Sparkles, Code, PencilSimple as Edit, SignOut as LogOut, ChatCircle as MessageSquare, Globe, Leaf, Share as Share2, UserCheck, GitMerge, FileXls as FileSpreadsheet, FileText, UploadSimple as Upload, Columns, DotsSixVertical as GripVertical, Users, Envelope as Mail, BookOpen, Copy, Eye, Clock, ClockCounterClockwise as History, ArrowsOut as Maximize2, MagnifyingGlassPlus as ZoomIn, MagnifyingGlassMinus as ZoomOut, Robot as Bot, DeviceMobile as Smartphone, ChartBar as BarChart3, User, Calendar, CaretRight as ChevronRight, CaretDown as ChevronDown, CaretUp as ChevronUp, Plus, Folder, ShieldCheck as Shield, Terminal, Tag, DotsThreeVertical as MoreVertical, WebhooksLogo as Webhook, Flask as FlaskConical, TrendUp, Bell, FilePdf, Bug } from '@phosphor-icons/react';
 import { NodeConfigSidePanel } from './NodeConfigSidePanel';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { PromptInput } from './PromptInput';
@@ -51,8 +51,6 @@ import {
   // Hooks
   useWorkflowHistory,
 } from './workflows/index';
-import { OpcUaConfigModal, MqttConfigModal, ModbusConfigModal, ScadaConfigModal, MesConfigModal, DataHistorianConfigModal, TimeSeriesAggregatorConfigModal, SaveRecordsConfigModal } from './workflows/modals';
-import { OTAlertsPanel } from './OTAlertsPanel';
 
 // Use imported DRAGGABLE_ITEMS from workflows module
 const DRAGGABLE_ITEMS = WORKFLOW_DRAGGABLE_ITEMS;
@@ -181,11 +179,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 } : n
             ));
         },
-        onWorkflowRunning: (_userName) => {
-            // TODO: Show notification that another user started running
+        onWorkflowRunning: (userName) => {
+            // Show notification that another user started running
+            console.log(`${userName} started running the workflow`);
         },
-        onWorkflowCompleted: (_userName) => {
-            // TODO: Show notification that another user finished running
+        onWorkflowCompleted: (userName) => {
+            // Show notification that another user finished running
+            console.log(`${userName} finished running the workflow`);
         }
     });
     const [savedWorkflows, setSavedWorkflows] = useState<any[]>([]);
@@ -211,7 +211,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [addFieldValue, setAddFieldValue] = useState<string>('');
     const [configuringSaveNodeId, setConfiguringSaveNodeId] = useState<string | null>(null);
     const [saveEntityId, setSaveEntityId] = useState<string>('');
-    const [saveMode, setSaveMode] = useState<'insert' | 'upsert' | 'update'>('insert');
 
     // Sidebar State
     const [searchQuery, setSearchQuery] = useState('');
@@ -310,9 +309,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [twilioAccountSid, setTwilioAccountSid] = useState<string>('');
     const [twilioAuthToken, setTwilioAuthToken] = useState<string>('');
     const [twilioFromNumber, setTwilioFromNumber] = useState<string>('');
-
-    // OT Alerts Panel State
-    const [showOTAlertsPanel, setShowOTAlertsPanel] = useState(false);
     const [showSMSTwilioSettings, setShowSMSTwilioSettings] = useState<boolean>(false);
 
     // Data Visualization Node State
@@ -354,24 +350,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [mqttClientId, setMqttClientId] = useState<string>('');
     const [mqttQos, setMqttQos] = useState<'0' | '1' | '2'>('0');
     const [mqttCleanSession, setMqttCleanSession] = useState<boolean>(true);
-
-    // Modbus Node State
-    const [configuringModbusNodeId, setConfiguringModbusNodeId] = useState<string | null>(null);
-    
-    // SCADA Node State
-    const [configuringScadaNodeId, setConfiguringScadaNodeId] = useState<string | null>(null);
-    
-    // MES Node State
-    const [configuringMesNodeId, setConfiguringMesNodeId] = useState<string | null>(null);
-    
-    // Data Historian Node State
-    const [configuringDataHistorianNodeId, setConfiguringDataHistorianNodeId] = useState<string | null>(null);
-
-    // Time-Series Aggregator Node State
-    const [configuringTimeSeriesAggregatorNodeId, setConfiguringTimeSeriesAggregatorNodeId] = useState<string | null>(null);
-
-    // Available connections for OT nodes
-    const [availableConnections, setAvailableConnections] = useState<Array<{ id: string; name: string; type: string }>>([]);
 
     // Unsaved Changes Confirmation
     const [showExitConfirmation, setShowExitConfirmation] = useState<boolean>(false);
@@ -666,28 +644,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         }
     };
 
-    // Fetch available connections for OT nodes
-    useEffect(() => {
-        const fetchConnections = async () => {
-            try {
-                const res = await fetch(`${API_BASE}/data-connections`, { credentials: 'include' });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (Array.isArray(data)) {
-                        setAvailableConnections(data.map((conn: any) => ({
-                            id: conn.id,
-                            name: conn.name,
-                            type: conn.type
-                        })));
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching connections:', error);
-            }
-        };
-        fetchConnections();
-    }, []);
-
     const loadWorkflow = async (id: string, updateUrl = true) => {
         try {
             const res = await fetch(`${API_BASE}/workflows/${id}`, { credentials: 'include' });
@@ -709,20 +665,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             const workflow = await res.json();
             setWorkflowName(workflow.name);
             setCurrentWorkflowId(workflow.id);
-            const loadedNodes = workflow.data.nodes || [];
-            setNodes(loadedNodes);
+            setNodes(workflow.data.nodes || []);
             setConnections(workflow.data.connections || []);
             setWorkflowTags(workflow.tags || []);
             lastLoadedWorkflowIdRef.current = workflow.id;
-            // Reset unsaved changes flag after loading
-            setHasUnsavedChanges(false);
             // Update URL to reflect the loaded workflow
             if (updateUrl) {
                 navigate(`/workflow/${workflow.id}`, { replace: true });
-            }
-            // Auto fit-to-content after loading - small delay to ensure canvas is rendered
-            if (loadedNodes.length > 0) {
-                setTimeout(() => fitToContent(loadedNodes), 150);
             }
         } catch (error) {
             console.error('Error loading workflow:', error);
@@ -851,7 +800,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             }
 
             await fetchWorkflows();
-            setHasUnsavedChanges(false);
             showToast('Workflow saved successfully!', 'success');
         } catch (error) {
             console.error('Error saving workflow:', error);
@@ -905,8 +853,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     };
 
     const backToList = () => {
-        // Only show confirmation if there are actual unsaved changes
-        if (currentView === 'canvas' && hasUnsavedChanges) {
+        // Show confirmation popup if there might be unsaved changes
+        if (currentView === 'canvas' && (nodes.length > 0 || workflowName.trim())) {
             setShowExitConfirmation(true);
         } else {
             navigate('/workflows');
@@ -1548,144 +1496,33 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         if (node && node.type === 'saveRecords') {
             setConfiguringSaveNodeId(nodeId);
             setSaveEntityId(node.config?.entityId || '');
-            setSaveMode(node.config?.saveMode || 'insert');
+            setNodeCustomTitle(node.config?.customName || '');
         }
     };
 
-    const saveSaveRecordsConfig = async (config: {
-        entityId: string;
-        saveMode: 'insert' | 'upsert' | 'update';
-        autoCreateEntity?: boolean;
-        entityName?: string;
-    }) => {
-        if (!configuringSaveNodeId) return;
+    const saveSaveRecordsConfig = () => {
+        if (!configuringSaveNodeId || !saveEntityId) return;
 
-        let finalEntityId = config.entityId;
-        let finalEntityName = '';
-
-        // If auto-create entity is requested
-        if (config.autoCreateEntity && config.entityName) {
-            try {
-                // Get preview data from previous node to generate schema
-                const currentNode = nodes.find(n => n.id === configuringSaveNodeId);
-                const previousNodes = connections
-                    .filter(c => c.toNodeId === configuringSaveNodeId)
-                    .map(c => nodes.find(n => n.id === c.fromNodeId))
-                    .filter(Boolean);
-                
-                // Try to get data preview from previous node
-                let dataPreview = null;
-                if (previousNodes.length > 0 && previousNodes[0]?.outputData) {
-                    dataPreview = previousNodes[0].outputData;
-                }
-
-                // Generate entity ID
-                const newEntityId = `entity-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                
-                // Create properties based on data preview if available
-                const properties = [];
-                if (dataPreview) {
-                    const sample = Array.isArray(dataPreview) ? dataPreview[0] : dataPreview;
-                    if (sample) {
-                        // Add timestamp property for time-series
-                        properties.push({
-                            id: `prop-${Date.now()}-timestamp`,
-                            name: 'timestamp',
-                            type: 'TEXT',
-                            defaultValue: ''
-                        });
-
-                        // Add other properties
-                        Object.keys(sample).forEach((key, idx) => {
-                            if (key !== 'id' && key !== 'createdAt' && key !== 'metadata' && key !== 'raw') {
-                                const value = sample[key];
-                                let propType = 'TEXT';
-                                if (typeof value === 'number') {
-                                    propType = 'NUMBER';
-                                } else if (typeof value === 'boolean') {
-                                    propType = 'TEXT';
-                                }
-                                
-                                properties.push({
-                                    id: `prop-${Date.now()}-${idx}`,
-                                    name: key,
-                                    type: propType,
-                                    defaultValue: ''
-                                });
-                            }
-                        });
-                    }
-                } else {
-                    // Default properties if no preview
-                    properties.push(
-                        { id: `prop-${Date.now()}-0`, name: 'timestamp', type: 'TEXT', defaultValue: '' },
-                        { id: `prop-${Date.now()}-1`, name: 'value', type: 'NUMBER', defaultValue: '' }
-                    );
-                }
-
-                // Create entity
-                const newEntity = {
-                    id: newEntityId,
-                    name: config.entityName,
-                    description: 'Auto-created for time-series data storage',
-                    properties: properties,
-                    author: user?.name || user?.email?.split('@')[0] || 'System',
-                    lastEdited: 'Just now'
-                };
-
-                const createRes = await fetch(`${API_BASE}/entities`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify(newEntity)
-                });
-
-                if (!createRes.ok) {
-                    throw new Error('Failed to create entity');
-                }
-
-                finalEntityId = newEntityId;
-                finalEntityName = config.entityName;
-                
-                // Refresh entities list
-                if (onViewChange) {
-                    // Trigger entity refresh
-                    setTimeout(() => {
-                        window.dispatchEvent(new Event('entities-updated'));
-                    }, 500);
-                }
-            } catch (error) {
-                console.error('Error creating entity:', error);
-                showToast('Failed to create entity: ' + (error as Error).message, 'error');
-                return;
-            }
-        } else {
-            const entity = entities.find(e => e.id === config.entityId);
-            finalEntityName = entity?.name || '';
-        }
-
-        const defaultLabel = `Save to ${finalEntityName || 'Database'}`;
+        const entity = entities.find(e => e.id === saveEntityId);
+        const defaultLabel = `Save to ${entity?.name || 'Database'}`;
+        const finalLabel = nodeCustomTitle.trim() || defaultLabel;
         
         setNodes(prev => prev.map(n =>
             n.id === configuringSaveNodeId
                 ? { 
                     ...n, 
-                    label: defaultLabel,
+                    label: finalLabel,
                     config: { 
-                        entityId: finalEntityId, 
-                        entityName: finalEntityName,
-                        saveMode: config.saveMode
+                        entityId: saveEntityId, 
+                        entityName: entity?.name || '',
+                        customName: nodeCustomTitle.trim() || undefined
                     } 
                 }
                 : n
         ));
         setConfiguringSaveNodeId(null);
         setSaveEntityId('');
-        setSaveMode('insert');
-        
-        if (config.autoCreateEntity) {
-            showToast(`Entity "${finalEntityName}" created successfully`, 'success');
-        }
+        setNodeCustomTitle('');
     };
 
     const openEquipmentConfig = async (nodeId: string) => {
@@ -1984,24 +1821,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         }
     };
 
-    const saveOpcuaConfig = (config: {
-        opcuaConnectionId: string;
-        opcuaNodeIds: string[];
-        opcuaPollingInterval: number;
-    }) => {
-        if (!configuringOpcuaNodeId) return;
+    const saveOpcuaConfig = () => {
+        if (!configuringOpcuaNodeId || !opcuaEndpointUrl.trim() || !opcuaNodeId.trim()) return;
 
         setNodes(prev => prev.map(n =>
             n.id === configuringOpcuaNodeId
                 ? {
                     ...n,
-                    label: config.opcuaNodeIds.length > 0 ? `OPC UA: ${config.opcuaNodeIds[0]}${config.opcuaNodeIds.length > 1 ? ` (+${config.opcuaNodeIds.length - 1})` : ''}` : 'OPC UA',
+                    label: opcuaNodeId ? `OPC UA: ${opcuaNodeId}` : 'OPC UA',
                     config: {
                         ...n.config,
-                        opcuaConnectionId: config.opcuaConnectionId,
-                        opcuaNodeIds: config.opcuaNodeIds,
-                        opcuaPollingInterval: config.opcuaPollingInterval,
-                        alerts: config.alerts
+                        opcuaEndpointUrl,
+                        opcuaNodeId,
+                        opcuaUsername: opcuaUsername || undefined,
+                        opcuaPassword: opcuaPassword || undefined,
+                        opcuaSecurityMode,
+                        opcuaSecurityPolicy,
+                        opcuaPollInterval
                     }
                 }
                 : n
@@ -2024,174 +1860,29 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         }
     };
 
-    const saveMqttConfig = (config: {
-        mqttConnectionId: string;
-        mqttTopics: string[];
-        mqttQos: number;
-    }) => {
-        if (!configuringMqttNodeId) return;
+    const saveMqttConfig = () => {
+        if (!configuringMqttNodeId || !mqttBrokerUrl.trim() || !mqttTopic.trim()) return;
 
         setNodes(prev => prev.map(n =>
             n.id === configuringMqttNodeId
                 ? {
                     ...n,
-                    label: config.mqttTopics.length > 0 ? `MQTT: ${config.mqttTopics[0]}${config.mqttTopics.length > 1 ? ` (+${config.mqttTopics.length - 1})` : ''}` : 'MQTT',
+                    label: mqttTopic ? `MQTT: ${mqttTopic}` : 'MQTT',
                     config: {
                         ...n.config,
-                        mqttConnectionId: config.mqttConnectionId,
-                        mqttTopics: config.mqttTopics,
-                        mqttQos: config.mqttQos,
-                        alerts: config.alerts
+                        mqttBrokerUrl,
+                        mqttPort,
+                        mqttTopic,
+                        mqttUsername: mqttUsername || undefined,
+                        mqttPassword: mqttPassword || undefined,
+                        mqttClientId: mqttClientId || undefined,
+                        mqttQos,
+                        mqttCleanSession
                     }
                 }
                 : n
         ));
         setConfiguringMqttNodeId(null);
-    };
-
-    const openModbusConfig = (nodeId: string) => {
-        setConfiguringModbusNodeId(nodeId);
-    };
-
-    const saveModbusConfig = (config: {
-        modbusConnectionId: string;
-        modbusAddresses: string[];
-        modbusFunctionCode: number;
-    }) => {
-        if (!configuringModbusNodeId) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringModbusNodeId
-                ? {
-                    ...n,
-                    label: config.modbusAddresses.length > 0 ? `Modbus: ${config.modbusAddresses[0]}${config.modbusAddresses.length > 1 ? ` (+${config.modbusAddresses.length - 1})` : ''}` : 'Modbus',
-                    config: {
-                        ...n.config,
-                        modbusConnectionId: config.modbusConnectionId,
-                        modbusAddresses: config.modbusAddresses,
-                        modbusFunctionCode: config.modbusFunctionCode,
-                        alerts: config.alerts
-                    }
-                }
-                : n
-        ));
-        setConfiguringModbusNodeId(null);
-    };
-
-    const openScadaConfig = (nodeId: string) => {
-        setConfiguringScadaNodeId(nodeId);
-    };
-
-    const saveScadaConfig = (config: {
-        scadaConnectionId: string;
-        scadaTags: string[];
-        scadaPollingInterval: number;
-    }) => {
-        if (!configuringScadaNodeId) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringScadaNodeId
-                ? {
-                    ...n,
-                    label: config.scadaTags.length > 0 ? `SCADA: ${config.scadaTags[0]}${config.scadaTags.length > 1 ? ` (+${config.scadaTags.length - 1})` : ''}` : 'SCADA',
-                    config: {
-                        ...n.config,
-                        scadaConnectionId: config.scadaConnectionId,
-                        scadaTags: config.scadaTags,
-                        scadaPollingInterval: config.scadaPollingInterval
-                    }
-                }
-                : n
-        ));
-        setConfiguringScadaNodeId(null);
-    };
-
-    const openMesConfig = (nodeId: string) => {
-        setConfiguringMesNodeId(nodeId);
-    };
-
-    const saveMesConfig = (config: {
-        mesConnectionId: string;
-        mesEndpoint: string;
-        mesQuery?: string;
-    }) => {
-        if (!configuringMesNodeId) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringMesNodeId
-                ? {
-                    ...n,
-                    label: config.mesEndpoint ? `MES: ${config.mesEndpoint.split('/').pop()}` : 'MES',
-                    config: {
-                        ...n.config,
-                        mesConnectionId: config.mesConnectionId,
-                        mesEndpoint: config.mesEndpoint,
-                        mesQuery: config.mesQuery
-                    }
-                }
-                : n
-        ));
-        setConfiguringMesNodeId(null);
-    };
-
-    const openDataHistorianConfig = (nodeId: string) => {
-        setConfiguringDataHistorianNodeId(nodeId);
-    };
-
-    const saveDataHistorianConfig = (config: {
-        dataHistorianConnectionId: string;
-        dataHistorianTags: string[];
-        dataHistorianStartTime: string;
-        dataHistorianEndTime: string;
-        dataHistorianAggregation: string;
-    }) => {
-        if (!configuringDataHistorianNodeId) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringDataHistorianNodeId
-                ? {
-                    ...n,
-                    label: config.dataHistorianTags.length > 0 ? `Data Historian: ${config.dataHistorianTags[0]}${config.dataHistorianTags.length > 1 ? ` (+${config.dataHistorianTags.length - 1})` : ''}` : 'Data Historian',
-                    config: {
-                        ...n.config,
-                        dataHistorianConnectionId: config.dataHistorianConnectionId,
-                        dataHistorianTags: config.dataHistorianTags,
-                        dataHistorianStartTime: config.dataHistorianStartTime,
-                        dataHistorianEndTime: config.dataHistorianEndTime,
-                        dataHistorianAggregation: config.dataHistorianAggregation
-                    }
-                }
-                : n
-        ));
-        setConfiguringDataHistorianNodeId(null);
-    };
-
-    const openTimeSeriesAggregatorConfig = (nodeId: string) => {
-        setConfiguringTimeSeriesAggregatorNodeId(nodeId);
-    };
-
-    const saveTimeSeriesAggregatorConfig = (config: {
-        timeSeriesAggregationType: 'avg' | 'min' | 'max' | 'sum' | 'count';
-        timeSeriesInterval: string;
-        timeSeriesFields?: string[];
-    }) => {
-        if (!configuringTimeSeriesAggregatorNodeId) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringTimeSeriesAggregatorNodeId
-                ? {
-                    ...n,
-                    label: `Aggregate: ${config.timeSeriesAggregationType} (${config.timeSeriesInterval})`,
-                    config: {
-                        ...n.config,
-                        timeSeriesAggregationType: config.timeSeriesAggregationType,
-                        timeSeriesInterval: config.timeSeriesInterval,
-                        timeSeriesFields: config.timeSeriesFields
-                    }
-                }
-                : n
-        ));
-        setConfiguringTimeSeriesAggregatorNodeId(null);
     };
 
     const openEmailConfig = (nodeId: string) => {
@@ -2480,6 +2171,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             if (response.ok) {
                 const data = await response.json();
+                console.log('Climatiq search response:', data);
                 // Extract top 10 results
                 const results = data.results?.slice(0, 10) || [];
                 setClimatiqSearchResults(results);
@@ -2563,10 +2255,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 columns,
                                 sampleData: parentData.slice(0, 3) // Send first 3 records as sample
                             };
+                            console.log('Python AI - Input data schema:', inputDataSchema);
                         }
                     }
                 }
             }
+
+            console.log('Python AI - Sending to API:', { prompt: pythonAiPrompt, inputDataSchema });
             const response = await fetch(`${API_BASE}/python/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -3967,258 +3662,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         result = 'No input data';
                     }
                     break;
-                // OT/Industrial Nodes
-                case 'opcua':
-                    if (node.config?.opcuaConnectionId && node.config?.opcuaNodeIds && node.config.opcuaNodeIds.length > 0) {
-                        // Simulate OPC UA data
-                        const timestamp = new Date().toISOString();
-                        const values: Record<string, number> = {};
-                        node.config.opcuaNodeIds.forEach((nodeId: string) => {
-                            values[nodeId] = Math.random() * 100;
-                        });
-                        
-                        nodeData = [{
-                            timestamp,
-                            values,
-                            raw: node.config.opcuaNodeIds.map((nodeId: string) => ({
-                                nodeId,
-                                value: values[nodeId],
-                                timestamp,
-                                quality: 'Good'
-                            })),
-                            metadata: {
-                                connectionId: node.config.opcuaConnectionId,
-                                nodeCount: node.config.opcuaNodeIds.length
-                            }
-                        }];
-                        result = `Read ${node.config.opcuaNodeIds.length} OPC UA node(s)`;
-                    } else {
-                        result = 'Not configured - please configure OPC UA connection and node IDs';
-                        nodeData = [];
-                    }
-                    break;
-                case 'mqtt':
-                    if (node.config?.mqttConnectionId && node.config?.mqttTopics && node.config.mqttTopics.length > 0) {
-                        // Simulate MQTT messages
-                        const timestamp = new Date().toISOString();
-                        const messages = node.config.mqttTopics.map((topic: string) => ({
-                            topic,
-                            payload: JSON.stringify({
-                                value: Math.random() * 100,
-                                timestamp,
-                                sensorId: topic.split('/').pop()
-                            }),
-                            qos: node.config.mqttQos || 0,
-                            timestamp
-                        }));
-                        
-                        const topicData: Record<string, number> = {};
-                        messages.forEach(msg => {
-                            try {
-                                const payload = JSON.parse(msg.payload);
-                                topicData[msg.topic] = payload.value;
-                            } catch (e) {
-                                // Skip invalid JSON
-                            }
-                        });
-                        
-                        nodeData = [{
-                            timestamp,
-                            messages,
-                            topicData,
-                            metadata: {
-                                connectionId: node.config.mqttConnectionId,
-                                topicCount: node.config.mqttTopics.length
-                            }
-                        }];
-                        result = `Received ${messages.length} MQTT message(s)`;
-                    } else {
-                        result = 'Not configured - please configure MQTT connection and topics';
-                        nodeData = [];
-                    }
-                    break;
-                case 'modbus':
-                    if (node.config?.modbusConnectionId && node.config?.modbusAddresses && node.config.modbusAddresses.length > 0) {
-                        // Simulate Modbus data
-                        const timestamp = new Date().toISOString();
-                        const registers: Record<string, number> = {};
-                        node.config.modbusAddresses.forEach((addr: string) => {
-                            registers[addr] = Math.floor(Math.random() * 65535);
-                        });
-                        
-                        nodeData = [{
-                            timestamp,
-                            registers,
-                            raw: node.config.modbusAddresses.map((addr: string) => ({
-                                address: addr,
-                                value: registers[addr],
-                                functionCode: node.config.modbusFunctionCode || 3,
-                                timestamp
-                            })),
-                            metadata: {
-                                connectionId: node.config.modbusConnectionId,
-                                addressCount: node.config.modbusAddresses.length
-                            }
-                        }];
-                        result = `Read ${node.config.modbusAddresses.length} Modbus register(s)`;
-                    } else {
-                        result = 'Not configured - please configure Modbus connection and addresses';
-                        nodeData = [];
-                    }
-                    break;
-                case 'scada':
-                    if (node.config?.scadaConnectionId && node.config?.scadaTags && node.config.scadaTags.length > 0) {
-                        // Simulate SCADA data
-                        const timestamp = new Date().toISOString();
-                        const tags: Record<string, number> = {};
-                        node.config.scadaTags.forEach((tag: string) => {
-                            tags[tag] = Math.random() * 100;
-                        });
-                        
-                        nodeData = [{
-                            timestamp,
-                            tags,
-                            raw: node.config.scadaTags.map((tag: string) => ({
-                                tag,
-                                value: tags[tag],
-                                timestamp,
-                                quality: 'Good'
-                            })),
-                            metadata: {
-                                connectionId: node.config.scadaConnectionId,
-                                tagCount: node.config.scadaTags.length
-                            }
-                        }];
-                        result = `Read ${node.config.scadaTags.length} SCADA tag(s)`;
-                    } else {
-                        result = 'Not configured - please configure SCADA connection and tags';
-                        nodeData = [];
-                    }
-                    break;
-                case 'mes':
-                    if (node.config?.mesConnectionId && node.config?.mesEndpoint) {
-                        // Simulate MES data
-                        const timestamp = new Date().toISOString();
-                        nodeData = [{
-                            timestamp,
-                            productionOrder: `PO-${Date.now()}`,
-                            quantity: Math.floor(Math.random() * 1000),
-                            status: 'In Progress',
-                            startTime: timestamp,
-                            equipment: 'Line-01',
-                            operator: 'Operator-123',
-                            query: node.config.mesQuery || 'production-status',
-                            metadata: {
-                                connectionId: node.config.mesConnectionId,
-                                endpoint: node.config.mesEndpoint
-                            }
-                        }];
-                        result = `Fetched production data from MES`;
-                    } else {
-                        result = 'Not configured - please configure MES connection and endpoint';
-                        nodeData = [];
-                    }
-                    break;
-                case 'dataHistorian':
-                    if (node.config?.dataHistorianConnectionId && node.config?.dataHistorianTags && node.config.dataHistorianTags.length > 0) {
-                        // Simulate historical data
-                        const startTime = node.config.dataHistorianStartTime || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-                        const endTime = node.config.dataHistorianEndTime || new Date().toISOString();
-                        const dataPoints: any[] = [];
-                        
-                        // Generate sample data points
-                        const start = new Date(startTime);
-                        const end = new Date(endTime);
-                        const interval = 60000; // 1 minute intervals
-                        let current = new Date(start);
-                        
-                        while (current <= end && dataPoints.length < 100) {
-                            node.config.dataHistorianTags.forEach((tag: string) => {
-                                dataPoints.push({
-                                    tag,
-                                    timestamp: current.toISOString(),
-                                    value: Math.random() * 100
-                                });
-                            });
-                            current = new Date(current.getTime() + interval);
-                        }
-                        
-                        const tagsData: Record<string, any[]> = {};
-                        node.config.dataHistorianTags.forEach((tag: string) => {
-                            tagsData[tag] = dataPoints.filter(dp => dp.tag === tag).map(dp => ({
-                                timestamp: dp.timestamp,
-                                value: dp.value
-                            }));
-                        });
-                        
-                        nodeData = [{
-                            startTime,
-                            endTime,
-                            aggregation: node.config.dataHistorianAggregation || 'raw',
-                            dataPoints: dataPoints.slice(0, 50), // Limit preview
-                            tags: tagsData,
-                            metadata: {
-                                connectionId: node.config.dataHistorianConnectionId,
-                                pointCount: dataPoints.length,
-                                tagCount: node.config.dataHistorianTags.length
-                            }
-                        }];
-                        result = `Queried ${dataPoints.length} historical data points for ${node.config.dataHistorianTags.length} tag(s)`;
-                    } else {
-                        result = 'Not configured - please configure Data Historian connection and tags';
-                        nodeData = [];
-                    }
-                    break;
-                case 'timeSeriesAggregator':
-                    if (inputData) {
-                        // Simulate aggregation
-                        const dataArray = Array.isArray(inputData) ? inputData : [inputData];
-                        const aggType = node.config?.timeSeriesAggregationType || 'avg';
-                        const interval = node.config?.timeSeriesInterval || '5m';
-                        
-                        if (dataArray.length > 0) {
-                            const sample = dataArray[0];
-                            const aggregated: Record<string, any> = {
-                                timestamp: sample.timestamp || sample.createdAt || new Date().toISOString(),
-                                interval
-                            };
-                            
-                            // Aggregate numeric fields
-                            const fields = node.config?.timeSeriesFields || Object.keys(sample).filter(k => k !== 'timestamp' && k !== 'createdAt');
-                            fields.forEach((field: string) => {
-                                const values = dataArray.map((r: any) => Number(r[field])).filter(v => !isNaN(v));
-                                if (values.length > 0) {
-                                    switch (aggType) {
-                                        case 'avg':
-                                            aggregated[field] = values.reduce((a, b) => a + b, 0) / values.length;
-                                            break;
-                                        case 'min':
-                                            aggregated[field] = Math.min(...values);
-                                            break;
-                                        case 'max':
-                                            aggregated[field] = Math.max(...values);
-                                            break;
-                                        case 'sum':
-                                            aggregated[field] = values.reduce((a, b) => a + b, 0);
-                                            break;
-                                        case 'count':
-                                            aggregated[field] = values.length;
-                                            break;
-                                    }
-                                }
-                            });
-                            
-                            nodeData = [aggregated];
-                            result = `Aggregated ${dataArray.length} data point(s) using ${aggType} (${interval})`;
-                        } else {
-                            result = 'No data to aggregate';
-                            nodeData = [];
-                        }
-                    } else {
-                        result = 'Waiting for input data...';
-                        nodeData = [];
-                    }
-                    break;
                 case 'humanApproval':
                     // Human approval node - wait for user acceptance
                     if (!node.config?.assignedUserId) {
@@ -4929,41 +4372,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setCanvasZoom(1);
     };
 
-    // Fit all nodes into the viewport with comfortable zoom level
-    const fitToContent = useCallback((nodesList?: WorkflowNode[]) => {
-        const targetNodes = nodesList || nodes;
-        if (targetNodes.length === 0 || !canvasRef.current) return;
-        
-        const container = canvasRef.current;
-        const padding = 120;
-        
-        // Find bounding box (account for node dimensions ~320x100)
-        const minX = Math.min(...targetNodes.map(n => n.x)) - 160;
-        const maxX = Math.max(...targetNodes.map(n => n.x)) + 160;
-        const minY = Math.min(...targetNodes.map(n => n.y)) - 60;
-        const maxY = Math.max(...targetNodes.map(n => n.y)) + 60;
-        
-        const contentWidth = maxX - minX;
-        const contentHeight = maxY - minY;
-        
-        const containerWidth = container.clientWidth - padding * 2;
-        const containerHeight = container.clientHeight - padding * 2;
-        
-        const scaleX = containerWidth / contentWidth;
-        const scaleY = containerHeight / contentHeight;
-        // Cap at 0.75 (75%) so workflows don't appear too large by default
-        const newZoom = Math.max(0.25, Math.min(0.75, Math.min(scaleX, scaleY)));
-        
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
-        
-        const newOffsetX = container.clientWidth / 2 - centerX * newZoom;
-        const newOffsetY = container.clientHeight / 2 - centerY * newZoom;
-        
-        setCanvasZoom(newZoom);
-        setCanvasOffset({ x: newOffsetX, y: newOffsetY });
-    }, [nodes]);
-
     // Navigate to a remote user's cursor position
     const goToUserCursor = useCallback((userId: string) => {
         if (!canvasRef.current) return;
@@ -5290,11 +4698,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'agent':
             case 'opcua':
             case 'mqtt':
-            case 'modbus':
-            case 'scada':
-            case 'mes':
-            case 'dataHistorian':
-            case 'timeSeriesAggregator':
                 return true; // Estos tipos siempre están configurados
             default:
                 return false;
@@ -5382,11 +4785,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'agent': return 'text-purple-600';
             case 'opcua': return 'text-indigo-600';
             case 'mqtt': return 'text-cyan-600';
-            case 'modbus': return 'text-indigo-600';
-            case 'scada': return 'text-indigo-600';
-            case 'mes': return 'text-indigo-600';
-            case 'dataHistorian': return 'text-indigo-600';
-            case 'timeSeriesAggregator': return 'text-indigo-600';
             default: return 'text-[var(--text-secondary)]';
         }
     };
@@ -5679,13 +5077,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 title="History"
                             >
                                 <History size={18} className="text-[var(--text-secondary)]" weight="light" />
-                            </button>
-                            <button
-                                onClick={() => setShowOTAlertsPanel(true)}
-                                className="relative p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
-                                title="OT Alerts"
-                            >
-                                <AlertCircle size={18} className="text-[var(--text-secondary)]" weight="light" />
                             </button>
                             <button
                                 onClick={runWorkflow}
@@ -6039,9 +5430,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 
                                 {/* Fit View */}
                                 <button
-                                    onClick={() => fitToContent()}
+                                    onClick={resetView}
                                     className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
-                                    title="Fit to content"
+                                    title="Fit view to screen"
                                 >
                                     <Maximize2 size={18} className="text-[var(--text-secondary)]" weight="light" />
                                 </button>
@@ -6386,20 +5777,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openPdfConfig(node.id);
                                             } else if (node.type === 'trigger' && (node.label === 'Schedule' || node.label.startsWith('Schedule:') || node.config?.scheduleInterval)) {
                                                 openScheduleConfig(node.id);
-                                            } else if (node.type === 'opcua') {
-                                                openOpcuaConfig(node.id);
-                                            } else if (node.type === 'mqtt') {
-                                                openMqttConfig(node.id);
-                                            } else if (node.type === 'modbus') {
-                                                openModbusConfig(node.id);
-                                            } else if (node.type === 'scada') {
-                                                openScadaConfig(node.id);
-                                            } else if (node.type === 'mes') {
-                                                openMesConfig(node.id);
-                                            } else if (node.type === 'dataHistorian') {
-                                                openDataHistorianConfig(node.id);
-                                            } else if (node.type === 'timeSeriesAggregator') {
-                                                openTimeSeriesAggregatorConfig(node.id);
                                             }
                                         }}
                                         onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
@@ -6818,16 +6195,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                             <p className={`text-xs font-medium break-words leading-relaxed ${textColor} text-left`}>
                                                                 {message}
                                                             </p>
-                                                            {isError && node.status === 'error' && (
+                                                            {/* Debug button for Python nodes with errors */}
+                                                            {isError && node.type === 'python' && node.config?.pythonCode && (
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        handleRunNode(node.id);
+                                                                        handleDebugPythonNode(node);
                                                                     }}
-                                                                    className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors w-full justify-center active:scale-95"
+                                                                    className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium bg-white border border-red-300 text-red-700 rounded-md hover:bg-red-50 transition-colors"
                                                                 >
-                                                                    <ArrowClockwise size={12} weight="bold" />
-                                                                    Retry
+                                                                    <Bug size={14} />
+                                                                    Debug with AI
                                                                 </button>
                                                             )}
                                                         </div>
@@ -9195,65 +8573,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     
                                                     const allKeys = getAllKeys(flattenedData);
                                                     
-                                                    // Check if this is OT/time-series data
-                                                    const isOTData = displayData.length > 0 && (
-                                                        displayData[0].values || 
-                                                        displayData[0].tags || 
-                                                        displayData[0].registers || 
-                                                        displayData[0].topicData ||
-                                                        displayData[0].metadata?.connectionId
-                                                    );
-                                                    
                                                     return displayData && displayData.length > 0 && allKeys.length > 0 ? (
                                                         <>
-                                                            {/* OT/Time-Series Data Info Banner */}
-                                                            {isOTData && displayData[0] && (
-                                                                <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4 mb-4 shrink-0">
-                                                                    <div className="flex items-start gap-3">
-                                                                        <Clock size={20} className="text-indigo-600 dark:text-indigo-400 mt-0.5 flex-shrink-0" />
-                                                                        <div className="flex-1">
-                                                                            <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100 mb-2">
-                                                                                Time-Series Data
-                                                                            </p>
-                                                                            {displayData[0].timestamp && (
-                                                                                <p className="text-xs text-indigo-700 dark:text-indigo-300 mb-2">
-                                                                                    Timestamp: {new Date(displayData[0].timestamp).toLocaleString()}
-                                                                                </p>
-                                                                            )}
-                                                                            {displayData[0].metadata && (
-                                                                                <div className="flex flex-wrap gap-2 mt-2">
-                                                                                    {displayData[0].metadata.nodeCount && (
-                                                                                        <span className="px-2 py-1 text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded">
-                                                                                            {displayData[0].metadata.nodeCount} node(s)
-                                                                                        </span>
-                                                                                    )}
-                                                                                    {displayData[0].metadata.tagCount && (
-                                                                                        <span className="px-2 py-1 text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded">
-                                                                                            {displayData[0].metadata.tagCount} tag(s)
-                                                                                        </span>
-                                                                                    )}
-                                                                                    {displayData[0].metadata.addressCount && (
-                                                                                        <span className="px-2 py-1 text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded">
-                                                                                            {displayData[0].metadata.addressCount} address(es)
-                                                                                        </span>
-                                                                                    )}
-                                                                                    {displayData[0].metadata.topicCount && (
-                                                                                        <span className="px-2 py-1 text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded">
-                                                                                            {displayData[0].metadata.topicCount} topic(s)
-                                                                                        </span>
-                                                                                    )}
-                                                                                    {displayData[0].metadata.pointCount && (
-                                                                                        <span className="px-2 py-1 text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded">
-                                                                                            {displayData[0].metadata.pointCount} data point(s)
-                                                                                        </span>
-                                                                                    )}
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                            
                                                             {isLimited && (
                                                                 <div className="bg-[var(--bg-tertiary)] border border-[var(--border-light)] text-[var(--text-secondary)] px-4 py-2.5 rounded-lg mb-4 text-sm flex items-center gap-2 shrink-0">
                                                                     <AlertCircle size={16} />
@@ -9895,78 +9216,42 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
                         {/* Split Columns Configuration Modal */}
                         {configuringSplitColumnsNodeId && (() => {
-                            // Get unique columns from all lists
-                            const allUniqueColumns = Array.from(new Set([...splitColumnsAvailable, ...splitColumnsOutputA, ...splitColumnsOutputB]));
+                            const allColumns = [...splitColumnsAvailable, ...splitColumnsOutputA, ...splitColumnsOutputB];
                             
-                            const handleDragStart = (column: string, source: 'A' | 'B', index: number) => {
+                            const handleDragStart = (column: string) => {
                                 setDraggedColumn(column);
-                                // Store source info in data transfer
-                                (window as any).__splitDragSource = { source, index };
                             };
                             
                             const handleDragEnd = () => {
                                 setDraggedColumn(null);
-                                delete (window as any).__splitDragSource;
                             };
                             
-                            const handleDropOnOutputA = (e: React.DragEvent, dropIndex?: number) => {
+                            const handleDropOnOutputA = (e: React.DragEvent) => {
                                 e.preventDefault();
                                 if (!draggedColumn) return;
                                 
-                                const dragSource = (window as any).__splitDragSource;
+                                // Remove from other lists
+                                setSplitColumnsAvailable(prev => prev.filter(c => c !== draggedColumn));
+                                setSplitColumnsOutputB(prev => prev.filter(c => c !== draggedColumn));
                                 
-                                // If dragging within Output A (reorder)
-                                if (dragSource?.source === 'A' && dropIndex !== undefined) {
-                                    setSplitColumnsOutputA(prev => {
-                                        const newArr = prev.filter((_, i) => i !== dragSource.index);
-                                        const insertIdx = dropIndex > dragSource.index ? dropIndex - 1 : dropIndex;
-                                        newArr.splice(insertIdx, 0, draggedColumn);
-                                        return newArr;
-                                    });
-                                } else {
-                                    // Add to Output A (allow duplicates - same column can be in both)
-                                    if (!splitColumnsOutputA.includes(draggedColumn)) {
-                                        if (dropIndex !== undefined) {
-                                            setSplitColumnsOutputA(prev => {
-                                                const newArr = [...prev];
-                                                newArr.splice(dropIndex, 0, draggedColumn);
-                                                return newArr;
-                                            });
-                                        } else {
-                                            setSplitColumnsOutputA(prev => [...prev, draggedColumn]);
-                                        }
-                                    }
+                                // Add to Output A if not already there
+                                if (!splitColumnsOutputA.includes(draggedColumn)) {
+                                    setSplitColumnsOutputA(prev => [...prev, draggedColumn]);
                                 }
                                 setDraggedColumn(null);
                             };
                             
-                            const handleDropOnOutputB = (e: React.DragEvent, dropIndex?: number) => {
+                            const handleDropOnOutputB = (e: React.DragEvent) => {
                                 e.preventDefault();
                                 if (!draggedColumn) return;
                                 
-                                const dragSource = (window as any).__splitDragSource;
+                                // Remove from other lists
+                                setSplitColumnsAvailable(prev => prev.filter(c => c !== draggedColumn));
+                                setSplitColumnsOutputA(prev => prev.filter(c => c !== draggedColumn));
                                 
-                                // If dragging within Output B (reorder)
-                                if (dragSource?.source === 'B' && dropIndex !== undefined) {
-                                    setSplitColumnsOutputB(prev => {
-                                        const newArr = prev.filter((_, i) => i !== dragSource.index);
-                                        const insertIdx = dropIndex > dragSource.index ? dropIndex - 1 : dropIndex;
-                                        newArr.splice(insertIdx, 0, draggedColumn);
-                                        return newArr;
-                                    });
-                                } else {
-                                    // Add to Output B (allow duplicates - same column can be in both)
-                                    if (!splitColumnsOutputB.includes(draggedColumn)) {
-                                        if (dropIndex !== undefined) {
-                                            setSplitColumnsOutputB(prev => {
-                                                const newArr = [...prev];
-                                                newArr.splice(dropIndex, 0, draggedColumn);
-                                                return newArr;
-                                            });
-                                        } else {
-                                            setSplitColumnsOutputB(prev => [...prev, draggedColumn]);
-                                        }
-                                    }
+                                // Add to Output B if not already there
+                                if (!splitColumnsOutputB.includes(draggedColumn)) {
+                                    setSplitColumnsOutputB(prev => [...prev, draggedColumn]);
                                 }
                                 setDraggedColumn(null);
                             };
@@ -9975,75 +9260,38 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 e.preventDefault();
                             };
                             
-                            // Copy column to A (allows duplicates)
-                            const copyColumnToA = (column: string) => {
+                            const moveColumnToA = (column: string) => {
+                                setSplitColumnsOutputB(prev => prev.filter(c => c !== column));
                                 if (!splitColumnsOutputA.includes(column)) {
                                     setSplitColumnsOutputA(prev => [...prev, column]);
                                 }
                             };
                             
-                            // Copy column to B (allows duplicates)
-                            const copyColumnToB = (column: string) => {
+                            const moveColumnToB = (column: string) => {
+                                setSplitColumnsOutputA(prev => prev.filter(c => c !== column));
                                 if (!splitColumnsOutputB.includes(column)) {
                                     setSplitColumnsOutputB(prev => [...prev, column]);
                                 }
                             };
                             
-                            // Remove column from A
-                            const removeFromA = (column: string) => {
-                                setSplitColumnsOutputA(prev => prev.filter(c => c !== column));
-                            };
-                            
-                            // Remove column from B
-                            const removeFromB = (column: string) => {
-                                setSplitColumnsOutputB(prev => prev.filter(c => c !== column));
-                            };
-                            
-                            // Move column up in list
-                            const moveUp = (list: 'A' | 'B', index: number) => {
-                                if (index === 0) return;
-                                const setter = list === 'A' ? setSplitColumnsOutputA : setSplitColumnsOutputB;
-                                setter(prev => {
-                                    const newArr = [...prev];
-                                    [newArr[index - 1], newArr[index]] = [newArr[index], newArr[index - 1]];
-                                    return newArr;
-                                });
-                            };
-                            
-                            // Move column down in list
-                            const moveDown = (list: 'A' | 'B', index: number, length: number) => {
-                                if (index === length - 1) return;
-                                const setter = list === 'A' ? setSplitColumnsOutputA : setSplitColumnsOutputB;
-                                setter(prev => {
-                                    const newArr = [...prev];
-                                    [newArr[index], newArr[index + 1]] = [newArr[index + 1], newArr[index]];
-                                    return newArr;
-                                });
-                            };
-                            
                             const moveAllToA = () => {
-                                const allCols = Array.from(new Set([...splitColumnsOutputA, ...splitColumnsOutputB]));
-                                setSplitColumnsOutputA(allCols);
+                                setSplitColumnsOutputA([...splitColumnsOutputA, ...splitColumnsOutputB]);
                                 setSplitColumnsOutputB([]);
                             };
                             
                             const moveAllToB = () => {
-                                const allCols = Array.from(new Set([...splitColumnsOutputA, ...splitColumnsOutputB]));
-                                setSplitColumnsOutputB(allCols);
+                                setSplitColumnsOutputB([...splitColumnsOutputB, ...splitColumnsOutputA]);
                                 setSplitColumnsOutputA([]);
                             };
-                            
-                            // Check if column is in both outputs
-                            const isInBoth = (column: string) => splitColumnsOutputA.includes(column) && splitColumnsOutputB.includes(column);
                             
                             return (
                                 <NodeConfigSidePanel
                                     isOpen={!!configuringSplitColumnsNodeId}
                                     onClose={() => setConfiguringSplitColumnsNodeId(null)}
                                     title="Split by Columns"
-                                    description="Distribute columns between outputs. Same column can be in both outputs."
+                                    description="Drag columns between outputs A and B"
                                     icon={Columns}
-                                    width="w-[650px]"
+                                    width="w-[600px]"
                                     footer={
                                         <>
                                             <button
@@ -10062,7 +9310,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </>
                                     }
                                 >
-                                        {allUniqueColumns.length === 0 ? (
+                                        {allColumns.length === 0 ? (
                                             <div className="text-center py-8 text-[var(--text-secondary)]">
                                                 <Columns size={32} className="mx-auto mb-2 opacity-50" />
                                                 <p className="font-medium">No columns available</p>
@@ -10075,7 +9323,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     <div 
                                                         className="flex-1 flex flex-col"
                                                         onDragOver={handleDragOver}
-                                                        onDrop={(e) => handleDropOnOutputA(e)}
+                                                        onDrop={handleDropOnOutputA}
                                                     >
                                                         <div className="flex items-center justify-between mb-2">
                                                             <div className="flex items-center gap-2">
@@ -10097,37 +9345,24 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 </div>
                                                             ) : (
                                                                 <div className="space-y-1">
-                                                                    {splitColumnsOutputA.map((column, idx) => (
+                                                                    {splitColumnsOutputA.map(column => (
                                                                         <div
-                                                                            key={`a-${column}-${idx}`}
+                                                                            key={column}
                                                                             draggable
-                                                                            onDragStart={() => handleDragStart(column, 'A', idx)}
+                                                                            onDragStart={() => handleDragStart(column)}
                                                                             onDragEnd={handleDragEnd}
-                                                                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                                                            onDrop={(e) => { e.stopPropagation(); handleDropOnOutputA(e, idx); }}
-                                                                            className={`flex items-center justify-between px-2.5 py-1.5 bg-[var(--bg-card)] rounded border cursor-grab group ${isInBoth(column) ? 'border-teal-500/50 bg-teal-500/5' : 'border-[var(--border-light)]'}`}
+                                                                            className="flex items-center justify-between px-2.5 py-1.5 bg-[var(--bg-card)] rounded border border-[var(--border-light)] cursor-grab group"
                                                                         >
                                                                             <div className="flex items-center gap-2">
                                                                                 <GripVertical size={12} className="text-[var(--text-tertiary)]" />
                                                                                 <span className="text-xs font-medium text-[var(--text-primary)]">{column}</span>
-                                                                                {isInBoth(column) && (
-                                                                                    <span className="text-[10px] px-1.5 py-0.5 bg-teal-500/20 text-teal-500 rounded">A+B</span>
-                                                                                )}
                                                                             </div>
-                                                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                                <button onClick={() => moveUp('A', idx)} className="p-0.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]" title="Move up">
-                                                                                    <ChevronUp size={12} weight="bold" />
-                                                                                </button>
-                                                                                <button onClick={() => moveDown('A', idx, splitColumnsOutputA.length)} className="p-0.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]" title="Move down">
-                                                                                    <ChevronDown size={12} weight="bold" />
-                                                                                </button>
-                                                                                <button onClick={() => copyColumnToB(column)} className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] px-1" title="Copy to B">
-                                                                                    +B
-                                                                                </button>
-                                                                                <button onClick={() => removeFromA(column)} className="p-0.5 text-red-400 hover:text-red-500" title="Remove">
-                                                                                    <X size={12} weight="bold" />
-                                                                                </button>
-                                                                            </div>
+                                                                            <button
+                                                                                onClick={() => moveColumnToB(column)}
+                                                                                className="opacity-0 group-hover:opacity-100 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-opacity"
+                                                                            >
+                                                                                → B
+                                                                            </button>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -10139,7 +9374,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                     <div 
                                                         className="flex-1 flex flex-col"
                                                         onDragOver={handleDragOver}
-                                                        onDrop={(e) => handleDropOnOutputB(e)}
+                                                        onDrop={handleDropOnOutputB}
                                                     >
                                                         <div className="flex items-center justify-between mb-2">
                                                             <div className="flex items-center gap-2">
@@ -10161,37 +9396,24 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                 </div>
                                                             ) : (
                                                                 <div className="space-y-1">
-                                                                    {splitColumnsOutputB.map((column, idx) => (
+                                                                    {splitColumnsOutputB.map(column => (
                                                                         <div
-                                                                            key={`b-${column}-${idx}`}
+                                                                            key={column}
                                                                             draggable
-                                                                            onDragStart={() => handleDragStart(column, 'B', idx)}
+                                                                            onDragStart={() => handleDragStart(column)}
                                                                             onDragEnd={handleDragEnd}
-                                                                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                                                            onDrop={(e) => { e.stopPropagation(); handleDropOnOutputB(e, idx); }}
-                                                                            className={`flex items-center justify-between px-2.5 py-1.5 bg-[var(--bg-card)] rounded border cursor-grab group ${isInBoth(column) ? 'border-teal-500/50 bg-teal-500/5' : 'border-[var(--border-light)]'}`}
+                                                                            className="flex items-center justify-between px-2.5 py-1.5 bg-[var(--bg-card)] rounded border border-[var(--border-light)] cursor-grab group"
                                                                         >
                                                                             <div className="flex items-center gap-2">
                                                                                 <GripVertical size={12} className="text-[var(--text-tertiary)]" />
                                                                                 <span className="text-xs font-medium text-[var(--text-primary)]">{column}</span>
-                                                                                {isInBoth(column) && (
-                                                                                    <span className="text-[10px] px-1.5 py-0.5 bg-teal-500/20 text-teal-500 rounded">A+B</span>
-                                                                                )}
                                                                             </div>
-                                                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                                <button onClick={() => moveUp('B', idx)} className="p-0.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]" title="Move up">
-                                                                                    <ChevronUp size={12} weight="bold" />
-                                                                                </button>
-                                                                                <button onClick={() => moveDown('B', idx, splitColumnsOutputB.length)} className="p-0.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]" title="Move down">
-                                                                                    <ChevronDown size={12} weight="bold" />
-                                                                                </button>
-                                                                                <button onClick={() => copyColumnToA(column)} className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] px-1" title="Copy to A">
-                                                                                    +A
-                                                                                </button>
-                                                                                <button onClick={() => removeFromB(column)} className="p-0.5 text-red-400 hover:text-red-500" title="Remove">
-                                                                                    <X size={12} weight="bold" />
-                                                                                </button>
-                                                                            </div>
+                                                                            <button
+                                                                                onClick={() => moveColumnToA(column)}
+                                                                                className="opacity-0 group-hover:opacity-100 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-opacity"
+                                                                            >
+                                                                                ← A
+                                                                            </button>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -10202,7 +9424,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 
                                                 <div className="mt-4 pt-3 border-t border-[var(--border-light)]">
                                                     <p className="text-xs text-[var(--text-secondary)]">
-                                                        <span className="font-medium">Tip:</span> Drag to reorder within a column. Use <span className="px-1 py-0.5 bg-[var(--bg-tertiary)] rounded text-[10px]">+A</span>/<span className="px-1 py-0.5 bg-[var(--bg-tertiary)] rounded text-[10px]">+B</span> to add a column to both outputs (useful for timestamps).
+                                                        <span className="font-medium">Tip:</span> Drag columns between outputs, or use the arrow buttons. Each row will be split into two datasets with the selected columns.
                                                     </p>
                                                 </div>
                                             </>
@@ -10424,31 +9646,49 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         )}
 
                         {/* Save Records Configuration Modal */}
-                        {configuringSaveNodeId && (() => {
-                            // Get preview data from previous node
-                            const currentNode = nodes.find(n => n.id === configuringSaveNodeId);
-                            const previousConnections = connections.filter(c => c.toNodeId === configuringSaveNodeId);
-                            const previousNode = previousConnections.length > 0 
-                                ? nodes.find(n => n.id === previousConnections[0].fromNodeId)
-                                : null;
-                            const inputDataPreview = previousNode?.outputData || previousNode?.data || null;
-
-                            return (
-                                <SaveRecordsConfigModal
-                                    isOpen={!!configuringSaveNodeId}
-                                    entityId={saveEntityId}
-                                    saveMode={saveMode}
-                                    availableEntities={entities}
-                                    inputDataPreview={inputDataPreview}
-                                    onSave={saveSaveRecordsConfig}
-                                    onClose={() => {
-                                        setConfiguringSaveNodeId(null);
-                                        setSaveEntityId('');
-                                        setSaveMode('insert');
-                                    }}
-                                />
-                            );
-                        })()}
+                        {configuringSaveNodeId && (
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringSaveNodeId}
+                                onClose={() => setConfiguringSaveNodeId(null)}
+                                title="Save to Database"
+                                icon={Database}
+                                footer={
+                                    <>
+                                        <button
+                                            onClick={() => setConfiguringSaveNodeId(null)}
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveSaveRecordsConfig}
+                                            disabled={!saveEntityId}
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save
+                                        </button>
+                                    </>
+                                }
+                            >
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                            Select Entity
+                                        </label>
+                                        <select
+                                            value={saveEntityId}
+                                            onChange={(e) => setSaveEntityId(e.target.value)}
+                                            className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
+                                        >
+                                            <option value="">Choose entity...</option>
+                                            {entities.map(entity => (
+                                                <option key={entity.id} value={entity.id}>{entity.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                            </NodeConfigSidePanel>
+                        )}
                     </div>
 
                     {/* LLM Config Modal */}
@@ -11080,21 +10320,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             {/* Execution History Modal */}
             {showExecutionHistory && (
                 <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none" onClick={() => setShowExecutionHistory(false)}>
-                    <div className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col pointer-events-auto border border-[var(--border-light)]" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="px-6 py-4 border-b border-[var(--border-light)] rounded-t-xl shrink-0">
+                        <div className="bg-gradient-to-r from-teal-600 to-teal-700 px-6 py-4 text-white rounded-t-xl shrink-0">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-lg bg-[var(--accent-primary)]/10 flex items-center justify-center">
-                                        <History size={20} className="text-[var(--accent-primary)]" />
-                                    </div>
+                                    <History size={24} />
                                     <div>
-                                        <h3 className="font-medium text-base text-[var(--text-primary)]">Execution History</h3>
-                                        <p className="text-[var(--text-secondary)] text-sm">View past workflow executions and their results</p>
+                                        <h3 className="font-normal text-lg">Execution History</h3>
+                                        <p className="text-teal-200 text-sm">View past workflow executions and their results</p>
                                     </div>
                                 </div>
-                                <button onClick={() => setShowExecutionHistory(false)} className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors">
-                                    <X size={20} />
+                                <button onClick={() => setShowExecutionHistory(false)} className="text-white/80 hover:text-white">
+                                    <X size={24} />
                                 </button>
                             </div>
                         </div>
@@ -11106,10 +10344,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 <div className="p-3 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
                                     <button
                                         onClick={loadExecutionHistory}
-                                        className="w-full px-3 py-2 bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] rounded-lg text-sm font-medium hover:bg-[var(--accent-primary)]/20 transition-colors flex items-center justify-center gap-2"
+                                        className="w-full px-3 py-2 bg-teal-100 text-[#1e554f] rounded-lg text-sm font-medium hover:bg-teal-200 transition-colors flex items-center justify-center gap-2"
                                     >
                                         {loadingExecutions ? (
-                                            <div className="w-4 h-4 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
+                                            <div className="w-4 h-4 border-2 border-[#256A65] border-t-transparent rounded-full animate-spin" />
                                         ) : (
                                             <History size={14} />
                                         )}
@@ -11118,7 +10356,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 </div>
                                 {loadingExecutions ? (
                                     <div className="p-8 text-center text-[var(--text-secondary)]">
-                                        <div className="w-8 h-8 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                                        <div className="w-8 h-8 border-2 border-[#256A65] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                                         Loading...
                                     </div>
                                 ) : executionHistory.length === 0 ? (
@@ -11128,18 +10366,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <p className="text-xs mt-1">Run the workflow or send a webhook to see executions here</p>
                                     </div>
                                 ) : (
-                                    <div className="divide-y divide-[var(--border-light)]">
+                                    <div className="divide-y divide-slate-100">
                                         {executionHistory.map((exec) => (
                                             <button
                                                 key={exec.id}
                                                 onClick={() => setSelectedExecution(exec)}
-                                                className={`w-full p-3 text-left hover:bg-[var(--bg-tertiary)] transition-colors ${selectedExecution?.id === exec.id ? 'bg-[var(--accent-primary)]/5 border-l-2 border-[var(--accent-primary)]' : ''}`}
+                                                className={`w-full p-3 text-left hover:bg-[var(--bg-tertiary)] transition-colors ${selectedExecution?.id === exec.id ? 'bg-[#256A65]/5 border-l-2 border-[#256A65]' : ''}`}
                                             >
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                                        exec.status === 'completed' ? 'bg-[var(--accent-success)]/10 text-[var(--accent-success)]' :
-                                                        exec.status === 'failed' ? 'bg-[var(--accent-error)]/10 text-[var(--accent-error)]' :
-                                                        exec.status === 'running' ? 'bg-[var(--accent-warning)]/10 text-[var(--accent-warning)]' :
+                                                        exec.status === 'completed' ? 'bg-[#256A65]/10 text-[#1e554f]' :
+                                                        exec.status === 'failed' ? 'bg-red-100 text-red-700' :
+                                                        exec.status === 'running' ? 'bg-yellow-100 text-yellow-700' :
                                                         'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
                                                     }`}>
                                                         {exec.status}
@@ -11166,8 +10404,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 <div>
                                                     <span className="text-[var(--text-secondary)]">Status:</span>
                                                     <span className={`ml-2 font-medium ${
-                                                        selectedExecution.status === 'completed' ? 'text-[var(--accent-success)]' :
-                                                        selectedExecution.status === 'failed' ? 'text-[var(--accent-error)]' :
+                                                        selectedExecution.status === 'completed' ? 'text-[#256A65]' :
+                                                        selectedExecution.status === 'failed' ? 'text-red-600' :
                                                         'text-[var(--text-secondary)]'
                                                     }`}>{selectedExecution.status}</span>
                                                 </div>
@@ -11187,20 +10425,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         </div>
 
                                         {selectedExecution.inputs && Object.keys(selectedExecution.inputs).length > 0 && (
-                                            <div className="bg-[var(--accent-info)]/10 rounded-lg p-4">
-                                                <h4 className="font-normal text-[var(--accent-info)] mb-2 flex items-center gap-2">
+                                            <div className="bg-blue-500/10 rounded-lg p-4">
+                                                <h4 className="font-normal text-blue-500 mb-2 flex items-center gap-2">
                                                     <ArrowRight size={16} />
                                                     Inputs
                                                 </h4>
-                                                <pre className="text-xs bg-[var(--bg-card)] p-3 rounded border border-[var(--border-light)] overflow-x-auto max-h-40 text-[var(--text-primary)]">
+                                                <pre className="text-xs bg-[var(--bg-card)] p-3 rounded border border-blue-100 overflow-x-auto max-h-40">
                                                     {JSON.stringify(selectedExecution.inputs, null, 2)}
                                                 </pre>
                                             </div>
                                         )}
 
                                         {selectedExecution.nodeResults && Object.keys(selectedExecution.nodeResults).length > 0 && (
-                                            <div className="bg-[var(--accent-success)]/5 rounded-lg p-4">
-                                                <h4 className="font-normal text-[var(--accent-success)] mb-2 flex items-center gap-2">
+                                            <div className="bg-[#256A65]/5 rounded-lg p-4">
+                                                <h4 className="font-normal text-[#1e554f] mb-2 flex items-center gap-2">
                                                     <CheckCircle size={16} />
                                                     Node Results
                                                 </h4>
@@ -11212,11 +10450,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                         const nodeType = node?.type || result.nodeType || '';
                                                         
                                                         return (
-                                                            <div key={nodeId} className="bg-[var(--bg-card)] p-3 rounded border border-[var(--border-light)]">
+                                                            <div key={nodeId} className="bg-[var(--bg-card)] p-3 rounded border border-[#256A65]/20">
                                                                 <div className="flex items-center gap-2 mb-1">
                                                                     <span className="font-medium text-[var(--text-primary)]">{nodeLabel}</span>
                                                                     {nodeType && <span className="text-xs text-[var(--text-tertiary)]">({nodeType})</span>}
-                                                                    {result.success && <Check size={14} className="text-[var(--accent-success)]" />}
+                                                                    {result.success && <Check size={14} className="text-[#256A65]" />}
                                                                 </div>
                                                                 {result.message && (
                                                                     <p className="text-xs text-[var(--text-secondary)] mb-1">{result.message}</p>
@@ -11234,12 +10472,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         )}
 
                                         {selectedExecution.error && (
-                                            <div className="bg-[var(--accent-error)]/10 rounded-lg p-4">
-                                                <h4 className="font-normal text-[var(--accent-error)] mb-2 flex items-center gap-2">
+                                            <div className="bg-red-50 rounded-lg p-4">
+                                                <h4 className="font-normal text-red-800 mb-2 flex items-center gap-2">
                                                     <XCircle size={16} />
                                                     Error
                                                 </h4>
-                                                <pre className="text-xs bg-[var(--bg-card)] p-3 rounded border border-[var(--accent-error)]/20 text-[var(--accent-error)] overflow-x-auto">
+                                                <pre className="text-xs bg-[var(--bg-card)] p-3 rounded border border-red-100 text-red-600 overflow-x-auto">
                                                     {selectedExecution.error}
                                                 </pre>
                                             </div>
@@ -11949,94 +11187,56 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 </div>
             )}
 
-            {/* OPC UA Configuration Modal */}
-            <OpcUaConfigModal
-                isOpen={configuringOpcuaNodeId !== null}
-                connectionId={nodes.find(n => n.id === configuringOpcuaNodeId)?.config?.opcuaConnectionId}
-                nodeIds={nodes.find(n => n.id === configuringOpcuaNodeId)?.config?.opcuaNodeIds || []}
-                pollingInterval={nodes.find(n => n.id === configuringOpcuaNodeId)?.config?.opcuaPollingInterval || 5000}
-                alerts={nodes.find(n => n.id === configuringOpcuaNodeId)?.config?.alerts}
-                availableConnections={availableConnections.filter(c => c.type === 'opcua' || c.type === 'OPC UA')}
-                onSave={saveOpcuaConfig}
-                onClose={() => setConfiguringOpcuaNodeId(null)}
-            />
+            {/* Schedule Upgrade Modal */}
+            {showScheduleUpgradeModal && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => { setShowScheduleUpgradeModal(false); setShowScheduleContactInfo(false); }}>
+                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl p-6 w-[400px] max-w-[90vw]" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-base font-medium text-[var(--text-primary)]">
+                                Schedule Workflows
+                            </h3>
+                            <button
+                                onClick={() => { setShowScheduleUpgradeModal(false); setShowScheduleContactInfo(false); }}
+                                className="p-1 hover:bg-[var(--bg-tertiary)] rounded-md transition-colors"
+                            >
+                                <X size={18} className="text-[var(--text-tertiary)]" weight="light" />
+                            </button>
+                        </div>
 
-            {/* MQTT Configuration Modal */}
-            <MqttConfigModal
-                isOpen={configuringMqttNodeId !== null}
-                connectionId={nodes.find(n => n.id === configuringMqttNodeId)?.config?.mqttConnectionId}
-                topics={nodes.find(n => n.id === configuringMqttNodeId)?.config?.mqttTopics || []}
-                qos={nodes.find(n => n.id === configuringMqttNodeId)?.config?.mqttQos || 0}
-                alerts={nodes.find(n => n.id === configuringMqttNodeId)?.config?.alerts}
-                availableConnections={availableConnections.filter(c => c.type === 'mqtt' || c.type === 'MQTT')}
-                onSave={saveMqttConfig}
-                onClose={() => setConfiguringMqttNodeId(null)}
-            />
-
-            {/* Modbus Configuration Modal */}
-            <ModbusConfigModal
-                isOpen={configuringModbusNodeId !== null}
-                connectionId={nodes.find(n => n.id === configuringModbusNodeId)?.config?.modbusConnectionId}
-                addresses={nodes.find(n => n.id === configuringModbusNodeId)?.config?.modbusAddresses || []}
-                functionCode={nodes.find(n => n.id === configuringModbusNodeId)?.config?.modbusFunctionCode || 3}
-                alerts={nodes.find(n => n.id === configuringModbusNodeId)?.config?.alerts}
-                availableConnections={availableConnections.filter(c => c.type === 'modbus' || c.type === 'Modbus')}
-                onSave={saveModbusConfig}
-                onClose={() => setConfiguringModbusNodeId(null)}
-            />
-
-            {/* SCADA Configuration Modal */}
-            <ScadaConfigModal
-                isOpen={configuringScadaNodeId !== null}
-                connectionId={nodes.find(n => n.id === configuringScadaNodeId)?.config?.scadaConnectionId}
-                tags={nodes.find(n => n.id === configuringScadaNodeId)?.config?.scadaTags || []}
-                pollingInterval={nodes.find(n => n.id === configuringScadaNodeId)?.config?.scadaPollingInterval || 5000}
-                availableConnections={availableConnections.filter(c => c.type === 'scada' || c.type === 'SCADA')}
-                onSave={saveScadaConfig}
-                onClose={() => setConfiguringScadaNodeId(null)}
-            />
-
-            {/* MES Configuration Modal */}
-            <MesConfigModal
-                isOpen={configuringMesNodeId !== null}
-                connectionId={nodes.find(n => n.id === configuringMesNodeId)?.config?.mesConnectionId}
-                endpoint={nodes.find(n => n.id === configuringMesNodeId)?.config?.mesEndpoint}
-                query={nodes.find(n => n.id === configuringMesNodeId)?.config?.mesQuery}
-                availableConnections={availableConnections.filter(c => c.type === 'mes' || c.type === 'MES')}
-                onSave={saveMesConfig}
-                onClose={() => setConfiguringMesNodeId(null)}
-            />
-
-            {/* Data Historian Configuration Modal */}
-            <DataHistorianConfigModal
-                isOpen={configuringDataHistorianNodeId !== null}
-                connectionId={nodes.find(n => n.id === configuringDataHistorianNodeId)?.config?.dataHistorianConnectionId}
-                tags={nodes.find(n => n.id === configuringDataHistorianNodeId)?.config?.dataHistorianTags || []}
-                startTime={nodes.find(n => n.id === configuringDataHistorianNodeId)?.config?.dataHistorianStartTime}
-                endTime={nodes.find(n => n.id === configuringDataHistorianNodeId)?.config?.dataHistorianEndTime}
-                aggregation={nodes.find(n => n.id === configuringDataHistorianNodeId)?.config?.dataHistorianAggregation || 'raw'}
-                availableConnections={availableConnections.filter(c => c.type === 'data-historian' || c.type === 'Data Historian')}
-                onSave={saveDataHistorianConfig}
-                onClose={() => setConfiguringDataHistorianNodeId(null)}
-            />
-
-            {/* Time-Series Aggregator Configuration Modal */}
-            <TimeSeriesAggregatorConfigModal
-                isOpen={configuringTimeSeriesAggregatorNodeId !== null}
-                aggregationType={nodes.find(n => n.id === configuringTimeSeriesAggregatorNodeId)?.config?.timeSeriesAggregationType || 'avg'}
-                interval={nodes.find(n => n.id === configuringTimeSeriesAggregatorNodeId)?.config?.timeSeriesInterval || '5m'}
-                fields={nodes.find(n => n.id === configuringTimeSeriesAggregatorNodeId)?.config?.timeSeriesFields || []}
-                availableFields={[]} // Could be populated from input node data
-                onSave={saveTimeSeriesAggregatorConfig}
-                onClose={() => setConfiguringTimeSeriesAggregatorNodeId(null)}
-            />
-
-            {/* OT Alerts Panel */}
-            <OTAlertsPanel
-                isOpen={showOTAlertsPanel}
-                onClose={() => setShowOTAlertsPanel(false)}
-                workflowId={currentWorkflowId || undefined}
-            />
+                        <div className="py-4 text-center">
+                            <h4 className="text-lg font-medium text-[var(--text-primary)] mb-2">
+                                Upgrade to create schedules for workflows
+                            </h4>
+                            <p className="text-sm text-[var(--text-secondary)] mb-5 max-w-sm mx-auto">
+                                Automate your workflows by scheduling them to run at specific times or intervals with our Business or Enterprise plan.
+                            </p>
+                            <div className="flex flex-col gap-3 items-center">
+                                <button
+                                    onClick={() => setShowScheduleContactInfo(true)}
+                                    className="px-6 py-2.5 bg-[#2D3748] hover:bg-[#1A202C] text-white rounded-lg text-sm font-medium transition-all shadow-md hover:shadow-lg"
+                                >
+                                    Contact Sales
+                                </button>
+                                <button
+                                    onClick={() => { setShowScheduleUpgradeModal(false); setShowScheduleContactInfo(false); }}
+                                    className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                                >
+                                    Maybe later
+                                </button>
+                            </div>
+                            
+                            {/* Contact Info Popup */}
+                            {showScheduleContactInfo && (
+                                <div className="mt-4 p-4 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-left">
+                                    <p className="text-sm text-[var(--text-secondary)]">
+                                        Write us at <a href="mailto:info@intemic.com" className="text-[#419CAF] hover:underline font-medium">info@intemic.com</a> about your requirements and we will provide a personalized proposal.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
 
     );

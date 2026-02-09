@@ -235,13 +235,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
     
     const iconClasses = `${isCollapsed ? '' : 'mr-3'} transition-colors duration-200 ease-in-out flex-shrink-0 ${active ? 'text-[var(--sidebar-icon-active)]' : 'text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]'}`;
     
-    // Badge component
-    const badgeElement = badge && !isCollapsed ? (
-      <span className="ml-auto px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide bg-amber-100 text-amber-700 rounded">
-        {badge}
-      </span>
-    ) : null;
-
     // Tooltip for collapsed state
     const tooltip = isCollapsed ? (
       <span className="absolute left-full ml-2 px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md text-xs text-[var(--text-primary)] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">

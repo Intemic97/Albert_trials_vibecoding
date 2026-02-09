@@ -1622,7 +1622,7 @@ export const Connections: React.FC = () => {
                                     </p>
                                 </div>
                             )}
-                        </div>
+                        </form>
                     </div>
                 </div>
             )}
