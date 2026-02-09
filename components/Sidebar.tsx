@@ -511,8 +511,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
           <SectionLabel label="Analyze" />
           <div className="space-y-0.5">
             <NavItem icon={SquaresFour} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
-            <NavItem icon={Flask} label="Lab" view="lab" active={activeView === 'lab'} />
             <NavItem icon={Sparkle} label="Copilots" view="copilots" active={activeView === 'copilots'} />
+            <NavItem icon={Flask} label="Lab" view="lab" active={activeView === 'lab'} />
           </div>
 
           <SectionLabel label="Reports" />
