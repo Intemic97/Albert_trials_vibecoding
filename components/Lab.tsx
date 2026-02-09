@@ -76,6 +76,8 @@ interface VisualizationConfig {
         xAxis?: string;
         yAxis?: string[];
         format?: 'number' | 'currency' | 'percent';
+        aggregation?: 'none' | 'sum' | 'avg' | 'min' | 'max' | 'count';
+        unit?: string;
     };
     position: { x: number; y: number; w: number; h: number };
     color?: string;
@@ -294,7 +296,8 @@ const KPICard: React.FC<{
     change?: number;
     color?: string;
     isLoading?: boolean;
-}> = ({ title, value, format = 'number', change, color, isLoading }) => {
+    subtitle?: string;
+}> = ({ title, value, format = 'number', change, color, isLoading, subtitle }) => {
     const [displayValue, setDisplayValue] = useState<number | null>(null);
     const [isAnimating, setIsAnimating] = useState(false);
     const prevValueRef = useRef<number | null>(null);
@@ -364,7 +367,10 @@ const KPICard: React.FC<{
 
     return (
         <div className={`bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 transition-all duration-200 hover:border-[var(--border-medium)] ${isAnimating ? 'border-[var(--accent-primary)]/30' : ''}`}>
-            <p className="text-xs text-[var(--text-secondary)] mb-2">{title}</p>
+            <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-[var(--text-secondary)]">{title}</p>
+                {subtitle && <span className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wide">{subtitle}</span>}
+            </div>
             <p 
                 className={`text-2xl font-normal transition-colors duration-300 tabular-nums`}
                 style={{ 
@@ -389,195 +395,198 @@ const VisualizationCard: React.FC<{
     config: VisualizationConfig;
     data: any;
     dateRange?: { start: string; end: string };
-}> = ({ config, data, dateRange }) => {
+}> = ({ config, data }) => {
     const { type, title, dataMapping, color } = config;
     
-    // Extract and filter data based on mapping and date range
+    // Format large numbers: 17100000 -> "17.1M", 427680 -> "427.7K"
+    const fmtNum = (n: number, fmt?: string): string => {
+        if (fmt === 'currency') {
+            if (Math.abs(n) >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+            if (Math.abs(n) >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
+            return '$' + n.toLocaleString();
+        }
+        if (fmt === 'percent') return n.toFixed(1) + '%';
+        if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+        if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+        return n.toLocaleString();
+    };
+
+    const tooltipStyle = {
+        background: 'rgba(20,20,20,0.95)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: '10px',
+        fontSize: '12px',
+        color: '#e5e5e5',
+        backdropFilter: 'blur(12px)',
+        padding: '8px 12px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+    };
+
+    // Extract data from source
     const chartData = useMemo(() => {
         if (!data) return [];
+        const source = dataMapping.source.split('.').reduce((obj: any, key: string) => obj?.[key], data);
+        if (Array.isArray(source)) return source;
+        if (typeof source === 'object' && source !== null) return [source];
+        return [];
+    }, [data, dataMapping.source]);
+
+    // KPI: get scalar value OR aggregate from array
+    const getKpiValue = (): number | string | null => {
+        if (!data) return null;
+        const source = dataMapping.source.split('.').reduce((obj: any, key: string) => obj?.[key], data);
         
-        // Navigate to the data source
-        const source = dataMapping.source.split('.').reduce((obj, key) => obj?.[key], data);
-        let result = [];
-        if (Array.isArray(source)) result = source;
-        else if (typeof source === 'object') result = [source];
-        else return [];
+        // Direct scalar value
+        if (typeof source === 'number') return source;
+        if (typeof source === 'string') return source;
         
-        // Filter by date range if applicable
-        if (dateRange && result.length > 0) {
-            const startDate = new Date(dateRange.start);
-            const endDate = new Date(dateRange.end);
-            endDate.setHours(23, 59, 59, 999); // Include end date fully
+        // Array with aggregation
+        if (Array.isArray(source) && source.length > 0 && dataMapping.valueKey) {
+            const values = source.map(item => parseFloat(item[dataMapping.valueKey!])).filter(v => !isNaN(v));
+            if (values.length === 0) return null;
             
-            // Try to find a date field in the data
-            const dateFields = ['date', 'fecha', 'timestamp', 'time', 'created_at', 'createdAt', 'month', 'day'];
-            const dateField = dateFields.find(field => result[0]?.[field] !== undefined);
-            
-            if (dateField) {
-                result = result.filter(item => {
-                    const itemDate = new Date(item[dateField]);
-                    return itemDate >= startDate && itemDate <= endDate;
-                });
+            switch (dataMapping.aggregation) {
+                case 'sum': return values.reduce((a, b) => a + b, 0);
+                case 'avg': return values.reduce((a, b) => a + b, 0) / values.length;
+                case 'min': return Math.min(...values);
+                case 'max': return Math.max(...values);
+                case 'count': return values.length;
+                default: return values.reduce((a, b) => a + b, 0); // default sum for arrays
             }
         }
         
-        return result;
-    }, [data, dataMapping.source, dateRange]);
-
-    const getValue = () => {
-        if (!data) return null;
-        if (dataMapping.valueKey) {
-            return dataMapping.source.split('.').reduce((obj, key) => obj?.[key], data)?.[dataMapping.valueKey];
+        // Object with valueKey
+        if (typeof source === 'object' && source !== null && dataMapping.valueKey) {
+            return source[dataMapping.valueKey];
         }
-        return dataMapping.source.split('.').reduce((obj, key) => obj?.[key], data);
+        
+        return source;
     };
 
+    // Tooltip formatter for charts
+    const tooltipFormatter = (value: number) => {
+        return fmtNum(value, dataMapping.format);
+    };
+
+    // Y-axis tick formatter
+    const yTickFormatter = (value: number) => fmtNum(value, dataMapping.format);
+
     if (type === 'kpi') {
+        const kpiValue = getKpiValue();
+        const unit = dataMapping.unit || '';
+        const aggregation = dataMapping.aggregation;
         return (
             <KPICard
                 title={title}
-                value={getValue()}
+                value={kpiValue}
                 format={dataMapping.format}
                 color={color}
+                subtitle={unit ? unit : (aggregation && aggregation !== 'none' ? aggregation.toUpperCase() : undefined)}
             />
         );
     }
 
     return (
         <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4 h-full">
-            <p className="text-sm font-medium text-[var(--text-primary)] mb-3">{title}</p>
+            <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium text-[var(--text-primary)]">{title}</p>
+                {dataMapping.unit && (
+                    <span className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wide">{dataMapping.unit}</span>
+                )}
+            </div>
             
             {type === 'line' && chartData.length > 0 && (
-                <ResponsiveContainer width="100%" height={200} minWidth={100} minHeight={100}>
+                <ResponsiveContainer width="100%" height={220} minWidth={100}>
                     <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-                        <XAxis dataKey={dataMapping.xAxis} tick={{ fontSize: 10 }} stroke="var(--text-tertiary)" />
-                        <YAxis tick={{ fontSize: 10 }} stroke="var(--text-tertiary)" />
-                        <Tooltip
-                            contentStyle={{ background: 'rgba(30,30,30,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px', color: '#e5e5e5', backdropFilter: 'blur(8px)' }}
-                            itemStyle={{ color: '#e5e5e5' }}
-                        />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                        <XAxis dataKey={dataMapping.xAxis} tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.2)" />
+                        <YAxis tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.2)" tickFormatter={yTickFormatter} width={60} />
+                        <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: '#e5e5e5' }} formatter={tooltipFormatter} />
+                        <Legend wrapperStyle={{ fontSize: '11px', color: 'var(--text-tertiary)' }} />
                         {dataMapping.yAxis?.map((key, i) => (
-                            <Line 
-                                key={key} 
-                                type="monotone" 
-                                dataKey={key} 
-                                stroke={CHART_COLORS[i % CHART_COLORS.length]}
-                                strokeWidth={2}
-                                dot={false}
-                            />
+                            <Line key={key} type="monotone" dataKey={key} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} dot={false} name={key.replace(/_/g, ' ')} />
                         ))}
                     </LineChart>
                 </ResponsiveContainer>
             )}
             
             {type === 'bar' && chartData.length > 0 && (
-                <ResponsiveContainer width="100%" height={200} minWidth={100} minHeight={100}>
+                <ResponsiveContainer width="100%" height={220} minWidth={100}>
                     <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-                        <XAxis dataKey={dataMapping.xAxis} tick={{ fontSize: 10 }} stroke="var(--text-tertiary)" />
-                        <YAxis tick={{ fontSize: 10 }} stroke="var(--text-tertiary)" />
-                        <Tooltip
-                            contentStyle={{ background: 'rgba(30,30,30,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px', color: '#e5e5e5', backdropFilter: 'blur(8px)' }}
-                            itemStyle={{ color: '#e5e5e5' }}
-                        />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                        <XAxis dataKey={dataMapping.xAxis} tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.2)" />
+                        <YAxis tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.2)" tickFormatter={yTickFormatter} width={60} />
+                        <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: '#e5e5e5' }} formatter={tooltipFormatter} />
+                        <Legend wrapperStyle={{ fontSize: '11px', color: 'var(--text-tertiary)' }} />
                         {dataMapping.yAxis?.map((key, i) => (
-                            <Bar 
-                                key={key} 
-                                dataKey={key} 
-                                fill={CHART_COLORS[i % CHART_COLORS.length]}
-                                radius={[4, 4, 0, 0]}
-                            />
+                            <Bar key={key} dataKey={key} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[4, 4, 0, 0]} name={key.replace(/_/g, ' ')} />
                         ))}
                     </BarChart>
                 </ResponsiveContainer>
             )}
             
             {type === 'area' && chartData.length > 0 && (
-                <ResponsiveContainer width="100%" height={200} minWidth={100} minHeight={100}>
+                <ResponsiveContainer width="100%" height={220} minWidth={100}>
                     <AreaChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-                        <XAxis dataKey={dataMapping.xAxis} tick={{ fontSize: 10 }} stroke="var(--text-tertiary)" />
-                        <YAxis tick={{ fontSize: 10 }} stroke="var(--text-tertiary)" />
-                        <Tooltip
-                            contentStyle={{ background: 'rgba(30,30,30,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px', color: '#e5e5e5', backdropFilter: 'blur(8px)' }}
-                            itemStyle={{ color: '#e5e5e5' }}
-                        />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                        <XAxis dataKey={dataMapping.xAxis} tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.2)" />
+                        <YAxis tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.2)" tickFormatter={yTickFormatter} width={60} />
+                        <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: '#e5e5e5' }} formatter={tooltipFormatter} />
+                        <Legend wrapperStyle={{ fontSize: '11px', color: 'var(--text-tertiary)' }} />
                         {dataMapping.yAxis?.map((key, i) => (
-                            <Area 
-                                key={key} 
-                                type="monotone" 
-                                dataKey={key} 
-                                fill={CHART_COLORS[i % CHART_COLORS.length]}
-                                fillOpacity={0.3}
-                                stroke={CHART_COLORS[i % CHART_COLORS.length]}
-                            />
+                            <Area key={key} type="monotone" dataKey={key} fill={CHART_COLORS[i % CHART_COLORS.length]} fillOpacity={0.2} stroke={CHART_COLORS[i % CHART_COLORS.length]} name={key.replace(/_/g, ' ')} />
                         ))}
                     </AreaChart>
                 </ResponsiveContainer>
             )}
             
             {type === 'pie' && chartData.length > 0 && (
-                <ResponsiveContainer width="100%" height={200} minWidth={100} minHeight={100}>
+                <ResponsiveContainer width="100%" height={220} minWidth={100}>
                     <PieChart>
-                        <Pie
-                            data={chartData}
-                            dataKey={dataMapping.valueKey || 'value'}
-                            nameKey={dataMapping.labelKey || 'name'}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={40}
-                            outerRadius={70}
-                        >
+                        <Pie data={chartData} dataKey={dataMapping.valueKey || 'value'} nameKey={dataMapping.labelKey || 'name'} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
                             {chartData.map((_, i) => (
                                 <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                             ))}
                         </Pie>
-                        <Tooltip
-                            contentStyle={{ 
-                                background: 'rgba(30,30,30,0.95)',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                borderRadius: '8px',
-                                fontSize: '12px',
-                                color: '#e5e5e5',
-                                backdropFilter: 'blur(8px)'
-                            }}
-                            itemStyle={{ color: '#e5e5e5' }}
-                        />
+                        <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: '#e5e5e5' }} formatter={tooltipFormatter} />
+                        <Legend wrapperStyle={{ fontSize: '11px', color: 'var(--text-tertiary)' }} />
                     </PieChart>
                 </ResponsiveContainer>
             )}
             
             {type === 'table' && (
-                <div className="overflow-auto max-h-[200px] custom-scrollbar">
+                <div className="overflow-auto max-h-[260px] custom-scrollbar">
                     <table className="w-full text-xs">
-                        <thead>
+                        <thead className="sticky top-0 bg-[var(--bg-card)]">
                             <tr className="border-b border-[var(--border-light)]">
                                 {chartData[0] && Object.keys(chartData[0]).map(key => (
-                                    <th key={key} className="text-left py-2 px-2 text-[var(--text-tertiary)] font-medium">
-                                        {key}
+                                    <th key={key} className="text-left py-2 px-2 text-[var(--text-tertiary)] font-medium whitespace-nowrap">
+                                        {key.replace(/_/g, ' ')}
                                     </th>
                                 ))}
                             </tr>
                         </thead>
                         <tbody>
-                            {chartData.slice(0, 10).map((row, i) => (
-                                <tr key={i} className="border-b border-[var(--border-light)]/50">
+                            {chartData.slice(0, 20).map((row, i) => (
+                                <tr key={i} className="border-b border-[var(--border-light)]/30 hover:bg-[var(--bg-tertiary)]/30 transition-colors">
                                     {Object.values(row).map((val: any, j) => (
-                                        <td key={j} className="py-2 px-2 text-[var(--text-primary)]">
-                                            {typeof val === 'number' ? val.toLocaleString() : val}
+                                        <td key={j} className="py-1.5 px-2 text-[var(--text-primary)] tabular-nums whitespace-nowrap">
+                                            {typeof val === 'number' ? val.toLocaleString() : String(val)}
                                         </td>
                                     ))}
                                 </tr>
                             ))}
                         </tbody>
                     </table>
+                    {chartData.length > 20 && (
+                        <p className="text-[10px] text-[var(--text-tertiary)] text-center py-2">+{chartData.length - 20} filas mas</p>
+                    )}
                 </div>
             )}
             
-            {chartData.length === 0 && (
-                <div className="h-[200px] flex items-center justify-center text-[var(--text-tertiary)] text-sm">
-                    No data available
+            {chartData.length === 0 && type !== 'kpi' && (
+                <div className="h-[200px] flex items-center justify-center text-[var(--text-tertiary)] text-xs">
+                    Sin datos. Ejecuta la simulacion primero.
                 </div>
             )}
         </div>
@@ -726,6 +735,8 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
         yAxis: [] as string[],
         labelKey: '',
         valueKey: '',
+        aggregation: 'none' as 'none' | 'sum' | 'avg' | 'min' | 'max' | 'count',
+        unit: '',
     });
 
     // Helper: classify lastResult fields into scalar vs array
@@ -1520,7 +1531,14 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
         const dataMapping: VisualizationConfig['dataMapping'] = {
             source: newVisualization.source,
             format: newVisualization.format,
+            ...(newVisualization.unit && { unit: newVisualization.unit }),
+            ...(newVisualization.aggregation !== 'none' && { aggregation: newVisualization.aggregation }),
         };
+
+        // KPI on array: add valueKey + aggregation
+        if (chartType === 'kpi' && newVisualization.valueKey) {
+            dataMapping.valueKey = newVisualization.valueKey;
+        }
 
         // Line / Bar / Area: add xAxis + yAxis
         if (isChartType(chartType)) {
@@ -1563,6 +1581,8 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
             yAxis: [],
             labelKey: '',
             valueKey: '',
+            aggregation: 'none',
+            unit: '',
         });
         setShowAddVisualization(false);
 
@@ -2830,7 +2850,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                         onDragEnd={handleDragEnd}
                                         onDragLeave={() => setDragOverVizId(null)}
                                     >
-                                        <VisualizationCard config={viz} data={lastResult} dateRange={dateRange} />
+                                        <VisualizationCard config={viz} data={lastResult} />
                                         {/* Context Menu Button */}
                                         <div className="absolute top-2 right-2">
                                             <button
@@ -2887,7 +2907,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                         onDragEnd={handleDragEnd}
                                         onDragLeave={() => setDragOverVizId(null)}
                                     >
-                                        <VisualizationCard config={viz} data={lastResult} dateRange={dateRange} />
+                                        <VisualizationCard config={viz} data={lastResult} />
                                         {/* Context Menu Button */}
                                         <div className="absolute top-3 right-3">
                                             <button
@@ -3129,10 +3149,10 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                 )}
                             </div>
 
-                            {/* KPI: Format selector */}
-                            {newVisualization.type === 'kpi' && (
+                            {/* Format selector (KPI + Charts) */}
+                            {newVisualization.type !== 'table' && (
                                 <div>
-                                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Format</label>
+                                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Formato</label>
                                     <div className="flex gap-1.5">
                                         {FORMAT_OPTIONS.map(opt => (
                                             <button
@@ -3150,6 +3170,62 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                     </div>
                                 </div>
                             )}
+
+                            {/* KPI on array: aggregation + valueKey */}
+                            {newVisualization.type === 'kpi' && newVisualization.source && lastResult && Array.isArray(lastResult[newVisualization.source]) && (
+                                <>
+                                    <div>
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Agregacion</label>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {['sum', 'avg', 'min', 'max', 'count'].map(agg => (
+                                                <button
+                                                    key={agg}
+                                                    type="button"
+                                                    onClick={() => setNewVisualization(prev => ({ ...prev, aggregation: agg as any }))}
+                                                    className={`px-3 py-1.5 text-xs rounded-md transition-all ${
+                                                        newVisualization.aggregation === agg
+                                                            ? 'bg-[#419CAF] text-white'
+                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50'
+                                                    }`}
+                                                >
+                                                    {agg === 'sum' ? 'Suma' : agg === 'avg' ? 'Promedio' : agg === 'min' ? 'Minimo' : agg === 'max' ? 'Maximo' : 'Conteo'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Campo a agregar</label>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {getArrayFieldKeys(newVisualization.source).filter(f => f.type === 'number').map(({ key }) => (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => setNewVisualization(prev => ({ ...prev, valueKey: key }))}
+                                                    className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${
+                                                        newVisualization.valueKey === key
+                                                            ? 'bg-[#419CAF] text-white'
+                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50'
+                                                    }`}
+                                                >
+                                                    {key}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Unit (optional, for all types) */}
+                            <div>
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Unidad <span className="text-[var(--text-tertiary)] font-normal">(opcional)</span></label>
+                                <input
+                                    type="text"
+                                    value={newVisualization.unit}
+                                    onChange={(e) => setNewVisualization(prev => ({ ...prev, unit: e.target.value }))}
+                                    placeholder="Ej: ton, USD/ton, kWh, %..."
+                                    className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#419CAF]"
+                                />
+                            </div>
 
                             {/* Line / Bar / Area: X-Axis and Y-Axis with clickable keys */}
                             {isChartType(newVisualization.type) && newVisualization.source && getArrayFieldKeys(newVisualization.source).length > 0 && (
