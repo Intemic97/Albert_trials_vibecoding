@@ -673,8 +673,35 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
         source: '',
         format: 'number' as 'number' | 'currency' | 'percent',
         xAxis: '',
-        yAxis: ''
+        yAxis: [] as string[],
+        labelKey: '',
+        valueKey: '',
     });
+
+    // Helper: classify lastResult fields into scalar vs array
+    const resultScalarFields = useMemo(() => {
+        if (!lastResult || typeof lastResult !== 'object') return [];
+        return Object.entries(lastResult).filter(([_, v]) => typeof v === 'number' || typeof v === 'string');
+    }, [lastResult]);
+
+    const resultArrayFields = useMemo(() => {
+        if (!lastResult || typeof lastResult !== 'object') return [];
+        return Object.entries(lastResult).filter(([_, v]) => Array.isArray(v) && v.length > 0) as [string, any[]][];
+    }, [lastResult]);
+
+    // Helper: get keys from an array field in lastResult
+    const getArrayFieldKeys = useCallback((fieldName: string) => {
+        if (!lastResult || !Array.isArray(lastResult[fieldName]) || lastResult[fieldName].length === 0) return [];
+        const sample = lastResult[fieldName][0];
+        if (!sample || typeof sample !== 'object') return [];
+        return Object.entries(sample).map(([key, val]) => ({
+            key,
+            type: typeof val as string,
+            sample: val
+        }));
+    }, [lastResult]);
+
+    const isChartType = (t: string) => ['line', 'bar', 'area'].includes(t);
     
     // Config panel state
     const [configTab, setConfigTab] = useState<'general' | 'parameters'>('general');
@@ -1358,18 +1385,29 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
     const addVisualization = async () => {
         if (!selectedSimulation || !newVisualization.title || !newVisualization.source) return;
 
+        const chartType = newVisualization.type;
+        const dataMapping: VisualizationConfig['dataMapping'] = {
+            source: newVisualization.source,
+            format: newVisualization.format,
+        };
+
+        // Line / Bar / Area: add xAxis + yAxis
+        if (isChartType(chartType)) {
+            dataMapping.xAxis = newVisualization.xAxis;
+            dataMapping.yAxis = newVisualization.yAxis;
+        }
+
+        // Pie: add labelKey + valueKey
+        if (chartType === 'pie') {
+            dataMapping.labelKey = newVisualization.labelKey || 'name';
+            dataMapping.valueKey = newVisualization.valueKey || 'value';
+        }
+
         const viz: VisualizationConfig = {
             id: generateUUID(),
-            type: newVisualization.type,
+            type: chartType,
             title: newVisualization.title,
-            dataMapping: {
-                source: newVisualization.source,
-                format: newVisualization.format,
-                ...(newVisualization.type !== 'kpi' && {
-                    xAxis: newVisualization.xAxis,
-                    yAxis: newVisualization.yAxis.split(',').map(y => y.trim()).filter(Boolean)
-                })
-            },
+            dataMapping,
             position: { x: 0, y: 0, w: 1, h: 1 },
             color: CHART_COLORS[selectedSimulation.visualizations.length % CHART_COLORS.length]
         };
@@ -1391,7 +1429,9 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
             source: '',
             format: 'number',
             xAxis: '',
-            yAxis: ''
+            yAxis: [],
+            labelKey: '',
+            valueKey: '',
         });
         setShowAddVisualization(false);
 
@@ -2938,84 +2978,82 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                 />
                             </div>
 
-                            {/* Data Source - from workflow results */}
+                            {/* Data Source - contextual by chart type */}
                             <div>
                                 <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                                     Data Source
                                 </label>
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        value={newVisualization.source}
-                                        onChange={(e) => setNewVisualization(prev => ({ ...prev, source: e.target.value }))}
-                                        placeholder={lastResult ? "Select a field from workflow results..." : "Run the experiment first to see available fields..."}
-                                        className="w-full px-3 py-2.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#419CAF]"
-                                    />
-                                </div>
-                                {/* Workflow result field suggestions */}
-                                {lastResult && typeof lastResult === 'object' && (
-                                    <div className="mt-3">
-                                        <p className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-2">
-                                            Workflow Output Fields
-                                        </p>
+                                {!lastResult ? (
+                                    <p className="text-xs text-[var(--text-tertiary)] p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
+                                        Run the experiment first to see available data fields.
+                                    </p>
+                                ) : newVisualization.type === 'kpi' ? (
+                                    /* KPI: show only scalar (number) fields with preview */
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-2">Numeric Fields</p>
                                         <div className="flex flex-wrap gap-1.5">
-                                            {Object.entries(lastResult).map(([key, value]) => {
-                                                const isArray = Array.isArray(value);
-                                                const isNumber = typeof value === 'number';
-                                                const tag = isArray ? 'array' : isNumber ? 'number' : typeof value;
-                                                return (
-                                                    <button
-                                                        key={key}
-                                                        type="button"
-                                                        onClick={() => setNewVisualization(prev => ({ 
-                                                            ...prev, 
-                                                            source: key,
-                                                            title: prev.title || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-                                                        }))}
-                                                        className={`px-2.5 py-1 text-xs rounded-md transition-all ${
-                                                            newVisualization.source === key
-                                                                ? 'bg-[#419CAF] text-white'
-                                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
-                                                        }`}
-                                                    >
-                                                        {key} <span className="opacity-50 ml-1">({tag})</span>
-                                                    </button>
-                                                );
-                                            })}
+                                            {resultScalarFields.filter(([_, v]) => typeof v === 'number').map(([key, value]) => (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => setNewVisualization(prev => ({
+                                                        ...prev,
+                                                        source: key,
+                                                        title: prev.title || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                                                    }))}
+                                                    className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${
+                                                        newVisualization.source === key
+                                                            ? 'bg-[#419CAF] text-white'
+                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
+                                                    }`}
+                                                >
+                                                    {key.replace(/_/g, ' ')} <span className="opacity-50 ml-1">({typeof value === 'number' ? value.toLocaleString() : value})</span>
+                                                </button>
+                                            ))}
                                         </div>
-                                        {/* Show array item keys if an array field is selected */}
-                                        {newVisualization.source && Array.isArray(lastResult[newVisualization.source]) && lastResult[newVisualization.source][0] && (
-                                            <div className="mt-3 p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-light)]">
-                                                <p className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-2">
-                                                    Available Keys (for axes)
-                                                </p>
-                                                <div className="flex flex-wrap gap-1">
-                                                    {Object.keys(lastResult[newVisualization.source][0]).map((k: string) => (
-                                                        <span 
-                                                            key={k}
-                                                            className="px-2 py-0.5 text-[10px] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded border border-[var(--border-light)]"
-                                                        >
-                                                            {k}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </div>
+                                        {resultScalarFields.filter(([_, v]) => typeof v === 'number').length === 0 && (
+                                            <p className="text-xs text-[var(--text-tertiary)]">No numeric fields in workflow output.</p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    /* Charts / Pie / Table: show only array fields */
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-2">Dataset Fields</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {resultArrayFields.map(([key, arr]) => (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => setNewVisualization(prev => ({
+                                                        ...prev,
+                                                        source: key,
+                                                        xAxis: '',
+                                                        yAxis: [],
+                                                        labelKey: '',
+                                                        valueKey: '',
+                                                        title: prev.title || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                                                    }))}
+                                                    className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${
+                                                        newVisualization.source === key
+                                                            ? 'bg-[#419CAF] text-white'
+                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
+                                                    }`}
+                                                >
+                                                    {key.replace(/_/g, ' ')} <span className="opacity-50 ml-1">({arr.length} items)</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {resultArrayFields.length === 0 && (
+                                            <p className="text-xs text-[var(--text-tertiary)]">No array fields in workflow output. Charts need array data.</p>
                                         )}
                                     </div>
                                 )}
-                                {!lastResult && (
-                                    <p className="mt-2 text-xs text-[var(--text-tertiary)]">
-                                        Run the experiment first to see available data fields from the workflow output.
-                                    </p>
-                                )}
                             </div>
 
-                            {/* Format (for KPI) */}
+                            {/* KPI: Format selector */}
                             {newVisualization.type === 'kpi' && (
                                 <div>
-                                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
-                                        Format
-                                    </label>
+                                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Format</label>
                                     <div className="flex gap-1.5">
                                         {FORMAT_OPTIONS.map(opt => (
                                             <button
@@ -3034,35 +3072,98 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                 </div>
                             )}
 
-                            {/* Axis config (for charts) */}
-                            {newVisualization.type !== 'kpi' && newVisualization.type !== 'table' && (
+                            {/* Line / Bar / Area: X-Axis and Y-Axis with clickable keys */}
+                            {isChartType(newVisualization.type) && newVisualization.source && getArrayFieldKeys(newVisualization.source).length > 0 && (
                                 <>
                                     <div>
-                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
-                                            X-Axis Key
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={newVisualization.xAxis}
-                                            onChange={(e) => setNewVisualization(prev => ({ ...prev, xAxis: e.target.value }))}
-                                            placeholder="e.g., month, category"
-                                            className="w-full px-3 py-2.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
-                                        />
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">X Axis (labels)</label>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {getArrayFieldKeys(newVisualization.source).map(({ key, type: kType }) => (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => setNewVisualization(prev => ({ ...prev, xAxis: key }))}
+                                                    className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${
+                                                        newVisualization.xAxis === key
+                                                            ? 'bg-[#419CAF] text-white'
+                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
+                                                    }`}
+                                                >
+                                                    {key} <span className="opacity-40">({kType})</span>
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
-                                            Y-Axis Keys
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={newVisualization.yAxis}
-                                            onChange={(e) => setNewVisualization(prev => ({ ...prev, yAxis: e.target.value }))}
-                                            placeholder="e.g., revenue, profit (comma separated)"
-                                            className="w-full px-3 py-2.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
-                                        />
-                                        <p className="text-xs text-[var(--text-tertiary)] mt-1.5">
-                                            Separate multiple keys with commas
-                                        </p>
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Y Axis (values) <span className="text-[var(--text-tertiary)] font-normal">- select one or more</span></label>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {getArrayFieldKeys(newVisualization.source).filter(f => f.type === 'number').map(({ key }) => {
+                                                const isSelected = newVisualization.yAxis.includes(key);
+                                                return (
+                                                    <button
+                                                        key={key}
+                                                        type="button"
+                                                        onClick={() => setNewVisualization(prev => ({
+                                                            ...prev,
+                                                            yAxis: isSelected
+                                                                ? prev.yAxis.filter(k => k !== key)
+                                                                : [...prev.yAxis, key]
+                                                        }))}
+                                                        className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${
+                                                            isSelected
+                                                                ? 'bg-[#419CAF] text-white'
+                                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
+                                                        }`}
+                                                    >
+                                                        {isSelected ? '✓ ' : ''}{key}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Pie Chart: Label Field + Value Field */}
+                            {newVisualization.type === 'pie' && newVisualization.source && getArrayFieldKeys(newVisualization.source).length > 0 && (
+                                <>
+                                    <div>
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Label Field (slice names)</label>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {getArrayFieldKeys(newVisualization.source).filter(f => f.type === 'string').map(({ key }) => (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => setNewVisualization(prev => ({ ...prev, labelKey: key }))}
+                                                    className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${
+                                                        newVisualization.labelKey === key
+                                                            ? 'bg-[#419CAF] text-white'
+                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
+                                                    }`}
+                                                >
+                                                    {key}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Value Field (slice sizes)</label>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {getArrayFieldKeys(newVisualization.source).filter(f => f.type === 'number').map(({ key }) => (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => setNewVisualization(prev => ({ ...prev, valueKey: key }))}
+                                                    className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${
+                                                        newVisualization.valueKey === key
+                                                            ? 'bg-[#419CAF] text-white'
+                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
+                                                    }`}
+                                                >
+                                                    {key}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                 </>
                             )}
@@ -3531,37 +3632,76 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                 </div>
                             )}
                             
-                            {editingViz.type !== 'kpi' && (
+                            {/* Line / Bar / Area: axes with clickable keys */}
+                            {isChartType(editingViz.type) && (
                                 <>
                                     <div>
-                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                                            X Axis Key
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={editingViz.dataMapping.xAxis || ''}
-                                            onChange={(e) => setEditingViz({ 
-                                                ...editingViz, 
-                                                dataMapping: { ...editingViz.dataMapping, xAxis: e.target.value }
-                                            })}
-                                            placeholder="e.g., month"
-                                            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm"
-                                        />
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">X Axis (labels)</label>
+                                        {getArrayFieldKeys(editingViz.dataMapping.source).length > 0 ? (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {getArrayFieldKeys(editingViz.dataMapping.source).map(({ key, type: kType }) => (
+                                                    <button key={key} type="button"
+                                                        onClick={() => setEditingViz({ ...editingViz, dataMapping: { ...editingViz.dataMapping, xAxis: key } })}
+                                                        className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${editingViz.dataMapping.xAxis === key ? 'bg-[#419CAF] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50'}`}
+                                                    >{key} <span className="opacity-40">({kType})</span></button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <input type="text" value={editingViz.dataMapping.xAxis || ''} onChange={(e) => setEditingViz({ ...editingViz, dataMapping: { ...editingViz.dataMapping, xAxis: e.target.value } })} placeholder="e.g., month" className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm" />
+                                        )}
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                                            Y Axis Keys (comma separated)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={editingViz.dataMapping.yAxis?.join(', ') || ''}
-                                            onChange={(e) => setEditingViz({ 
-                                                ...editingViz, 
-                                                dataMapping: { ...editingViz.dataMapping, yAxis: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }
-                                            })}
-                                            placeholder="e.g., revenue, cost"
-                                            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm"
-                                        />
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">Y Axis (values)</label>
+                                        {getArrayFieldKeys(editingViz.dataMapping.source).filter(f => f.type === 'number').length > 0 ? (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {getArrayFieldKeys(editingViz.dataMapping.source).filter(f => f.type === 'number').map(({ key }) => {
+                                                    const sel = editingViz.dataMapping.yAxis?.includes(key);
+                                                    return (
+                                                        <button key={key} type="button"
+                                                            onClick={() => setEditingViz({ ...editingViz, dataMapping: { ...editingViz.dataMapping, yAxis: sel ? editingViz.dataMapping.yAxis?.filter(k => k !== key) : [...(editingViz.dataMapping.yAxis || []), key] } })}
+                                                            className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${sel ? 'bg-[#419CAF] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50'}`}
+                                                        >{sel ? '✓ ' : ''}{key}</button>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <input type="text" value={editingViz.dataMapping.yAxis?.join(', ') || ''} onChange={(e) => setEditingViz({ ...editingViz, dataMapping: { ...editingViz.dataMapping, yAxis: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} placeholder="e.g., revenue, cost" className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm" />
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                            {/* Pie: label + value keys */}
+                            {editingViz.type === 'pie' && (
+                                <>
+                                    <div>
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">Label Field</label>
+                                        {getArrayFieldKeys(editingViz.dataMapping.source).filter(f => f.type === 'string').length > 0 ? (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {getArrayFieldKeys(editingViz.dataMapping.source).filter(f => f.type === 'string').map(({ key }) => (
+                                                    <button key={key} type="button"
+                                                        onClick={() => setEditingViz({ ...editingViz, dataMapping: { ...editingViz.dataMapping, labelKey: key } })}
+                                                        className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${editingViz.dataMapping.labelKey === key ? 'bg-[#419CAF] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50'}`}
+                                                    >{key}</button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <input type="text" value={editingViz.dataMapping.labelKey || ''} onChange={(e) => setEditingViz({ ...editingViz, dataMapping: { ...editingViz.dataMapping, labelKey: e.target.value } })} placeholder="e.g., name" className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm" />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">Value Field</label>
+                                        {getArrayFieldKeys(editingViz.dataMapping.source).filter(f => f.type === 'number').length > 0 ? (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {getArrayFieldKeys(editingViz.dataMapping.source).filter(f => f.type === 'number').map(({ key }) => (
+                                                    <button key={key} type="button"
+                                                        onClick={() => setEditingViz({ ...editingViz, dataMapping: { ...editingViz.dataMapping, valueKey: key } })}
+                                                        className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${editingViz.dataMapping.valueKey === key ? 'bg-[#419CAF] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50'}`}
+                                                    >{key}</button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <input type="text" value={editingViz.dataMapping.valueKey || ''} onChange={(e) => setEditingViz({ ...editingViz, dataMapping: { ...editingViz.dataMapping, valueKey: e.target.value } })} placeholder="e.g., value" className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm" />
+                                        )}
                                     </div>
                                 </>
                             )}
