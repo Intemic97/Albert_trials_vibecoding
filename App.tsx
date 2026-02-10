@@ -19,25 +19,48 @@ import { Plus, MagnifyingGlass, Funnel, ArrowLeft, Trash, Link as LinkIcon, Text
 import { Tabs } from './components/Tabs';
 import { API_BASE } from './config';
 
-// Lazy-loaded components for better performance
-const Workflows = React.lazy(() => import('./components/Workflows').then(m => ({ default: m.Workflows })));
-const WorkflowEditor = React.lazy(() => import('./components/workflows/WorkflowEditor').then(m => ({ default: m.WorkflowEditor })));
-const ReportEditor = React.lazy(() => import('./components/ReportEditor').then(m => ({ default: m.ReportEditor })));
-const Dashboard = React.lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
-const Overview = React.lazy(() => import('./components/Overview').then(m => ({ default: m.Overview })));
-const Reporting = React.lazy(() => import('./components/Reporting').then(m => ({ default: m.Reporting })));
-const Copilots = React.lazy(() => import('./components/Copilots').then(m => ({ default: m.Copilots })));
-const KnowledgeBase = React.lazy(() => import('./components/KnowledgeBase').then(m => ({ default: m.KnowledgeBase })));
-const Lab = React.lazy(() => import('./components/Lab').then(m => ({ default: m.Lab })));
-const Settings = React.lazy(() => import('./components/Settings').then(m => ({ default: m.Settings })));
-const AdminPanel = React.lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
-const LogsAndAlerts = React.lazy(() => import('./components/LogsAndAlerts').then(m => ({ default: m.LogsAndAlerts })));
-const Connections = React.lazy(() => import('./components/Connections').then(m => ({ default: m.Connections })));
-const Documentation = React.lazy(() => import('./components/Documentation').then(m => ({ default: m.Documentation })));
-const SharedDashboard = React.lazy(() => import('./components/SharedDashboard').then(m => ({ default: m.SharedDashboard })));
-const PublicWorkflowForm = React.lazy(() => import('./components/PublicWorkflowForm').then(m => ({ default: m.PublicWorkflowForm })));
-const InteractiveTutorial = React.lazy(() => import('./components/InteractiveTutorial').then(m => ({ default: m.InteractiveTutorial })));
-const IndustrialDashboard = React.lazy(() => import('./components/IndustrialDashboard').then(m => ({ default: m.IndustrialDashboard })));
+// Helper: retry dynamic import once and auto-reload on chunk load failure (stale deploy)
+function lazyWithRetry<T extends React.ComponentType<any>>(
+    importFn: () => Promise<{ default: T }>
+): React.LazyExoticComponent<T> {
+    return React.lazy(() =>
+        importFn().catch((error: Error) => {
+            // Only auto-reload once to avoid infinite loops
+            const hasReloaded = sessionStorage.getItem('chunk_reload');
+            if (!hasReloaded) {
+                sessionStorage.setItem('chunk_reload', '1');
+                window.location.reload();
+                // Return a never-resolving promise so React doesn't render the error
+                return new Promise<{ default: T }>(() => {});
+            }
+            sessionStorage.removeItem('chunk_reload');
+            throw error;
+        })
+    );
+}
+
+// Clear the reload flag on successful page load (new chunks loaded OK)
+sessionStorage.removeItem('chunk_reload');
+
+// Lazy-loaded components with auto-retry on stale chunk errors
+const Workflows = lazyWithRetry(() => import('./components/Workflows').then(m => ({ default: m.Workflows as any })));
+const WorkflowEditor = lazyWithRetry(() => import('./components/workflows/WorkflowEditor').then(m => ({ default: m.WorkflowEditor as any })));
+const ReportEditor = lazyWithRetry(() => import('./components/ReportEditor').then(m => ({ default: m.ReportEditor as any })));
+const Dashboard = lazyWithRetry(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard as any })));
+const Overview = lazyWithRetry(() => import('./components/Overview').then(m => ({ default: m.Overview as any })));
+const Reporting = lazyWithRetry(() => import('./components/Reporting').then(m => ({ default: m.Reporting as any })));
+const Copilots = lazyWithRetry(() => import('./components/Copilots').then(m => ({ default: m.Copilots as any })));
+const KnowledgeBase = lazyWithRetry(() => import('./components/KnowledgeBase').then(m => ({ default: m.KnowledgeBase as any })));
+const Lab = lazyWithRetry(() => import('./components/Lab').then(m => ({ default: m.Lab as any })));
+const Settings = lazyWithRetry(() => import('./components/Settings').then(m => ({ default: m.Settings as any })));
+const AdminPanel = lazyWithRetry(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel as any })));
+const LogsAndAlerts = lazyWithRetry(() => import('./components/LogsAndAlerts').then(m => ({ default: m.LogsAndAlerts as any })));
+const Connections = lazyWithRetry(() => import('./components/Connections').then(m => ({ default: m.Connections as any })));
+const Documentation = lazyWithRetry(() => import('./components/Documentation').then(m => ({ default: m.Documentation as any })));
+const SharedDashboard = lazyWithRetry(() => import('./components/SharedDashboard').then(m => ({ default: m.SharedDashboard as any })));
+const PublicWorkflowForm = lazyWithRetry(() => import('./components/PublicWorkflowForm').then(m => ({ default: m.PublicWorkflowForm as any })));
+const InteractiveTutorial = lazyWithRetry(() => import('./components/InteractiveTutorial').then(m => ({ default: m.InteractiveTutorial as any })));
+const IndustrialDashboard = lazyWithRetry(() => import('./components/IndustrialDashboard').then(m => ({ default: m.IndustrialDashboard as any })));
 
 // Loading fallback component
 const PageLoader = () => (

@@ -558,20 +558,6 @@ export const NODE_DEFINITIONS: Record<NodeType, NodeDefinition> = {
       requiredConfig: ['aggregationType', 'interval'],
     },
   },
-  franmit: {
-    type: 'franmit',
-    label: 'FranMIT Node',
-    description: 'Connect to FranMIT reactor simulation API',
-    category: 'data',
-    icon: Flask,
-    color: 'text-teal-600',
-    bgColor: 'bg-teal-50',
-    borderColor: 'border-teal-200',
-    configFields: ['apiSecretId', 'reactorVolume', 'reactionVolume', 'catalystScaleFactor'],
-    validationRules: {
-      requiredConfig: ['franmitApiSecretId'],
-    },
-  },
 };
 
 /**

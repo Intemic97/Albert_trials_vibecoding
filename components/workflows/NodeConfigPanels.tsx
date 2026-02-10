@@ -148,18 +148,6 @@ export const NodeConfigPanels: React.FC<NodeConfigPanelsProps> = ({
         />
       );
     
-    case 'franmit':
-      return (
-        <FranmitConfig
-          node={node}
-          onSave={(config) => {
-            updateNode(node.id, { config });
-            closeConfig();
-          }}
-          onClose={closeConfig}
-        />
-      );
-    
     default:
       return (
         <GenericConfig
@@ -777,104 +765,6 @@ const JoinConfig: React.FC<JoinConfigProps> = ({
           {joinType === 'outer' && 'Returns all rows from both inputs'}
         </p>
       </div>
-    </NodeConfigSidePanel>
-  );
-};
-
-// ============================================================================
-// FRANMIT CONFIG
-// ============================================================================
-
-interface FranmitConfigProps {
-  node: any;
-  onSave: (config: any) => void;
-  onClose: () => void;
-}
-
-const FranmitConfig: React.FC<FranmitConfigProps> = ({
-  node,
-  onSave,
-  onClose,
-}) => {
-  const [apiSecretId, setApiSecretId] = useState(node.config?.franmitApiSecretId || '');
-  const [reactorVolume, setReactorVolume] = useState(node.config?.franmitReactorVolume || '');
-  const [reactionVolume, setReactionVolume] = useState(node.config?.franmitReactionVolume || '');
-  const [catalystScaleFactor, setCatalystScaleFactor] = useState(node.config?.franmitCatalystScaleFactor || '');
-  const [showApiSecret, setShowApiSecret] = useState(false);
-
-  return (
-    <NodeConfigSidePanel
-      isOpen={true}
-      onClose={onClose}
-      title="Franmit Node"
-      footer={
-        <div className="flex gap-2">
-          <ConfigButton variant="secondary" onClick={onClose}>
-            Cancel
-          </ConfigButton>
-          <ConfigButton
-            variant="primary"
-            onClick={() => onSave({
-              ...node.config,
-              franmitApiSecretId: apiSecretId,
-              franmitReactorVolume: reactorVolume,
-              franmitReactionVolume: reactionVolume,
-              franmitCatalystScaleFactor: catalystScaleFactor,
-            })}
-          >
-            <Save size={14} />
-            Save
-          </ConfigButton>
-        </div>
-      }
-    >
-      <ConfigField label="API Credentials Secret ID">
-        <div className="relative">
-          <input
-            type={showApiSecret ? 'text' : 'password'}
-            value={apiSecretId}
-            onChange={(e) => setApiSecretId(e.target.value)}
-            placeholder="Enter secret ID..."
-            className="w-full px-3 py-2 pr-10 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
-          />
-          <button
-            type="button"
-            onClick={() => setShowApiSecret(!showApiSecret)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
-            title={showApiSecret ? 'Hide' : 'Show'}
-          >
-            👁
-          </button>
-        </div>
-      </ConfigField>
-
-      <div className="border-t border-[var(--border-light)] pt-4 mt-4">
-        <p className="text-xs font-medium text-[var(--text-secondary)] mb-3 text-center">Parameters</p>
-      </div>
-
-      <ConfigField label="Reactor Volume (m³)">
-        <ConfigInput
-          value={reactorVolume}
-          onChange={setReactorVolume}
-          placeholder="Reactor Volume"
-        />
-      </ConfigField>
-
-      <ConfigField label="Reaction Volume (m³)">
-        <ConfigInput
-          value={reactionVolume}
-          onChange={setReactionVolume}
-          placeholder="Reaction Volume"
-        />
-      </ConfigField>
-
-      <ConfigField label="Catalyst Scale Factor">
-        <ConfigInput
-          value={catalystScaleFactor}
-          onChange={setCatalystScaleFactor}
-          placeholder="Catalyst Scale Factor"
-        />
-      </ConfigField>
     </NodeConfigSidePanel>
   );
 };

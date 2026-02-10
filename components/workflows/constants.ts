@@ -33,7 +33,8 @@ import {
   Factory,
   Cpu,
   WifiHigh,
-  Pi
+  Pi,
+  Atom
 } from '@phosphor-icons/react';
 import { DraggableItem, NodeType } from './types';
 
@@ -64,7 +65,6 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   { type: 'mqtt', label: 'MQTT Subscriber', icon: WifiHigh, description: 'Subscribe to MQTT topics for IoT sensor data', category: 'Data' },
   { type: 'modbus', label: 'Modbus Input', icon: Cpu, description: 'Read data from Modbus devices (PLCs, sensors)', category: 'Data' },
   { type: 'osiPi', label: 'OSIsoft PI', icon: Pi, description: 'Fetch time-series data from AVEVA PI Web API', category: 'Data' },
-  { type: 'franmit', label: 'FranMIT', icon: Flask, description: 'Connect to FranMIT reactor simulation API', category: 'Other' },
   
   // Logic
   { type: 'condition', label: 'If / Else', icon: WarningCircle, description: 'Branch based on conditions', category: 'Logic' },
@@ -74,6 +74,7 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   { type: 'llm', label: 'AI Generation', icon: Sparkle, description: 'Generate text using AI', category: 'Logic' },
   { type: 'python', label: 'Python Code', icon: Code, description: 'Run Python script', category: 'Logic' },
   { type: 'statisticalAnalysis', label: 'Statistical Analysis', icon: TrendUp, description: 'Perform PCA, SPC, or compare with golden batch', category: 'Logic' },
+  { type: 'franmit', label: 'FranMIT Reactor', icon: Atom, description: 'Chemical reactor model - calculate outputs from inputs', category: 'Other' },
   { type: 'alertAgent', label: 'Alert Agent', icon: Bell, description: 'Configure deterministic alerts with conditions and actions', category: 'Logic' },
   { type: 'addField', label: 'Add Field', icon: CheckCircle, description: 'Add a new field to data', category: 'Logic' },
   { type: 'humanApproval', label: 'Human in the Loop', icon: UserCheck, description: 'Wait for user approval to continue', category: 'Logic' },
@@ -145,7 +146,7 @@ export const NODE_ICONS: Record<NodeType, React.ElementType> = {
   alertAgent: Bell,
   pdfReport: FilePdf,
   osiPi: Pi,
-  franmit: Flask,
+  franmit: Atom,
 };
 
 /**

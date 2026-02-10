@@ -3032,6 +3032,82 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         result = 'Code not configured';
                     }
                     break;
+                case 'franmit':
+                    try {
+                        // Build receta from input data or use inputData directly
+                        let franmitInput: any = {};
+                        
+                        if (inputData) {
+                            if (Array.isArray(inputData) && inputData.length > 0) {
+                                // If array, take first element
+                                franmitInput = inputData[0];
+                            } else if (typeof inputData === 'object') {
+                                // If object, use directly
+                                franmitInput = inputData;
+                            }
+                        }
+                        
+                        // Build reactor configuration from node config
+                        const reactorConfiguration: any = {};
+                        if (node.config?.franmitReactorVolume) {
+                            reactorConfiguration.V_reb = parseFloat(node.config.franmitReactorVolume) || 53;
+                        } else {
+                            reactorConfiguration.V_reb = 53; // Default
+                        }
+                        if (node.config?.franmitCatalystScaleFactor) {
+                            reactorConfiguration.scale_cat = parseFloat(node.config.franmitCatalystScaleFactor) || 1;
+                        } else {
+                            reactorConfiguration.scale_cat = 1; // Default
+                        }
+
+                        const response = await fetch(`${API_BASE}/franmit/execute`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                funName: 'solve_single_receta',
+                                receta: franmitInput,
+                                reactorConfiguration: reactorConfiguration
+                            }),
+                            credentials: 'include'
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            
+                            if (data.success === false) {
+                                const error: any = new Error(data.error || 'FranMIT execution failed');
+                                error.traceback = data.traceback;
+                                throw error;
+                            }
+                            
+                            // Extract outputs from the result
+                            // data.outs is a dict with grado as key, get the first value
+                            const outs = data.outs || {};
+                            const firstGrado = Object.keys(outs)[0];
+                            const outputData = firstGrado ? outs[firstGrado] : outs;
+                            
+                            // Convert to array format for node output
+                            nodeData = [outputData];
+                            result = `FranMIT reactor model executed successfully`;
+                        } else {
+                            const errorData = await response.json();
+                            const error: any = new Error(errorData.error || 'FranMIT execution failed');
+                            error.traceback = errorData.traceback;
+                            throw error;
+                        }
+                    } catch (error: any) {
+                        console.error('FranMIT execution error:', error);
+                        const errorMessage = error.message || 'Failed to execute';
+                        const traceback = error.traceback || '';
+                        result = `Error: ${errorMessage}${traceback ? '\n' + traceback : ''}`;
+                        updateNodeAndBroadcast(nodeId, { 
+                            status: 'error' as const, 
+                            executionResult: result,
+                            outputData: [{ error: errorMessage }]
+                        });
+                        return;
+                    }
+                    break;
                 case 'llm':
                     if (node.config?.llmPrompt) {
                         const llmProcessingMode = node.config.processingMode || 'batch';
@@ -4788,7 +4864,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'mqtt':
                 return true; // Estos tipos siempre están configurados
             case 'franmit':
-                return !!node.config?.franmitApiSecretId;
+                // Franmit está configurado si tiene al menos un parámetro configurado
+                // (no requiere API Secret ID para ejecución local)
+                return true; // Siempre permitir ejecución, validación se hace en el backend
             default:
                 return false;
         }
@@ -5231,7 +5309,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             'Data Sources': { icon: Database, items: DRAGGABLE_ITEMS.filter(i => ['fetchData', 'excelInput', 'pdfInput', 'http', 'mysql', 'sapFetch', 'limsFetch', 'opcua', 'mqtt', 'esios', 'climatiq', 'manualInput'].includes(i.type)) },
                                             'Data Operations': { icon: GitMerge, items: DRAGGABLE_ITEMS.filter(i => ['join', 'splitColumns', 'addField', 'action'].includes(i.type)) },
                                             'Control Flow': { icon: AlertCircle, items: DRAGGABLE_ITEMS.filter(i => ['condition', 'humanApproval', 'alertAgent', 'dataVisualization'].includes(i.type)) },
-                                            'Models': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['llm', 'statisticalAnalysis'].includes(i.type)) },
+                                            'Models': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['llm', 'statisticalAnalysis', 'franmit'].includes(i.type)) },
                                             'Code': { icon: Code, items: DRAGGABLE_ITEMS.filter(i => ['python'].includes(i.type)) },
                                             'Output & Logging': { icon: LogOut, items: DRAGGABLE_ITEMS.filter(i => ['output', 'saveRecords'].includes(i.type)) },
                                             'Notifications': { icon: Mail, items: DRAGGABLE_ITEMS.filter(i => ['sendEmail', 'sendSMS', 'pdfReport'].includes(i.type)) },
