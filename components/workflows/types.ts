@@ -42,7 +42,8 @@ export type NodeType =
   | 'statisticalAnalysis' 
   | 'alertAgent' 
   | 'pdfReport'
-  | 'osiPi';
+  | 'osiPi'
+  | 'franmit';
 
 export type NodeStatus = 'idle' | 'running' | 'completed' | 'error' | 'waiting';
 

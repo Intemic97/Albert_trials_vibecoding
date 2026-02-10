@@ -62,5 +62,53 @@ async function executePythonInLambda(code, inputData) {
     }
 }
 
-module.exports = { executePythonInLambda };
+/**
+ * Execute Franmit Reactor Model in AWS Lambda
+ * @param {string} funName - Function to call: 'solve_single_receta' or 'solve_recetas_parallel'
+ * @param {Object} argsFun - Arguments for the function (receta, qins, reactor_configuration)
+ * @returns {Object} - Execution result with outs and qouts
+ */
+async function executeFranmitInLambda(funName, argsFun) {
+    const payload = {
+        fun_name: funName,
+        args_fun: argsFun
+    };
+
+    const command = new InvokeCommand({
+        FunctionName: process.env.FRANMIT_LAMBDA_FUNCTION_NAME || 'franmit-reactor',
+        Payload: JSON.stringify(payload),
+        InvocationType: 'RequestResponse'
+    });
+
+    try {
+        console.log('[Franmit Lambda] Executing reactor model...');
+        const response = await lambdaClient.send(command);
+        
+        // Parse Lambda response
+        const result = JSON.parse(Buffer.from(response.Payload).toString());
+        
+        // Check if Lambda execution itself failed
+        if (response.FunctionError) {
+            throw new Error(`Lambda function error: ${response.FunctionError}`);
+        }
+        
+        const body = JSON.parse(result.body);
+        console.log('[Franmit Lambda] Execution completed:', body.success ? 'SUCCESS' : 'FAILED');
+        
+        // Log error details if execution failed
+        if (!body.success) {
+            console.log('[Franmit Lambda] Error details:', body.error);
+            if (body.traceback) {
+                console.log('[Franmit Lambda] Traceback:', body.traceback);
+            }
+        }
+        
+        return body;
+    } catch (error) {
+        console.error('[Franmit Lambda] Execution error:', error);
+        throw new Error(`Franmit Lambda execution failed: ${error.message}`);
+    }
+}
+
+module.exports = { executePythonInLambda, executeFranmitInLambda };
 

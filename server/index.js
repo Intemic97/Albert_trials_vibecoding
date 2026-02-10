@@ -3443,6 +3443,143 @@ finally:
     }
 });
 
+// Franmit Reactor Execution Endpoint - Local Python Execution
+app.post('/api/franmit/execute', authenticateToken, async (req, res) => {
+    const { funName, receta, qins, reactorConfiguration } = req.body;
+
+    const fs = require('fs');
+    const path = require('path');
+    const { spawn } = require('child_process');
+    const platform = require('os').platform();
+
+    try {
+        console.log('[Franmit] Executing reactor model locally');
+        
+        // Build input data
+        const zeros8 = [0, 0, 0, 0, 0, 0, 0, 0];
+        const inputData = {
+            receta: receta || {},
+            reactor_configuration: reactorConfiguration || { V_reb: 53, scale_cat: 1 },
+            qins: qins || {
+                'Q_H2o': 0, 'Q_Hxo': 0,
+                'Q_Po': [...zeros8], 'Q_Yo': [...zeros8], 'Q_Y1': [...zeros8],
+                'Q_To': [...zeros8], 'Q_T1': [...zeros8], 'Q_T2': [...zeros8],
+            }
+        };
+        
+        console.log('[Franmit] Input data:', JSON.stringify(inputData).substring(0, 300));
+
+        // Path to Python script
+        const scriptPath = path.join(__dirname, 'franmit_model.py');
+        
+        // Check if script exists
+        if (!fs.existsSync(scriptPath)) {
+            return res.status(500).json({
+                success: false,
+                error: `Franmit model script not found at ${scriptPath}`
+            });
+        }
+
+        // Determine Python command
+        const pythonCmd = platform === 'win32' ? 'py' : 'python3';
+        
+        // Execute Python script
+        const pythonProcess = spawn(pythonCmd, [scriptPath], {
+            stdio: ['pipe', 'pipe', 'pipe']
+        });
+
+        // Send input data as JSON
+        pythonProcess.stdin.write(JSON.stringify(inputData));
+        pythonProcess.stdin.end();
+
+        let stdoutData = '';
+        let stderrData = '';
+
+        pythonProcess.stdout.on('data', (data) => {
+            stdoutData += data.toString();
+        });
+
+        pythonProcess.stderr.on('data', (data) => {
+            stderrData += data.toString();
+        });
+
+        // Set timeout (60 seconds for reactor model)
+        const timeout = setTimeout(() => {
+            pythonProcess.kill('SIGKILL');
+            return res.status(500).json({
+                success: false,
+                error: 'Franmit execution timed out (60s limit)'
+            });
+        }, 60000);
+
+        pythonProcess.on('close', (code) => {
+            clearTimeout(timeout);
+            
+            // Log stderr warnings (numpy RuntimeWarnings are expected)
+            if (stderrData) {
+                console.log('[Franmit] Python stderr (warnings):', stderrData.substring(0, 300));
+            }
+
+            // Try to parse stdout first (even on non-zero exit code, errors are in stdout as JSON)
+            try {
+                const result = JSON.parse(stdoutData);
+                
+                if (result.success) {
+                    console.log('[Franmit] Reactor model completed successfully');
+                    res.json({
+                        success: true,
+                        outs: result.outs,
+                        qouts: result.qouts,
+                        display: ''
+                    });
+                } else {
+                    console.log('[Franmit] Model returned error:', result.error);
+                    res.json({
+                        success: false,
+                        error: result.error || 'Franmit execution failed',
+                        traceback: result.traceback,
+                        display: result.error || ''
+                    });
+                }
+            } catch (parseError) {
+                // If stdout is not valid JSON, fall back to stderr
+                if (code !== 0) {
+                    console.error('[Franmit] Python process error (code ' + code + '):', stderrData || stdoutData);
+                    res.status(500).json({
+                        success: false,
+                        error: stderrData || stdoutData || 'Franmit execution failed',
+                        traceback: stderrData
+                    });
+                } else {
+                    console.error('[Franmit] Failed to parse output:', parseError);
+                    console.error('[Franmit] Raw stdout:', stdoutData.substring(0, 500));
+                    res.status(500).json({
+                        success: false,
+                        error: 'Failed to parse Franmit output',
+                        rawOutput: stdoutData.substring(0, 500)
+                    });
+                }
+            }
+        });
+
+        pythonProcess.on('error', (error) => {
+            clearTimeout(timeout);
+            console.error('[Franmit] Failed to start Python process:', error);
+            res.status(500).json({
+                success: false,
+                error: `Failed to execute Python: ${error.message}. Make sure Python 3 with numpy is installed.`
+            });
+        });
+
+    } catch (error) {
+        console.error('[Franmit] Execution error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Franmit execution failed'
+        });
+    }
+});
+
 // Python Debug Endpoint - AI analyzes error and suggests fix
 app.post('/api/debug-python-code', authenticateToken, async (req, res) => {
     const { code, error, inputDataSample } = req.body;
