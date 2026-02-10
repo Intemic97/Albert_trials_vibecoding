@@ -140,6 +140,11 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
     const [isApplyingAiBundle, setIsApplyingAiBundle] = useState(false);
     const [aiGeneratedTemplate, setAiGeneratedTemplate] = useState<ReportTemplate | null>(null);
 
+    // Template Examples state
+    const [showTemplateExamples, setShowTemplateExamples] = useState(false);
+    const [isCreatingExampleTemplates, setIsCreatingExampleTemplates] = useState(false);
+    const templateExamplesRef = useRef<HTMLDivElement>(null);
+
     // Fetch all data on mount
     useEffect(() => {
         fetchTemplates();
@@ -390,6 +395,267 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
             alert(`Error creating from AI output: ${error?.message || 'Please try again.'}`);
         } finally {
             setIsApplyingAiBundle(false);
+        }
+    };
+
+    // Click-outside for template examples dropdown
+    useEffect(() => {
+        if (!showTemplateExamples) return;
+        const handler = (event: MouseEvent) => {
+            if (templateExamplesRef.current && !templateExamplesRef.current.contains(event.target as Node)) {
+                setShowTemplateExamples(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showTemplateExamples]);
+
+    const TEMPLATE_PRESETS: Array<{
+        id: string;
+        label: string;
+        description: string;
+        templates: Array<{
+            name: string;
+            description: string;
+            icon: string;
+            sections: Array<{
+                title: string;
+                content: string;
+                generationRules: string;
+                items: Array<{ title: string; content: string; generationRules: string }>;
+            }>;
+        }>;
+    }> = [
+        {
+            id: 'quality_control',
+            label: 'Quality Control & Compliance',
+            description: '3 templates for product quality, spec tracking, and compliance reporting',
+            templates: [
+                {
+                    name: 'HDPE Product Quality Report',
+                    description: 'Periodic quality summary covering Melt Index, density, scrap rates, lab checkpoints and spec compliance by reactor line.',
+                    icon: 'FlaskConical',
+                    sections: [
+                        {
+                            title: 'Executive Summary',
+                            content: 'High-level quality performance overview for the reporting period.',
+                            generationRules: 'Summarize key quality KPIs: in-spec rate, scrap trend, MI compliance.',
+                            items: [
+                                { title: 'Key Quality Indicators', content: '', generationRules: 'Table with MI avg, density avg, in-spec %, scrap %, energy per ton.' },
+                                { title: 'Deviation Summary', content: '', generationRules: 'List all out-of-spec events with date, line, grade, and root cause if available.' }
+                            ]
+                        },
+                        {
+                            title: 'Melt Index Tracking',
+                            content: 'MI measurements vs specification bands by grade.',
+                            generationRules: 'Chart MI over time with LSL/USL bands. Highlight any excursions.',
+                            items: [
+                                { title: 'MI by Grade', content: '', generationRules: 'Breakdown table: grade, target MI, actual avg MI, std dev, compliance %.' },
+                                { title: 'Trend Analysis', content: '', generationRules: 'Line chart of MI values over reporting period with control limits.' }
+                            ]
+                        },
+                        {
+                            title: 'Scrap & Waste Analysis',
+                            content: 'Scrap rates by line, shift and product grade.',
+                            generationRules: 'Heatmap of scrap by line x shift. Bar chart of scrap by grade.',
+                            items: [
+                                { title: 'Scrap by Production Line', content: '', generationRules: 'Bar chart comparing avg scrap per line. Highlight worst performer.' },
+                                { title: 'Root Cause Breakdown', content: '', generationRules: 'Pareto chart of scrap causes: transitions, equipment, raw material, process drift.' }
+                            ]
+                        },
+                        {
+                            title: 'Recommendations', content: '', generationRules: 'AI-generated action items based on quality data.',
+                            items: [
+                                { title: 'Immediate Actions', content: '', generationRules: 'List urgent corrective actions for out-of-spec conditions.' },
+                                { title: 'Process Improvements', content: '', generationRules: 'Suggest longer-term process changes based on recurring issues.' }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    name: 'Grade Transition Performance',
+                    description: 'HDPE grade transition tracking: duration (LAB-safe vs model-assisted), secondary polymer volume, and economic value recovery.',
+                    icon: 'Wrench',
+                    sections: [
+                        {
+                            title: 'Transition Overview',
+                            content: 'Summary of all grade transitions during the period.',
+                            generationRules: 'Table of transitions: from grade, to grade, duration, off-spec tons, method (LAB vs model).',
+                            items: [
+                                { title: 'Transition KPIs', content: '', generationRules: 'Avg duration, best/worst transition, total off-spec volume, improvement vs baseline.' },
+                                { title: 'Transition Timeline', content: '', generationRules: 'Gantt-style timeline of each transition with color-coded severity.' }
+                            ]
+                        },
+                        {
+                            title: 'LAB vs Model Comparison',
+                            content: 'Comparative analysis of lab-safe vs model-assisted approach.',
+                            generationRules: 'Side-by-side bar chart of transition times. Calculate hours and value saved.',
+                            items: [
+                                { title: 'Duration Benchmark', content: '', generationRules: 'Grouped bar chart: LAB hours vs Model hours per transition.' },
+                                { title: 'Economic Impact', content: '', generationRules: 'Calculate saved hours x production rate x price delta. Show annual projection.' }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    name: 'Product Specification Certificate',
+                    description: 'Formal quality compliance certificate for HDPE grades against customer and regulatory specifications (REACH, ISO).',
+                    icon: 'FileCheck',
+                    sections: [
+                        {
+                            title: 'Scope & Period',
+                            content: 'Defines the products, lines and dates covered by this certificate.',
+                            generationRules: 'List product grades, production lines, and reporting period.',
+                            items: []
+                        },
+                        {
+                            title: 'Specification Compliance',
+                            content: 'Declaration of conformity against product specifications.',
+                            generationRules: 'For each grade: target specs (MI, density), actual range, pass/fail status.',
+                            items: [
+                                { title: 'Test Results Summary', content: '', generationRules: 'Table with grade, parameter, specification, actual, result (PASS/FAIL).' },
+                                { title: 'Non-Conformance Register', content: '', generationRules: 'List any NCRs raised, disposition, and corrective action status.' }
+                            ]
+                        },
+                        {
+                            title: 'Certification Statement',
+                            content: 'Formal declaration signed by quality manager.',
+                            generationRules: 'Standard certification text with placeholders for signoff.',
+                            items: []
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            id: 'operational_efficiency',
+            label: 'Operational Efficiency',
+            description: '3 templates for OEE, energy, and production planning',
+            templates: [
+                {
+                    name: 'Reactor & Extrusion OEE Report',
+                    description: 'Overall Equipment Effectiveness analysis by reactor/extrusion line and shift, including availability, performance and quality losses.',
+                    icon: 'Clipboard',
+                    sections: [
+                        {
+                            title: 'Plant OEE Summary',
+                            content: 'Aggregate OEE and its components: availability, performance, quality.',
+                            generationRules: 'Gauge for plant OEE. Breakdown into A x P x Q components.',
+                            items: [
+                                { title: 'OEE by Line', content: '', generationRules: 'Bar chart comparing OEE per extrusion line. Color-code by target threshold.' },
+                                { title: 'OEE Trend', content: '', generationRules: 'Line chart of daily OEE over reporting period with rolling average.' }
+                            ]
+                        },
+                        {
+                            title: 'Downtime Analysis',
+                            content: 'Planned and unplanned downtime breakdown.',
+                            generationRules: 'Stacked bar chart: planned vs unplanned downtime by line.',
+                            items: [
+                                { title: 'Top Downtime Causes', content: '', generationRules: 'Pareto chart of downtime causes with cumulative percentage.' },
+                                { title: 'Shift Performance', content: '', generationRules: 'Heatmap of throughput by shift x day to identify weak shifts.' }
+                            ]
+                        },
+                        {
+                            title: 'Throughput Analysis',
+                            content: 'Daily production volume trends and capacity utilization.',
+                            generationRules: 'Area chart of daily production vs nominal capacity.',
+                            items: [
+                                { title: 'Capacity Utilization', content: '', generationRules: 'Calculate actual vs max capacity per line. Flag underperformers.' },
+                                { title: 'Product Mix Impact', content: '', generationRules: 'Show how grade mix affects throughput (some grades run slower).' }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    name: 'Energy & Circularity Report',
+                    description: 'Specific energy (kWh/ton), CO2 footprint, recycled content tracking and material circularity indicators for polyolefins production.',
+                    icon: 'AlertTriangle',
+                    sections: [
+                        {
+                            title: 'Energy Overview',
+                            content: 'Total and specific energy consumption for the period.',
+                            generationRules: 'KPIs: total kWh, kWh/ton, trend vs previous period.',
+                            items: [
+                                { title: 'Energy by Line', content: '', generationRules: 'Bar chart of kWh per line. Highlight most/least efficient.' },
+                                { title: 'Specific Energy Trend', content: '', generationRules: 'Line chart of kWh/ton over time. Show target line.' }
+                            ]
+                        },
+                        {
+                            title: 'Circularity Metrics',
+                            content: 'Recycled content usage and material circularity indicators.',
+                            generationRules: 'Pie chart of virgin vs recycled feedstock. Track recycled content %.',
+                            items: [
+                                { title: 'Recycled Content Tracking', content: '', generationRules: 'Monthly trend of recycled content % in production.' },
+                                { title: 'Waste Streams', content: '', generationRules: 'Sankey of material flows: virgin input → product, regrind, off-spec, waste.' }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    name: 'Weekly Production & Scheduling',
+                    description: 'Production plan adherence, grade change scheduling, order fulfillment and raw material readiness for polymer plant operations.',
+                    icon: 'Clipboard',
+                    sections: [
+                        {
+                            title: 'Schedule Compliance',
+                            content: 'Planned vs actual production by grade and line.',
+                            generationRules: 'Table: planned grade, planned volume, actual volume, variance, compliance %.',
+                            items: [
+                                { title: 'Order Fulfillment', content: '', generationRules: 'Status of each production order: on time, delayed, at risk.' },
+                                { title: 'Grade Change Schedule', content: '', generationRules: 'Timeline of planned vs actual grade changes with duration.' }
+                            ]
+                        },
+                        {
+                            title: 'Inventory & Material Readiness',
+                            content: 'Raw material stock levels vs upcoming demand.',
+                            generationRules: 'Table of material families with current stock, weekly demand, days of cover.',
+                            items: [
+                                { title: 'Stock Alerts', content: '', generationRules: 'Flag materials below safety stock. Suggest reorder quantities.' }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ];
+
+    const handleCreateExampleTemplates = async (presetId: string) => {
+        if (isCreatingExampleTemplates) return;
+        setIsCreatingExampleTemplates(true);
+        setShowTemplateExamples(false);
+        try {
+            const preset = TEMPLATE_PRESETS.find(p => p.id === presetId);
+            if (!preset) return;
+
+            const existingNames = new Set(templates.map(t => t.name.toLowerCase()));
+            let created = 0;
+
+            for (const tpl of preset.templates) {
+                if (existingNames.has(tpl.name.toLowerCase())) continue;
+
+                const res = await fetch(`${API_BASE}/report-templates`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        name: tpl.name,
+                        description: tpl.description,
+                        icon: tpl.icon,
+                        sections: tpl.sections
+                    })
+                });
+                if (res.ok) created += 1;
+            }
+
+            await fetchTemplates();
+            alert(created > 0
+                ? `Created ${created} example template${created > 1 ? 's' : ''}.`
+                : 'Example templates already exist.');
+        } catch (error) {
+            console.error('Error creating example templates:', error);
+            alert('Failed to create example templates.');
+        } finally {
+            setIsCreatingExampleTemplates(false);
         }
     };
 
@@ -688,6 +954,31 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                 <p className="text-xs text-[var(--text-secondary)] mt-1">Templates define the structure of your documents</p>
                             </div>
                             <div className="flex items-center gap-2">
+                                <div className="relative" ref={templateExamplesRef}>
+                                    <button
+                                        onClick={() => setShowTemplateExamples(prev => !prev)}
+                                        disabled={isCreatingExampleTemplates}
+                                        className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-60"
+                                    >
+                                        {isCreatingExampleTemplates ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                        Examples
+                                        <ChevronDown size={12} />
+                                    </button>
+                                    {showTemplateExamples && (
+                                        <div className="absolute right-0 mt-2 w-[340px] z-30 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-xl p-2">
+                                            {TEMPLATE_PRESETS.map((preset) => (
+                                                <button
+                                                    key={preset.id}
+                                                    onClick={() => handleCreateExampleTemplates(preset.id)}
+                                                    className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+                                                >
+                                                    <p className="text-sm font-medium text-[var(--text-primary)]">{preset.label}</p>
+                                                    <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{preset.description}</p>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                                 <button
                                     onClick={handleCreateWithAI}
                                     className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
