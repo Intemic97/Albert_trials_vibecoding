@@ -61,6 +61,7 @@ const SharedDashboard = lazyWithRetry(() => import('./components/SharedDashboard
 const PublicWorkflowForm = lazyWithRetry(() => import('./components/PublicWorkflowForm').then(m => ({ default: m.PublicWorkflowForm as any })));
 const InteractiveTutorial = lazyWithRetry(() => import('./components/InteractiveTutorial').then(m => ({ default: m.InteractiveTutorial as any })));
 const IndustrialDashboard = lazyWithRetry(() => import('./components/IndustrialDashboard').then(m => ({ default: m.IndustrialDashboard as any })));
+const UseCaseImport = lazyWithRetry(() => import('./components/UseCaseImport').then(m => ({ default: m.UseCaseImport as any })));
 
 // Loading fallback component
 const PageLoader = () => (
