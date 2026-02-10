@@ -3445,7 +3445,7 @@ finally:
 
 // Franmit Reactor Execution Endpoint - Local Python Execution
 app.post('/api/franmit/execute', authenticateToken, async (req, res) => {
-    const { funName, receta, qins, reactorConfiguration } = req.body;
+    const { funName, receta, recetas, qins, reactorConfiguration } = req.body;
 
     const fs = require('fs');
     const path = require('path');
@@ -3453,83 +3453,62 @@ app.post('/api/franmit/execute', authenticateToken, async (req, res) => {
     const platform = require('os').platform();
 
     try {
-        console.log('[Franmit] Executing reactor model locally');
-        
-        // Build input data
-        const zeros8 = [0, 0, 0, 0, 0, 0, 0, 0];
-        const inputData = {
-            receta: receta || {},
-            reactor_configuration: reactorConfiguration || { V_reb: 53, scale_cat: 1 },
-            qins: qins || {
-                'Q_H2o': 0, 'Q_Hxo': 0,
-                'Q_Po': [...zeros8], 'Q_Yo': [...zeros8], 'Q_Y1': [...zeros8],
-                'Q_To': [...zeros8], 'Q_T1': [...zeros8], 'Q_T2': [...zeros8],
-            }
-        };
-        
-        console.log('[Franmit] Input data:', JSON.stringify(inputData).substring(0, 300));
+        // Support batch mode (array of recetas) or single receta
+        const recetaRows = recetas || (receta ? [receta] : []);
+        console.log(`[Franmit] Executing reactor model locally (${recetaRows.length} row(s))`);
 
         // Path to Python script
         const scriptPath = path.join(__dirname, 'franmit_model.py');
         
-        // Check if script exists
         if (!fs.existsSync(scriptPath)) {
-            return res.status(500).json({
-                success: false,
-                error: `Franmit model script not found at ${scriptPath}`
-            });
+            return res.status(500).json({ success: false, error: `Franmit model script not found at ${scriptPath}` });
         }
 
-        // Determine Python command
         const pythonCmd = platform === 'win32' ? 'py' : 'python3';
-        
-        // Execute Python script
-        const pythonProcess = spawn(pythonCmd, [scriptPath], {
-            stdio: ['pipe', 'pipe', 'pipe']
-        });
+        const zeros8 = [0, 0, 0, 0, 0, 0, 0, 0];
+        const defaultQins = {
+            'Q_H2o': 0, 'Q_Hxo': 0,
+            'Q_Po': [...zeros8], 'Q_Yo': [...zeros8], 'Q_Y1': [...zeros8],
+            'Q_To': [...zeros8], 'Q_T1': [...zeros8], 'Q_T2': [...zeros8],
+        };
 
-        // Send input data as JSON
+        // Build batch input for Python script
+        const inputData = {
+            mode: 'batch',
+            recetas: recetaRows,
+            reactor_configuration: reactorConfiguration || { V_reb: 53, scale_cat: 1 },
+            qins: qins || defaultQins
+        };
+
+        const pythonProcess = spawn(pythonCmd, [scriptPath], { stdio: ['pipe', 'pipe', 'pipe'] });
         pythonProcess.stdin.write(JSON.stringify(inputData));
         pythonProcess.stdin.end();
 
         let stdoutData = '';
         let stderrData = '';
+        pythonProcess.stdout.on('data', (data) => { stdoutData += data.toString(); });
+        pythonProcess.stderr.on('data', (data) => { stderrData += data.toString(); });
 
-        pythonProcess.stdout.on('data', (data) => {
-            stdoutData += data.toString();
-        });
-
-        pythonProcess.stderr.on('data', (data) => {
-            stderrData += data.toString();
-        });
-
-        // Set timeout (60 seconds for reactor model)
+        // Timeout: 30s per row, max 5 min
+        const timeoutMs = Math.min(recetaRows.length * 30000, 300000);
         const timeout = setTimeout(() => {
             pythonProcess.kill('SIGKILL');
-            return res.status(500).json({
-                success: false,
-                error: 'Franmit execution timed out (60s limit)'
-            });
-        }, 60000);
+            return res.status(500).json({ success: false, error: `Franmit execution timed out (${Math.round(timeoutMs/1000)}s limit for ${recetaRows.length} rows)` });
+        }, timeoutMs);
 
         pythonProcess.on('close', (code) => {
             clearTimeout(timeout);
-            
-            // Log stderr warnings (numpy RuntimeWarnings are expected)
-            if (stderrData) {
-                console.log('[Franmit] Python stderr (warnings):', stderrData.substring(0, 300));
-            }
+            if (stderrData) console.log('[Franmit] Python stderr:', stderrData.substring(0, 300));
 
-            // Try to parse stdout first (even on non-zero exit code, errors are in stdout as JSON)
             try {
                 const result = JSON.parse(stdoutData);
                 
                 if (result.success) {
-                    console.log('[Franmit] Reactor model completed successfully');
+                    console.log(`[Franmit] Batch completed: ${(result.results || []).length} rows`);
                     res.json({
                         success: true,
-                        outs: result.outs,
-                        qouts: result.qouts,
+                        results: result.results,
+                        errors: result.errors || [],
                         display: ''
                     });
                 } else {
@@ -3542,22 +3521,12 @@ app.post('/api/franmit/execute', authenticateToken, async (req, res) => {
                     });
                 }
             } catch (parseError) {
-                // If stdout is not valid JSON, fall back to stderr
                 if (code !== 0) {
-                    console.error('[Franmit] Python process error (code ' + code + '):', stderrData || stdoutData);
-                    res.status(500).json({
-                        success: false,
-                        error: stderrData || stdoutData || 'Franmit execution failed',
-                        traceback: stderrData
-                    });
+                    console.error('[Franmit] Python error (code ' + code + '):', stderrData || stdoutData);
+                    res.status(500).json({ success: false, error: stderrData || stdoutData || 'Franmit execution failed' });
                 } else {
-                    console.error('[Franmit] Failed to parse output:', parseError);
-                    console.error('[Franmit] Raw stdout:', stdoutData.substring(0, 500));
-                    res.status(500).json({
-                        success: false,
-                        error: 'Failed to parse Franmit output',
-                        rawOutput: stdoutData.substring(0, 500)
-                    });
+                    console.error('[Franmit] Parse error:', stdoutData.substring(0, 500));
+                    res.status(500).json({ success: false, error: 'Failed to parse Franmit output' });
                 }
             }
         });

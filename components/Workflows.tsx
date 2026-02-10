@@ -3034,38 +3034,35 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     break;
                 case 'franmit':
                     try {
-                        // Build receta from input data or use inputData directly
-                        let franmitInput: any = {};
+                        // Collect all input rows (each row = one set of sensor readings)
+                        let recetaRows: any[] = [];
                         
                         if (inputData) {
                             if (Array.isArray(inputData) && inputData.length > 0) {
-                                // If array, take first element
-                                franmitInput = inputData[0];
+                                recetaRows = inputData;
                             } else if (typeof inputData === 'object') {
-                                // If object, use directly
-                                franmitInput = inputData;
+                                recetaRows = [inputData];
                             }
+                        }
+                        
+                        if (recetaRows.length === 0) {
+                            throw new Error('No input data provided for FranMIT model');
                         }
                         
                         // Build reactor configuration from node config
                         const reactorConfiguration: any = {};
-                        if (node.config?.franmitReactorVolume) {
-                            reactorConfiguration.V_reb = parseFloat(node.config.franmitReactorVolume) || 53;
-                        } else {
-                            reactorConfiguration.V_reb = 53; // Default
-                        }
-                        if (node.config?.franmitCatalystScaleFactor) {
-                            reactorConfiguration.scale_cat = parseFloat(node.config.franmitCatalystScaleFactor) || 1;
-                        } else {
-                            reactorConfiguration.scale_cat = 1; // Default
-                        }
+                        reactorConfiguration.V_reb = node.config?.franmitReactorVolume 
+                            ? parseFloat(node.config.franmitReactorVolume) || 53 : 53;
+                        reactorConfiguration.scale_cat = node.config?.franmitCatalystScaleFactor 
+                            ? parseFloat(node.config.franmitCatalystScaleFactor) || 1 : 1;
 
+                        // Send ALL rows to the server for batch processing
                         const response = await fetch(`${API_BASE}/franmit/execute`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                funName: 'solve_single_receta',
-                                receta: franmitInput,
+                                funName: 'solve_batch',
+                                recetas: recetaRows,
                                 reactorConfiguration: reactorConfiguration
                             }),
                             credentials: 'include'
@@ -3080,15 +3077,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 throw error;
                             }
                             
-                            // Extract outputs from the result
-                            // data.outs is a dict with grado as key, get the first value
-                            const outs = data.outs || {};
-                            const firstGrado = Object.keys(outs)[0];
-                            const outputData = firstGrado ? outs[firstGrado] : outs;
-                            
-                            // Convert to array format for node output
-                            nodeData = [outputData];
-                            result = `FranMIT reactor model executed successfully`;
+                            // data.results is an array of clean output dicts, one per input row
+                            nodeData = data.results || [];
+                            result = `FranMIT: ${nodeData.length} row${nodeData.length !== 1 ? 's' : ''} calculated`;
                         } else {
                             const errorData = await response.json();
                             const error: any = new Error(errorData.error || 'FranMIT execution failed');

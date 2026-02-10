@@ -13,6 +13,48 @@ import traceback
 from random import randrange
 import numpy as np
 
+# Try to use scipy's odeint (adaptive solver, much better for stiff ODEs)
+# Falls back to custom RK4 if scipy is not available
+try:
+    from scipy.integrate import odeint as scipy_odeint
+    HAS_SCIPY = True
+except ImportError:
+    HAS_SCIPY = False
+
+class SafeJSONEncoder(json.JSONEncoder):
+    """JSON encoder that handles NaN, Inf, and numpy types."""
+    def default(self, obj):
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, (np.floating,)):
+            if np.isnan(obj) or np.isinf(obj):
+                return None
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+    
+    def encode(self, o):
+        return super().encode(self._clean(o))
+    
+    def _clean(self, obj):
+        if isinstance(obj, float):
+            if math.isnan(obj) or math.isinf(obj):
+                return None
+        if isinstance(obj, dict):
+            return {k: self._clean(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [self._clean(v) for v in obj]
+        if isinstance(obj, (np.floating,)):
+            if np.isnan(obj) or np.isinf(obj):
+                return None
+            return float(obj)
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, np.ndarray):
+            return self._clean(obj.tolist())
+        return obj
+
 # ============================================================================
 # SETTINGS
 # ============================================================================
@@ -108,7 +150,7 @@ stts = settings
 # ============================================================================
 
 def odeint_rk4(func, y0, t, args=()):
-    """Runge-Kutta 4th order ODE solver"""
+    """Runge-Kutta 4th order ODE solver (fallback when scipy is not available)"""
     y0 = np.asarray(y0, dtype=float)
     n = len(t)
     y = np.zeros((n, len(y0)))
@@ -127,6 +169,13 @@ def odeint_rk4(func, y0, t, args=()):
         y[i + 1] = yi + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
     
     return y
+
+def odeint_solve(func, y0, t, args=()):
+    """Use scipy.odeint if available (adaptive LSODA solver), otherwise fall back to RK4."""
+    if HAS_SCIPY:
+        return scipy_odeint(func, y0, t, args=args, mxstep=10000)
+    else:
+        return odeint_rk4(func, y0, t, args=args)
 
 # ============================================================================
 # SOLVER FUNCTIONS (copiadas del archivo original)
@@ -470,7 +519,7 @@ class SolverR(BaseSolver):
         T = hours * 3600
         t = np.arange(0, T, step)
         args = ([params, receta, qins, reactor_config],)
-        u = odeint_rk4(REACTOR_NODE, u0, t, args=args)
+        u = odeint_solve(REACTOR_NODE, u0, t, args=args)
         
         results_dict = process_output_multiple_sites(u if not give_only_last else u[-1:], catalizer, receta, qins, params, reactor_config)
         results_dict["t"] = t
@@ -539,12 +588,82 @@ def to_list(obj):
         return val
     return obj
 
+def to_numeric(val):
+    """Convierte strings a float recursivamente (valores del frontend llegan como strings)."""
+    if isinstance(val, str):
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            return val
+    elif isinstance(val, list):
+        return [to_numeric(v) for v in val]
+    elif isinstance(val, dict):
+        return {k: to_numeric(v) for k, v in val.items()}
+    return val
+
+def last_valid(arr):
+    """Get last non-null/NaN value from array."""
+    if not hasattr(arr, '__len__') or len(arr) == 0:
+        return None
+    for i in range(len(arr) - 1, -1, -1):
+        v = arr[i]
+        if v is not None and not (isinstance(v, float) and (np.isnan(v) or np.isinf(v))):
+            return float(v)
+    return None
+
+def safe_round(v, decimals=4):
+    if v is None:
+        return None
+    return round(v, decimals)
+
+def extract_clean_outputs(raw):
+    """Extract human-readable steady-state outputs from raw model results."""
+    conv_h2 = last_valid(raw.get("conversion_H", []))
+    return {
+        'MI_2.16': safe_round(last_valid(raw.get("Mi", [])), 2),
+        'MI_5': safe_round(last_valid(raw.get("Mi5", [])), 2),
+        'Densidad_g_cm3': safe_round(last_valid(raw.get("rho_p_calculated", [])), 4),
+        'Mw_g_mol': safe_round(last_valid(raw.get("Mw", [])), 0),
+        'Mn_g_mol': safe_round(last_valid(raw.get("Mn", [])), 0),
+        'PDI': safe_round(last_valid(raw.get("PDI", [])), 2),
+        'Produccion_kg_h': safe_round(last_valid(raw.get("produccion", [])), 2),
+        'Presion_bar': safe_round(last_valid(raw.get("P", [])), 2),
+        'Conversion_H2_pct': safe_round(conv_h2 * 100 if conv_h2 is not None else None, 2),
+        'Pasta_pct_wt': safe_round(last_valid(raw.get("pasta", [])), 2),
+        'Ratio_H2_Et': safe_round(last_valid(raw.get("ratio_h2_et", [])), 6),
+        'Ratio_But_Et': safe_round(last_valid(raw.get("ratio_but_et", [])), 6),
+        'xBut': safe_round(last_valid(raw.get("xbut", [])), 6),
+        'T_residencia_s': safe_round(last_valid(raw.get("t_resid", [])), 1),
+        'Caudal_vol_m3_s': safe_round(last_valid(raw.get("qv", [])), 6),
+    }
+
+def solve_single_receta_clean(receta, reactor_config, qins):
+    """Solve a single receta and return clean outputs."""
+    receta = to_numeric(receta)
+    reactor_config = to_numeric(reactor_config)
+    qins = to_numeric(qins)
+    
+    required_keys = ["Q_cat", "Q_cocat", "Q_but", "Q_et", "Q_H2", "Q_hx", "T", "ratio_h2_et"]
+    for key in required_keys:
+        if key not in receta:
+            raise ValueError(f"'{key}' not present in receta input")
+    
+    grado = receta.get("grado", "M5206")
+    recetas_dict = {grado: receta}
+    
+    u, outs_dict, qouts = solve_recetas_parallel(qins, recetas_dict, reactor_config)
+    
+    # Get first grado results
+    first_key = list(outs_dict.keys())[0]
+    raw = outs_dict[first_key]
+    
+    return extract_clean_outputs(raw)
+
 if __name__ == "__main__":
     try:
-        # Leer JSON de stdin
         input_data = json.load(sys.stdin)
         
-        receta = input_data.get("receta", {})
+        mode = input_data.get("mode", "single")
         reactor_config = input_data.get("reactor_configuration", {"V_reb": 53, "scale_cat": 1})
         qins = input_data.get("qins", {
             'Q_H2o': 0, 'Q_Hxo': 0,
@@ -552,53 +671,42 @@ if __name__ == "__main__":
             'Q_To': [0]*8, 'Q_T1': [0]*8, 'Q_T2': [0]*8,
         })
         
-        # Convertir strings a float (los valores del frontend llegan como strings)
-        def to_numeric(val):
-            """Convierte un valor a float si es posible, o deja listas/dicts intactos."""
-            if isinstance(val, str):
+        if mode == "batch":
+            # Batch mode: process multiple recetas
+            receta_rows = input_data.get("recetas", [])
+            results = []
+            errors = []
+            
+            for i, receta in enumerate(receta_rows):
                 try:
-                    return float(val)
-                except (ValueError, TypeError):
-                    return val
-            elif isinstance(val, list):
-                return [to_numeric(v) for v in val]
-            elif isinstance(val, dict):
-                return {k: to_numeric(v) for k, v in val.items()}
-            return val
-        
-        receta = to_numeric(receta)
-        reactor_config = to_numeric(reactor_config)
-        qins = to_numeric(qins)
-        
-        # Validar receta
-        required_keys = ["Q_cat", "Q_cocat", "Q_but", "Q_et", "Q_H2", "Q_hx", "T", "ratio_h2_et"]
-        for key in required_keys:
-            if key not in receta:
-                raise ValueError(f"'{key}' not present in receta input")
-        
-        grado = receta.get("grado", "M5206")
-        recetas = {grado: receta}
-        
-        # Ejecutar modelo
-        u, outs, qouts = solve_recetas_parallel(qins, recetas, reactor_config)
-        
-        # Convertir a tipos nativos
-        result = {
-            "success": True,
-            "outs": to_list(outs),
-            "qouts": to_list(qouts)
-        }
-        
-        # Escribir JSON a stdout
-        print(json.dumps(result))
+                    clean = solve_single_receta_clean(receta, reactor_config, qins)
+                    results.append(clean)
+                except Exception as row_err:
+                    # On error, append a row with error info
+                    results.append({"_error": str(row_err), "_row": i})
+                    errors.append({"row": i, "error": str(row_err)})
+            
+            print(json.dumps({
+                "success": True,
+                "results": results,
+                "errors": errors
+            }, cls=SafeJSONEncoder))
+        else:
+            # Single mode (legacy)
+            receta = input_data.get("receta", {})
+            clean = solve_single_receta_clean(receta, reactor_config, qins)
+            print(json.dumps({
+                "success": True,
+                "results": [clean],
+                "errors": []
+            }, cls=SafeJSONEncoder))
         
     except Exception as e:
-        error_result = {
+        print(json.dumps({
             "success": False,
             "error": str(e),
             "traceback": traceback.format_exc()
-        }
-        print(json.dumps(error_result))
+        }, cls=SafeJSONEncoder))
         sys.exit(1)
 
 
