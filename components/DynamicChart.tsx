@@ -48,21 +48,74 @@ export interface DateRange {
 
 interface DynamicChartProps {
     config: WidgetConfig;
-    height?: number;
+    height?: number | string;
     dateRange?: DateRange;
 }
 
 // Helper function to filter data by date range
-const filterDataByDateRange = (data: any[], dateRange?: DateRange): any[] => {
+const filterDataByDateRange = (data: any[], dateRange?: DateRange, preferredDateKeys: string[] = []): any[] => {
     if (!dateRange || !data || data.length === 0) return data;
     
     const startDate = new Date(dateRange.start);
     const endDate = new Date(dateRange.end);
     endDate.setHours(23, 59, 59, 999);
+
+    const dateLikeKeyRegex = /(date|fecha|time|timestamp|period|month|day|start|end)/i;
+    const looksLikeDateString = (raw: string): boolean => {
+        const text = raw.trim();
+        if (!text) return false;
+        // Accept common ISO/local formats only; reject plain numbers like "8"
+        return (
+            /^\d{4}-\d{2}-\d{2}/.test(text) ||
+            /^\d{4}\/\d{2}\/\d{2}/.test(text) ||
+            /^\d{2}\/\d{2}\/\d{4}/.test(text) ||
+            /^\d{4}-\d{2}$/.test(text) ||
+            /^\d{4}$/.test(text)
+        );
+    };
+
+    const isValidDateValue = (value: unknown): boolean => {
+        if (value === null || value === undefined) return false;
+        if (typeof value === 'number') {
+            // Only accept realistic epoch timestamps
+            return value > 946684800000 && value < 4102444800000; // 2000-01-01 to 2100-01-01
+        }
+        const asString = String(value);
+        if (!looksLikeDateString(asString)) return false;
+        const date = new Date(asString);
+        return !Number.isNaN(date.getTime());
+    };
     
     // Common date field names to look for
-    const dateFields = ['date', 'fecha', 'timestamp', 'time', 'created_at', 'createdAt', 'month', 'day', 'periodo', 'period'];
-    const dateField = dateFields.find(field => data[0]?.[field] !== undefined);
+    const defaultDateFields = ['date', 'fecha', 'timestamp', 'time', 'created_at', 'createdAt', 'month', 'day', 'periodo', 'period', 'start', 'end'];
+    const dateFields = Array.from(new Set([...preferredDateKeys.filter(Boolean), ...defaultDateFields]));
+    let dateField = dateFields.find((field) => data[0]?.[field] !== undefined && isValidDateValue(data[0]?.[field]));
+
+    // Heuristic fallback for datasets where date column has custom name
+    if (!dateField) {
+        const sample = data.slice(0, Math.min(data.length, 20));
+        const keys = Object.keys(sample[0] || {});
+        const scored = keys
+            .filter((key) => dateLikeKeyRegex.test(key))
+            .map((key) => {
+            const validCount = sample.reduce((acc, row) => acc + (isValidDateValue(row?.[key]) ? 1 : 0), 0);
+            return { key, score: sample.length > 0 ? validCount / sample.length : 0 };
+        });
+        // If nothing matched by key name, try preferred keys (like xAxisKey) anyway
+        if (scored.length === 0) {
+            preferredDateKeys.forEach((key) => {
+                if (!key) return;
+                const validCount = sample.reduce((acc, row) => acc + (isValidDateValue(row?.[key]) ? 1 : 0), 0);
+                if (sample.length > 0) {
+                    scored.push({ key, score: validCount / sample.length });
+                }
+            });
+        }
+        const best = scored.sort((a, b) => b.score - a.score)[0];
+        if (best && best.score >= 0.6) {
+            dateField = best.key;
+        }
+    }
     
     if (!dateField) return data;
     
@@ -70,6 +123,17 @@ const filterDataByDateRange = (data: any[], dateRange?: DateRange): any[] => {
         const itemDate = new Date(item[dateField]);
         return !isNaN(itemDate.getTime()) && itemDate >= startDate && itemDate <= endDate;
     });
+};
+
+const isInDateRange = (value: string | Date | undefined, dateRange?: DateRange): boolean => {
+    if (!value) return false;
+    if (!dateRange) return true;
+    const start = new Date(dateRange.start);
+    const end = new Date(dateRange.end);
+    end.setHours(23, 59, 59, 999);
+    const current = new Date(value);
+    if (Number.isNaN(current.getTime())) return false;
+    return current >= start && current <= end;
 };
 
 const normalizeWidgetConfig = (config: WidgetConfig): WidgetConfig => {
@@ -291,13 +355,16 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
     );
 };
 
-export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height = 250, dateRange }) => {
+export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height = '100%', dateRange }) => {
     const normalizedConfig = useMemo(() => normalizeWidgetConfig(config), [config]);
     const { type, data: rawData, xAxisKey, dataKey, colors = DEFAULT_COLORS } = normalizedConfig;
     const containerRef = useRef<HTMLDivElement>(null);
     
     // Filter data by date range if provided
-    const data = React.useMemo(() => filterDataByDateRange(rawData, dateRange), [rawData, dateRange]);
+    const data = React.useMemo(
+        () => filterDataByDateRange(rawData, dateRange, [xAxisKey, normalizedConfig.xAxisKey]),
+        [rawData, dateRange, xAxisKey, normalizedConfig.xAxisKey]
+    );
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     const [isReady, setIsReady] = useState(false);
     const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -366,6 +433,12 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
 
     const onPieEnter = (_: any, index: number) => setActiveIndex(index);
     const onPieLeave = () => setActiveIndex(null);
+
+    const chartHeightPx = useMemo(() => {
+        if (typeof height === 'number') return height;
+        if (dimensions.height > 10) return dimensions.height;
+        return 260;
+    }, [height, dimensions.height]);
 
     const renderChart = () => {
         const actualDataKey = Array.isArray(dataKey) ? dataKey[0] : dataKey;
@@ -592,7 +665,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                         data={data}
                         dimensions={parallelDimensions}
                         colorKey={config.colorKey}
-                        height={height}
+                        height={chartHeightPx}
                     />
                 );
                 
@@ -604,7 +677,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                         xKey={xAxisKey}
                         yKey={normalizedConfig.yKey || 'category'}
                         valueKey={normalizedConfig.valueKey || (Array.isArray(dataKey) ? dataKey[0] : dataKey)}
-                        height={height}
+                        height={chartHeightPx}
                     />
                 );
                 
@@ -617,7 +690,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                         data={data}
                         dimensions={scatterDimensions}
                         colorKey={config.colorKey}
-                        height={height}
+                        height={chartHeightPx}
                     />
                 );
                 
@@ -628,7 +701,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                         <SankeyChart
                             nodes={normalizedConfig.nodes}
                             links={normalizedConfig.links}
-                            height={height}
+                            height={chartHeightPx}
                         />
                     );
                 }
@@ -665,7 +738,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                     <SankeyChart
                         nodes={sankeyNodes}
                         links={sankeyLinks}
-                        height={height}
+                        height={chartHeightPx}
                     />
                 );
                 
@@ -678,7 +751,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                         yKey={normalizedConfig.yKey || (Array.isArray(dataKey) ? dataKey[0] : dataKey)}
                         sizeKey={normalizedConfig.sizeKey || (Array.isArray(dataKey) && dataKey[1] ? dataKey[1] : 'size')}
                         colorKey={normalizedConfig.colorKey}
-                        height={height}
+                        height={chartHeightPx}
                     />
                 );
                 
@@ -692,8 +765,8 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                 }));
                 const timelineEvents = (timelineEventsRaw as any[]).filter((event) => {
                     const startValue = event?.start;
-                    return startValue && !Number.isNaN(new Date(startValue).getTime());
-                });
+                    return startValue && !Number.isNaN(new Date(startValue).getTime()) && isInDateRange(startValue, dateRange);
+                }).sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
                 if (timelineEvents.length === 0) {
                     return renderGuidedEmptyState('Timeline requires at least one valid date.', [
                         'No parseable start date found in current rows.',
@@ -705,22 +778,29 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                         title={config.title}
                         subtitle={normalizedConfig.subtitle || normalizedConfig.description}
                         events={timelineEvents as any}
-                        height={height}
+                        height={chartHeightPx}
                     />
                 );
                 
             case 'multi_timeline':
                 // Multi-Track Timeline
                 if (normalizedConfig.tracks) {
-                    if (normalizedConfig.tracks.length === 0) {
+                    const filteredTracks = normalizedConfig.tracks
+                        .map((track: any) => ({
+                            ...track,
+                            events: (Array.isArray(track.events) ? track.events : []).filter((event: any) => isInDateRange(event?.start, dateRange))
+                        }))
+                        .filter((track: any) => track.events.length > 0);
+
+                    if (filteredTracks.length === 0) {
                         return renderGuidedEmptyState('No tracks available for Multi-Track Timeline.', [
                             'Provide rows with track grouping and valid dates.'
                         ]);
                     }
                     return (
                         <MultiTrackTimelineChart
-                            tracks={normalizedConfig.tracks}
-                            height={height}
+                            tracks={filteredTracks}
+                            height={chartHeightPx}
                         />
                     );
                 }
@@ -753,7 +833,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                 return (
                     <MultiTrackTimelineChart
                         tracks={autoTracks}
-                        height={height}
+                        height={chartHeightPx}
                     />
                 );
                 
@@ -782,7 +862,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                 }
                 
                 return (
-                    <ResponsiveContainer width="100%" height={height} minWidth={100} minHeight={100}>
+                    <ResponsiveContainer width="100%" height={chartHeightPx} minWidth={100} minHeight={100}>
                         <RadialBarChart
                             cx="50%"
                             cy="50%"
@@ -834,7 +914,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                 ];
                 
                 return (
-                    <ResponsiveContainer width="100%" height={height} minWidth={100} minHeight={100}>
+                    <ResponsiveContainer width="100%" height={chartHeightPx} minWidth={100} minHeight={100}>
                         <RadialBarChart
                             cx="50%"
                             cy="90%"
@@ -883,9 +963,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
         if (type === 'heatmap') return !xAxisKey || !normalizedConfig.yKey;
         if (type === 'bubble') return !xAxisKey || !normalizedConfig.yKey;
         if (type === 'sankey') return !(normalizedConfig.nodes?.length || data.some((d: any) => d.source || d.target));
-        if (type === 'timeline' || type === 'multi_timeline') {
-            return !Array.isArray(data) || data.length === 0;
-        }
+        if (type === 'timeline' || type === 'multi_timeline') return false;
         return !xAxisKey || !dataKey;
     }, [type, xAxisKey, dataKey, normalizedConfig.yKey, normalizedConfig.nodes, data]);
 
@@ -893,7 +971,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
         return (
             <div 
                 ref={containerRef} 
-                style={{ width: '100%', height: height, minHeight: height }}
+                style={{ width: '100%', height: typeof height === 'number' ? height : height, minHeight: typeof height === 'number' ? height : 180 }}
                 className="flex items-center justify-center text-[var(--text-tertiary)] text-sm"
             >
                 {!data || data.length === 0 ? (
@@ -912,7 +990,11 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
     const isAdvancedChart = ['parallel', 'heatmap', 'scatter_matrix', 'sankey', 'bubble', 'timeline', 'multi_timeline'].includes(type);
 
     return (
-        <div ref={containerRef} style={{ width: '100%', height: height, minHeight: height }} className="relative">
+        <div
+            ref={containerRef}
+            style={{ width: '100%', height: typeof height === 'number' ? height : height, minHeight: typeof height === 'number' ? height : 180 }}
+            className="relative h-full"
+        >
             {isAdvancedChart ? (
                 renderChart()
             ) : (

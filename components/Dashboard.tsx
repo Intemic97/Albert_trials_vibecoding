@@ -231,6 +231,25 @@ interface WidgetCardProps {
     dateRange?: { start: string; end: string };
 }
 
+type ExamplePresetId = 'hdpe_transition_monitoring' | 'hdpe_transition_economics';
+
+const EXAMPLE_PRESETS: Array<{
+    id: ExamplePresetId;
+    name: string;
+    description: string;
+}> = [
+    {
+        id: 'hdpe_transition_monitoring',
+        name: 'Example - HDPE Transition Monitoring',
+        description: 'Monitor dual-reactor HDPE transitions, out-of-spec windows, and material flow in near real time.'
+    },
+    {
+        id: 'hdpe_transition_economics',
+        name: 'Example - HDPE Transition Economics',
+        description: 'Estimate yearly value from reducing transition time using model-assisted quality monitoring.'
+    }
+];
+
 // Helper function to convert TimeRange to DateRange
 const timeRangeToDateRange = (timeRange: TimeRange): { start: string; end: string } => {
     const end = new Date();
@@ -266,9 +285,79 @@ const timeRangeToDateRange = (timeRange: TimeRange): { start: string; end: strin
 };
 
 // Grid Widget Card Component (for use in GridLayout)
-const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void; dateRange?: { start: string; end: string } }> = React.memo(({ widget, onRemove, dateRange }) => {
+const GridWidgetCard: React.FC<{
+    widget: SavedWidget;
+    onRemove: () => void;
+    onEdit?: (widget: SavedWidget) => void;
+    entities?: Entity[];
+    dateRange?: { start: string; end: string };
+}> = React.memo(({ widget, onRemove, onEdit, entities, dateRange }) => {
     const [showExplanation, setShowExplanation] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
+    const sourceEntity = entities?.find((entity) => entity.id === widget.dataConfig?.entityId);
+    const relatedEntityNames = Array.from(
+        new Set(
+            (widget.dataConfig?.relatedEntityIds || [])
+                .map((id: string) => entities?.find((entity) => entity.id === id)?.name)
+                .filter(Boolean)
+        )
+    ) as string[];
+    const sourceLabel = useMemo(() => {
+        const sources = Array.from(
+            new Set(
+                [
+                    sourceEntity?.name,
+                    widget.dataConfig?.entityName,
+                    ...relatedEntityNames
+                ].filter(Boolean) as string[]
+            )
+        );
+
+        if (sources.length > 0) {
+            return `Source: ${sources.join(' + ')}`;
+        }
+
+        if (!widget.dataConfig?.entityId && relatedEntityNames.length === 0) {
+            return 'Source: Synthetic';
+        }
+
+        if (sourceEntity?.entityType === 'example') return 'Source: Example entity';
+        return 'Source: Entity';
+    }, [
+        sourceEntity?.name,
+        sourceEntity?.entityType,
+        widget.dataConfig?.entityId,
+        widget.dataConfig?.entityName,
+        relatedEntityNames
+    ]);
+
+    const analyticalConfidence = useMemo(() => {
+        const rows = Array.isArray(widget.data) ? widget.data : [];
+        if (rows.length === 0) return { label: 'Analytical confidence: Low', color: 'text-red-600', bg: 'bg-red-500/10' };
+        const sample = rows.slice(0, Math.min(rows.length, 40));
+        const primaryValueKey = Array.isArray(widget.dataKey) ? widget.dataKey[0] : widget.dataKey;
+        const validPrimaryValues = sample.filter((row: any) => {
+            const value = row?.[primaryValueKey as string];
+            return value !== undefined && value !== null && `${value}`.trim() !== '';
+        }).length;
+        const validDates = sample.filter((row: any) => {
+            const candidate = row?.date || row?.fecha || row?.start || row?.timestamp || row?.name;
+            if (!candidate) return false;
+            return !Number.isNaN(new Date(candidate).getTime());
+        }).length;
+        const valueCoverage = validPrimaryValues / sample.length;
+        const dateCoverage = validDates / sample.length;
+        const numericValues = sample
+            .map((row: any) => Number(row?.[primaryValueKey as string]))
+            .filter((value: number) => Number.isFinite(value));
+        const hasSignalVariance = numericValues.length > 2
+            ? Math.max(...numericValues) - Math.min(...numericValues) > 0
+            : true;
+        const score = Math.round((valueCoverage * 0.55 + dateCoverage * 0.25 + (hasSignalVariance ? 0.2 : 0)) * 100);
+        if (score >= 80) return { label: 'Analytical confidence: High', color: 'text-emerald-600', bg: 'bg-emerald-500/10' };
+        if (score >= 55) return { label: 'Analytical confidence: Medium', color: 'text-amber-600', bg: 'bg-amber-500/10' };
+        return { label: 'Analytical confidence: Low', color: 'text-red-600', bg: 'bg-red-500/10' };
+    }, [widget.data, widget.dataKey]);
     
     return (
         <>
@@ -285,28 +374,62 @@ const GridWidgetCard: React.FC<{ widget: SavedWidget; onRemove: () => void; date
                         </div>
                         <h3 className="text-sm font-medium text-[var(--text-primary)] truncate">{widget.title}</h3>
                     </div>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            onRemove();
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        className="p-1.5 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0 z-10"
-                        title="Delete Widget"
-                    >
-                        <X size={14} weight="light" />
-                    </button>
+                    <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {onEdit && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    onEdit(widget);
+                                }}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors flex-shrink-0 z-10"
+                                title="Edit Widget"
+                            >
+                                <GearSix size={14} weight="light" />
+                            </button>
+                        )}
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onRemove();
+                            }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="p-1.5 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 rounded-md transition-colors flex-shrink-0 z-10"
+                            title="Delete Widget"
+                        >
+                            <X size={14} weight="light" />
+                        </button>
+                    </div>
                 </div>
                 {/* Chart container - takes all remaining space */}
                 <div className="flex-1 flex flex-col min-h-0" style={{ overflow: 'hidden' }}>
+                    <div className="px-3 pt-2 flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]">
+                            {sourceLabel}
+                        </span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border border-[var(--border-light)] ${analyticalConfidence.bg} ${analyticalConfidence.color}`}>
+                            {analyticalConfidence.label}
+                        </span>
+                        {widget.dataConfig?.xAxisColumn && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] border border-[var(--border-light)]">
+                                X: {widget.xAxisKey || 'n/a'}
+                            </span>
+                        )}
+                        {widget.dataConfig?.yAxisColumn && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] border border-[var(--border-light)]">
+                                Y: {Array.isArray(widget.dataKey) ? widget.dataKey.join(', ') : widget.dataKey}
+                            </span>
+                        )}
+                    </div>
                     {widget.description && (
                         <div className="px-3 pt-2 pb-1 flex-shrink-0">
                             <p className="text-xs text-[var(--text-secondary)]">{widget.description}</p>
                         </div>
                     )}
                     <div className="flex-1 p-3" style={{ minHeight: 0 }}>
-                        <DynamicChart config={widget} dateRange={dateRange} />
+                        <DynamicChart config={widget} dateRange={dateRange} height="100%" />
                     </div>
                 </div>
                 
@@ -423,7 +546,7 @@ const WidgetCard: React.FC<WidgetCardProps> = React.memo(({ widget, onSave, onRe
             <h3 className="text-base font-normal text-[var(--text-primary)] mb-1">{widget.title}</h3>
             <p className="text-xs text-[var(--text-secondary)] mb-3">{widget.description}</p>
 
-            <DynamicChart config={widget} dateRange={dateRange} />
+            <DynamicChart config={widget} dateRange={dateRange} height="100%" />
 
             {widget.explanation && (
                 <div className="mt-3 pt-3 border-t border-[var(--border-light)]">
@@ -499,10 +622,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     // New Grafana-style states
     const [showWidgetGallery, setShowWidgetGallery] = useState(false);
     const [selectedWidgetTemplate, setSelectedWidgetTemplate] = useState<WidgetTemplate | null>(null);
+    const [editingSavedWidget, setEditingSavedWidget] = useState<SavedWidget | null>(null);
     const [isEditMode, setIsEditMode] = useState(false);
     const [timeRange, setTimeRange] = useState<TimeRange>('last_30d');
     const [refreshInterval, setRefreshInterval] = useState(0); // 0 = disabled
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isSavingDashboard, setIsSavingDashboard] = useState(false);
+    const [isCreatingExample, setIsCreatingExample] = useState(false);
+    const [creatingExamplePresetId, setCreatingExamplePresetId] = useState<ExamplePresetId | null>(null);
+    const [showExamplesMenu, setShowExamplesMenu] = useState(false);
+    const examplesMenuRef = useRef<HTMLDivElement>(null);
     
     // Auto refresh effect
     useEffect(() => {
@@ -513,12 +642,809 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             return () => clearInterval(intervalId);
         }
     }, [refreshInterval, selectedDashboardId]);
+
+    useEffect(() => {
+        if (!showExamplesMenu) return;
+        const handleClickOutside = (event: MouseEvent) => {
+            if (!examplesMenuRef.current) return;
+            if (!examplesMenuRef.current.contains(event.target as Node)) {
+                setShowExamplesMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showExamplesMenu]);
     
     const handleRefreshDashboard = async () => {
         if (!selectedDashboardId || isRefreshing) return;
         setIsRefreshing(true);
         await fetchWidgets(selectedDashboardId);
         setTimeout(() => setIsRefreshing(false), 500);
+    };
+
+    const handleCreateProcessExampleDashboard = async (
+        presetId: ExamplePresetId = 'hdpe_transition_monitoring',
+        autoSelect: boolean = true
+    ) => {
+        if (isCreatingExample) return;
+        const selectedPreset = EXAMPLE_PRESETS.find((preset) => preset.id === presetId) || EXAMPLE_PRESETS[0];
+        const exampleName = selectedPreset.name;
+        const existing = dashboards.find(d => d.name === exampleName);
+
+        setIsCreatingExample(true);
+        setCreatingExamplePresetId(selectedPreset.id);
+        try {
+            const normalizeText = (value: string = '') =>
+                value
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .toLowerCase();
+            const includesAny = (value: string, tokens: string[]) => {
+                const normalized = normalizeText(value);
+                return tokens.some((token) => normalized.includes(normalizeText(token)));
+            };
+            const findEntityByName = (tokens: string[]) =>
+                entities.find((entity) => includesAny(entity.name, tokens));
+            const findProp = (entity: Entity | undefined, tokens: string[], preferredType?: string) => {
+                if (!entity?.properties?.length) return undefined;
+                const typedCandidate = preferredType
+                    ? entity.properties.find((prop: any) => prop.type === preferredType && includesAny(prop.name, tokens))
+                    : undefined;
+                return typedCandidate || entity.properties.find((prop: any) => includesAny(prop.name, tokens));
+            };
+
+            const extrusionEntity = findEntityByName(['extrus', 'linea', 'line']);
+            const productionEntity = findEntityByName(['produccion', 'production', 'throughput']);
+            const rawMaterialEntity = findEntityByName(['materia prima', 'material', 'feedstock', 'resina']);
+            const ordersEntity = findEntityByName(['orden', 'order']);
+
+            const fetchRecords = async (entity?: Entity) => {
+                if (!entity) return [];
+                const res = await fetch(`${API_BASE}/entities/${entity.id}/records`, { credentials: 'include' });
+                if (!res.ok) return [];
+                const data = await res.json();
+                return Array.isArray(data) ? data : [];
+            };
+
+            const [extrusionRecords, productionRecords, rawMaterialRecords, orderRecords] = await Promise.all([
+                fetchRecords(extrusionEntity),
+                fetchRecords(productionEntity),
+                fetchRecords(rawMaterialEntity),
+                fetchRecords(ordersEntity)
+            ]);
+
+            const toNum = (value: any) => {
+                const parsed = parseFloat(value);
+                return Number.isFinite(parsed) ? parsed : 0;
+            };
+
+            const extrusionNameProp = findProp(extrusionEntity, ['nombre', 'linea', 'line', 'name']);
+            const extrusionEffProp = findProp(extrusionEntity, ['eficiencia', 'oee']);
+            const extrusionCapacityProp = findProp(extrusionEntity, ['capacidad', 'capacity']);
+
+            const productionDateProp = findProp(productionEntity, ['fecha', 'date', 'timestamp']);
+            const productionLineProp =
+                findProp(productionEntity, ['linea', 'line', 'extrusora'], 'relation') ||
+                findProp(productionEntity, ['linea', 'line', 'extrusora']);
+            const productionTonsProp = findProp(productionEntity, ['produccion', 'ton', 'output']);
+            const productionScrapProp = findProp(productionEntity, ['scrap', 'merma', 'rechazo']);
+            const productionEnergyProp = findProp(productionEntity, ['energia', 'kwh', 'consumo']);
+            const productionShiftProp = findProp(productionEntity, ['turno', 'shift']);
+            const productionQualityProp = findProp(productionEntity, ['calidad', 'quality', 'grade']);
+            const productionProductProp = findProp(productionEntity, ['producto', 'product', 'sku']);
+
+            const materialTypeProp = findProp(rawMaterialEntity, ['tipo', 'type', 'familia']);
+            const materialNameProp = findProp(rawMaterialEntity, ['material', 'nombre', 'name']);
+            const materialStockProp = findProp(rawMaterialEntity, ['stock', 'inventario', 'inventory']);
+
+            const orderDueDateProp = findProp(ordersEntity, ['entrega', 'due', 'fecha', 'date']);
+            const orderPriorityProp = findProp(ordersEntity, ['prioridad', 'priority']);
+            const orderCodeProp = findProp(ordersEntity, ['codigo', 'code', 'orden', 'order']);
+            const orderStatusProp = findProp(ordersEntity, ['estado', 'status']);
+
+            const extrusionNameById = new Map<string, string>();
+            const extrusionRows = extrusionRecords.map((record: any) => {
+                const lineName = String(record.values?.[extrusionNameProp?.id || ''] || `Line ${record.id}`);
+                extrusionNameById.set(record.id, lineName);
+                return {
+                    name: lineName,
+                    oee: toNum(record.values?.[extrusionEffProp?.id || '']),
+                    capacity: toNum(record.values?.[extrusionCapacityProp?.id || ''])
+                };
+            });
+
+            const avgOee = extrusionRows.length > 0
+                ? extrusionRows.reduce((sum, row) => sum + row.oee, 0) / extrusionRows.length
+                : 0;
+
+            const productionNormalized = productionRecords.map((record: any) => {
+                let lineValue = record.values?.[productionLineProp?.id || ''];
+                try {
+                    const parsed = JSON.parse(lineValue);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        lineValue = parsed[0];
+                    }
+                } catch {
+                    // keep raw value
+                }
+                const relatedLineId = String(lineValue || '');
+                const lineNameFromMap = extrusionNameById.get(relatedLineId);
+                const fallbackLineName = String(
+                    record.values?.[productionLineProp?.id || ''] ||
+                    record.values?.[extrusionNameProp?.id || ''] ||
+                    ''
+                ).trim();
+                const lineName = lineNameFromMap || fallbackLineName || `Line ${record.id.slice(-4)}`;
+                const date = String(record.values?.[productionDateProp?.id || ''] || '').slice(0, 10) || 'Unknown date';
+                const tons = toNum(record.values?.[productionTonsProp?.id || '']);
+                const scrap = toNum(record.values?.[productionScrapProp?.id || '']);
+                const energy = toNum(record.values?.[productionEnergyProp?.id || '']);
+                const shift = String(record.values?.[productionShiftProp?.id || ''] || 'Unknown shift');
+                const quality = String(record.values?.[productionQualityProp?.id || ''] || 'A');
+                const product = String(record.values?.[productionProductProp?.id || ''] || 'Product');
+                return { date, lineName, tons, scrap, energy, shift, quality, product };
+            });
+
+            const scrapByLineMap = new Map<string, number[]>();
+            const tonsByDateMap = new Map<string, number>();
+            const scrapByDateMap = new Map<string, number[]>();
+            const heatMapAgg = new Map<string, number[]>();
+            for (const row of productionNormalized) {
+                if (!scrapByLineMap.has(row.lineName)) scrapByLineMap.set(row.lineName, []);
+                scrapByLineMap.get(row.lineName)!.push(row.scrap);
+
+                tonsByDateMap.set(row.date, (tonsByDateMap.get(row.date) || 0) + row.tons);
+                if (!scrapByDateMap.has(row.date)) scrapByDateMap.set(row.date, []);
+                scrapByDateMap.get(row.date)!.push(row.scrap);
+
+                const key = `${row.date}||${row.shift}`;
+                if (!heatMapAgg.has(key)) heatMapAgg.set(key, []);
+                heatMapAgg.get(key)!.push(row.scrap);
+            }
+
+            const scrapByLine = Array.from(scrapByLineMap.entries()).map(([name, values]) => ({
+                name,
+                value: values.length ? Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(2)) : 0
+            })).sort((a, b) => b.value - a.value);
+
+            const tonsByDate = Array.from(tonsByDateMap.entries())
+                .map(([name, value]) => ({ name, value }))
+                .sort((a, b) => a.name.localeCompare(b.name));
+            const latestProductionDate =
+                tonsByDate.length > 0
+                    ? tonsByDate[tonsByDate.length - 1].name
+                    : new Date().toISOString().slice(0, 10);
+
+            const scrapTrend = Array.from(scrapByDateMap.entries())
+                .map(([name, values]) => ({
+                    name,
+                    value: values.length ? Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(2)) : 0
+                }))
+                .sort((a, b) => a.name.localeCompare(b.name));
+
+            const heatmapData = Array.from(heatMapAgg.entries()).map(([key, values]) => {
+                const [date, shift] = key.split('||');
+                const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+                return {
+                    [productionDateProp?.name || 'Date']: date,
+                    [productionShiftProp?.name || 'Shift']: shift,
+                    [productionScrapProp?.name || 'Scrap']: Number(avg.toFixed(2)),
+                    name: date,
+                    category: shift,
+                    value: Number(avg.toFixed(2))
+                };
+            });
+
+            const bubbleData = productionNormalized.map((row) => ({
+                [productionTonsProp?.name || 'Production (ton)']: row.tons,
+                [productionEnergyProp?.name || 'Energy (kWh)']: row.energy,
+                [productionScrapProp?.name || 'Scrap (%)']: row.scrap,
+                date: row.date,
+                name: `${row.product} • ${row.date}`,
+                value: row.energy
+            }));
+
+            const sankeyData = rawMaterialRecords.map((record: any) => {
+                const source = String(record.values?.[materialTypeProp?.id || ''] || 'Raw material');
+                const target = String(record.values?.[materialNameProp?.id || ''] || 'Material');
+                const value = Math.max(0, toNum(record.values?.[materialStockProp?.id || '']));
+                return { source, target, value, date: latestProductionDate };
+            }).filter((row) => row.source && row.target && row.value > 0);
+
+            const scrapSeries = productionNormalized.map((row) => row.scrap).filter((value) => Number.isFinite(value));
+            const avgScrap = scrapSeries.length ? scrapSeries.reduce((sum, value) => sum + value, 0) / scrapSeries.length : 0;
+            const timelineData = productionNormalized
+                .filter((row) => row.date && row.scrap >= 0)
+                .map((row) => ({
+                    start: row.date,
+                    severity: row.scrap >= Math.max(4, avgScrap + 1.2)
+                        ? 'high'
+                        : row.scrap >= Math.max(2.5, avgScrap + 0.5)
+                            ? 'medium'
+                            : 'low',
+                    label: `${row.lineName} | ${row.product} | scrap ${row.scrap.toFixed(1)}% | ${row.tons.toFixed(0)} t`
+                }))
+                .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+            // Transition intelligence (grade/product change impact)
+            const productionOrdered = [...productionNormalized]
+                .filter((row) => row.date && row.product)
+                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            const qualityIsStable = (row: typeof productionOrdered[number]) =>
+                row.scrap <= avgScrap + 0.3 && ['A', 'A+'].includes((row.quality || '').toUpperCase());
+            const transitionComparisonData: Array<{
+                name: string;
+                date: string;
+                fromProduct: string;
+                toProduct: string;
+                labSafeHours: number;
+                modelEstimatedHours: number;
+                savingHours: number;
+            }> = [];
+            for (let index = 1; index < productionOrdered.length; index++) {
+                const previous = productionOrdered[index - 1];
+                const current = productionOrdered[index];
+                if (previous.product === current.product) continue;
+
+                const followup = productionOrdered.slice(index, index + 6);
+                let firstStableAt = followup.findIndex((row) => qualityIsStable(row));
+                if (firstStableAt < 0) firstStableAt = Math.min(followup.length, 3);
+                const modelEstimatedHours = Math.max(2, firstStableAt * 2 || 2);
+                const labSafeHours = Math.max(modelEstimatedHours + 2, Math.round(modelEstimatedHours * 1.8));
+                const savingHours = Math.max(0.5, Number((labSafeHours - modelEstimatedHours).toFixed(1)));
+
+                transitionComparisonData.push({
+                    name: `${previous.product} -> ${current.product}`,
+                    date: current.date,
+                    fromProduct: previous.product,
+                    toProduct: current.product,
+                    labSafeHours: Number(labSafeHours.toFixed(1)),
+                    modelEstimatedHours: Number(modelEstimatedHours.toFixed(1)),
+                    savingHours
+                });
+            }
+            const transitionInsights = transitionComparisonData.length > 0
+                ? transitionComparisonData
+                : [
+                    {
+                        name: 'Grade A -> Grade B',
+                        date: productionOrdered[0]?.date || new Date().toISOString().slice(0, 10),
+                        fromProduct: 'Grade A',
+                        toProduct: 'Grade B',
+                        labSafeHours: 8,
+                        modelEstimatedHours: 4,
+                        savingHours: 4
+                    }
+                ];
+            const avgLabTransitionHours = transitionInsights.reduce((sum, row) => sum + row.labSafeHours, 0) / transitionInsights.length;
+            const avgModelTransitionHours = transitionInsights.reduce((sum, row) => sum + row.modelEstimatedHours, 0) / transitionInsights.length;
+            const avgSavedTransitionHours = transitionInsights.reduce((sum, row) => sum + row.savingHours, 0) / transitionInsights.length;
+
+            const specBandDates = tonsByDate.length > 0
+                ? tonsByDate.map((d) => d.name).sort((a, b) => a.localeCompare(b))
+                : Array.from({ length: 6 }).map((_, idx) => {
+                    const date = new Date();
+                    date.setDate(date.getDate() - (6 - idx));
+                    return date.toISOString().slice(0, 10);
+                });
+            const specBandData = specBandDates.map((date, idx) => {
+                const isSecondPhase = idx >= Math.floor(specBandDates.length / 2);
+                const targetMi = isSecondPhase ? 0.28 : 0.60;
+                const lowerSpec = Number((targetMi - 0.06).toFixed(3));
+                const upperSpec = Number((targetMi + 0.06).toFixed(3));
+                const predictedMI = Number((targetMi + ((idx % 3) - 1) * 0.018).toFixed(3));
+                const labMI = idx % 2 === 0 ? Number((predictedMI + (idx % 4 === 0 ? 0.012 : -0.008)).toFixed(3)) : null;
+                return {
+                    name: date,
+                    predictedMI,
+                    labMI,
+                    lowerSpec,
+                    upperSpec
+                };
+            });
+            const outOfSpecCount = specBandData.filter((row) => row.predictedMI < row.lowerSpec || row.predictedMI > row.upperSpec).length;
+            const avgTransitionSavingHours = transitionInsights.reduce((sum, row) => sum + row.savingHours, 0) / transitionInsights.length;
+            const transitionsPerYear = 365 / 4; // average 4-day cycle between transitions
+            const productionRateKgH = 14000; // representative production rate
+            const primaryPriceEurKg = 1.45;
+            const secondaryPriceEurKg = 1.05;
+            const priceDeltaEurKg = primaryPriceEurKg - secondaryPriceEurKg;
+            const yearlyTransitionGainEur = avgTransitionSavingHours * transitionsPerYear * productionRateKgH * priceDeltaEurKg;
+            const transitionValueGauge = [{
+                name: 'Annual value',
+                value: Number(yearlyTransitionGainEur.toFixed(0)),
+                date: latestProductionDate
+            }];
+            const transitionFlowSankeyData = transitionInsights.map((transition) => ({
+                // Use explicit "from/to" lanes to avoid cyclic depth collapse in simplified Sankey layout
+                source: `From: ${transition.fromProduct}`,
+                target: `To: ${transition.toProduct}`,
+                value: Number(Math.max(1, transition.savingHours).toFixed(2)),
+                date: transition.date
+            }));
+
+            const today = new Date();
+            const orderEvents = orderRecords.map((record: any, idx: number) => {
+                const rawDate = String(record.values?.[orderDueDateProp?.id || ''] || '').slice(0, 10);
+                const parsedDate = rawDate && !Number.isNaN(new Date(rawDate).getTime()) ? new Date(rawDate) : null;
+                // Keep example readable with past-oriented ranges: clamp far-future dates to recent timeline window
+                const fallbackDate = new Date(today.getTime() - idx * 2 * 24 * 60 * 60 * 1000);
+                const plottedDate = parsedDate
+                    ? (parsedDate.getTime() > today.getTime() ? fallbackDate : parsedDate)
+                    : fallbackDate;
+                const date = plottedDate.toISOString().slice(0, 10);
+                const priority = String(record.values?.[orderPriorityProp?.id || ''] || 'Normal').toLowerCase();
+                const status = String(record.values?.[orderStatusProp?.id || ''] || 'Planned');
+                const code = String(record.values?.[orderCodeProp?.id || ''] || `Order ${record.id}`);
+                const severity = /alta|high|urgent/.test(priority)
+                    ? 'high'
+                    : /baja|low/.test(priority)
+                        ? 'low'
+                        : 'medium';
+                return { date, priority, status, code, severity };
+            }).filter((event) => event.date && !Number.isNaN(new Date(event.date).getTime()));
+
+            const trackMap = new Map<string, any[]>();
+            for (const event of orderEvents) {
+                if (!trackMap.has(event.status)) trackMap.set(event.status, []);
+                trackMap.get(event.status)!.push({
+                    start: event.date,
+                    severity: event.severity,
+                    label: event.code
+                });
+            }
+            const tracks = Array.from(trackMap.entries()).map(([id, events]) => ({
+                id,
+                title: id,
+                subtitle: `${events.length} orders`,
+                events
+            }));
+
+            const entityIds = {
+                extrusion: extrusionEntity?.id,
+                production: productionEntity?.id,
+                materials: rawMaterialEntity?.id,
+                orders: ordersEntity?.id
+            };
+
+            let targetDashboardId = existing?.id;
+            const wasExistingDashboard = Boolean(existing);
+            if (!targetDashboardId) {
+                const dashboardId = generateUUID();
+                const createDashboardRes = await fetch(`${API_BASE}/dashboards`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        id: dashboardId,
+                        name: exampleName,
+                        description: selectedPreset.description
+                    })
+                });
+                if (!createDashboardRes.ok) {
+                    throw new Error('Failed to create example dashboard');
+                }
+                const createdDashboard = await createDashboardRes.json();
+                targetDashboardId = createdDashboard.id;
+            }
+
+            const widgetCatalog: Record<string, { title: string; description: string; config: any; gridX: number; gridY: number; gridWidth: number; gridHeight: number }> = {
+                oeeGauge: {
+                    title: 'Plant OEE (avg)',
+                    description: 'Average operational efficiency across extrusion lines.',
+                    config: {
+                        type: 'gauge',
+                        title: 'Plant OEE (avg)',
+                        description: '',
+                        data: [{ name: 'OEE', value: Number(avgOee.toFixed(1)), date: latestProductionDate }],
+                        xAxisKey: 'name',
+                        dataKey: 'value',
+                        min: 0,
+                        max: 100,
+                        subtitle: 'Target >= 90%',
+                        dataConfig: {
+                            entityId: entityIds.extrusion,
+                            entityName: extrusionEntity?.name || 'Extrusion',
+                            relatedEntityIds: [entityIds.extrusion].filter(Boolean)
+                        }
+                    },
+                    gridX: 0, gridY: 0, gridWidth: 3, gridHeight: 3
+                },
+                efficiencyByLine: {
+                    title: 'Efficiency by line',
+                    description: 'Performance benchmark by extrusion line.',
+                    config: {
+                        type: 'bar',
+                        title: 'Efficiency by line',
+                        description: '',
+                        data: extrusionRows.map(r => ({ name: r.name, value: r.oee, date: latestProductionDate })),
+                        xAxisKey: 'name',
+                        dataKey: 'value',
+                        dataConfig: {
+                            entityId: entityIds.extrusion,
+                            entityName: extrusionEntity?.name || 'Extrusion',
+                            relatedEntityIds: [entityIds.extrusion].filter(Boolean)
+                        }
+                    },
+                    gridX: 3, gridY: 0, gridWidth: 5, gridHeight: 4
+                },
+                scrapByLine: {
+                    title: 'Scrap by line',
+                    description: 'Average scrap rate by line (higher is worse).',
+                    config: {
+                        type: 'bar',
+                        title: 'Scrap by line',
+                        description: '',
+                        data: scrapByLine.map((row) => ({ ...row, date: latestProductionDate })),
+                        xAxisKey: 'name',
+                        dataKey: 'value',
+                        dataConfig: {
+                            entityId: entityIds.production,
+                            entityName: productionEntity?.name || 'Production',
+                            relatedEntityIds: [entityIds.production, entityIds.extrusion].filter(Boolean)
+                        }
+                    },
+                    gridX: 8, gridY: 0, gridWidth: 4, gridHeight: 4
+                },
+                throughputTrend: {
+                    title: 'Daily production throughput',
+                    description: 'Total production output trend (ton/day).',
+                    config: {
+                        type: 'line',
+                        title: 'Daily production throughput',
+                        description: '',
+                        data: tonsByDate,
+                        xAxisKey: 'name',
+                        dataKey: 'value',
+                        dataConfig: {
+                            entityId: entityIds.production,
+                            entityName: productionEntity?.name || 'Production',
+                            relatedEntityIds: [entityIds.production].filter(Boolean)
+                        }
+                    },
+                    gridX: 0, gridY: 4, gridWidth: 6, gridHeight: 4
+                },
+                scrapTrend: {
+                    title: 'Scrap trend',
+                    description: 'Average scrap evolution by day.',
+                    config: {
+                        type: 'line',
+                        title: 'Scrap trend',
+                        description: '',
+                        data: scrapTrend,
+                        xAxisKey: 'name',
+                        dataKey: 'value',
+                        dataConfig: {
+                            entityId: entityIds.production,
+                            entityName: productionEntity?.name || 'Production',
+                            relatedEntityIds: [entityIds.production].filter(Boolean)
+                        }
+                    },
+                    gridX: 6, gridY: 4, gridWidth: 6, gridHeight: 4
+                },
+                scrapHeatmap: {
+                    title: 'Scrap heatmap (date x shift)',
+                    description: 'Scrap intensity by day and shift to detect unstable windows.',
+                    config: {
+                        type: 'heatmap',
+                        title: 'Scrap heatmap',
+                        description: '',
+                        data: heatmapData,
+                        xAxisKey: productionDateProp?.name || 'Date',
+                        yKey: productionShiftProp?.name || 'Shift',
+                        dataKey: productionScrapProp?.name || 'Scrap',
+                        valueKey: productionScrapProp?.name || 'Scrap',
+                        dataConfig: {
+                            entityId: entityIds.production,
+                            entityName: productionEntity?.name || 'Production',
+                            relatedEntityIds: [entityIds.production].filter(Boolean)
+                        }
+                    },
+                    gridX: 0, gridY: 8, gridWidth: 6, gridHeight: 5
+                },
+                energyBubble: {
+                    title: 'Energy vs throughput vs scrap',
+                    description: 'Bubble view to identify inefficient production runs.',
+                    config: {
+                        type: 'bubble',
+                        title: 'Energy vs throughput vs scrap',
+                        description: '',
+                        data: bubbleData,
+                        xAxisKey: productionTonsProp?.name || 'Production (ton)',
+                        yKey: productionEnergyProp?.name || 'Energy (kWh)',
+                        dataKey: productionEnergyProp?.name || 'Energy (kWh)',
+                        sizeKey: productionScrapProp?.name || 'Scrap (%)',
+                        dataConfig: {
+                            entityId: entityIds.production,
+                            entityName: productionEntity?.name || 'Production',
+                            relatedEntityIds: [entityIds.production].filter(Boolean)
+                        }
+                    },
+                    gridX: 6, gridY: 8, gridWidth: 6, gridHeight: 5
+                },
+                materialFlow: {
+                    title: 'Material stock flow',
+                    description: 'Current raw material inventory by family and material.',
+                    config: {
+                        type: 'sankey',
+                        title: 'Material stock flow',
+                        description: '',
+                        data: sankeyData,
+                        xAxisKey: 'source',
+                        dataKey: 'value',
+                        valueKey: 'value',
+                        dataConfig: {
+                            entityId: entityIds.materials,
+                            entityName: rawMaterialEntity?.name || 'Materials',
+                            relatedEntityIds: [entityIds.materials].filter(Boolean)
+                        }
+                    },
+                    gridX: 0, gridY: 13, gridWidth: 6, gridHeight: 5
+                },
+                qualityTimeline: {
+                    title: 'Quality risk timeline',
+                    description: 'Daily quality anomalies detected from scrap excursions vs plant baseline.',
+                    config: {
+                        type: 'timeline',
+                        title: 'Quality risk timeline',
+                        description: '',
+                        subtitle: `Baseline scrap: ${avgScrap.toFixed(2)}%`,
+                        data: timelineData,
+                        xAxisKey: 'start',
+                        dataKey: 'severity',
+                        events: timelineData,
+                        dataConfig: {
+                            entityId: entityIds.production,
+                            entityName: productionEntity?.name || 'Production',
+                            relatedEntityIds: [entityIds.production, entityIds.extrusion].filter(Boolean)
+                        }
+                    },
+                    gridX: 6, gridY: 13, gridWidth: 6, gridHeight: 4
+                },
+                transitionDurationCompare: {
+                    title: 'Transition duration (lab-safe vs model-assisted)',
+                    description: 'Estimated time per grade/product transition under conservative lab-safe criteria vs model-assisted monitoring.',
+                    config: {
+                        type: 'line',
+                        title: 'Transition duration (h)',
+                        description: '',
+                        data: transitionInsights,
+                        xAxisKey: 'name',
+                        dataKey: ['labSafeHours', 'modelEstimatedHours'],
+                        dataConfig: {
+                            entityId: entityIds.production,
+                            entityName: productionEntity?.name || 'Production',
+                            relatedEntityIds: [entityIds.production, entityIds.orders].filter(Boolean)
+                        }
+                    },
+                    gridX: 0, gridY: 18, gridWidth: 7, gridHeight: 5
+                },
+                transitionLabGauge: {
+                    title: 'Avg transition time (LAB-safe)',
+                    description: 'Average transition duration using conservative laboratory-based decision point.',
+                    config: {
+                        type: 'gauge',
+                        title: 'LAB-safe transition (h)',
+                        description: '',
+                        data: [{ name: 'LAB-safe', value: Number(avgLabTransitionHours.toFixed(2)), date: latestProductionDate }],
+                        xAxisKey: 'name',
+                        dataKey: 'value',
+                        min: 0,
+                        max: 12,
+                        subtitle: 'Hours'
+                    },
+                    gridX: 0, gridY: 23, gridWidth: 3, gridHeight: 4
+                },
+                transitionModelGauge: {
+                    title: 'Avg transition time (model-assisted)',
+                    description: 'Average transition duration with online model-assisted quality monitoring.',
+                    config: {
+                        type: 'gauge',
+                        title: 'Model transition (h)',
+                        description: '',
+                        data: [{ name: 'Model', value: Number(avgModelTransitionHours.toFixed(2)), date: latestProductionDate }],
+                        xAxisKey: 'name',
+                        dataKey: 'value',
+                        min: 0,
+                        max: 12,
+                        subtitle: 'Hours'
+                    },
+                    gridX: 3, gridY: 23, gridWidth: 3, gridHeight: 4
+                },
+                transitionSavedGauge: {
+                    title: 'Avg hours saved per transition',
+                    description: 'Expected transition-time reduction enabled by model-assisted tracking.',
+                    config: {
+                        type: 'gauge',
+                        title: 'Hours saved',
+                        description: '',
+                        data: [{ name: 'Saved', value: Number(avgSavedTransitionHours.toFixed(2)), date: latestProductionDate }],
+                        xAxisKey: 'name',
+                        dataKey: 'value',
+                        min: 0,
+                        max: 8,
+                        subtitle: 'h / transition'
+                    },
+                    gridX: 6, gridY: 23, gridWidth: 3, gridHeight: 4
+                },
+                outOfSpecGauge: {
+                    title: 'Out-of-spec checkpoints',
+                    description: 'Predicted checkpoints outside MI specification bounds.',
+                    config: {
+                        type: 'gauge',
+                        title: 'Out-of-spec checkpoints',
+                        description: '',
+                        data: [{ name: 'Out-of-spec', value: outOfSpecCount, date: latestProductionDate }],
+                        xAxisKey: 'name',
+                        dataKey: 'value',
+                        min: 0,
+                        max: Math.max(6, specBandData.length),
+                        subtitle: 'count'
+                    },
+                    gridX: 9, gridY: 23, gridWidth: 3, gridHeight: 4
+                },
+                transitionValue: {
+                    title: 'Estimated annual value from faster transitions',
+                    description: 'Potential annual value from reducing secondary-quality production time during grade transitions.',
+                    config: {
+                        type: 'gauge',
+                        title: 'Annual transition value',
+                        description: '',
+                        data: transitionValueGauge,
+                        xAxisKey: 'name',
+                        dataKey: 'value',
+                        min: 0,
+                        max: Math.max(100000, Number((yearlyTransitionGainEur * 1.5).toFixed(0))),
+                        subtitle: 'EUR/year (scenario)',
+                        dataConfig: {
+                            entityId: entityIds.production,
+                            entityName: productionEntity?.name || 'Production',
+                            relatedEntityIds: [entityIds.production, entityIds.orders].filter(Boolean)
+                        }
+                    },
+                    gridX: 7, gridY: 18, gridWidth: 5, gridHeight: 5
+                },
+                specBandComparison: {
+                    title: 'MI specification tracking (LAB vs model)',
+                    description: 'Model prediction and periodic laboratory checkpoints against lower/upper specification bounds.',
+                    config: {
+                        type: 'line',
+                        title: 'MI tracking with spec band',
+                        description: '',
+                        data: specBandData,
+                        xAxisKey: 'name',
+                        dataKey: ['predictedMI', 'labMI', 'lowerSpec', 'upperSpec'],
+                        dataConfig: {
+                            entityId: entityIds.production,
+                            entityName: productionEntity?.name || 'Production',
+                            relatedEntityIds: [entityIds.production].filter(Boolean)
+                        }
+                    },
+                    gridX: 0, gridY: 27, gridWidth: 12, gridHeight: 5
+                },
+                gradeTransitionFlow: {
+                    title: 'Grade transition flow (saving-weighted)',
+                    description: 'Flow between produced grades; link weight is proportional to transition hours saved with model-assisted monitoring.',
+                    config: {
+                        type: 'sankey',
+                        title: 'Grade transition flow',
+                        description: '',
+                        data: transitionFlowSankeyData,
+                        xAxisKey: 'source',
+                        dataKey: 'value',
+                        valueKey: 'value',
+                        dataConfig: {
+                            entityId: entityIds.production,
+                            entityName: productionEntity?.name || 'Production',
+                            relatedEntityIds: [entityIds.production, entityIds.orders].filter(Boolean)
+                        }
+                    },
+                    gridX: 0, gridY: 32, gridWidth: 12, gridHeight: 5
+                },
+                orderPortfolio: {
+                    title: 'Order portfolio by status',
+                    description: 'Multi-track due-date timeline grouped by order status.',
+                    config: {
+                        type: 'multi_timeline',
+                        title: 'Order portfolio by status',
+                        description: '',
+                        data: orderEvents,
+                        xAxisKey: 'date',
+                        dataKey: 'severity',
+                        tracks,
+                        dataConfig: {
+                            entityId: entityIds.orders,
+                            entityName: ordersEntity?.name || 'Orders',
+                            relatedEntityIds: [entityIds.orders].filter(Boolean)
+                        }
+                    },
+                    gridX: 0, gridY: 37, gridWidth: 12, gridHeight: 5
+                }
+            };
+
+            const presetWidgetKeys: Record<ExamplePresetId, Array<keyof typeof widgetCatalog>> = {
+                hdpe_transition_monitoring: [
+                    'oeeGauge',
+                    'efficiencyByLine',
+                    'scrapByLine',
+                    'throughputTrend',
+                    'scrapTrend',
+                    'scrapHeatmap',
+                    'energyBubble',
+                    'materialFlow',
+                    'qualityTimeline',
+                    'transitionDurationCompare',
+                    'transitionLabGauge',
+                    'transitionModelGauge',
+                    'transitionSavedGauge',
+                    'outOfSpecGauge',
+                    'specBandComparison',
+                    'gradeTransitionFlow',
+                    'orderPortfolio'
+                ],
+                hdpe_transition_economics: [
+                    'transitionDurationCompare',
+                    'transitionValue',
+                    'transitionSavedGauge',
+                    'specBandComparison',
+                    'gradeTransitionFlow',
+                    'materialFlow',
+                    'energyBubble',
+                    'scrapTrend',
+                    'throughputTrend',
+                    'orderPortfolio'
+                ]
+            };
+            const widgetDefs = presetWidgetKeys[presetId].map((key) => widgetCatalog[key]);
+
+            const existingWidgetsRes = await fetch(`${API_BASE}/dashboards/${targetDashboardId}/widgets`, { credentials: 'include' });
+            const existingWidgetsData = existingWidgetsRes.ok ? await existingWidgetsRes.json() : [];
+            const existingTitles = new Set(
+                Array.isArray(existingWidgetsData)
+                    ? existingWidgetsData.map((widget: any) => widget?.title).filter(Boolean)
+                    : []
+            );
+
+            for (let index = 0; index < widgetDefs.length; index++) {
+                const widget = widgetDefs[index];
+                if (existingTitles.has(widget.title)) continue;
+                await fetch(`${API_BASE}/dashboards/${targetDashboardId}/widgets`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        id: generateUUID(),
+                        title: widget.title,
+                        description: widget.description,
+                        config: widget.config,
+                        gridX: widget.gridX,
+                        gridY: widget.gridY,
+                        gridWidth: widget.gridWidth,
+                        gridHeight: widget.gridHeight
+                    })
+                });
+            }
+
+            const refreshed = await fetch(`${API_BASE}/dashboards`, { credentials: 'include' });
+            const refreshedDashboards = await refreshed.json();
+            if (Array.isArray(refreshedDashboards)) {
+                setDashboards(refreshedDashboards);
+            }
+            if (autoSelect) {
+                selectDashboard(targetDashboardId);
+            }
+            success(
+                wasExistingDashboard ? 'Example dashboard updated' : 'Example dashboard created',
+                `${selectedPreset.name} is ready.`
+            );
+            setShowExamplesMenu(false);
+        } catch (error) {
+            console.error('Error creating process example dashboard:', error);
+            showError('Failed to create example dashboard', 'Please try again');
+        } finally {
+            setIsCreatingExample(false);
+            setCreatingExamplePresetId(null);
+        }
     };
     
     const handleWidgetTemplateSelect = (template: WidgetTemplate) => {
@@ -528,15 +1454,43 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             setShowAddWidgetModal(true);
         } else {
             // For data-driven widgets, show configurator
+            setEditingSavedWidget(null);
             setSelectedWidgetTemplate(template);
         }
+    };
+
+    const handleEditSavedWidget = (widget: SavedWidget) => {
+        const widgetTypeToTemplate: Record<string, WidgetTemplate['id']> = {
+            bar: 'bar_chart',
+            line: 'line_chart',
+            area: 'area_chart',
+            pie: 'pie_chart',
+            donut: 'pie_chart',
+            radial: 'gauge',
+            gauge: 'gauge',
+            parallel: 'parallel',
+            heatmap: 'heatmap',
+            scatter_matrix: 'scatter_matrix',
+            sankey: 'sankey',
+            bubble: 'bubble',
+            timeline: 'timeline',
+            multi_timeline: 'multi_timeline'
+        };
+        const templateId = widgetTypeToTemplate[widget.type] || 'bar_chart';
+        const template = WIDGET_TEMPLATES.find((item) => item.id === templateId);
+        if (!template) {
+            warning('This widget type is not editable yet from configurator');
+            return;
+        }
+        setEditingSavedWidget(widget);
+        setSelectedWidgetTemplate(template);
     };
     
     const handleSaveConfiguredWidget = async (config: WidgetFullConfig) => {
         if (!selectedDashboardId) return;
         
         try {
-            const id = generateUUID();
+            const id = editingSavedWidget?.id || generateUUID();
             const template = selectedWidgetTemplate || WIDGET_TEMPLATES.find(t => t.id === config.type);
             const selectedEntity = entities.find(e => e.id === config.dataConfig?.entityId);
             const findColumnName = (columnId?: string, fallback?: string) => {
@@ -545,12 +1499,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 return col?.name || fallback || columnId;
             };
             
-            // Find position for new widget
+            // Find position for new widget (or keep current on edit)
             const maxY = layout.length > 0 ? Math.max(...layout.map(l => l.y + l.h)) : 0;
-            const gridX = 0;
-            const gridY = maxY;
-            const gridW = template?.defaultWidth || 6;
-            const gridH = template?.defaultHeight || 4;
+            const currentLayoutItem = editingSavedWidget
+                ? layout.find((item) => item.i === editingSavedWidget.id)
+                : undefined;
+            const gridX = currentLayoutItem?.x ?? 0;
+            const gridY = currentLayoutItem?.y ?? maxY;
+            const gridW = currentLayoutItem?.w ?? template?.defaultWidth ?? 6;
+            const gridH = currentLayoutItem?.h ?? template?.defaultHeight ?? 4;
 
             const typeMap: Record<string, WidgetConfig['type']> = {
                 bar_chart: 'bar',
@@ -583,6 +1540,37 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             const labelKey = findColumnName(config.dataConfig?.labelColumn, 'label') || 'label';
             const trackKey = findColumnName(config.dataConfig?.trackColumn, 'asset') || 'asset';
             const safeData = Array.isArray(config.data) ? config.data : [];
+
+            const usedColumnIds = [
+                config.dataConfig?.xAxisColumn,
+                config.dataConfig?.yAxisColumn,
+                config.dataConfig?.groupBy,
+                config.dataConfig?.sizeColumn,
+                config.dataConfig?.sourceColumn,
+                config.dataConfig?.targetColumn,
+                config.dataConfig?.dateColumn,
+                config.dataConfig?.severityColumn,
+                config.dataConfig?.labelColumn,
+                config.dataConfig?.trackColumn
+            ].filter(Boolean) as string[];
+            const relatedEntityIds = Array.from(
+                new Set(
+                    [
+                        config.dataConfig?.entityId,
+                        ...(config.dataConfig?.relatedEntityIds || []),
+                        ...usedColumnIds
+                            .map((columnId) => selectedEntity?.properties?.find((p) => p.id === columnId))
+                            .filter((property: any) => property?.type === 'relation' && property?.relatedEntityId)
+                            .map((property: any) => property.relatedEntityId)
+                    ].filter(Boolean)
+                )
+            ) as string[];
+            const enrichedDataConfig = config.dataConfig
+                ? {
+                    ...config.dataConfig,
+                    relatedEntityIds
+                }
+                : undefined;
             
             const widgetConfig: WidgetConfig = {
                 type: resolvedType,
@@ -637,13 +1625,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                             .slice(0, resolvedType === 'parallel' ? 6 : 4)
                     }
                     : {}),
-                dataConfig: config.dataConfig as any
+                dataConfig: enrichedDataConfig as any
             };
             
-            const res = await fetch(`${API_BASE}/dashboards/${selectedDashboardId}/widgets`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const endpoint = editingSavedWidget
+                ? `${API_BASE}/widgets/${editingSavedWidget.id}`
+                : `${API_BASE}/dashboards/${selectedDashboardId}/widgets`;
+            const method = editingSavedWidget ? 'PUT' : 'POST';
+            const payload = editingSavedWidget
+                ? {
+                    title: config.title,
+                    description: config.description,
+                    config: widgetConfig
+                }
+                : {
                     id,
                     title: config.title,
                     description: config.description,
@@ -652,19 +1647,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     gridY,
                     gridWidth: gridW,
                     gridHeight: gridH
-                }),
+                };
+            const res = await fetch(endpoint, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
                 credentials: 'include'
             });
             
             if (res.ok) {
                 await fetchWidgets(selectedDashboardId);
-                success('Widget added successfully');
+                success(editingSavedWidget ? 'Widget updated successfully' : 'Widget added successfully');
             }
         } catch (error) {
             console.error('Error saving widget:', error);
-            showError('Failed to add widget');
+            showError(editingSavedWidget ? 'Failed to update widget' : 'Failed to add widget');
         }
         
+        setEditingSavedWidget(null);
         setSelectedWidgetTemplate(null);
     };
     
@@ -751,6 +1751,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     }
                 } else {
                     setSelectedDashboardId(null);
+                    await handleCreateProcessExampleDashboard('hdpe_transition_monitoring', true);
                 }
             }
         } catch (error) {
@@ -888,6 +1889,53 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             console.error('Error updating dashboard:', error);
         }
         setIsEditingDescription(false);
+    };
+
+    const handleSaveDashboard = async () => {
+        if (!selectedDashboardId || isSavingDashboard) return;
+        setIsSavingDashboard(true);
+        try {
+            const dashboardName = (isEditingTitle ? editingTitle : (selectedDashboard?.name || '')).trim();
+            const dashboardDescription = (isEditingDescription ? editingDescription : (selectedDashboard?.description || '')).trim();
+
+            await fetch(`${API_BASE}/dashboards/${selectedDashboardId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: dashboardName || selectedDashboard?.name || 'Dashboard',
+                    description: dashboardDescription
+                }),
+                credentials: 'include'
+            });
+
+            for (const item of layout) {
+                await fetch(`${API_BASE}/widgets/${item.i}/grid`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        gridX: item.x,
+                        gridY: item.y,
+                        gridWidth: item.w,
+                        gridHeight: item.h
+                    })
+                });
+            }
+
+            setDashboards(prev => prev.map(d =>
+                d.id === selectedDashboardId
+                    ? { ...d, name: dashboardName || d.name, description: dashboardDescription }
+                    : d
+            ));
+            setIsEditingTitle(false);
+            setIsEditingDescription(false);
+            success('Dashboard saved');
+        } catch (error) {
+            console.error('Error saving dashboard:', error);
+            showError('Failed to save dashboard', 'Please try again');
+        } finally {
+            setIsSavingDashboard(false);
+        }
     };
 
     const handleDeleteDashboard = async () => {
@@ -1274,13 +2322,54 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                     {filteredDashboards.length} {filteredDashboards.length === 1 ? 'dashboard' : 'dashboards'}
                                 </p>
                             </div>
-                            <button
-                                onClick={handleCreateDashboard}
-                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
-                            >
-                                <Plus size={14} weight="light" className="mr-2" />
-                                Create Dashboard
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleCreateDashboard}
+                                    className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
+                                >
+                                    <Plus size={14} weight="light" className="mr-2" />
+                                    Create Dashboard
+                                </button>
+                                <div className="relative" ref={examplesMenuRef}>
+                                    <button
+                                        onClick={() => setShowExamplesMenu((prev) => !prev)}
+                                        disabled={isCreatingExample}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-lg text-xs font-medium transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    >
+                                        {isCreatingExample ? 'Creating example...' : 'Examples'}
+                                        <CaretDown size={12} weight="bold" />
+                                    </button>
+                                    {showExamplesMenu && (
+                                        <div className="absolute right-0 top-10 z-20 w-80 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl p-2">
+                                            <div className="px-2 py-1.5 text-[10px] uppercase tracking-wide text-[var(--text-tertiary)]">
+                                                Example dashboards
+                                            </div>
+                                            {EXAMPLE_PRESETS.map((preset) => {
+                                                const exists = dashboards.some((d) => d.name === preset.name);
+                                                const isCreatingThis = creatingExamplePresetId === preset.id;
+                                                return (
+                                                    <button
+                                                        key={preset.id}
+                                                        onClick={() => handleCreateProcessExampleDashboard(preset.id, true)}
+                                                        disabled={isCreatingExample}
+                                                        className="w-full text-left px-2.5 py-2 rounded-md hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-60"
+                                                    >
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="text-xs font-medium text-[var(--text-primary)]">{preset.name.replace('Example - ', '')}</span>
+                                                            <span className="text-[10px] text-[var(--text-tertiary)]">
+                                                                {isCreatingThis ? 'Creating...' : exists ? 'Open existing' : 'Create'}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                                                            {preset.description}
+                                                        </p>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
                         {/* Dashboards Grid */}
@@ -1399,6 +2488,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                         isRefreshing={isRefreshing}
                         isEditMode={isEditMode}
                         onToggleEditMode={() => setIsEditMode(!isEditMode)}
+                        onSave={handleSaveDashboard}
+                        isSaving={isSavingDashboard}
                     />
 
                     {/* Main Content */}
@@ -1522,6 +2613,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                                 <GridWidgetCard
                                                     widget={widget}
                                                     onRemove={() => removeWidget(widget.id)}
+                                                    onEdit={handleEditSavedWidget}
+                                                    entities={entities}
                                                     dateRange={timeRangeToDateRange(timeRange)}
                                                 />
                                             </div>
@@ -1594,7 +2687,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                     template={selectedWidgetTemplate}
                                     entities={entities}
                                     onSave={handleSaveConfiguredWidget}
-                                    onCancel={() => setSelectedWidgetTemplate(null)}
+                                    onCancel={() => {
+                                        setSelectedWidgetTemplate(null);
+                                        setEditingSavedWidget(null);
+                                    }}
+                                    initialConfig={editingSavedWidget || undefined}
+                                    submitLabel={editingSavedWidget ? 'Save changes' : 'Add Widget'}
                                 />
                             )}
 

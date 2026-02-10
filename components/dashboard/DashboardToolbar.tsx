@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
     Calendar, Clock, CaretDown, ArrowsClockwise, Funnel, X, 
-    Play, Pause, GearSix, Share, Trash, ArrowLeft, Plus
+    Play, Pause, GearSix, Share, Trash, ArrowLeft, Plus, FloppyDisk
 } from '@phosphor-icons/react';
 
 // ============================================================================
@@ -309,6 +309,8 @@ interface DashboardToolbarProps {
     isRefreshing?: boolean;
     isEditMode: boolean;
     onToggleEditMode: () => void;
+    onSave: () => void;
+    isSaving?: boolean;
 }
 
 export const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
@@ -324,7 +326,9 @@ export const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
     onRefresh,
     isRefreshing,
     isEditMode,
-    onToggleEditMode
+    onToggleEditMode,
+    onSave,
+    isSaving
 }) => {
     return (
         <header className="h-14 bg-[var(--bg-primary)] border-b border-[var(--border-light)] flex items-center justify-between px-6 shrink-0">
@@ -367,6 +371,14 @@ export const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
                 >
                     <Plus size={14} weight="light" />
                     Add Widget
+                </button>
+                <button
+                    onClick={onSave}
+                    disabled={isSaving}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-lg text-xs font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                    <FloppyDisk size={14} weight="light" />
+                    {isSaving ? 'Saving...' : 'Save'}
                 </button>
 
                 {/* Actions */}

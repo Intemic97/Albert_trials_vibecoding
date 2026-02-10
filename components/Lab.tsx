@@ -139,6 +139,8 @@ interface LabProps {
     onNavigate?: (entityId: string) => void;
 }
 
+type LabPresetId = 'hdpe_transition_monitoring' | 'hdpe_transition_economics';
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -166,6 +168,19 @@ const FORMAT_OPTIONS = [
     { value: 'number', label: 'Number' },
     { value: 'currency', label: 'Currency ($)' },
     { value: 'percent', label: 'Percentage (%)' },
+];
+
+const LAB_PRESETS: Array<{ id: LabPresetId; label: string; description: string }> = [
+    {
+        id: 'hdpe_transition_monitoring',
+        label: 'HDPE Transition Monitoring',
+        description: 'Seguimiento tecnico de transiciones y cumplimiento MI'
+    },
+    {
+        id: 'hdpe_transition_economics',
+        label: 'HDPE Transition Economics',
+        description: 'Impacto economico por acelerar cambios de grado'
+    }
 ];
 
 // ============================================================================
@@ -702,9 +717,12 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
     const [chatInput, setChatInput] = useState('');
     const [isChatLoading, setIsChatLoading] = useState(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
+    const presetsMenuRef = useRef<HTMLDivElement>(null);
     
     // UI State
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showPresetsMenu, setShowPresetsMenu] = useState(false);
+    const [isCreatingPreset, setIsCreatingPreset] = useState(false);
     const [showConfigPanel, setShowConfigPanel] = useState(false);
     const [activeTab, setActiveTab] = useState<'parameters' | 'agent' | 'scenarios' | 'history'>('parameters');
     const [isChatExpanded, setIsChatExpanded] = useState(false);
@@ -815,6 +833,18 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
             }
         }
     }, [simulationId, simulations]);
+
+    useEffect(() => {
+        const onDocumentClick = (event: MouseEvent) => {
+            if (!showPresetsMenu) return;
+            if (presetsMenuRef.current && !presetsMenuRef.current.contains(event.target as Node)) {
+                setShowPresetsMenu(false);
+            }
+        };
+
+        document.addEventListener('mousedown', onDocumentClick);
+        return () => document.removeEventListener('mousedown', onDocumentClick);
+    }, [showPresetsMenu]);
 
     const fetchSimulations = async () => {
         setIsLoading(true);
@@ -1062,6 +1092,368 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
         };
     };
 
+    const createLabPresetSimulation = (presetId: LabPresetId): Simulation => {
+        const now = new Date().toISOString();
+        const id = generateUUID();
+
+        if (presetId === 'hdpe_transition_economics') {
+            const economicsParams: ParameterConfig[] = [
+                {
+                    id: generateUUID(),
+                    nodeId: 'transitions_per_year',
+                    variableName: 'transitions_per_year',
+                    label: 'Transitions per year',
+                    description: 'Total de cambios de grado en planta por ano',
+                    controlType: 'slider',
+                    config: { min: 20, max: 220, step: 5, defaultValue: 120 },
+                    group: 'Demand',
+                    order: 0
+                },
+                {
+                    id: generateUUID(),
+                    nodeId: 'tons_per_transition',
+                    variableName: 'tons_per_transition',
+                    label: 'Tons per transition',
+                    description: 'Volumen procesado por cada cambio de grado',
+                    controlType: 'slider',
+                    config: { min: 30, max: 260, step: 5, defaultValue: 95 },
+                    group: 'Demand',
+                    order: 1
+                },
+                {
+                    id: generateUUID(),
+                    nodeId: 'lab_transition_hours',
+                    variableName: 'lab_transition_hours',
+                    label: 'LAB transition time',
+                    description: 'Tiempo medio de transicion con enfoque tradicional',
+                    controlType: 'slider',
+                    config: { min: 4, max: 36, step: 0.5, unit: 'h', defaultValue: 16 },
+                    group: 'Performance',
+                    order: 2
+                },
+                {
+                    id: generateUUID(),
+                    nodeId: 'model_improvement_percent',
+                    variableName: 'model_improvement_percent',
+                    label: 'Model acceleration',
+                    description: 'Reduccion porcentual del tiempo de transicion',
+                    controlType: 'slider',
+                    config: { min: 5, max: 65, step: 1, unit: '%', defaultValue: 34 },
+                    group: 'Performance',
+                    order: 3
+                },
+                {
+                    id: generateUUID(),
+                    nodeId: 'margin_per_ton_eur',
+                    variableName: 'margin_per_ton_eur',
+                    label: 'Contribution margin',
+                    description: 'Margen medio capturado por tonelada estable',
+                    controlType: 'slider',
+                    config: { min: 40, max: 520, step: 5, prefix: 'EUR ', defaultValue: 160 },
+                    group: 'Economics',
+                    order: 4
+                },
+                {
+                    id: generateUUID(),
+                    nodeId: 'off_spec_penalty_eur_ton',
+                    variableName: 'off_spec_penalty_eur_ton',
+                    label: 'Off-spec penalty',
+                    description: 'Penalizacion media por tonelada fuera de especificacion',
+                    controlType: 'slider',
+                    config: { min: 20, max: 420, step: 5, prefix: 'EUR ', defaultValue: 110 },
+                    group: 'Economics',
+                    order: 5
+                }
+            ];
+
+            return {
+                id,
+                name: 'HDPE Transition Economics',
+                description: 'Preset de ejemplo para estimar impacto anual de acelerar transiciones de grado',
+                workflowId: 'preset-hdpe-transition-economics',
+                workflowName: 'Examples / Presets',
+                parameters: economicsParams,
+                visualizations: [
+                    {
+                        id: generateUUID(),
+                        type: 'kpi',
+                        title: 'Annual value unlocked',
+                        dataMapping: { source: 'annual_value_eur', format: 'currency' },
+                        position: { x: 0, y: 0, w: 1, h: 1 }
+                    },
+                    {
+                        id: generateUUID(),
+                        type: 'kpi',
+                        title: 'Hours saved per transition',
+                        dataMapping: { source: 'saved_hours_per_transition', format: 'number', unit: 'h' },
+                        position: { x: 1, y: 0, w: 1, h: 1 }
+                    },
+                    {
+                        id: generateUUID(),
+                        type: 'kpi',
+                        title: 'Off-spec avoided',
+                        dataMapping: { source: 'off_spec_avoided_tons', format: 'number', unit: 'ton/y' },
+                        position: { x: 2, y: 0, w: 1, h: 1 }
+                    },
+                    {
+                        id: generateUUID(),
+                        type: 'line',
+                        title: 'Transition time benchmark',
+                        dataMapping: { source: 'transition_time_series', xAxis: 'month', yAxis: ['lab_hours', 'model_hours'] },
+                        position: { x: 0, y: 1, w: 2, h: 1 }
+                    },
+                    {
+                        id: generateUUID(),
+                        type: 'bar',
+                        title: 'Economic impact breakdown',
+                        dataMapping: { source: 'economic_breakdown', xAxis: 'category', yAxis: ['value'] },
+                        position: { x: 2, y: 1, w: 2, h: 1 }
+                    },
+                    {
+                        id: generateUUID(),
+                        type: 'table',
+                        title: 'Transition KPI table',
+                        dataMapping: { source: 'transition_kpi_table' },
+                        position: { x: 0, y: 2, w: 4, h: 1 }
+                    }
+                ],
+                savedScenarios: [],
+                runs: [],
+                createdAt: now,
+                updatedAt: now
+            };
+        }
+
+        const monitoringParams: ParameterConfig[] = [
+            {
+                id: generateUUID(),
+                nodeId: 'target_mi',
+                variableName: 'target_mi',
+                label: 'Target MI',
+                description: 'Indice de fluidez objetivo para el grado',
+                controlType: 'number',
+                config: { min: 0.1, max: 80, step: 0.1, defaultValue: 8.5 },
+                group: 'Quality',
+                order: 0
+            },
+            {
+                id: generateUUID(),
+                nodeId: 'spec_band_percent',
+                variableName: 'spec_band_percent',
+                label: 'Spec band (+/-)',
+                description: 'Tolerancia porcentual aceptada frente al target',
+                controlType: 'slider',
+                config: { min: 1, max: 20, step: 0.5, unit: '%', defaultValue: 8 },
+                group: 'Quality',
+                order: 1
+            },
+            {
+                id: generateUUID(),
+                nodeId: 'lab_transition_hours',
+                variableName: 'lab_transition_hours',
+                label: 'LAB transition time',
+                description: 'Duracion media observada en enfoque tradicional',
+                controlType: 'slider',
+                config: { min: 4, max: 36, step: 0.5, unit: 'h', defaultValue: 15 },
+                group: 'Process',
+                order: 2
+            },
+            {
+                id: generateUUID(),
+                nodeId: 'model_improvement_percent',
+                variableName: 'model_improvement_percent',
+                label: 'Model acceleration',
+                description: 'Mejora relativa del enfoque asistido por modelo',
+                controlType: 'slider',
+                config: { min: 5, max: 65, step: 1, unit: '%', defaultValue: 32 },
+                group: 'Process',
+                order: 3
+            },
+            {
+                id: generateUUID(),
+                nodeId: 'transitions_per_month',
+                variableName: 'transitions_per_month',
+                label: 'Transitions per month',
+                description: 'Cambios de grado gestionados por mes',
+                controlType: 'slider',
+                config: { min: 2, max: 28, step: 1, defaultValue: 10 },
+                group: 'Demand',
+                order: 4
+            }
+        ];
+
+        return {
+            id,
+            name: 'HDPE Transition Monitoring',
+            description: 'Preset de ejemplo para control de calidad en transiciones de grado',
+            workflowId: 'preset-hdpe-transition-monitoring',
+            workflowName: 'Examples / Presets',
+            parameters: monitoringParams,
+            visualizations: [
+                {
+                    id: generateUUID(),
+                    type: 'kpi',
+                    title: 'Model transition time',
+                    dataMapping: { source: 'model_transition_hours', format: 'number', unit: 'h' },
+                    position: { x: 0, y: 0, w: 1, h: 1 }
+                },
+                {
+                    id: generateUUID(),
+                    type: 'kpi',
+                    title: 'Transitions in-spec rate',
+                    dataMapping: { source: 'in_spec_rate', format: 'percent' },
+                    position: { x: 1, y: 0, w: 1, h: 1 }
+                },
+                {
+                    id: generateUUID(),
+                    type: 'kpi',
+                    title: 'Hours saved monthly',
+                    dataMapping: { source: 'monthly_hours_saved', format: 'number', unit: 'h/mo' },
+                    position: { x: 2, y: 0, w: 1, h: 1 }
+                },
+                {
+                    id: generateUUID(),
+                    type: 'line',
+                    title: 'MI tracking: LAB vs model',
+                    dataMapping: { source: 'mi_tracking', xAxis: 'sample', yAxis: ['lsl', 'target', 'lab_mi', 'model_mi', 'usl'] },
+                    position: { x: 0, y: 1, w: 2, h: 1 }
+                },
+                {
+                    id: generateUUID(),
+                    type: 'bar',
+                    title: 'Transition duration comparison',
+                    dataMapping: { source: 'transition_comparison', xAxis: 'mode', yAxis: ['hours'] },
+                    position: { x: 2, y: 1, w: 2, h: 1 }
+                },
+                {
+                    id: generateUUID(),
+                    type: 'table',
+                    title: 'Recent transitions',
+                    dataMapping: { source: 'recent_transitions' },
+                    position: { x: 0, y: 2, w: 4, h: 1 }
+                }
+            ],
+            savedScenarios: [],
+            runs: [],
+            createdAt: now,
+            updatedAt: now
+        };
+    };
+
+    const runHdpePresetSimulation = () => {
+        if (!selectedSimulation) return null;
+        const paramsByVariable = selectedSimulation.parameters.reduce<Record<string, any>>((acc, param) => {
+            acc[param.variableName] = parameterValues[param.id] ?? param.config.defaultValue;
+            return acc;
+        }, {});
+
+        const labHours = Number(paramsByVariable.lab_transition_hours || 15);
+        const improvementPct = Number(paramsByVariable.model_improvement_percent || 30);
+        const modelHours = Math.max(1, labHours * (1 - improvementPct / 100));
+
+        if (selectedSimulation.workflowId === 'preset-hdpe-transition-economics') {
+            const transitionsPerYear = Number(paramsByVariable.transitions_per_year || 120);
+            const tonsPerTransition = Number(paramsByVariable.tons_per_transition || 95);
+            const marginPerTon = Number(paramsByVariable.margin_per_ton_eur || 160);
+            const offSpecPenalty = Number(paramsByVariable.off_spec_penalty_eur_ton || 110);
+            const savedHours = Math.max(0, labHours - modelHours);
+            const offSpecAvoided = Math.max(0, transitionsPerYear * tonsPerTransition * (savedHours / Math.max(labHours, 1)) * 0.08);
+            const throughputValue = transitionsPerYear * savedHours * tonsPerTransition * marginPerTon * 0.03;
+            const qualityValue = offSpecAvoided * offSpecPenalty;
+            const annualValue = throughputValue + qualityValue;
+
+            const transitionTimeSeries = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((month, index) => ({
+                month,
+                lab_hours: Number((labHours + Math.sin(index) * 0.8).toFixed(2)),
+                model_hours: Number((modelHours + Math.cos(index) * 0.6).toFixed(2))
+            }));
+
+            return {
+                saved_hours_per_transition: Number(savedHours.toFixed(2)),
+                annual_value_eur: Math.round(annualValue),
+                off_spec_avoided_tons: Math.round(offSpecAvoided),
+                transition_time_series: transitionTimeSeries,
+                economic_breakdown: [
+                    { category: 'Throughput uplift', value: Math.round(throughputValue) },
+                    { category: 'Off-spec avoided', value: Math.round(qualityValue) }
+                ],
+                transition_kpi_table: [
+                    { metric: 'Transitions/year', value: transitionsPerYear, unit: 'count' },
+                    { metric: 'Saved time/transition', value: Number(savedHours.toFixed(2)), unit: 'h' },
+                    { metric: 'Model transition', value: Number(modelHours.toFixed(2)), unit: 'h' },
+                    { metric: 'Off-spec avoided', value: Math.round(offSpecAvoided), unit: 'ton/y' },
+                    { metric: 'Annual value', value: Math.round(annualValue), unit: 'EUR/y' }
+                ]
+            };
+        }
+
+        const targetMI = Number(paramsByVariable.target_mi || 8.5);
+        const specBandPct = Number(paramsByVariable.spec_band_percent || 8);
+        const transitionsPerMonth = Number(paramsByVariable.transitions_per_month || 10);
+        const savedHoursMonthly = Math.max(0, labHours - modelHours) * transitionsPerMonth;
+        const tolerance = targetMI * (specBandPct / 100);
+        const lsl = Number((targetMI - tolerance).toFixed(2));
+        const usl = Number((targetMI + tolerance).toFixed(2));
+
+        const miTracking = Array.from({ length: 10 }, (_, idx) => {
+            const noise = (idx % 2 === 0 ? 1 : -1) * (tolerance * 0.45) * ((idx + 1) / 10);
+            return {
+                sample: `S${idx + 1}`,
+                lsl,
+                target: Number(targetMI.toFixed(2)),
+                usl,
+                lab_mi: Number((targetMI + noise).toFixed(2)),
+                model_mi: Number((targetMI + noise * 0.45).toFixed(2))
+            };
+        });
+
+        const modelInSpec = miTracking.filter(row => row.model_mi >= lsl && row.model_mi <= usl).length;
+        const inSpecRate = (modelInSpec / miTracking.length) * 100;
+
+        return {
+            model_transition_hours: Number(modelHours.toFixed(2)),
+            in_spec_rate: Number(inSpecRate.toFixed(1)),
+            monthly_hours_saved: Number(savedHoursMonthly.toFixed(1)),
+            mi_tracking: miTracking,
+            transition_comparison: [
+                { mode: 'LAB baseline', hours: Number(labHours.toFixed(2)) },
+                { mode: 'Model assisted', hours: Number(modelHours.toFixed(2)) }
+            ],
+            recent_transitions: miTracking.slice(-6).map((row, idx) => ({
+                transition_id: `T-${idx + 201}`,
+                lab_mi: row.lab_mi,
+                model_mi: row.model_mi,
+                target: row.target,
+                status: row.model_mi >= lsl && row.model_mi <= usl ? 'In spec' : 'Risk'
+            }))
+        };
+    };
+
+    const createPresetSimulation = async (presetId: LabPresetId) => {
+        setIsCreatingPreset(true);
+        setShowPresetsMenu(false);
+        try {
+            const simulation = createLabPresetSimulation(presetId);
+            const res = await fetch(`${API_BASE}/simulations`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(simulation)
+            });
+
+            if (!res.ok) {
+                throw new Error(await res.text());
+            }
+
+            setSimulations(prev => [simulation, ...prev]);
+            navigate(`/lab/${simulation.id}`);
+        } catch (error) {
+            console.error('Error creating preset simulation:', error);
+        } finally {
+            setIsCreatingPreset(false);
+        }
+    };
+
     const initializeParameters = (sim: Simulation) => {
         const values: Record<string, any> = {};
         sim.parameters.forEach(param => {
@@ -1131,6 +1523,12 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
             if (selectedSimulation.id === 'demo-experiment') {
                 await new Promise(resolve => setTimeout(resolve, 500));
                 result = runDemoSimulation();
+            } else if (
+                selectedSimulation.workflowId === 'preset-hdpe-transition-monitoring' ||
+                selectedSimulation.workflowId === 'preset-hdpe-transition-economics'
+            ) {
+                await new Promise(resolve => setTimeout(resolve, 350));
+                result = runHdpePresetSimulation();
             } else if (selectedSimulation.calculationCode) {
                 // === CLIENT-SIDE CALCULATION ENGINE ===
                 // Step 1: Execute workflow to get raw data from DB
@@ -2219,6 +2617,35 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                 
                 <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                     <div className="max-w-6xl mx-auto">
+                        <div className="flex items-center justify-end mb-4" ref={presetsMenuRef}>
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowPresetsMenu(prev => !prev)}
+                                    disabled={isCreatingPreset}
+                                    className="inline-flex items-center gap-2 px-3 py-2 border border-[var(--border-light)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-lg text-sm transition-colors disabled:opacity-60"
+                                >
+                                    {isCreatingPreset ? <SpinnerGap size={14} className="animate-spin" /> : <Sparkle size={14} />}
+                                    Examples / Presets
+                                    <CaretDown size={14} />
+                                </button>
+
+                                {showPresetsMenu && (
+                                    <div className="absolute right-0 mt-2 w-[320px] z-20 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-xl p-2">
+                                        {LAB_PRESETS.map((preset) => (
+                                            <button
+                                                key={preset.id}
+                                                onClick={() => createPresetSimulation(preset.id)}
+                                                className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+                                            >
+                                                <p className="text-sm font-medium text-[var(--text-primary)]">{preset.label}</p>
+                                                <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{preset.description}</p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Search */}
                         <div className="relative mb-6">
                             <MagnifyingGlass 
@@ -2252,13 +2679,22 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                     }
                                 </p>
                                 {!searchQuery && (
-                                    <button
-                                        onClick={() => setShowCreateModal(true)}
-                                        className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors"
-                                    >
-                                        <Plus size={16} />
-                                        New Experiment
-                                    </button>
+                                    <div className="inline-flex items-center gap-2">
+                                        <button
+                                            onClick={() => setShowCreateModal(true)}
+                                            className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors"
+                                        >
+                                            <Plus size={16} />
+                                            New Experiment
+                                        </button>
+                                        <button
+                                            onClick={() => setShowPresetsMenu(true)}
+                                            className="inline-flex items-center gap-2 px-4 py-2 border border-[var(--border-light)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-lg text-sm font-medium transition-colors"
+                                        >
+                                            <Sparkle size={14} />
+                                            Examples / Presets
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                         ) : (

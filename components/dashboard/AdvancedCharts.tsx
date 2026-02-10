@@ -261,11 +261,19 @@ export const HeatmapChart: React.FC<HeatmapProps> = ({
     const plotLeft = 12;
     const plotTop = 8;
     const plotRight = 88;
-    const plotBottom = 86;
+    const plotBottom = 82;
     const plotWidth = Math.max(1, plotRight - plotLeft);
     const plotHeight = Math.max(1, plotBottom - plotTop);
     const cellWidth = hasData ? plotWidth / xValues.length : plotWidth;
     const cellHeight = hasData ? plotHeight / yValues.length : plotHeight;
+    const xLabelStep = Math.max(1, Math.ceil(xValues.length / 8));
+    const formatXAxisLabel = (raw: string) => {
+        const date = new Date(raw);
+        if (!Number.isNaN(date.getTime())) {
+            return date.toLocaleDateString('es-ES', { month: '2-digit', day: '2-digit' });
+        }
+        return raw.length > 10 ? `${raw.slice(0, 10)}..` : raw;
+    };
 
     return (
         <div className="w-full relative" style={{ height }}>
@@ -297,12 +305,13 @@ export const HeatmapChart: React.FC<HeatmapProps> = ({
                     <text
                         key={`x-${i}`}
                         x={plotLeft + i * cellWidth + cellWidth / 2}
-                        y="96"
+                        y="95"
                         textAnchor="middle"
-                        fontSize="2.3"
+                        fontSize="2.1"
                         fill="var(--text-tertiary)"
+                        opacity={i % xLabelStep === 0 ? 1 : 0}
                     >
-                        {x.length > 8 ? `${x.slice(0, 8)}..` : x}
+                        {formatXAxisLabel(x)}
                     </text>
                 ))}
                 
@@ -313,10 +322,10 @@ export const HeatmapChart: React.FC<HeatmapProps> = ({
                         x="10"
                         y={plotTop + i * cellHeight + cellHeight / 2 + 0.8}
                         textAnchor="end"
-                        fontSize="2.3"
+                        fontSize="2.2"
                         fill="var(--text-tertiary)"
                     >
-                        {y.length > 10 ? `${y.slice(0, 10)}..` : y}
+                        {y.length > 12 ? `${y.slice(0, 12)}..` : y}
                     </text>
                 ))}
             </svg>
@@ -778,7 +787,7 @@ export const SeverityTimelineChart: React.FC<SeverityTimelineProps> = ({
     events,
     startDate,
     endDate,
-    height = 120,
+    height = 170,
     showLegend = true
 }) => {
     const [hoveredEvent, setHoveredEvent] = useState<{ event: TimelineEvent; x: number } | null>(null);
@@ -808,19 +817,17 @@ export const SeverityTimelineChart: React.FC<SeverityTimelineProps> = ({
     const timeLabels = useMemo(() => {
         const labels: { time: number; label: string }[] = [];
         const range = timeRange.end - timeRange.start;
-        const numLabels = 8;
+        const numLabels = 6;
         
         for (let i = 0; i <= numLabels; i++) {
             const time = timeRange.start + (range * i / numLabels);
             const date = new Date(time);
             labels.push({
                 time,
-                label: date.toLocaleDateString('en-US', { 
-                    weekday: 'short', 
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                }).replace(',', '')
+                label: date.toLocaleDateString('es-ES', {
+                    month: '2-digit',
+                    day: '2-digit'
+                })
             });
         }
         return labels;
@@ -850,6 +857,14 @@ export const SeverityTimelineChart: React.FC<SeverityTimelineProps> = ({
         return Array.from(severities);
     }, [events]);
 
+    const severityCounts = useMemo(() => {
+        return events.reduce<Record<string, number>>((acc, event) => {
+            acc[event.severity] = (acc[event.severity] || 0) + 1;
+            return acc;
+        }, {});
+    }, [events]);
+    const timelineTrackHeight = Math.max(48, Math.min(90, height - (showLegend ? 92 : 64)));
+
     return (
         <div className="w-full" style={{ height }}>
             {/* Header */}
@@ -860,17 +875,25 @@ export const SeverityTimelineChart: React.FC<SeverityTimelineProps> = ({
                         <p className="text-xs text-[var(--text-tertiary)]">{subtitle}</p>
                     )}
                 </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
+                        {events.length} eventos
+                    </span>
+                    {!!severityCounts.high && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-300">
+                            {severityCounts.high} high
+                        </span>
+                    )}
+                    {!!severityCounts.very_high && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300">
+                            {severityCounts.very_high} very high
+                        </span>
+                    )}
+                </div>
             </div>
             
             {/* Timeline */}
-            <div className="relative bg-[var(--bg-tertiary)] rounded-lg overflow-hidden" style={{ height: 40 }}>
-                {/* Track label */}
-                <div className="absolute left-0 top-0 bottom-0 w-auto max-w-[40%] px-2 flex items-center bg-gradient-to-r from-[var(--bg-card)] to-transparent z-10">
-                    <span className="text-[10px] text-[var(--text-secondary)] truncate font-medium">
-                        {subtitle || title}
-                    </span>
-                </div>
-                
+            <div className="relative bg-[var(--bg-tertiary)] rounded-lg overflow-hidden" style={{ height: timelineTrackHeight }}>
                 {/* Event bars */}
                 {eventBars.map((bar, idx) => (
                     <div
@@ -879,7 +902,7 @@ export const SeverityTimelineChart: React.FC<SeverityTimelineProps> = ({
                         style={{
                             left: `${bar.x}%`,
                             width: `${bar.width}%`,
-                            minWidth: '3px',
+                            minWidth: '4px',
                             backgroundColor: SEVERITY_COLORS[bar.severity],
                             boxShadow: hoveredEvent?.event === bar ? '0 0 8px rgba(255,255,255,0.3)' : 'none'
                         }}
@@ -908,7 +931,7 @@ export const SeverityTimelineChart: React.FC<SeverityTimelineProps> = ({
                             transform: 'translateX(-50%)'
                         }}
                     >
-                        {label.label.split(' ').slice(0, 2).join(' ')}
+                        {label.label}
                     </span>
                 ))}
             </div>
@@ -938,8 +961,7 @@ export const SeverityTimelineChart: React.FC<SeverityTimelineProps> = ({
                 <div className="fixed bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-2 shadow-xl text-xs z-50 pointer-events-none"
                     style={{ 
                         left: hoveredEvent.x + 10, 
-                        top: '50%',
-                        transform: 'translateY(-50%)'
+                        top: 80
                     }}
                 >
                     <div className="flex items-center gap-2 mb-1">

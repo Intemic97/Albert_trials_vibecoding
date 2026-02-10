@@ -11,6 +11,7 @@ import { PromptInput } from '../PromptInput';
 export interface WidgetDataConfig {
     entityId: string;
     entityName: string;
+    relatedEntityIds?: string[];
     xAxisColumn?: string;
     yAxisColumn?: string;
     sizeColumn?: string;
@@ -48,6 +49,8 @@ interface WidgetConfiguratorProps {
     entities: Entity[];
     onSave: (config: WidgetFullConfig) => void;
     onCancel: () => void;
+    initialConfig?: Partial<WidgetFullConfig>;
+    submitLabel?: string;
 }
 
 const AGGREGATIONS = [
@@ -70,23 +73,26 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
     template,
     entities,
     onSave,
-    onCancel
+    onCancel,
+    initialConfig,
+    submitLabel
 }) => {
-    const [title, setTitle] = useState(template.name);
-    const [description, setDescription] = useState('');
-    const [selectedEntityId, setSelectedEntityId] = useState<string>('');
-    const [xAxisColumn, setXAxisColumn] = useState<string>('');
-    const [yAxisColumn, setYAxisColumn] = useState<string>('');
-    const [sizeColumn, setSizeColumn] = useState<string>('');
-    const [sourceColumn, setSourceColumn] = useState<string>('');
-    const [targetColumn, setTargetColumn] = useState<string>('');
-    const [dateColumn, setDateColumn] = useState<string>('');
-    const [severityColumn, setSeverityColumn] = useState<string>('');
-    const [labelColumn, setLabelColumn] = useState<string>('');
-    const [trackColumn, setTrackColumn] = useState<string>('');
-    const [aggregation, setAggregation] = useState<string>('sum');
-    const [groupBy, setGroupBy] = useState<string>('');
-    const [limit, setLimit] = useState<number>(10);
+    const initialDataConfig = initialConfig?.dataConfig;
+    const [title, setTitle] = useState(initialConfig?.title || template.name);
+    const [description, setDescription] = useState(initialConfig?.description || '');
+    const [selectedEntityId, setSelectedEntityId] = useState<string>(initialDataConfig?.entityId || '');
+    const [xAxisColumn, setXAxisColumn] = useState<string>(initialDataConfig?.xAxisColumn || '');
+    const [yAxisColumn, setYAxisColumn] = useState<string>(initialDataConfig?.yAxisColumn || '');
+    const [sizeColumn, setSizeColumn] = useState<string>(initialDataConfig?.sizeColumn || '');
+    const [sourceColumn, setSourceColumn] = useState<string>(initialDataConfig?.sourceColumn || '');
+    const [targetColumn, setTargetColumn] = useState<string>(initialDataConfig?.targetColumn || '');
+    const [dateColumn, setDateColumn] = useState<string>(initialDataConfig?.dateColumn || '');
+    const [severityColumn, setSeverityColumn] = useState<string>(initialDataConfig?.severityColumn || '');
+    const [labelColumn, setLabelColumn] = useState<string>(initialDataConfig?.labelColumn || '');
+    const [trackColumn, setTrackColumn] = useState<string>(initialDataConfig?.trackColumn || '');
+    const [aggregation, setAggregation] = useState<string>(initialDataConfig?.aggregation || 'sum');
+    const [groupBy, setGroupBy] = useState<string>(initialDataConfig?.groupBy || '');
+    const [limit, setLimit] = useState<number>(initialDataConfig?.limit || 10);
     const [selectedColorIndex, setSelectedColorIndex] = useState(0);
     
     // AI specific
@@ -94,7 +100,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
     const [isGenerating, setIsGenerating] = useState(false);
     
     // Preview data
-    const [previewData, setPreviewData] = useState<any[]>([]);
+    const [previewData, setPreviewData] = useState<any[]>(Array.isArray(initialConfig?.data) ? initialConfig!.data as any[] : []);
     const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
     const selectedEntity = entities.find(e => e.id === selectedEntityId);
@@ -616,7 +622,6 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
         return { errors, warnings };
     }, [
         template.id,
-        template.id,
         selectedEntityId,
         allColumns,
         xAxisColumn,
@@ -631,6 +636,56 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
         isLoadingPreview
     ]);
     const isValid = validationState.errors.length === 0;
+
+    const previewInsights = useMemo(() => {
+        if (previewData.length === 0) return null;
+
+        if (template.id === 'sankey') {
+            const uniqueSources = new Set(previewData.map((row) => row.source).filter(Boolean)).size;
+            const uniqueTargets = new Set(previewData.map((row) => row.target).filter(Boolean)).size;
+            const selfLoops = previewData.filter((row) => row.source && row.target && row.source === row.target).length;
+            return {
+                title: 'Flow quality',
+                details: [
+                    `${uniqueSources} unique sources`,
+                    `${uniqueTargets} unique targets`,
+                    `${selfLoops} self-loops`
+                ]
+            };
+        }
+
+        if (template.id === 'timeline' || template.id === 'multi_timeline') {
+            const validDates = previewData.filter((row) => {
+                const value = row.start || row.date || row.timestamp || row.time;
+                return value && !Number.isNaN(new Date(value).getTime());
+            }).length;
+            const invalidDates = previewData.length - validDates;
+            const tracks = template.id === 'multi_timeline'
+                ? new Set(previewData.map((row) => row[allColumns.find(c => c.id === trackColumn)?.name || 'asset']).filter(Boolean)).size
+                : null;
+            return {
+                title: 'Event quality',
+                details: [
+                    `${validDates} valid dates`,
+                    invalidDates > 0 ? `${invalidDates} invalid dates` : 'No invalid dates',
+                    tracks !== null ? `${tracks} tracks detected` : ''
+                ].filter(Boolean)
+            };
+        }
+
+        if (template.id === 'heatmap') {
+            const xName = allColumns.find(c => c.id === xAxisColumn)?.name || 'name';
+            const yName = allColumns.find(c => c.id === groupBy)?.name || 'category';
+            const distinctX = new Set(previewData.map((row) => row[xName]).filter(Boolean)).size;
+            const distinctY = new Set(previewData.map((row) => row[yName]).filter(Boolean)).size;
+            return {
+                title: 'Matrix coverage',
+                details: [`${distinctX} X categories`, `${distinctY} row categories`]
+            };
+        }
+
+        return null;
+    }, [previewData, template.id, allColumns, trackColumn, xAxisColumn, groupBy]);
 
     // Render AI Generator UI
     if (template.id === 'ai_generated') {
@@ -994,6 +1049,14 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                 ) : previewData.length > 0 ? (
                                     <div className="w-full">
                                         <p className="text-xs text-[var(--text-secondary)] mb-3">{previewData.length} results</p>
+                                        {previewInsights && (
+                                            <div className="mb-3 p-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
+                                                <p className="text-[11px] font-medium text-[var(--text-secondary)]">{previewInsights.title}</p>
+                                                <p className="text-[11px] text-[var(--text-tertiary)] mt-1">
+                                                    {previewInsights.details.join(' • ')}
+                                                </p>
+                                            </div>
+                                        )}
                                         <div className="space-y-2 max-h-[250px] overflow-y-auto">
                                             {previewData.map((item, index) => (
                                                 <div key={index} className="flex items-center justify-between p-2 bg-[var(--bg-card)] rounded-lg text-xs">
@@ -1049,7 +1112,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                         disabled={!isValid}
                         className="px-4 py-2 bg-[#256A65] hover:bg-[#1e5a55] disabled:bg-[var(--bg-tertiary)] disabled:text-[var(--text-tertiary)] text-white rounded-lg text-sm font-medium transition-colors"
                     >
-                        Add Widget
+                        {submitLabel || 'Add Widget'}
                     </button>
                 </div>
             </div>

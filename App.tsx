@@ -15,7 +15,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ErrorBoundary, KeyboardShortcutsProvider, useShortcut, AnnouncerProvider, SkipLink } from './components/ui';
 import { Entity, Property, PropertyType } from './types';
-import { Plus, MagnifyingGlass, Funnel, ArrowLeft, Trash, Link as LinkIcon, TextT, Hash, PencilSimple, X, Code, Paperclip, Download, SpinnerGap, Sparkle, TreeStructure } from '@phosphor-icons/react';
+import { Plus, MagnifyingGlass, Funnel, ArrowLeft, Trash, Link as LinkIcon, TextT, Hash, PencilSimple, X, Code, Paperclip, Download, SpinnerGap, Sparkle, TreeStructure, CaretDown } from '@phosphor-icons/react';
 import { Tabs } from './components/Tabs';
 import { API_BASE } from './config';
 
@@ -274,6 +274,9 @@ function AuthenticatedApp() {
     const [isCreatingEntity, setIsCreatingEntity] = useState(false);
     const [newEntityName, setNewEntityName] = useState('');
     const [newEntityDescription, setNewEntityDescription] = useState('');
+    const [showEntityExamplesMenu, setShowEntityExamplesMenu] = useState(false);
+    const [isCreatingEntityExamples, setIsCreatingEntityExamples] = useState(false);
+    const entityExamplesMenuRef = useRef<HTMLDivElement>(null);
 
     // Records State
     const [activeTab, setActiveTab] = useState<'structure' | 'data'>('data');
@@ -324,6 +327,18 @@ function AuthenticatedApp() {
     const [importError, setImportError] = useState<string | null>(null);
 
     const activeEntity = entities.find(e => e.id === activeEntityId);
+
+    useEffect(() => {
+        if (!showEntityExamplesMenu) return;
+        const handleClickOutside = (event: MouseEvent) => {
+            if (!entityExamplesMenuRef.current) return;
+            if (!entityExamplesMenuRef.current.contains(event.target as Node)) {
+                setShowEntityExamplesMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showEntityExamplesMenu]);
 
     // Smart Import Functions
     const detectColumnType = (values: any[]): PropertyType => {
@@ -783,6 +798,166 @@ function AuthenticatedApp() {
             setIsCreatingEntity(false);
         } catch (error) {
             console.error('Error creating entity:', error);
+        }
+    };
+
+    const makeId = (prefix: string) => `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+
+    const handleCreateEntityExamples = async (presetId: 'quality_core' | 'transitions_economics') => {
+        if (isCreatingEntityExamples) return;
+        setIsCreatingEntityExamples(true);
+        try {
+            const authorName = user?.name || user?.email?.split('@')[0] || 'User';
+            const nowLabel = 'Just now';
+            const entityBlueprints: Record<'quality_core' | 'transitions_economics', Array<{
+                name: string;
+                description: string;
+                properties: Array<{ name: string; type: PropertyType; defaultValue?: string; unit?: string }>;
+                records?: Array<Record<string, string | number>>;
+            }>> = {
+                quality_core: [
+                    {
+                        name: 'Example - Polymer Batches',
+                        description: 'Batches with quality, productivity and energy indicators.',
+                        properties: [
+                            { name: 'Date', type: 'text' },
+                            { name: 'Line', type: 'text' },
+                            { name: 'Grade', type: 'text' },
+                            { name: 'Melting Index (Mi2)', type: 'number', unit: 'g/10min' },
+                            { name: 'Density', type: 'number', unit: 'g/cm3' },
+                            { name: 'Scrap (%)', type: 'number', unit: '%' },
+                            { name: 'Energy (kWh)', type: 'number', unit: 'kWh' },
+                            { name: 'Quality Status', type: 'text' }
+                        ],
+                        records: [
+                            { Date: '2026-02-01', Line: 'R1', Grade: 'M5309', 'Melting Index (Mi2)': 0.61, Density: 0.953, 'Scrap (%)': 1.4, 'Energy (kWh)': 14120, 'Quality Status': 'In spec' },
+                            { Date: '2026-02-02', Line: 'R1', Grade: 'M5309', 'Melting Index (Mi2)': 0.58, Density: 0.952, 'Scrap (%)': 1.6, 'Energy (kWh)': 13980, 'Quality Status': 'In spec' },
+                            { Date: '2026-02-03', Line: 'R2', Grade: '5803', 'Melting Index (Mi2)': 0.31, Density: 0.957, 'Scrap (%)': 3.2, 'Energy (kWh)': 14940, 'Quality Status': 'Transition' },
+                            { Date: '2026-02-04', Line: 'R2', Grade: '5803', 'Melting Index (Mi2)': 0.27, Density: 0.956, 'Scrap (%)': 1.9, 'Energy (kWh)': 14410, 'Quality Status': 'In spec' }
+                        ]
+                    },
+                    {
+                        name: 'Example - Grade Transitions',
+                        description: 'Transition windows and quality/economic context.',
+                        properties: [
+                            { name: 'Start Time', type: 'text' },
+                            { name: 'End Time', type: 'text' },
+                            { name: 'From Grade', type: 'text' },
+                            { name: 'To Grade', type: 'text' },
+                            { name: 'Operation Mode', type: 'text' },
+                            { name: 'Lab-safe Duration (h)', type: 'number', unit: 'h' },
+                            { name: 'Model Duration (h)', type: 'number', unit: 'h' },
+                            { name: 'Secondary Polymer (t)', type: 'number', unit: 't' },
+                            { name: 'Severity', type: 'text' }
+                        ],
+                        records: [
+                            { 'Start Time': '2026-02-02 20:00', 'End Time': '2026-02-03 04:00', 'From Grade': 'M5309', 'To Grade': '5803', 'Operation Mode': 'Parallel->Series', 'Lab-safe Duration (h)': 8, 'Model Duration (h)': 4, 'Secondary Polymer (t)': 56, Severity: 'high' },
+                            { 'Start Time': '2026-02-05 08:00', 'End Time': '2026-02-05 14:00', 'From Grade': '5803', 'To Grade': 'R4805', 'Operation Mode': 'Series', 'Lab-safe Duration (h)': 6, 'Model Duration (h)': 3.5, 'Secondary Polymer (t)': 39, Severity: 'medium' }
+                        ]
+                    }
+                ],
+                transitions_economics: [
+                    {
+                        name: 'Example - Transition Economics',
+                        description: 'Economic impact assumptions to quantify yearly value from transition reduction.',
+                        properties: [
+                            { name: 'Scenario', type: 'text' },
+                            { name: 'Transition Time LAB (h)', type: 'number', unit: 'h' },
+                            { name: 'Transition Time Improved (h)', type: 'number', unit: 'h' },
+                            { name: 'Production Rate (kg/h)', type: 'number', unit: 'kg/h' },
+                            { name: 'Primary Price (EUR/kg)', type: 'number', unit: 'EUR/kg' },
+                            { name: 'Secondary Price (EUR/kg)', type: 'number', unit: 'EUR/kg' },
+                            { name: 'Estimated Gain (EUR/year)', type: 'number', unit: 'EUR/year' }
+                        ],
+                        records: [
+                            { Scenario: 'Conservative', 'Transition Time LAB (h)': 8, 'Transition Time Improved (h)': 7.5, 'Production Rate (kg/h)': 14000, 'Primary Price (EUR/kg)': 1.45, 'Secondary Price (EUR/kg)': 1.05, 'Estimated Gain (EUR/year)': 267826 },
+                            { Scenario: 'Aggressive', 'Transition Time LAB (h)': 8, 'Transition Time Improved (h)': 6.5, 'Production Rate (kg/h)': 14000, 'Primary Price (EUR/kg)': 1.45, 'Secondary Price (EUR/kg)': 1.05, 'Estimated Gain (EUR/year)': 803478 }
+                        ]
+                    },
+                    {
+                        name: 'Example - Circular Material Streams',
+                        description: 'Circularity-related material movements with emissions context.',
+                        properties: [
+                            { name: 'Date', type: 'text' },
+                            { name: 'Stream Type', type: 'text' },
+                            { name: 'Origin', type: 'text' },
+                            { name: 'Destination', type: 'text' },
+                            { name: 'Tonnes', type: 'number', unit: 't' },
+                            { name: 'Recycled Content (%)', type: 'number', unit: '%' },
+                            { name: 'CO2e (kg/t)', type: 'number', unit: 'kg/t' },
+                            { name: 'Status', type: 'text' }
+                        ],
+                        records: [
+                            { Date: '2026-02-01', 'Stream Type': 'Regrind', Origin: 'Extrusion line 1', Destination: 'Compounding', Tonnes: 18, 'Recycled Content (%)': 75, 'CO2e (kg/t)': 280, Status: 'In reuse' },
+                            { Date: '2026-02-02', 'Stream Type': 'Off-spec pellet', Origin: 'Transition buffer', Destination: 'External recycler', Tonnes: 26, 'Recycled Content (%)': 0, 'CO2e (kg/t)': 410, Status: 'Sold as secondary' }
+                        ]
+                    }
+                ]
+            };
+
+            const selectedBlueprint = entityBlueprints[presetId];
+            const existingByName = new Map(entities.map((entity) => [entity.name.toLowerCase(), entity]));
+            let createdCount = 0;
+
+            for (const blueprint of selectedBlueprint) {
+                const existing = existingByName.get(blueprint.name.toLowerCase());
+                let entityId = existing?.id;
+
+                if (!entityId) {
+                    entityId = makeId('ent_ex');
+                    const properties = blueprint.properties.map((property) => ({
+                        id: makeId('prop_ex'),
+                        name: property.name,
+                        type: property.type,
+                        defaultValue: property.defaultValue || (property.type === 'number' ? '0' : ''),
+                        unit: property.unit
+                    }));
+
+                    const createRes = await fetch(`${API_BASE}/entities`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            id: entityId,
+                            name: blueprint.name,
+                            description: blueprint.description,
+                            author: authorName,
+                            lastEdited: nowLabel,
+                            entityType: 'example',
+                            properties
+                        })
+                    });
+                    if (!createRes.ok) {
+                        throw new Error(`Failed creating entity: ${blueprint.name}`);
+                    }
+                    createdCount += 1;
+                }
+
+                // Seed example records only when entity was just created
+                if (!existing && blueprint.records && blueprint.records.length > 0 && entityId) {
+                    for (const row of blueprint.records) {
+                        await fetch(`${API_BASE}/entities/${entityId}/records`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify(row)
+                        });
+                    }
+                }
+            }
+
+            await fetchEntities();
+            setShowEntityExamplesMenu(false);
+            if (createdCount > 0) {
+                alert(`Created ${createdCount} example entities.`);
+            } else {
+                alert('Example entities already exist. Open and edit them directly.');
+            }
+        } catch (error) {
+            console.error('Error creating entity examples:', error);
+            alert('Failed creating example entities');
+        } finally {
+            setIsCreatingEntityExamples(false);
         }
     };
 
@@ -1563,6 +1738,37 @@ function AuthenticatedApp() {
                                                         <Funnel size={14} className="mr-2" weight="light" />
                                                         Filter
                                                     </button>
+                                                    <div className="relative" ref={entityExamplesMenuRef}>
+                                                        <button
+                                                            onClick={() => setShowEntityExamplesMenu((prev) => !prev)}
+                                                            disabled={isCreatingEntityExamples}
+                                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                                                        >
+                                                            {isCreatingEntityExamples ? 'Creating...' : 'Examples'}
+                                                            <CaretDown size={12} className="ml-2" weight="bold" />
+                                                        </button>
+                                                        {showEntityExamplesMenu && (
+                                                            <div className="absolute right-0 top-10 z-30 w-80 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl p-2">
+                                                                <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-[var(--text-tertiary)]">
+                                                                    Example entity packs
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => handleCreateEntityExamples('quality_core')}
+                                                                    className="w-full text-left px-2.5 py-2 rounded-md hover:bg-[var(--bg-hover)] transition-colors"
+                                                                >
+                                                                    <div className="text-xs font-medium text-[var(--text-primary)]">Quality Core Pack</div>
+                                                                    <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">Polymer batches + grade transitions with process quality context.</div>
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleCreateEntityExamples('transitions_economics')}
+                                                                    className="w-full text-left px-2.5 py-2 rounded-md hover:bg-[var(--bg-hover)] transition-colors"
+                                                                >
+                                                                    <div className="text-xs font-medium text-[var(--text-primary)]">Transitions & Economics Pack</div>
+                                                                    <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">Transition economics + circular material streams.</div>
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                     <button
                                                         onClick={() => setIsCreatingEntity(true)}
                                                         className="flex items-center px-3 py-1.5 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"

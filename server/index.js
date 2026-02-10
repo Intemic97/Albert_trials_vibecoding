@@ -4638,6 +4638,37 @@ app.delete('/api/widgets/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// Update widget (title/description/config)
+app.put('/api/widgets/:id', authenticateToken, async (req, res) => {
+    try {
+        const { title, description, config } = req.body;
+
+        // Verify widget belongs to user's org via dashboard
+        const widget = await db.get(`
+            SELECT w.id, w.dashboardId FROM widgets w
+            JOIN dashboards d ON w.dashboardId = d.id
+            WHERE w.id = ? AND d.organizationId = ?
+        `, [req.params.id, req.user.orgId]);
+
+        if (!widget) {
+            return res.status(404).json({ error: 'Widget not found' });
+        }
+
+        await db.run(
+            'UPDATE widgets SET title = ?, description = ?, config = ? WHERE id = ?',
+            [title || 'Widget', description || '', JSON.stringify(config || {}), req.params.id]
+        );
+
+        // Touch dashboard updatedAt
+        await db.run('UPDATE dashboards SET updatedAt = ? WHERE id = ?', [new Date().toISOString(), widget.dashboardId]);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating widget:', error);
+        res.status(500).json({ error: 'Failed to update widget' });
+    }
+});
+
 // ==================== USE CASE PACKAGE IMPORT ====================
 
 // POST /api/use-case/import - Subir un package JSON para importar como use case (entidades, workflow, simulación, dashboard)
