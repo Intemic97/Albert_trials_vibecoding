@@ -8153,18 +8153,19 @@ app.post('/api/report-templates/generate', authenticateToken, async (req, res) =
                     messages: [
                         {
                             role: 'system',
-                            content: `You are a reporting architect assistant.
-Return valid JSON only with this shape:
+                            content: `You are a senior reporting architect for industrial plants (petrochemical, plastics, polymers). You create structured report templates.
+
+Return valid JSON only with this exact shape:
 {
-  "name": "string",
-  "description": "string",
+  "name": "string (concise template name)",
+  "description": "string (1-2 sentence purpose)",
   "icon": "FileText|FlaskConical|Clipboard|Wrench|AlertTriangle|Sparkles",
   "suggestedDocument": { "name": "string", "description": "string" },
   "sections": [
     {
       "title": "string",
-      "content": "string",
-      "generationRules": "string",
+      "content": "string (what this section covers)",
+      "generationRules": "string (instructions for auto-generating content from data)",
       "items": [
         { "title": "string", "content": "string", "generationRules": "string" }
       ]
@@ -8181,14 +8182,18 @@ Return valid JSON only with this shape:
     }
   ]
 }
-Requirements:
-- Return at least 3 sections.
-- Each section should have 1-4 items.
-- Keep names concise and professional.`
+
+STRICT REQUIREMENTS:
+- You MUST return between 4 and 6 sections. Never return just 1 section.
+- Each section MUST have 2-4 items (subsections).
+- Use industrial/process engineering terminology (MI, OEE, scrap, grade transitions, spec bands, etc.).
+- generationRules should describe what data to pull and how to visualize (charts, tables, KPIs).
+- suggestedEntities should include 2-3 relevant data entities with realistic properties.
+- Keep the template actionable for a process engineer or quality manager.`
                         },
                         { role: 'user', content: String(prompt) }
                     ],
-                    max_tokens: 2500
+                    max_tokens: 4000
                 });
 
                 const content = completion.choices?.[0]?.message?.content || '{}';
