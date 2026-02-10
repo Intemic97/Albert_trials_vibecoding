@@ -360,11 +360,13 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
     const { type, data: rawData, xAxisKey, dataKey, colors = DEFAULT_COLORS } = normalizedConfig;
     const containerRef = useRef<HTMLDivElement>(null);
     
-    // Filter data by date range if provided
-    const data = React.useMemo(
-        () => filterDataByDateRange(rawData, dateRange, [xAxisKey, normalizedConfig.xAxisKey]),
-        [rawData, dateRange, xAxisKey, normalizedConfig.xAxisKey]
-    );
+    // Filter data by date range if provided — fall back to full dataset if filter removes everything
+    const data = React.useMemo(() => {
+        const filtered = filterDataByDateRange(rawData, dateRange, [xAxisKey, normalizedConfig.xAxisKey]);
+        // If filtering emptied the dataset but raw data exists, show all data rather than nothing
+        if (filtered.length === 0 && rawData.length > 0) return rawData;
+        return filtered;
+    }, [rawData, dateRange, xAxisKey, normalizedConfig.xAxisKey]);
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     const [isReady, setIsReady] = useState(false);
     const [activeIndex, setActiveIndex] = useState<number | null>(null);
