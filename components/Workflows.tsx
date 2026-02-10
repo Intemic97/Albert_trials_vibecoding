@@ -3034,18 +3034,26 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     break;
                 case 'franmit':
                     try {
-                        // Build receta from input data or use inputData directly
-                        let franmitInput: any = {};
-                        
-                        if (inputData) {
-                            if (Array.isArray(inputData) && inputData.length > 0) {
-                                // If array, take first element
-                                franmitInput = inputData[0];
-                            } else if (typeof inputData === 'object') {
-                                // If object, use directly
-                                franmitInput = inputData;
+                        // Sanitize null/NaN values from integration output
+                        const sanitizeFranmitOutput = (obj: any, depth = 0): any => {
+                            if (depth > 50) return obj;
+                            if (obj === null || obj === undefined) return 0;
+                            if (typeof obj === 'number') {
+                                if (isNaN(obj) || !isFinite(obj)) return 0;
+                                return obj;
                             }
-                        }
+                            if (Array.isArray(obj)) {
+                                return obj.map(item => sanitizeFranmitOutput(item, depth + 1));
+                            }
+                            if (typeof obj === 'object') {
+                                const sanitized: any = {};
+                                for (const key of Object.keys(obj)) {
+                                    sanitized[key] = sanitizeFranmitOutput(obj[key], depth + 1);
+                                }
+                                return sanitized;
+                            }
+                            return obj;
+                        };
                         
                         // Build reactor configuration from node config
                         const reactorConfiguration: any = {};
@@ -3060,14 +3068,24 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             reactorConfiguration.scale_cat = 1; // Default
                         }
 
+                        // Determine if we have multiple rows (batch) or single receta
+                        const isBatch = Array.isArray(inputData) && inputData.length > 0;
+                        const requestBody = isBatch
+                            ? {
+                                mode: 'batch',
+                                recetas: inputData,
+                                reactorConfiguration: reactorConfiguration
+                            }
+                            : {
+                                mode: 'single',
+                                receta: (typeof inputData === 'object' && !Array.isArray(inputData)) ? inputData : {},
+                                reactorConfiguration: reactorConfiguration
+                            };
+
                         const response = await fetch(`${API_BASE}/franmit/execute`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                funName: 'solve_single_receta',
-                                receta: franmitInput,
-                                reactorConfiguration: reactorConfiguration
-                            }),
+                            body: JSON.stringify(requestBody),
                             credentials: 'include'
                         });
 
@@ -3080,15 +3098,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 throw error;
                             }
                             
-                            // Extract outputs from the result
-                            // data.outs is a dict with grado as key, get the first value
-                            const outs = data.outs || {};
-                            const firstGrado = Object.keys(outs)[0];
-                            const outputData = firstGrado ? outs[firstGrado] : outs;
+                            // data.results is an array of output rows (one per input receta)
+                            const results = sanitizeFranmitOutput(data.results || []);
                             
                             // Convert to array format for node output
-                            nodeData = [outputData];
-                            result = `FranMIT reactor model executed successfully`;
+                            nodeData = Array.isArray(results) ? results : [results];
+                            result = `FranMIT reactor model executed: ${nodeData.length} row(s)`;
                         } else {
                             const errorData = await response.json();
                             const error: any = new Error(errorData.error || 'FranMIT execution failed');

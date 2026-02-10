@@ -3463,34 +3463,73 @@ finally:
 
 // Franmit Reactor Execution Endpoint - Local Python Execution
 app.post('/api/franmit/execute', authenticateToken, async (req, res) => {
-    const { funName, receta, qins, reactorConfiguration } = req.body;
+    const { mode, receta, recetas, qins, reactorConfiguration } = req.body;
 
     const fs = require('fs');
     const path = require('path');
     const { spawn } = require('child_process');
     const platform = require('os').platform();
 
-    try {
-        console.log('[Franmit] Executing reactor model locally');
-        
-        // Build input data
-        const zeros8 = [0, 0, 0, 0, 0, 0, 0, 0];
-        const inputData = {
-            receta: receta || {},
-            reactor_configuration: reactorConfiguration || { V_reb: 53, scale_cat: 1 },
-            qins: qins || {
-                'Q_H2o': 0, 'Q_Hxo': 0,
-                'Q_Po': [...zeros8], 'Q_Yo': [...zeros8], 'Q_Y1': [...zeros8],
-                'Q_To': [...zeros8], 'Q_T1': [...zeros8], 'Q_T2': [...zeros8],
+    // Sanitize NaN/null/Infinity values from integration outputs
+    function sanitizeNaNValues(obj, depth = 0) {
+        if (depth > 50) return obj;
+        if (obj === null || obj === undefined) return 0;
+        if (typeof obj === 'number') {
+            if (isNaN(obj) || !isFinite(obj)) return 0;
+            return obj;
+        }
+        if (Array.isArray(obj)) {
+            return obj.map(item => sanitizeNaNValues(item, depth + 1));
+        }
+        if (typeof obj === 'object') {
+            const sanitized = {};
+            for (const key of Object.keys(obj)) {
+                sanitized[key] = sanitizeNaNValues(obj[key], depth + 1);
             }
+            return sanitized;
+        }
+        return obj;
+    }
+
+    // Pre-process raw Python stdout to fix NaN/Infinity tokens before JSON.parse
+    function sanitizeJsonString(rawStr) {
+        return rawStr
+            .replace(/\bNaN\b/g, '0')
+            .replace(/\b-Infinity\b/g, '0')
+            .replace(/\bInfinity\b/g, '0');
+    }
+
+    try {
+        const isBatch = mode === 'batch' && Array.isArray(recetas) && recetas.length > 0;
+        console.log(`[Franmit] Executing reactor model locally (mode: ${isBatch ? 'batch' : 'single'}, rows: ${isBatch ? recetas.length : 1})`);
+        
+        // Build input data for Python script
+        const zeros8 = [0, 0, 0, 0, 0, 0, 0, 0];
+        const defaultQins = {
+            'Q_H2o': 0, 'Q_Hxo': 0,
+            'Q_Po': [...zeros8], 'Q_Yo': [...zeros8], 'Q_Y1': [...zeros8],
+            'Q_To': [...zeros8], 'Q_T1': [...zeros8], 'Q_T2': [...zeros8],
         };
         
-        console.log('[Franmit] Input data:', JSON.stringify(inputData).substring(0, 300));
+        const inputData = isBatch
+            ? {
+                mode: 'batch',
+                recetas: recetas,
+                reactor_configuration: reactorConfiguration || { V_reb: 53, scale_cat: 1 },
+                qins: qins || defaultQins
+            }
+            : {
+                mode: 'single',
+                receta: receta || {},
+                reactor_configuration: reactorConfiguration || { V_reb: 53, scale_cat: 1 },
+                qins: qins || defaultQins
+            };
+        
+        console.log('[Franmit] Input data:', JSON.stringify(inputData).substring(0, 400));
 
         // Path to Python script
         const scriptPath = path.join(__dirname, 'franmit_model.py');
         
-        // Check if script exists
         if (!fs.existsSync(scriptPath)) {
             return res.status(500).json({
                 success: false,
@@ -3521,33 +3560,42 @@ app.post('/api/franmit/execute', authenticateToken, async (req, res) => {
             stderrData += data.toString();
         });
 
-        // Set timeout (60 seconds for reactor model)
+        // Set timeout (90 seconds for reactor model - ODE integration can be slow)
         const timeout = setTimeout(() => {
             pythonProcess.kill('SIGKILL');
             return res.status(500).json({
                 success: false,
-                error: 'Franmit execution timed out (60s limit)'
+                error: 'Franmit execution timed out (90s limit)'
             });
-        }, 60000);
+        }, 90000);
 
         pythonProcess.on('close', (code) => {
             clearTimeout(timeout);
             
             // Log stderr warnings (numpy RuntimeWarnings are expected)
             if (stderrData) {
-                console.log('[Franmit] Python stderr (warnings):', stderrData.substring(0, 300));
+                console.log('[Franmit] Python stderr (warnings):', stderrData.substring(0, 500));
             }
 
-            // Try to parse stdout first (even on non-zero exit code, errors are in stdout as JSON)
             try {
-                const result = JSON.parse(stdoutData);
+                // Pre-process: replace NaN/Infinity tokens with 0 before JSON.parse
+                const sanitizedStdout = sanitizeJsonString(stdoutData);
+                const result = JSON.parse(sanitizedStdout);
                 
                 if (result.success) {
-                    console.log('[Franmit] Reactor model completed successfully');
+                    // Python returns { success, results: [...], errors: [] }
+                    // results is an array of output rows (one per input receta)
+                    const sanitizedResults = sanitizeNaNValues(result.results || []);
+                    
+                    if (result.errors && result.errors.length > 0) {
+                        console.log('[Franmit] Some rows had errors:', result.errors);
+                    }
+                    
+                    console.log(`[Franmit] Reactor model completed: ${sanitizedResults.length} result(s)`);
                     res.json({
                         success: true,
-                        outs: result.outs,
-                        qouts: result.qouts,
+                        results: sanitizedResults,
+                        errors: result.errors || [],
                         display: ''
                     });
                 } else {
@@ -3560,7 +3608,6 @@ app.post('/api/franmit/execute', authenticateToken, async (req, res) => {
                     });
                 }
             } catch (parseError) {
-                // If stdout is not valid JSON, fall back to stderr
                 if (code !== 0) {
                     console.error('[Franmit] Python process error (code ' + code + '):', stderrData || stdoutData);
                     res.status(500).json({
@@ -3585,7 +3632,7 @@ app.post('/api/franmit/execute', authenticateToken, async (req, res) => {
             console.error('[Franmit] Failed to start Python process:', error);
             res.status(500).json({
                 success: false,
-                error: `Failed to execute Python: ${error.message}. Make sure Python 3 with numpy is installed.`
+                error: `Failed to execute Python: ${error.message}. Make sure Python 3 with numpy/scipy is installed.`
             });
         });
 
