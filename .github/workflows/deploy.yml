@@ -28,7 +28,7 @@ jobs:
             npm ci
 
             echo "== Install Python deps =="
-            pip3 install numpy --quiet || python3 -m pip install numpy --quiet
+            sudo apt-get install -y -qq python3-pip python3-numpy 2>/dev/null || true
 
             echo "== Build frontend =="
             npm run build
