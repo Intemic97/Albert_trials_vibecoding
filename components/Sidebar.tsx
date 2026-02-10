@@ -630,7 +630,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
               onNavigate={onNavigate}
               menuPlacement="top-right"
               initialView="organizations"
-              triggerClassName="p-1.5 rounded hover:bg-[var(--sidebar-bg-active)] transition-colors duration-200 ease-in-out flex-shrink-0"
+              triggerClassName="p-1.5 rounded hover:bg-[var(--sidebar-bg-hover)] transition-colors duration-200 ease-in-out flex-shrink-0"
               triggerContent={
                 <CaretUpDown size={16} weight="light" className="text-[var(--sidebar-icon)]" />
               }

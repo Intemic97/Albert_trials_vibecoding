@@ -1,0 +1,200 @@
+{
+  "name": "Knowledge Base Repsol - Planta Petroquimica",
+  "version": "1.0.0",
+  "language": "es",
+  "createdAt": "2026-02-09T00:00:00.000Z",
+  "description": "Base de conocimiento de referencia para operacion de planta petroquimica (caso tipo Repsol). Incluye procedimientos, seguridad, mantenimiento, calidad y energia.",
+  "folders": [
+    {
+      "id": "kb_folder_operaciones",
+      "name": "Operaciones",
+      "description": "Procedimientos operativos estandar y guias de operacion diaria",
+      "color": "#256A65",
+      "parentId": null
+    },
+    {
+      "id": "kb_folder_hse",
+      "name": "Seguridad y Medio Ambiente",
+      "description": "Normas HSE, permisos, LOTO y gestion ambiental",
+      "color": "#DC2626",
+      "parentId": null
+    },
+    {
+      "id": "kb_folder_mantenimiento",
+      "name": "Mantenimiento y Fiabilidad",
+      "description": "Planes preventivos, criticidad y analisis de fallos",
+      "color": "#1D4ED8",
+      "parentId": null
+    },
+    {
+      "id": "kb_folder_calidad",
+      "name": "Calidad y Laboratorio",
+      "description": "Control de calidad, especificaciones y metodos de ensayo",
+      "color": "#7C3AED",
+      "parentId": null
+    },
+    {
+      "id": "kb_folder_energia",
+      "name": "Energia y Utilidades",
+      "description": "Optimizacion energetica, vapor, electricidad y agua de proceso",
+      "color": "#D97706",
+      "parentId": null
+    }
+  ],
+  "documents": [
+    {
+      "id": "kb_doc_sop_arranque_extrusion",
+      "folderId": "kb_folder_operaciones",
+      "title": "SOP Arranque de linea de extrusion de poliolefinas",
+      "docType": "SOP",
+      "revision": "R3",
+      "effectiveDate": "2025-10-01",
+      "owner": "Jefatura de Operaciones",
+      "tags": ["operacion", "extrusion", "arranque", "poliolefinas", "sop"],
+      "summary": "Secuencia de arranque seguro para linea de extrusion HDPE/PP con controles criticos de temperatura, presion y calidad de pellet.",
+      "content": "Objetivo: Garantizar un arranque seguro, estable y repetible de la linea de extrusion.\\n\\nPrecondiciones:\\n1) Permiso de trabajo cerrado y area liberada.\\n2) Servicios auxiliares disponibles: vapor, aire de instrumentos, agua de enfriamiento y energia electrica.\\n3) Verificacion de materias primas segun receta de produccion.\\n\\nSecuencia:\\n1) Confirmar estado mecanico de extrusora, alimentadores y cuchillas de pelletizado.\\n2) Activar calentamiento por zonas con rampas de 20-25 C por hora hasta setpoint.\\n3) Verificar interlocks de alta presion y alta temperatura activos.\\n4) Iniciar giro en vacio a baja velocidad durante 5-10 minutos.\\n5) Introducir carga de resina de forma gradual (20%, 50%, 80%, 100%).\\n6) Estabilizar presion de cabezal y temperatura de fusión.\\n7) Tomar primera muestra de pellet y validar MFI, humedad y dispersion de aditivo.\\n\\nCriterios de aceptacion:\\n- Variacion de presion < +/-5%.\\n- Scrap inicial < 3% en los primeros 30 minutos.\\n- Cumplimiento de especificacion de producto en laboratorio."
+    },
+    {
+      "id": "kb_doc_sop_parada_segura",
+      "folderId": "kb_folder_operaciones",
+      "title": "SOP Parada segura de unidad de extrusion",
+      "docType": "SOP",
+      "revision": "R2",
+      "effectiveDate": "2025-09-15",
+      "owner": "Jefatura de Operaciones",
+      "tags": ["operacion", "parada", "seguridad", "extrusion"],
+      "summary": "Procedimiento para parada programada y no programada minimizando riesgos de degradacion termica y danos de equipo.",
+      "content": "Parada programada:\\n1) Reducir carga al 50% durante 15 minutos.\\n2) Purga de material con resina de limpieza segun receta.\\n3) Reducir velocidad de husillo y desactivar alimentacion principal.\\n4) Mantener giro lento hasta que la presion del cabezal sea estable y baja.\\n5) Parar motor principal, luego calefaccion por zonas de forma secuencial.\\n6) Registrar evento en bitacora digital.\\n\\nParada de emergencia:\\n- Activar ESD.\\n- Asegurar aislamiento de energia.\\n- Notificar a sala de control y HSE.\\n\\nPost-parada:\\n- Inspeccion visual de boquilla y filtro.\\n- Captura de causa raiz preliminar si hubo parada no programada."
+    },
+    {
+      "id": "kb_doc_permisos_trabajo",
+      "folderId": "kb_folder_hse",
+      "title": "Matriz de permisos de trabajo y aislamiento (PTW + LOTO)",
+      "docType": "Politica",
+      "revision": "R5",
+      "effectiveDate": "2025-08-20",
+      "owner": "HSE Planta",
+      "tags": ["hse", "ptw", "loto", "aislamiento", "seguridad"],
+      "summary": "Define tipos de permiso, responsables y pasos obligatorios para aislamiento de energias peligrosas.",
+      "content": "Tipos de permiso:\\n- Trabajo en caliente\\n- Espacio confinado\\n- Trabajo electrico\\n- Trabajo en altura\\n\\nReglas obligatorias:\\n1) Ningun trabajo inicia sin PTW aprobado y vigente.\\n2) LOTO fisico verificado por ejecutor y supervisor.\\n3) Prueba de cero energia documentada antes de intervenir.\\n4) Cierre de permiso con verificacion de restitucion segura.\\n\\nResponsabilidades:\\n- Operaciones: aislamiento de proceso.\\n- Mantenimiento: bloqueo tecnico.\\n- HSE: auditoria de cumplimiento y cierre de desvíos."
+    },
+    {
+      "id": "kb_doc_respuesta_incidentes",
+      "folderId": "kb_folder_hse",
+      "title": "Plan de respuesta ante incidentes de proceso",
+      "docType": "Plan",
+      "revision": "R4",
+      "effectiveDate": "2025-11-05",
+      "owner": "HSE y Sala de Control",
+      "tags": ["incidentes", "emergencia", "hse", "respuesta", "escalado"],
+      "summary": "Protocolo de actuacion para fugas, incendios, sobrepresion y desviaciones criticas de proceso.",
+      "content": "Escenarios cubiertos:\\n- Fuga de hidrocarburos\\n- Incendio en area de extrusion\\n- Sobrepresion de reactor/equipo\\n- Perdida de servicios criticos\\n\\nNiveles de severidad:\\n- Nivel 1: Control local por operador.\\n- Nivel 2: Activacion de brigada interna.\\n- Nivel 3: Emergencia mayor y notificacion externa.\\n\\nTiempos objetivo:\\n- Deteccion a notificacion: < 2 minutos.\\n- Aislamiento inicial: < 5 minutos.\\n- Reporte preliminar: < 30 minutos."
+    },
+    {
+      "id": "kb_doc_plan_mantenimiento_preventivo",
+      "folderId": "kb_folder_mantenimiento",
+      "title": "Plan preventivo de activos criticos de extrusion y utilidades",
+      "docType": "Plan",
+      "revision": "R6",
+      "effectiveDate": "2025-07-10",
+      "owner": "Ingenieria de Mantenimiento",
+      "tags": ["mantenimiento", "preventivo", "fiabilidad", "activos", "mtbf"],
+      "summary": "Frecuencias y tareas PM para motores, reductores, bombas, compresores y sistemas de vapor/enfriamiento.",
+      "content": "Activos criticos:\\n- Motor principal extrusora\\n- Reductor\\n- Bomba de vacio\\n- Compresor de aire de instrumentos\\n- Intercambiadores de calor\\n\\nIndicadores de seguimiento:\\n- MTBF por familia de activo\\n- MTTR promedio\\n- Cumplimiento PM > 95%\\n- Backlog de ordenes < 4 semanas\\n\\nCondiciones de escalado:\\n- Vibracion > limite ISO: generar OT correctiva inmediata.\\n- Temperatura de rodamiento fuera de ventana: inspeccion en turno."
+    },
+    {
+      "id": "kb_doc_rcm_criticidad",
+      "folderId": "kb_folder_mantenimiento",
+      "title": "Metodologia RCM y criticidad de equipos",
+      "docType": "Guia",
+      "revision": "R1",
+      "effectiveDate": "2025-12-01",
+      "owner": "Fiabilidad",
+      "tags": ["rcm", "criticidad", "fmea", "fiabilidad"],
+      "summary": "Criterios de criticidad combinando impacto en seguridad, produccion, coste y medio ambiente.",
+      "content": "Formula de criticidad (0-100):\\nC = 0.35*Seguridad + 0.30*Produccion + 0.20*Coste + 0.15*Ambiental\\n\\nClasificacion:\\n- A (>=75): activo critico, estrategia predictiva + repuestos minimos definidos.\\n- B (50-74): estrategia preventiva reforzada.\\n- C (<50): estrategia basica preventiva.\\n\\nSalida esperada:\\n- Matriz de modos de fallo\\n- Plan de tareas por condicion\\n- Recomendaciones de rediseño."
+    },
+    {
+      "id": "kb_doc_especificaciones_producto",
+      "folderId": "kb_folder_calidad",
+      "title": "Especificaciones de calidad para grades HDPE y PP",
+      "docType": "Especificacion",
+      "revision": "R8",
+      "effectiveDate": "2025-10-12",
+      "owner": "Calidad Producto",
+      "tags": ["calidad", "hdpe", "pp", "mfi", "especificaciones"],
+      "summary": "Rangos de aceptacion de propiedades fisico-quimicas para liberacion de lote.",
+      "content": "Parametros clave por lote:\\n- MFI (g/10 min)\\n- Densidad\\n- Humedad\\n- Cenizas\\n- Colorimetria\\n\\nCriterios de liberacion:\\n- Todos los parametros dentro de especificacion.\\n- Trazabilidad completa de materia prima y linea.\\n- Certificado de analisis emitido y archivado.\\n\\nGestion de no conformidades:\\n- Bloqueo de lote en sistema.\\n- Evaluacion tecnica (reproceso, downgrade o descarte).\\n- CAPA con fecha compromiso."
+    },
+    {
+      "id": "kb_doc_metodos_laboratorio",
+      "folderId": "kb_folder_calidad",
+      "title": "Metodos de ensayo de laboratorio (MFI, humedad y densidad)",
+      "docType": "Metodo",
+      "revision": "R3",
+      "effectiveDate": "2025-06-30",
+      "owner": "Laboratorio Central",
+      "tags": ["laboratorio", "ensayo", "mfi", "humedad", "densidad"],
+      "summary": "Instrucciones para preparacion de muestra, calibracion de equipo y reporte de resultados.",
+      "content": "Buenas practicas:\\n1) Verificar calibracion vigente de equipos antes de iniciar.\\n2) Registrar temperatura y humedad ambiente de laboratorio.\\n3) Asegurar cadena de custodia de muestra.\\n\\nFrecuencia de control:\\n- Arranque de linea: muestra cada 30 min hasta estabilizacion.\\n- Regimen estable: muestra cada 2 horas por linea.\\n\\nReglas de reporte:\\n- Usar plantilla LIMS oficial.\\n- Incluir incertidumbre de medicion cuando aplique."
+    },
+    {
+      "id": "kb_doc_balance_energia",
+      "folderId": "kb_folder_energia",
+      "title": "Balance energetico y objetivos de intensidad",
+      "docType": "Estandar",
+      "revision": "R2",
+      "effectiveDate": "2025-11-20",
+      "owner": "Ingenieria de Proceso",
+      "tags": ["energia", "kpi", "intensidad", "vapor", "electricidad"],
+      "summary": "Define KPIs de intensidad energetica y acciones de optimizacion por area.",
+      "content": "KPIs base:\\n- kWh/ton producida\\n- kg vapor/ton producida\\n- m3 agua enfriamiento/ton\\n\\nObjetivos trimestrales:\\n- Reducir kWh/ton un 4% vs baseline anual.\\n- Reducir purgas de vapor un 8%.\\n- Mejorar factor de carga de compresores.\\n\\nAcciones recomendadas:\\n- Optimizar setpoints de temperatura por producto.\\n- Revisar aislamiento termico de lineas calientes.\\n- Programar limpiezas de intercambiadores por condicion."
+    },
+    {
+      "id": "kb_doc_utilidades_operacion",
+      "folderId": "kb_folder_energia",
+      "title": "Operacion de utilidades: vapor, aire de instrumentos y agua enfriamiento",
+      "docType": "Guia",
+      "revision": "R4",
+      "effectiveDate": "2025-09-08",
+      "owner": "Operaciones Utilidades",
+      "tags": ["utilidades", "vapor", "aire instrumentos", "agua enfriamiento"],
+      "summary": "Ventanas operativas y alarmas de utilidades para evitar impacto en produccion.",
+      "content": "Ventanas objetivo:\\n- Vapor cabecera: 10-12 barg\\n- Aire de instrumentos: 6.5-7.5 barg\\n- Temperatura agua enfriamiento: 28-32 C\\n\\nAlarmas criticas:\\n- Baja presion de aire de instrumentos: riesgo de fallo en valvulas de control.\\n- Alta temperatura de agua: perdida de capacidad de enfriamiento de extrusoras.\\n\\nAcciones inmediatas:\\n- Priorizar consumidores criticos.\\n- Activar equipos de respaldo.\\n- Notificar a sala de control y mantenimiento."
+    },
+    {
+      "id": "kb_doc_kpi_operacion_diaria",
+      "folderId": "kb_folder_operaciones",
+      "title": "KPI diarios de operacion de planta",
+      "docType": "Plantilla",
+      "revision": "R1",
+      "effectiveDate": "2026-01-15",
+      "owner": "Performance Manager",
+      "tags": ["kpi", "produccion", "scrap", "oee", "margen"],
+      "summary": "Plantilla de KPIs para seguimiento diario por turno y por linea.",
+      "content": "KPIs minimos por turno:\\n- Toneladas producidas\\n- OEE\\n- Scrap (%)\\n- Consumo especifico de energia\\n- Paradas no programadas (min)\\n- Cumplimiento de plan de produccion\\n\\nRecomendacion de visualizacion:\\n- KPI cards para metas diarias\\n- Serie temporal para tendencia semanal\\n- Pareto de causas de parada"
+    },
+    {
+      "id": "kb_doc_ciberseguridad_ics",
+      "folderId": "kb_folder_hse",
+      "title": "Lineamientos de ciberseguridad industrial (ICS)",
+      "docType": "Politica",
+      "revision": "R2",
+      "effectiveDate": "2025-12-12",
+      "owner": "OT Cybersecurity",
+      "tags": ["ics", "ciberseguridad", "ot", "segmentacion", "accesos"],
+      "summary": "Controles minimos de ciberseguridad para redes OT, accesos remotos y gestion de vulnerabilidades.",
+      "content": "Controles obligatorios:\\n1) Segmentacion IT/OT con zonas y conduits.\\n2) Acceso remoto con MFA y ventana temporal aprobada.\\n3) Inventario de activos OT actualizado.\\n4) Gestion de parches segun criticidad y ventana operativa.\\n5) Registro y monitorizacion de eventos de seguridad.\\n\\nRespuesta ante incidente OT:\\n- Contencion\\n- Analisis forense\\n- Recuperacion segura\\n- Lecciones aprendidas"
+    }
+  ],
+  "notes": {
+    "intendedUse": "Dataset JSON para carga de base de conocimiento industrial en plataforma real.",
+    "recommendedMapping": {
+      "document_name": "title",
+      "document_summary": "summary",
+      "document_tags": "tags",
+      "document_text": "content",
+      "folder_relation": "folderId"
+    }
+  }
+}

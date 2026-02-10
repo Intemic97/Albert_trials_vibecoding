@@ -1,0 +1,284 @@
+{
+  "name": "Repsol Knowledge - Use Case Package",
+  "version": "1.0.0",
+  "entities": [
+    {
+      "id": "ent_kb_documentos_repsol",
+      "name": "Documentos Knowledge Base Repsol",
+      "description": "Repositorio estructurado de documentos tecnicos de planta petroquimica",
+      "author": "System",
+      "lastEdited": "2026-02-09",
+      "entityType": "generic",
+      "properties": [
+        { "id": "p_kb_titulo", "name": "Titulo", "type": "text", "defaultValue": "" },
+        { "id": "p_kb_categoria", "name": "Categoria", "type": "text", "defaultValue": "" },
+        { "id": "p_kb_tipo_doc", "name": "Tipo Documento", "type": "text", "defaultValue": "" },
+        { "id": "p_kb_revision", "name": "Revision", "type": "text", "defaultValue": "" },
+        { "id": "p_kb_fecha", "name": "Fecha Efectiva", "type": "text", "defaultValue": "" },
+        { "id": "p_kb_owner", "name": "Owner", "type": "text", "defaultValue": "" },
+        { "id": "p_kb_tags", "name": "Tags", "type": "text", "defaultValue": "" },
+        { "id": "p_kb_resumen", "name": "Resumen", "type": "text", "defaultValue": "" },
+        { "id": "p_kb_contenido", "name": "Contenido", "type": "text", "defaultValue": "" },
+        { "id": "p_kb_criticidad", "name": "Criticidad", "type": "text", "defaultValue": "Media" }
+      ]
+    },
+    {
+      "id": "ent_kb_folders_repsol",
+      "name": "Carpetas Knowledge Base Repsol",
+      "description": "Estructura de carpetas tematicas de la base de conocimiento",
+      "author": "System",
+      "lastEdited": "2026-02-09",
+      "entityType": "generic",
+      "properties": [
+        { "id": "p_folder_nombre", "name": "Nombre", "type": "text", "defaultValue": "" },
+        { "id": "p_folder_desc", "name": "Descripcion", "type": "text", "defaultValue": "" },
+        { "id": "p_folder_color", "name": "Color", "type": "text", "defaultValue": "" },
+        { "id": "p_folder_parent", "name": "ParentId", "type": "text", "defaultValue": "" }
+      ]
+    }
+  ],
+  "records": [
+    {
+      "id": "r_kb_doc_001",
+      "entityId": "ent_kb_documentos_repsol",
+      "values": {
+        "p_kb_titulo": "SOP Arranque de linea de extrusion de poliolefinas",
+        "p_kb_categoria": "Operaciones",
+        "p_kb_tipo_doc": "SOP",
+        "p_kb_revision": "R3",
+        "p_kb_fecha": "2025-10-01",
+        "p_kb_owner": "Jefatura de Operaciones",
+        "p_kb_tags": "operacion, extrusion, arranque, poliolefinas, sop",
+        "p_kb_resumen": "Secuencia de arranque seguro para linea de extrusion HDPE/PP con controles criticos de temperatura, presion y calidad de pellet.",
+        "p_kb_contenido": "Precondiciones, secuencia de arranque por rampas termicas, validacion de interlocks y criterios de aceptacion de estabilidad y calidad.",
+        "p_kb_criticidad": "Alta"
+      }
+    },
+    {
+      "id": "r_kb_doc_002",
+      "entityId": "ent_kb_documentos_repsol",
+      "values": {
+        "p_kb_titulo": "SOP Parada segura de unidad de extrusion",
+        "p_kb_categoria": "Operaciones",
+        "p_kb_tipo_doc": "SOP",
+        "p_kb_revision": "R2",
+        "p_kb_fecha": "2025-09-15",
+        "p_kb_owner": "Jefatura de Operaciones",
+        "p_kb_tags": "operacion, parada, seguridad, extrusion",
+        "p_kb_resumen": "Procedimiento para parada programada y no programada minimizando riesgos de degradacion termica y danos de equipo.",
+        "p_kb_contenido": "Parada programada, parada de emergencia, purga y pasos post-parada para inspeccion y registro.",
+        "p_kb_criticidad": "Alta"
+      }
+    },
+    {
+      "id": "r_kb_doc_003",
+      "entityId": "ent_kb_documentos_repsol",
+      "values": {
+        "p_kb_titulo": "Matriz de permisos de trabajo y aislamiento (PTW + LOTO)",
+        "p_kb_categoria": "Seguridad y Medio Ambiente",
+        "p_kb_tipo_doc": "Politica",
+        "p_kb_revision": "R5",
+        "p_kb_fecha": "2025-08-20",
+        "p_kb_owner": "HSE Planta",
+        "p_kb_tags": "hse, ptw, loto, aislamiento, seguridad",
+        "p_kb_resumen": "Define tipos de permiso, responsables y pasos obligatorios para aislamiento de energias peligrosas.",
+        "p_kb_contenido": "Reglas obligatorias de PTW/LOTO, prueba de cero energia y responsabilidades operacion-mantenimiento-HSE.",
+        "p_kb_criticidad": "Alta"
+      }
+    },
+    {
+      "id": "r_kb_doc_004",
+      "entityId": "ent_kb_documentos_repsol",
+      "values": {
+        "p_kb_titulo": "Plan de respuesta ante incidentes de proceso",
+        "p_kb_categoria": "Seguridad y Medio Ambiente",
+        "p_kb_tipo_doc": "Plan",
+        "p_kb_revision": "R4",
+        "p_kb_fecha": "2025-11-05",
+        "p_kb_owner": "HSE y Sala de Control",
+        "p_kb_tags": "incidentes, emergencia, hse, escalado",
+        "p_kb_resumen": "Protocolo de actuacion para fugas, incendios, sobrepresion y desviaciones criticas de proceso.",
+        "p_kb_contenido": "Escenarios de emergencia, niveles de severidad y tiempos objetivo para notificacion, aislamiento y reporte.",
+        "p_kb_criticidad": "Alta"
+      }
+    },
+    {
+      "id": "r_kb_doc_005",
+      "entityId": "ent_kb_documentos_repsol",
+      "values": {
+        "p_kb_titulo": "Plan preventivo de activos criticos de extrusion y utilidades",
+        "p_kb_categoria": "Mantenimiento y Fiabilidad",
+        "p_kb_tipo_doc": "Plan",
+        "p_kb_revision": "R6",
+        "p_kb_fecha": "2025-07-10",
+        "p_kb_owner": "Ingenieria de Mantenimiento",
+        "p_kb_tags": "mantenimiento, preventivo, fiabilidad, activos",
+        "p_kb_resumen": "Frecuencias y tareas PM para motores, reductores, bombas, compresores y sistemas de vapor/enfriamiento.",
+        "p_kb_contenido": "Activos criticos, KPIs de mantenimiento y criterios de escalado por condicion de equipo.",
+        "p_kb_criticidad": "Media"
+      }
+    },
+    {
+      "id": "r_kb_doc_006",
+      "entityId": "ent_kb_documentos_repsol",
+      "values": {
+        "p_kb_titulo": "Metodologia RCM y criticidad de equipos",
+        "p_kb_categoria": "Mantenimiento y Fiabilidad",
+        "p_kb_tipo_doc": "Guia",
+        "p_kb_revision": "R1",
+        "p_kb_fecha": "2025-12-01",
+        "p_kb_owner": "Fiabilidad",
+        "p_kb_tags": "rcm, criticidad, fmea, fiabilidad",
+        "p_kb_resumen": "Criterios de criticidad combinando impacto en seguridad, produccion, coste y medio ambiente.",
+        "p_kb_contenido": "Formula de criticidad y clasificacion A/B/C con acciones de mantenimiento asociadas.",
+        "p_kb_criticidad": "Media"
+      }
+    },
+    {
+      "id": "r_kb_doc_007",
+      "entityId": "ent_kb_documentos_repsol",
+      "values": {
+        "p_kb_titulo": "Especificaciones de calidad para grades HDPE y PP",
+        "p_kb_categoria": "Calidad y Laboratorio",
+        "p_kb_tipo_doc": "Especificacion",
+        "p_kb_revision": "R8",
+        "p_kb_fecha": "2025-10-12",
+        "p_kb_owner": "Calidad Producto",
+        "p_kb_tags": "calidad, hdpe, pp, mfi, especificaciones",
+        "p_kb_resumen": "Rangos de aceptacion de propiedades fisico-quimicas para liberacion de lote.",
+        "p_kb_contenido": "Parametros clave por lote y flujo de no conformidades con CAPA.",
+        "p_kb_criticidad": "Alta"
+      }
+    },
+    {
+      "id": "r_kb_doc_008",
+      "entityId": "ent_kb_documentos_repsol",
+      "values": {
+        "p_kb_titulo": "Metodos de ensayo de laboratorio (MFI, humedad y densidad)",
+        "p_kb_categoria": "Calidad y Laboratorio",
+        "p_kb_tipo_doc": "Metodo",
+        "p_kb_revision": "R3",
+        "p_kb_fecha": "2025-06-30",
+        "p_kb_owner": "Laboratorio Central",
+        "p_kb_tags": "laboratorio, ensayo, mfi, humedad, densidad",
+        "p_kb_resumen": "Instrucciones para preparacion de muestra, calibracion de equipo y reporte de resultados.",
+        "p_kb_contenido": "Buenas practicas de laboratorio, frecuencias de control y reglas de reporte LIMS.",
+        "p_kb_criticidad": "Media"
+      }
+    },
+    {
+      "id": "r_kb_doc_009",
+      "entityId": "ent_kb_documentos_repsol",
+      "values": {
+        "p_kb_titulo": "Balance energetico y objetivos de intensidad",
+        "p_kb_categoria": "Energia y Utilidades",
+        "p_kb_tipo_doc": "Estandar",
+        "p_kb_revision": "R2",
+        "p_kb_fecha": "2025-11-20",
+        "p_kb_owner": "Ingenieria de Proceso",
+        "p_kb_tags": "energia, kpi, intensidad, vapor, electricidad",
+        "p_kb_resumen": "Define KPIs de intensidad energetica y acciones de optimizacion por area.",
+        "p_kb_contenido": "KPIs base, objetivos trimestrales y acciones de mejora de eficiencia.",
+        "p_kb_criticidad": "Media"
+      }
+    },
+    {
+      "id": "r_kb_doc_010",
+      "entityId": "ent_kb_documentos_repsol",
+      "values": {
+        "p_kb_titulo": "Operacion de utilidades: vapor, aire de instrumentos y agua enfriamiento",
+        "p_kb_categoria": "Energia y Utilidades",
+        "p_kb_tipo_doc": "Guia",
+        "p_kb_revision": "R4",
+        "p_kb_fecha": "2025-09-08",
+        "p_kb_owner": "Operaciones Utilidades",
+        "p_kb_tags": "utilidades, vapor, aire instrumentos, agua enfriamiento",
+        "p_kb_resumen": "Ventanas operativas y alarmas de utilidades para evitar impacto en produccion.",
+        "p_kb_contenido": "Setpoints de utilidades, alarmas criticas y acciones inmediatas de contingencia.",
+        "p_kb_criticidad": "Alta"
+      }
+    },
+    {
+      "id": "r_kb_doc_011",
+      "entityId": "ent_kb_documentos_repsol",
+      "values": {
+        "p_kb_titulo": "KPI diarios de operacion de planta",
+        "p_kb_categoria": "Operaciones",
+        "p_kb_tipo_doc": "Plantilla",
+        "p_kb_revision": "R1",
+        "p_kb_fecha": "2026-01-15",
+        "p_kb_owner": "Performance Manager",
+        "p_kb_tags": "kpi, produccion, scrap, oee, margen",
+        "p_kb_resumen": "Plantilla de KPIs para seguimiento diario por turno y por linea.",
+        "p_kb_contenido": "KPIs minimos por turno y recomendaciones de visualizacion operativa.",
+        "p_kb_criticidad": "Media"
+      }
+    },
+    {
+      "id": "r_kb_doc_012",
+      "entityId": "ent_kb_documentos_repsol",
+      "values": {
+        "p_kb_titulo": "Lineamientos de ciberseguridad industrial (ICS)",
+        "p_kb_categoria": "Seguridad y Medio Ambiente",
+        "p_kb_tipo_doc": "Politica",
+        "p_kb_revision": "R2",
+        "p_kb_fecha": "2025-12-12",
+        "p_kb_owner": "OT Cybersecurity",
+        "p_kb_tags": "ics, ciberseguridad, ot, segmentacion, accesos",
+        "p_kb_resumen": "Controles minimos de ciberseguridad para redes OT, accesos remotos y gestion de vulnerabilidades.",
+        "p_kb_contenido": "Controles obligatorios de ciberseguridad industrial y respuesta ante incidentes OT.",
+        "p_kb_criticidad": "Alta"
+      }
+    },
+    {
+      "id": "r_kb_folder_001",
+      "entityId": "ent_kb_folders_repsol",
+      "values": {
+        "p_folder_nombre": "Operaciones",
+        "p_folder_desc": "Procedimientos operativos estandar y guias de operacion diaria",
+        "p_folder_color": "#256A65",
+        "p_folder_parent": ""
+      }
+    },
+    {
+      "id": "r_kb_folder_002",
+      "entityId": "ent_kb_folders_repsol",
+      "values": {
+        "p_folder_nombre": "Seguridad y Medio Ambiente",
+        "p_folder_desc": "Normas HSE, permisos, LOTO y gestion ambiental",
+        "p_folder_color": "#DC2626",
+        "p_folder_parent": ""
+      }
+    },
+    {
+      "id": "r_kb_folder_003",
+      "entityId": "ent_kb_folders_repsol",
+      "values": {
+        "p_folder_nombre": "Mantenimiento y Fiabilidad",
+        "p_folder_desc": "Planes preventivos, criticidad y analisis de fallos",
+        "p_folder_color": "#1D4ED8",
+        "p_folder_parent": ""
+      }
+    },
+    {
+      "id": "r_kb_folder_004",
+      "entityId": "ent_kb_folders_repsol",
+      "values": {
+        "p_folder_nombre": "Calidad y Laboratorio",
+        "p_folder_desc": "Control de calidad, especificaciones y metodos de ensayo",
+        "p_folder_color": "#7C3AED",
+        "p_folder_parent": ""
+      }
+    },
+    {
+      "id": "r_kb_folder_005",
+      "entityId": "ent_kb_folders_repsol",
+      "values": {
+        "p_folder_nombre": "Energia y Utilidades",
+        "p_folder_desc": "Optimizacion energetica, vapor, electricidad y agua de proceso",
+        "p_folder_color": "#D97706",
+        "p_folder_parent": ""
+      }
+    }
+  ]
+}

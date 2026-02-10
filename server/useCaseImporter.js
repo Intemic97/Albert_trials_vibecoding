@@ -31,6 +31,24 @@ function validateUseCasePackage(pkg) {
         warnings.push('No se incluyen entidades. Se importarán solo las secciones presentes.');
     }
 
+    // Guard rail: avoid "successful" imports when user uploads a Knowledge Base JSON
+    // (folders/documents) into the Use Case importer endpoint.
+    const looksLikeKnowledgeBase =
+        Array.isArray(pkg.folders) || Array.isArray(pkg.documents);
+    const hasUseCaseSections =
+        (Array.isArray(pkg.entities) && pkg.entities.length > 0) ||
+        (Array.isArray(pkg.records) && pkg.records.length > 0) ||
+        !!(pkg.workflow && pkg.workflow.id && pkg.workflow.data) ||
+        !!(pkg.simulation && pkg.simulation.id) ||
+        !!(pkg.dashboard && pkg.dashboard.id && pkg.dashboard.name);
+    if (looksLikeKnowledgeBase && !hasUseCaseSections) {
+        errors.push('Este JSON parece de Knowledge Base (folders/documents) y no de Use Case (entities/records/workflow/simulation/dashboard).');
+    }
+
+    if (!hasUseCaseSections) {
+        errors.push('El package no incluye ninguna sección importable. Añade al menos entities, records, workflow, simulation o dashboard.');
+    }
+
     if (Array.isArray(pkg.entities)) {
         for (const [i, entity] of pkg.entities.entries()) {
             if (!entity?.id) errors.push(`entities[${i}].id es obligatorio`);
