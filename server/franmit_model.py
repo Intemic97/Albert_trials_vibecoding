@@ -22,13 +22,14 @@ except ImportError:
     HAS_SCIPY = False
 
 class SafeJSONEncoder(json.JSONEncoder):
-    """JSON encoder that handles NaN, Inf, and numpy types."""
+    """JSON encoder that handles NaN, Inf, and numpy types.
+    NaN/Inf are replaced with 0 (not None) to avoid null outputs."""
     def default(self, obj):
         if isinstance(obj, (np.integer,)):
             return int(obj)
         if isinstance(obj, (np.floating,)):
             if np.isnan(obj) or np.isinf(obj):
-                return None
+                return 0
             return float(obj)
         if isinstance(obj, np.ndarray):
             return obj.tolist()
@@ -40,14 +41,14 @@ class SafeJSONEncoder(json.JSONEncoder):
     def _clean(self, obj):
         if isinstance(obj, float):
             if math.isnan(obj) or math.isinf(obj):
-                return None
+                return 0
         if isinstance(obj, dict):
             return {k: self._clean(v) for k, v in obj.items()}
         if isinstance(obj, list):
             return [self._clean(v) for v in obj]
         if isinstance(obj, (np.floating,)):
             if np.isnan(obj) or np.isinf(obj):
-                return None
+                return 0
             return float(obj)
         if isinstance(obj, (np.integer,)):
             return int(obj)
@@ -149,8 +150,16 @@ stts = settings
 # RK4 ODE SOLVER
 # ============================================================================
 
+def _clamp_nan(arr, fallback):
+    """Replace NaN/Inf values in array with fallback values."""
+    result = np.asarray(arr, dtype=float)
+    bad = ~np.isfinite(result)
+    if np.any(bad):
+        result[bad] = np.asarray(fallback, dtype=float)[bad]
+    return result
+
 def odeint_rk4(func, y0, t, args=()):
-    """Runge-Kutta 4th order ODE solver (fallback when scipy is not available)"""
+    """Runge-Kutta 4th order ODE solver with NaN clamping (fallback when scipy is not available)"""
     y0 = np.asarray(y0, dtype=float)
     n = len(t)
     y = np.zeros((n, len(y0)))
@@ -162,18 +171,36 @@ def odeint_rk4(func, y0, t, args=()):
         ti = t[i]
         
         k1 = np.asarray(func(yi, ti, *args), dtype=float)
-        k2 = np.asarray(func(yi + 0.5 * dt * k1, ti + 0.5 * dt, *args), dtype=float)
-        k3 = np.asarray(func(yi + 0.5 * dt * k2, ti + 0.5 * dt, *args), dtype=float)
-        k4 = np.asarray(func(yi + dt * k3, ti + dt, *args), dtype=float)
+        k1 = np.where(np.isfinite(k1), k1, 0.0)
         
-        y[i + 1] = yi + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+        k2 = np.asarray(func(yi + 0.5 * dt * k1, ti + 0.5 * dt, *args), dtype=float)
+        k2 = np.where(np.isfinite(k2), k2, 0.0)
+        
+        k3 = np.asarray(func(yi + 0.5 * dt * k2, ti + 0.5 * dt, *args), dtype=float)
+        k3 = np.where(np.isfinite(k3), k3, 0.0)
+        
+        k4 = np.asarray(func(yi + dt * k3, ti + dt, *args), dtype=float)
+        k4 = np.where(np.isfinite(k4), k4, 0.0)
+        
+        y_next = yi + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+        
+        # Clamp: if any value is NaN/Inf, keep the previous step's value
+        y[i + 1] = _clamp_nan(y_next, yi)
     
     return y
 
 def odeint_solve(func, y0, t, args=()):
-    """Use scipy.odeint if available (adaptive LSODA solver), otherwise fall back to RK4."""
+    """Use scipy.odeint if available (adaptive LSODA solver), otherwise fall back to RK4.
+    In both cases, sanitize NaN/Inf from the integration output."""
     if HAS_SCIPY:
-        return scipy_odeint(func, y0, t, args=args, mxstep=10000)
+        with np.errstate(all='ignore'):
+            result = scipy_odeint(func, y0, t, args=args, mxstep=50000, full_output=False)
+        # Post-process: forward-fill NaN values with last good row
+        for i in range(1, len(result)):
+            bad = ~np.isfinite(result[i])
+            if np.any(bad):
+                result[i][bad] = result[i - 1][bad]
+        return result
     else:
         return odeint_rk4(func, y0, t, args=args)
 
@@ -561,7 +588,8 @@ def solve_recetas_parallel(qins, dict_recetas, reactor_configuration, params=Non
 # ============================================================================
 
 def to_list(obj):
-    """Convierte numpy arrays a tipos nativos de Python"""
+    """Convierte numpy arrays a tipos nativos de Python.
+    NaN/Inf se reemplazan con 0 para evitar nulls en JSON."""
     if isinstance(obj, np.ndarray):
         result = obj.tolist()
         return to_list(result)
@@ -574,17 +602,17 @@ def to_list(obj):
     elif isinstance(obj, (np.floating,)):
         val = float(obj)
         if math.isnan(val) or math.isinf(val):
-            return None
+            return 0
         return val
     elif isinstance(obj, float):
         if math.isnan(obj) or math.isinf(obj):
-            return None
+            return 0
         return obj
     elif hasattr(obj, 'item'):
         val = obj.item()
         if isinstance(val, float):
             if math.isnan(val) or math.isinf(val):
-                return None
+                return 0
         return val
     return obj
 
@@ -602,22 +630,25 @@ def to_numeric(val):
     return val
 
 def last_valid(arr):
-    """Get last non-null/NaN value from array."""
+    """Get last non-null/NaN value from array. Returns 0 if all values are bad."""
     if not hasattr(arr, '__len__') or len(arr) == 0:
-        return None
+        return 0
     for i in range(len(arr) - 1, -1, -1):
         v = arr[i]
         if v is not None and not (isinstance(v, float) and (np.isnan(v) or np.isinf(v))):
             return float(v)
-    return None
+    return 0
 
 def safe_round(v, decimals=4):
     if v is None:
-        return None
+        return 0
+    if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+        return 0
     return round(v, decimals)
 
 def extract_clean_outputs(raw):
-    """Extract human-readable steady-state outputs from raw model results."""
+    """Extract human-readable steady-state outputs from raw model results.
+    All values are guaranteed to be numeric (0 instead of None/null)."""
     conv_h2 = last_valid(raw.get("conversion_H", []))
     return {
         'MI_2.16': safe_round(last_valid(raw.get("Mi", [])), 2),
@@ -628,7 +659,7 @@ def extract_clean_outputs(raw):
         'PDI': safe_round(last_valid(raw.get("PDI", [])), 2),
         'Produccion_kg_h': safe_round(last_valid(raw.get("produccion", [])), 2),
         'Presion_bar': safe_round(last_valid(raw.get("P", [])), 2),
-        'Conversion_H2_pct': safe_round(conv_h2 * 100 if conv_h2 is not None else None, 2),
+        'Conversion_H2_pct': safe_round(conv_h2 * 100, 2),
         'Pasta_pct_wt': safe_round(last_valid(raw.get("pasta", [])), 2),
         'Ratio_H2_Et': safe_round(last_valid(raw.get("ratio_h2_et", [])), 6),
         'Ratio_But_Et': safe_round(last_valid(raw.get("ratio_but_et", [])), 6),

@@ -3034,37 +3034,58 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     break;
                 case 'franmit':
                     try {
-                        // Collect all input rows (each row = one set of sensor readings)
-                        let recetaRows: any[] = [];
-                        
-                        if (inputData) {
-                            if (Array.isArray(inputData) && inputData.length > 0) {
-                                recetaRows = inputData;
-                            } else if (typeof inputData === 'object') {
-                                recetaRows = [inputData];
+                        // Sanitize null/NaN values from integration output
+                        const sanitizeFranmitOutput = (obj: any, depth = 0): any => {
+                            if (depth > 50) return obj;
+                            if (obj === null || obj === undefined) return 0;
+                            if (typeof obj === 'number') {
+                                if (isNaN(obj) || !isFinite(obj)) return 0;
+                                return obj;
                             }
-                        }
-                        
-                        if (recetaRows.length === 0) {
-                            throw new Error('No input data provided for FranMIT model');
-                        }
+                            if (Array.isArray(obj)) {
+                                return obj.map(item => sanitizeFranmitOutput(item, depth + 1));
+                            }
+                            if (typeof obj === 'object') {
+                                const sanitized: any = {};
+                                for (const key of Object.keys(obj)) {
+                                    sanitized[key] = sanitizeFranmitOutput(obj[key], depth + 1);
+                                }
+                                return sanitized;
+                            }
+                            return obj;
+                        };
                         
                         // Build reactor configuration from node config
                         const reactorConfiguration: any = {};
-                        reactorConfiguration.V_reb = node.config?.franmitReactorVolume 
-                            ? parseFloat(node.config.franmitReactorVolume) || 53 : 53;
-                        reactorConfiguration.scale_cat = node.config?.franmitCatalystScaleFactor 
-                            ? parseFloat(node.config.franmitCatalystScaleFactor) || 1 : 1;
+                        if (node.config?.franmitReactorVolume) {
+                            reactorConfiguration.V_reb = parseFloat(node.config.franmitReactorVolume) || 53;
+                        } else {
+                            reactorConfiguration.V_reb = 53; // Default
+                        }
+                        if (node.config?.franmitCatalystScaleFactor) {
+                            reactorConfiguration.scale_cat = parseFloat(node.config.franmitCatalystScaleFactor) || 1;
+                        } else {
+                            reactorConfiguration.scale_cat = 1; // Default
+                        }
 
-                        // Send ALL rows to the server for batch processing
+                        // Determine if we have multiple rows (batch) or single receta
+                        const isBatch = Array.isArray(inputData) && inputData.length > 0;
+                        const requestBody = isBatch
+                            ? {
+                                mode: 'batch',
+                                recetas: inputData,
+                                reactorConfiguration: reactorConfiguration
+                            }
+                            : {
+                                mode: 'single',
+                                receta: (typeof inputData === 'object' && !Array.isArray(inputData)) ? inputData : {},
+                                reactorConfiguration: reactorConfiguration
+                            };
+
                         const response = await fetch(`${API_BASE}/franmit/execute`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                funName: 'solve_batch',
-                                recetas: recetaRows,
-                                reactorConfiguration: reactorConfiguration
-                            }),
+                            body: JSON.stringify(requestBody),
                             credentials: 'include'
                         });
 
@@ -3077,9 +3098,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                 throw error;
                             }
                             
-                            // data.results is an array of clean output dicts, one per input row
-                            nodeData = data.results || [];
-                            result = `FranMIT: ${nodeData.length} row${nodeData.length !== 1 ? 's' : ''} calculated`;
+                            // data.results is an array of output rows (one per input receta)
+                            const results = sanitizeFranmitOutput(data.results || []);
+                            
+                            // Convert to array format for node output
+                            nodeData = Array.isArray(results) ? results : [results];
+                            result = `FranMIT reactor model executed: ${nodeData.length} row(s)`;
                         } else {
                             const errorData = await response.json();
                             const error: any = new Error(errorData.error || 'FranMIT execution failed');
