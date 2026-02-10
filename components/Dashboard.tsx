@@ -803,7 +803,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 records: [
                     { Line: 'R1', OEE: 91.5, 'Capacity (t/day)': 280 },
                     { Line: 'R2', OEE: 88.2, 'Capacity (t/day)': 250 },
-                    { Line: 'R3', OEE: 86.9, 'Capacity (t/day)': 235 }
+                    { Line: 'R3', OEE: 86.9, 'Capacity (t/day)': 235 },
+                    { Line: 'R4', OEE: 93.1, 'Capacity (t/day)': 310 }
                 ]
             });
             const productionEntity = await ensureEntity({
@@ -821,14 +822,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     { name: 'Quality', type: 'text' },
                     { name: 'Product', type: 'text' }
                 ],
-                records: [
-                    { Date: '2026-02-01', Line: 'R1', 'Production (ton)': 265, 'Scrap (%)': 1.3, 'Energy (kWh)': 13840, Shift: 'A', Quality: 'A', Product: 'M5309' },
-                    { Date: '2026-02-02', Line: 'R1', 'Production (ton)': 258, 'Scrap (%)': 1.6, 'Energy (kWh)': 13910, Shift: 'B', Quality: 'A', Product: 'M5309' },
-                    { Date: '2026-02-03', Line: 'R2', 'Production (ton)': 236, 'Scrap (%)': 3.1, 'Energy (kWh)': 14730, Shift: 'A', Quality: 'B', Product: '5803' },
-                    { Date: '2026-02-04', Line: 'R2', 'Production (ton)': 242, 'Scrap (%)': 2.2, 'Energy (kWh)': 14450, Shift: 'B', Quality: 'A', Product: '5803' },
-                    { Date: '2026-02-05', Line: 'R3', 'Production (ton)': 221, 'Scrap (%)': 2.8, 'Energy (kWh)': 14220, Shift: 'C', Quality: 'B', Product: 'R4805' },
-                    { Date: '2026-02-06', Line: 'R3', 'Production (ton)': 229, 'Scrap (%)': 1.9, 'Energy (kWh)': 14010, Shift: 'A', Quality: 'A', Product: 'R4805' }
-                ]
+                records: (() => {
+                    const lines = ['R1', 'R2', 'R3', 'R4'];
+                    const shifts = ['A', 'B', 'C'];
+                    const products = ['M5309', '5803', 'R4805', 'F4520'];
+                    const qualities = ['A', 'A', 'A', 'B', 'A+', 'A'];
+                    const rows: Record<string, string | number>[] = [];
+                    for (let day = 1; day <= 14; day++) {
+                        const dateStr = `2026-02-${String(day).padStart(2, '0')}`;
+                        for (const line of lines) {
+                            const shift = shifts[(day + lines.indexOf(line)) % shifts.length];
+                            const product = products[(day + lines.indexOf(line)) % products.length];
+                            const baseTon = line === 'R1' ? 270 : line === 'R2' ? 245 : line === 'R3' ? 225 : 300;
+                            const tons = Math.round(baseTon + (Math.sin(day * 0.8 + lines.indexOf(line)) * 18));
+                            const scrap = Number((1.2 + Math.abs(Math.sin(day * 1.1 + lines.indexOf(line) * 2)) * 3.2).toFixed(1));
+                            const energy = Math.round(13200 + tons * 3.5 + scrap * 120 + Math.sin(day) * 300);
+                            const quality = scrap > 3 ? 'B' : qualities[(day + lines.indexOf(line)) % qualities.length];
+                            rows.push({ Date: dateStr, Line: line, 'Production (ton)': tons, 'Scrap (%)': scrap, 'Energy (kWh)': energy, Shift: shift, Quality: quality, Product: product });
+                        }
+                    }
+                    return rows;
+                })()
             });
             const rawMaterialEntity = await ensureEntity({
                 name: 'Example - Raw Materials',
@@ -842,8 +856,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 ],
                 records: [
                     { Type: 'Virgin', Material: 'Ethylene feed', 'Stock (t)': 920 },
+                    { Type: 'Virgin', Material: 'Butene-1 comonomer', 'Stock (t)': 145 },
                     { Type: 'Additives', Material: 'Stabilizer package', 'Stock (t)': 62 },
-                    { Type: 'Recycled', Material: 'Reprocessed HDPE', 'Stock (t)': 180 }
+                    { Type: 'Additives', Material: 'Antioxidant blend', 'Stock (t)': 38 },
+                    { Type: 'Additives', Material: 'Processing aid', 'Stock (t)': 27 },
+                    { Type: 'Recycled', Material: 'Reprocessed HDPE', 'Stock (t)': 180 },
+                    { Type: 'Recycled', Material: 'Post-consumer rHDPE', 'Stock (t)': 95 },
+                    { Type: 'Recycled', Material: 'Industrial regrind', 'Stock (t)': 210 },
+                    { Type: 'Packaging', Material: 'Bags & liners', 'Stock (t)': 42 },
+                    { Type: 'Packaging', Material: 'Bulk containers', 'Stock (t)': 18 }
                 ]
             });
             const ordersEntity = await ensureEntity({
@@ -858,10 +879,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     { name: 'Status', type: 'text' }
                 ],
                 records: [
-                    { 'Order code': 'PO-4012', 'Due date': '2026-02-07', Priority: 'High', Status: 'In progress' },
-                    { 'Order code': 'PO-4016', 'Due date': '2026-02-09', Priority: 'Medium', Status: 'Planned' },
-                    { 'Order code': 'PO-4021', 'Due date': '2026-02-11', Priority: 'Low', Status: 'Planned' },
-                    { 'Order code': 'PO-4025', 'Due date': '2026-02-12', Priority: 'High', Status: 'At risk' }
+                    { 'Order code': 'PO-4012', 'Due date': '2026-02-03', Priority: 'High', Status: 'Completed' },
+                    { 'Order code': 'PO-4014', 'Due date': '2026-02-05', Priority: 'Medium', Status: 'Completed' },
+                    { 'Order code': 'PO-4016', 'Due date': '2026-02-07', Priority: 'High', Status: 'In progress' },
+                    { 'Order code': 'PO-4018', 'Due date': '2026-02-08', Priority: 'Low', Status: 'In progress' },
+                    { 'Order code': 'PO-4021', 'Due date': '2026-02-10', Priority: 'Medium', Status: 'Planned' },
+                    { 'Order code': 'PO-4023', 'Due date': '2026-02-11', Priority: 'High', Status: 'At risk' },
+                    { 'Order code': 'PO-4025', 'Due date': '2026-02-12', Priority: 'Medium', Status: 'Planned' },
+                    { 'Order code': 'PO-4027', 'Due date': '2026-02-13', Priority: 'Low', Status: 'Planned' },
+                    { 'Order code': 'PO-4030', 'Due date': '2026-02-14', Priority: 'High', Status: 'Planned' },
+                    { 'Order code': 'PO-4032', 'Due date': '2026-02-15', Priority: 'Medium', Status: 'Planned' }
                 ]
             });
 

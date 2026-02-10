@@ -509,7 +509,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
           <div className="space-y-0.5">
             <NavItem icon={FlowArrow} label="Workflows" view="workflows" active={activeView === 'workflows'} />
             <NavItem icon={Database} label="Knowledge Base" view="database" active={activeView === 'database'} />
-            <NavItem icon={Plug} label="Connections" view="connections" active={activeView === 'connections'} badge={otAlertCount} />
+            <NavItem icon={Plug} label="Connections" view="connections" active={activeView === 'connections'} />
           </div>
 
           <SectionLabel label="Analyze" />
