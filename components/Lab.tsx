@@ -1307,8 +1307,8 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                 {
                     id: generateUUID(),
                     type: 'kpi',
-                    title: 'Hours saved monthly',
-                    dataMapping: { source: 'monthly_hours_saved', format: 'number', unit: 'h/mo' },
+                    title: 'Primary HDPE production hours',
+                    dataMapping: { source: 'primary_hdpe_hours_monthly', format: 'number', unit: 'h/mo' },
                     position: { x: 2, y: 0, w: 1, h: 1 }
                 },
                 {
@@ -1390,7 +1390,6 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
         const targetMI = Number(paramsByVariable.target_mi || 8.5);
         const specBandPct = Number(paramsByVariable.spec_band_percent || 8);
         const transitionsPerMonth = Number(paramsByVariable.transitions_per_month || 10);
-        const savedHoursMonthly = Math.max(0, labHours - modelHours) * transitionsPerMonth;
         const tolerance = targetMI * (specBandPct / 100);
         const lsl = Number((targetMI - tolerance).toFixed(2));
         const usl = Number((targetMI + tolerance).toFixed(2));
@@ -1409,11 +1408,17 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
 
         const modelInSpec = miTracking.filter(row => row.model_mi >= lsl && row.model_mi <= usl).length;
         const inSpecRate = (modelInSpec / miTracking.length) * 100;
+        const monthHours = 30 * 24;
+        const transitionHoursMonthly = transitionsPerMonth * modelHours;
+        const savedHoursMonthly = Math.max(0, labHours - modelHours) * transitionsPerMonth;
+        // Hours effectively sellable as prime-grade HDPE considering transition losses and in-spec ratio.
+        const primaryHdpeHoursMonthly = Math.max(0, (monthHours - transitionHoursMonthly) * (inSpecRate / 100));
 
         return {
             model_transition_hours: Number(modelHours.toFixed(2)),
             in_spec_rate: Number(inSpecRate.toFixed(1)),
             monthly_hours_saved: Number(savedHoursMonthly.toFixed(1)),
+            primary_hdpe_hours_monthly: Number(primaryHdpeHoursMonthly.toFixed(1)),
             mi_tracking: miTracking,
             transition_comparison: [
                 { mode: 'LAB baseline', hours: Number(labHours.toFixed(2)) },

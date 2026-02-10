@@ -969,6 +969,23 @@ app.get('/api/ot-alerts', authenticateToken, async (req, res) => {
     }
 });
 
+// Create OT alert (from dashboard threshold)
+app.post('/api/ot-alerts', authenticateToken, async (req, res) => {
+    try {
+        const { severity, message, metadata, fieldName, value, threshold } = req.body;
+        const id = require('crypto').randomUUID();
+        const now = new Date().toISOString();
+        await db.run(
+            `INSERT INTO ot_alerts (id, organizationId, severity, message, fieldName, value, threshold, metadata, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, req.user.orgId, severity || 'warning', message || 'Threshold crossed', fieldName || '', value || 0, threshold || '', JSON.stringify(metadata || {}), now]
+        );
+        res.status(201).json({ id, severity, message, createdAt: now });
+    } catch (error) {
+        console.error('Create OT alert error:', error);
+        res.status(500).json({ error: 'Failed to create alert' });
+    }
+});
+
 // Acknowledge OT alert
 app.post('/api/ot-alerts/:id/acknowledge', authenticateToken, async (req, res) => {
     try {

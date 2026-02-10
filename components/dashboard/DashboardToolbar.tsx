@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { 
     Calendar, Clock, CaretDown, ArrowsClockwise, Funnel, X, 
-    Play, Pause, GearSix, Share, Trash, ArrowLeft, Plus, FloppyDisk
+    Play, Pause, GearSix, Share, Trash, ArrowLeft, Plus, FloppyDisk,
+    FilePdf, SpinnerGap
 } from '@phosphor-icons/react';
 
 // ============================================================================
@@ -311,6 +312,8 @@ interface DashboardToolbarProps {
     onToggleEditMode: () => void;
     onSave: () => void;
     isSaving?: boolean;
+    onExportPdf?: () => void;
+    isExportingPdf?: boolean;
 }
 
 export const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
@@ -328,7 +331,9 @@ export const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
     isEditMode,
     onToggleEditMode,
     onSave,
-    isSaving
+    isSaving,
+    onExportPdf,
+    isExportingPdf
 }) => {
     return (
         <header className="h-14 bg-[var(--bg-primary)] border-b border-[var(--border-light)] flex items-center justify-between px-6 shrink-0">
@@ -383,6 +388,19 @@ export const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
 
                 {/* Actions */}
                 <div className="flex items-center gap-1">
+                    {onExportPdf && (
+                        <button
+                            onClick={onExportPdf}
+                            disabled={isExportingPdf}
+                            className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors disabled:opacity-50"
+                            title="Export as PDF"
+                        >
+                            {isExportingPdf
+                                ? <SpinnerGap size={16} weight="light" className="animate-spin" />
+                                : <FilePdf size={16} weight="light" />
+                            }
+                        </button>
+                    )}
                     <button
                         onClick={onShare}
                         className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"

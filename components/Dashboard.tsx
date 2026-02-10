@@ -289,9 +289,11 @@ const GridWidgetCard: React.FC<{
     widget: SavedWidget;
     onRemove: () => void;
     onEdit?: (widget: SavedWidget) => void;
+    onDrillDown?: (widget: SavedWidget) => void;
+    onSourceClick?: (widget: SavedWidget) => void;
     entities?: Entity[];
     dateRange?: { start: string; end: string };
-}> = React.memo(({ widget, onRemove, onEdit, entities, dateRange }) => {
+}> = React.memo(({ widget, onRemove, onEdit, onDrillDown, onSourceClick, entities, dateRange }) => {
     const [showExplanation, setShowExplanation] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
     const sourceEntity = entities?.find((entity) => entity.id === widget.dataConfig?.entityId);
@@ -375,6 +377,20 @@ const GridWidgetCard: React.FC<{
                         <h3 className="text-sm font-medium text-[var(--text-primary)] truncate">{widget.title}</h3>
                     </div>
                     <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {onDrillDown && Array.isArray(widget.data) && widget.data.length > 0 && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    onDrillDown(widget);
+                                }}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--accent-primary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors flex-shrink-0 z-10"
+                                title="Drill down into data"
+                            >
+                                <ArrowSquareOut size={14} weight="light" />
+                            </button>
+                        )}
                         {onEdit && (
                             <button
                                 onClick={(e) => {
@@ -406,7 +422,16 @@ const GridWidgetCard: React.FC<{
                 {/* Chart container - takes all remaining space */}
                 <div className="flex-1 flex flex-col min-h-0" style={{ overflow: 'hidden' }}>
                     <div className="px-3 pt-2 flex items-center gap-2 flex-wrap">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]">
+                        <span
+                            onClick={(e) => {
+                                if (!onSourceClick || !widget.dataConfig?.entityId) return;
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onSourceClick(widget);
+                            }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] ${widget.dataConfig?.entityId && onSourceClick ? 'cursor-pointer hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] transition-colors' : ''}`}
+                        >
                             {sourceLabel}
                         </span>
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border border-[var(--border-light)] ${analyticalConfidence.bg} ${analyticalConfidence.color}`}>
@@ -632,6 +657,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
     const [creatingExamplePresetId, setCreatingExamplePresetId] = useState<ExamplePresetId | null>(null);
     const [showExamplesMenu, setShowExamplesMenu] = useState(false);
     const examplesMenuRef = useRef<HTMLDivElement>(null);
+    const [isExportingPdf, setIsExportingPdf] = useState(false);
+    const [drillDownWidget, setDrillDownWidget] = useState<SavedWidget | null>(null);
     
     // Auto refresh effect
     useEffect(() => {
@@ -683,27 +710,174 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 const normalized = normalizeText(value);
                 return tokens.some((token) => normalized.includes(normalizeText(token)));
             };
-            const findEntityByName = (tokens: string[]) =>
-                entities.find((entity) => includesAny(entity.name, tokens));
-            const findProp = (entity: Entity | undefined, tokens: string[], preferredType?: string) => {
-                if (!entity?.properties?.length) return undefined;
-                const typedCandidate = preferredType
-                    ? entity.properties.find((prop: any) => prop.type === preferredType && includesAny(prop.name, tokens))
-                    : undefined;
-                return typedCandidate || entity.properties.find((prop: any) => includesAny(prop.name, tokens));
+            const fetchEntitiesSnapshot = async (): Promise<Entity[]> => {
+                const res = await fetch(`${API_BASE}/entities`, { credentials: 'include' });
+                if (!res.ok) return entities;
+                const data = await res.json();
+                return Array.isArray(data) ? data : entities;
             };
-
-            const extrusionEntity = findEntityByName(['extrus', 'linea', 'line']);
-            const productionEntity = findEntityByName(['produccion', 'production', 'throughput']);
-            const rawMaterialEntity = findEntityByName(['materia prima', 'material', 'feedstock', 'resina']);
-            const ordersEntity = findEntityByName(['orden', 'order']);
-
             const fetchRecords = async (entity?: Entity) => {
                 if (!entity) return [];
                 const res = await fetch(`${API_BASE}/entities/${entity.id}/records`, { credentials: 'include' });
                 if (!res.ok) return [];
                 const data = await res.json();
                 return Array.isArray(data) ? data : [];
+            };
+
+            let workingEntities: Entity[] = entities;
+            let createdEntitiesCount = 0;
+            let seededEntitiesCount = 0;
+
+            const ensureEntity = async (blueprint: {
+                name: string;
+                description: string;
+                entityType: string;
+                matchTokens: string[];
+                properties: Array<{ name: string; type: 'text' | 'number'; unit?: string; defaultValue?: string | number }>;
+                records?: Array<Record<string, string | number>>;
+            }) => {
+                let entity = workingEntities.find((candidate) =>
+                    normalizeText(candidate.name) === normalizeText(blueprint.name) ||
+                    includesAny(candidate.name, blueprint.matchTokens)
+                );
+
+                if (!entity) {
+                    const entityId = generateUUID();
+                    const createEntityRes = await fetch(`${API_BASE}/entities`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            id: entityId,
+                            name: blueprint.name,
+                            description: blueprint.description,
+                            author: 'Preset generator',
+                            lastEdited: 'Just now',
+                            entityType: blueprint.entityType,
+                            properties: blueprint.properties.map((prop) => ({
+                                id: generateUUID(),
+                                name: prop.name,
+                                type: prop.type,
+                                defaultValue: prop.defaultValue ?? (prop.type === 'number' ? '0' : ''),
+                                unit: prop.unit
+                            }))
+                        })
+                    });
+                    if (!createEntityRes.ok) {
+                        throw new Error(`Failed to create required preset entity: ${blueprint.name}`);
+                    }
+                    createdEntitiesCount += 1;
+                    workingEntities = await fetchEntitiesSnapshot();
+                    entity = workingEntities.find((candidate) => candidate.id === entityId)
+                        || workingEntities.find((candidate) => normalizeText(candidate.name) === normalizeText(blueprint.name));
+                }
+
+                if (entity && blueprint.records && blueprint.records.length > 0) {
+                    const currentRecords = await fetchRecords(entity);
+                    if (currentRecords.length === 0) {
+                        for (const row of blueprint.records) {
+                            await fetch(`${API_BASE}/entities/${entity.id}/records`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'include',
+                                body: JSON.stringify(row)
+                            });
+                        }
+                        seededEntitiesCount += 1;
+                    }
+                }
+
+                return entity;
+            };
+
+            const extrusionEntity = await ensureEntity({
+                name: 'Example - Extrusion Lines',
+                description: 'Extrusion line capabilities and baseline efficiency.',
+                entityType: 'process',
+                matchTokens: ['extrus', 'linea', 'line'],
+                properties: [
+                    { name: 'Line', type: 'text' },
+                    { name: 'OEE', type: 'number', unit: '%' },
+                    { name: 'Capacity (t/day)', type: 'number', unit: 't/day' }
+                ],
+                records: [
+                    { Line: 'R1', OEE: 91.5, 'Capacity (t/day)': 280 },
+                    { Line: 'R2', OEE: 88.2, 'Capacity (t/day)': 250 },
+                    { Line: 'R3', OEE: 86.9, 'Capacity (t/day)': 235 }
+                ]
+            });
+            const productionEntity = await ensureEntity({
+                name: 'Example - Daily Production',
+                description: 'Daily production and quality indicators by line and shift.',
+                entityType: 'process',
+                matchTokens: ['produccion', 'production', 'throughput'],
+                properties: [
+                    { name: 'Date', type: 'text' },
+                    { name: 'Line', type: 'text' },
+                    { name: 'Production (ton)', type: 'number', unit: 'ton' },
+                    { name: 'Scrap (%)', type: 'number', unit: '%' },
+                    { name: 'Energy (kWh)', type: 'number', unit: 'kWh' },
+                    { name: 'Shift', type: 'text' },
+                    { name: 'Quality', type: 'text' },
+                    { name: 'Product', type: 'text' }
+                ],
+                records: [
+                    { Date: '2026-02-01', Line: 'R1', 'Production (ton)': 265, 'Scrap (%)': 1.3, 'Energy (kWh)': 13840, Shift: 'A', Quality: 'A', Product: 'M5309' },
+                    { Date: '2026-02-02', Line: 'R1', 'Production (ton)': 258, 'Scrap (%)': 1.6, 'Energy (kWh)': 13910, Shift: 'B', Quality: 'A', Product: 'M5309' },
+                    { Date: '2026-02-03', Line: 'R2', 'Production (ton)': 236, 'Scrap (%)': 3.1, 'Energy (kWh)': 14730, Shift: 'A', Quality: 'B', Product: '5803' },
+                    { Date: '2026-02-04', Line: 'R2', 'Production (ton)': 242, 'Scrap (%)': 2.2, 'Energy (kWh)': 14450, Shift: 'B', Quality: 'A', Product: '5803' },
+                    { Date: '2026-02-05', Line: 'R3', 'Production (ton)': 221, 'Scrap (%)': 2.8, 'Energy (kWh)': 14220, Shift: 'C', Quality: 'B', Product: 'R4805' },
+                    { Date: '2026-02-06', Line: 'R3', 'Production (ton)': 229, 'Scrap (%)': 1.9, 'Energy (kWh)': 14010, Shift: 'A', Quality: 'A', Product: 'R4805' }
+                ]
+            });
+            const rawMaterialEntity = await ensureEntity({
+                name: 'Example - Raw Materials',
+                description: 'Material family and available stock for HDPE production.',
+                entityType: 'material',
+                matchTokens: ['materia prima', 'material', 'feedstock', 'resina'],
+                properties: [
+                    { name: 'Type', type: 'text' },
+                    { name: 'Material', type: 'text' },
+                    { name: 'Stock (t)', type: 'number', unit: 't' }
+                ],
+                records: [
+                    { Type: 'Virgin', Material: 'Ethylene feed', 'Stock (t)': 920 },
+                    { Type: 'Additives', Material: 'Stabilizer package', 'Stock (t)': 62 },
+                    { Type: 'Recycled', Material: 'Reprocessed HDPE', 'Stock (t)': 180 }
+                ]
+            });
+            const ordersEntity = await ensureEntity({
+                name: 'Example - Production Orders',
+                description: 'Open order portfolio and operational urgency.',
+                entityType: 'generic',
+                matchTokens: ['orden', 'order'],
+                properties: [
+                    { name: 'Order code', type: 'text' },
+                    { name: 'Due date', type: 'text' },
+                    { name: 'Priority', type: 'text' },
+                    { name: 'Status', type: 'text' }
+                ],
+                records: [
+                    { 'Order code': 'PO-4012', 'Due date': '2026-02-07', Priority: 'High', Status: 'In progress' },
+                    { 'Order code': 'PO-4016', 'Due date': '2026-02-09', Priority: 'Medium', Status: 'Planned' },
+                    { 'Order code': 'PO-4021', 'Due date': '2026-02-11', Priority: 'Low', Status: 'Planned' },
+                    { 'Order code': 'PO-4025', 'Due date': '2026-02-12', Priority: 'High', Status: 'At risk' }
+                ]
+            });
+
+            if (createdEntitiesCount > 0 || seededEntitiesCount > 0) {
+                success(
+                    'Preset entities prepared',
+                    `Created ${createdEntitiesCount} and seeded ${seededEntitiesCount} entities for this dashboard.`
+                );
+            }
+
+            const findProp = (entity: Entity | undefined, tokens: string[], preferredType?: string) => {
+                if (!entity?.properties?.length) return undefined;
+                const typedCandidate = preferredType
+                    ? entity.properties.find((prop: any) => prop.type === preferredType && includesAny(prop.name, tokens))
+                    : undefined;
+                return typedCandidate || entity.properties.find((prop: any) => includesAny(prop.name, tokens));
             };
 
             const [extrusionRecords, productionRecords, rawMaterialRecords, orderRecords] = await Promise.all([
@@ -1447,6 +1621,52 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         }
     };
     
+    const handleExportPdf = async () => {
+        if (isExportingPdf) return;
+        setIsExportingPdf(true);
+        try {
+            const container = document.getElementById('dashboard-grid-area');
+            if (!container) {
+                showError('Export failed', 'Dashboard container not found');
+                return;
+            }
+            const html2canvas = (await import('html2canvas')).default;
+            const canvas = await html2canvas(container, {
+                backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim() || '#0f1117',
+                scale: 2,
+                useCORS: true,
+                logging: false
+            });
+            const imgData = canvas.toDataURL('image/png');
+            const { default: jsPDF } = await import('jspdf');
+            const pdfWidth = canvas.width;
+            const pdfHeight = canvas.height;
+            const pdf = new jsPDF({
+                orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait',
+                unit: 'px',
+                format: [pdfWidth / 2, pdfHeight / 2]
+            });
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth / 2, pdfHeight / 2);
+            const dashName = selectedDashboard?.name || 'dashboard';
+            pdf.save(`${dashName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`);
+            success('PDF exported', `${dashName} saved as PDF.`);
+        } catch (error) {
+            console.error('Error exporting PDF:', error);
+            showError('Export failed', 'Could not generate PDF. Make sure html2canvas and jspdf are installed.');
+        } finally {
+            setIsExportingPdf(false);
+        }
+    };
+
+    const handleSourceClick = (widget: SavedWidget) => {
+        const entityId = widget.dataConfig?.entityId;
+        if (entityId && onViewChange) {
+            navigate(`/database`);
+        } else if (entityId) {
+            navigate(`/database`);
+        }
+    };
+
     const handleWidgetTemplateSelect = (template: WidgetTemplate) => {
         setShowWidgetGallery(false);
         if (template.id === 'ai_generated') {
@@ -1801,6 +2021,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             setLayout([]);
         }
     };
+
+    // Threshold alert checker — runs whenever widgets change
+    const thresholdAlertsFired = useRef(new Set<string>());
+    useEffect(() => {
+        if (savedWidgets.length === 0) return;
+        const gaugeWidgets = savedWidgets.filter((w) => w.type === 'gauge');
+        for (const widget of gaugeWidgets) {
+            const dataRow = Array.isArray(widget.data) ? widget.data[0] : null;
+            if (!dataRow) continue;
+            const value = typeof dataRow.value === 'number' ? dataRow.value : parseFloat(dataRow.value);
+            if (!Number.isFinite(value)) continue;
+            const maxVal = typeof widget.max === 'number' ? widget.max : 100;
+            const threshold = maxVal * 0.9;
+            const alertKey = `${widget.id}_${value}`;
+            if (thresholdAlertsFired.current.has(alertKey)) continue;
+            if (value >= threshold || value <= maxVal * 0.1) {
+                thresholdAlertsFired.current.add(alertKey);
+                const severity = value >= threshold ? 'warning' : 'error';
+                const msg = `${widget.title}: value ${value.toLocaleString()} ${value >= threshold ? 'exceeds' : 'below'} threshold (${threshold.toLocaleString()})`;
+                fetch(`${API_BASE}/ot-alerts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        severity,
+                        message: msg,
+                        fieldName: widget.title,
+                        value,
+                        threshold: String(threshold),
+                        metadata: { widgetId: widget.id, dashboardId: selectedDashboardId }
+                    })
+                }).catch(() => {});
+                warning(`${widget.title}`, msg);
+            }
+        }
+    }, [savedWidgets, selectedDashboardId]);
 
     const handleCreateDashboard = async () => {
         try {
@@ -2490,6 +2746,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                         onToggleEditMode={() => setIsEditMode(!isEditMode)}
                         onSave={handleSaveDashboard}
                         isSaving={isSavingDashboard}
+                        onExportPdf={handleExportPdf}
+                        isExportingPdf={isExportingPdf}
                     />
 
                     {/* Main Content */}
@@ -2553,7 +2811,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                             </div>
 
                             {/* Grid Layout for Widgets */}
-                            <div id="dashboard-container" className="relative min-h-[400px] w-full">
+                            <div id="dashboard-grid-area" className="relative min-h-[400px] w-full">
                                 {savedWidgets.length > 0 ? (
                                     <GridLayout
                                         className="layout"
@@ -2614,6 +2872,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                                     widget={widget}
                                                     onRemove={() => removeWidget(widget.id)}
                                                     onEdit={handleEditSavedWidget}
+                                                    onDrillDown={(w) => setDrillDownWidget(w)}
+                                                    onSourceClick={handleSourceClick}
                                                     entities={entities}
                                                     dateRange={timeRangeToDateRange(timeRange)}
                                                 />
@@ -2954,6 +3214,83 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 </div>
             )}
             
+            {/* Drill-down Panel */}
+            {drillDownWidget && (
+                <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setDrillDownWidget(null)}>
+                    <div className="absolute inset-0 bg-black/40" />
+                    <div
+                        className="relative w-full max-w-xl bg-[var(--bg-card)] border-l border-[var(--border-light)] shadow-2xl flex flex-col animate-slide-in-right"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-light)]">
+                            <div>
+                                <h3 className="text-sm font-semibold text-[var(--text-primary)]">{drillDownWidget.title}</h3>
+                                <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
+                                    {Array.isArray(drillDownWidget.data) ? drillDownWidget.data.length : 0} records
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setDrillDownWidget(null)}
+                                className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+                            >
+                                <X size={16} weight="light" />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-auto custom-scrollbar p-4">
+                            {Array.isArray(drillDownWidget.data) && drillDownWidget.data.length > 0 ? (
+                                <table className="w-full text-xs">
+                                    <thead className="sticky top-0 bg-[var(--bg-card)] z-10">
+                                        <tr className="border-b border-[var(--border-light)]">
+                                            {Object.keys(drillDownWidget.data[0]).map((key) => (
+                                                <th key={key} className="text-left py-2 px-2 text-[var(--text-tertiary)] font-medium whitespace-nowrap">
+                                                    {key.replace(/_/g, ' ')}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {drillDownWidget.data.slice(0, 100).map((row: any, rowIdx: number) => (
+                                            <tr key={rowIdx} className="border-b border-[var(--border-light)]/30 hover:bg-[var(--bg-tertiary)]/30 transition-colors">
+                                                {Object.values(row).map((cellValue: any, colIdx: number) => (
+                                                    <td key={colIdx} className="py-1.5 px-2 text-[var(--text-primary)] tabular-nums whitespace-nowrap">
+                                                        {typeof cellValue === 'number'
+                                                            ? cellValue.toLocaleString()
+                                                            : cellValue === null || cellValue === undefined
+                                                                ? '—'
+                                                                : String(cellValue)}
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <p className="text-sm text-[var(--text-tertiary)] text-center py-8">No underlying data available.</p>
+                            )}
+                            {Array.isArray(drillDownWidget.data) && drillDownWidget.data.length > 100 && (
+                                <p className="text-[10px] text-[var(--text-tertiary)] text-center py-2">
+                                    Showing first 100 of {drillDownWidget.data.length} records.
+                                </p>
+                            )}
+                        </div>
+                        {drillDownWidget.dataConfig?.entityId && (
+                            <div className="px-5 py-3 border-t border-[var(--border-light)]">
+                                <button
+                                    onClick={() => {
+                                        setDrillDownWidget(null);
+                                        navigate('/database');
+                                    }}
+                                    className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--accent-primary)] hover:underline"
+                                >
+                                    <ArrowSquareOut size={12} weight="light" />
+                                    Open source entity in Database
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Toast Notifications */}
             <ToastContainer 
                 notifications={notifications} 

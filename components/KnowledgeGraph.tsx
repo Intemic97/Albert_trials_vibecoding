@@ -711,10 +711,11 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
         fetchPreview();
     }, [selectedEntity]);
     
-    // Auto fit when settled
+    // Auto fit when settled — runs only once on first settle
+    const hasAutoFitted = useRef(false);
     useEffect(() => {
-        if (isSettled && nodes.length > 0) {
-            // Small delay to ensure all positions are final
+        if (isSettled && nodes.length > 0 && !hasAutoFitted.current) {
+            hasAutoFitted.current = true;
             const timer = setTimeout(fitToContent, 100);
             return () => clearTimeout(timer);
         }
