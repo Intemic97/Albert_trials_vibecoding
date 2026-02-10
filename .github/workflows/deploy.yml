@@ -27,6 +27,9 @@ jobs:
             echo "== Install deps =="
             npm ci
 
+            echo "== Install Python deps =="
+            pip3 install numpy --quiet || python3 -m pip install numpy --quiet
+
             echo "== Build frontend =="
             npm run build
 

@@ -5306,7 +5306,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         const folderStructure: { [key: string]: { icon: React.ElementType, items: DraggableItem[] } } = {
                                             'Recents': { icon: Clock, items: [] },
                                             'Triggers': { icon: Play, items: DRAGGABLE_ITEMS.filter(i => ['trigger', 'webhook'].includes(i.type)) },
-                                            'Data Sources': { icon: Database, items: DRAGGABLE_ITEMS.filter(i => ['fetchData', 'excelInput', 'pdfInput', 'http', 'mysql', 'sapFetch', 'limsFetch', 'opcua', 'mqtt', 'esios', 'climatiq', 'manualInput'].includes(i.type)) },
+                                            'Data Sources': { icon: Database, items: DRAGGABLE_ITEMS.filter(i => ['fetchData', 'excelInput', 'pdfInput', 'http', 'mysql', 'sapFetch', 'limsFetch', 'opcua', 'mqtt', 'osiPi', 'esios', 'climatiq', 'manualInput'].includes(i.type)) },
                                             'Data Operations': { icon: GitMerge, items: DRAGGABLE_ITEMS.filter(i => ['join', 'splitColumns', 'addField', 'action'].includes(i.type)) },
                                             'Control Flow': { icon: AlertCircle, items: DRAGGABLE_ITEMS.filter(i => ['condition', 'humanApproval', 'alertAgent', 'dataVisualization'].includes(i.type)) },
                                             'Models': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['llm', 'statisticalAnalysis', 'franmit'].includes(i.type)) },
