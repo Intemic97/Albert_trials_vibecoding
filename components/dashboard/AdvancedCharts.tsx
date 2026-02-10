@@ -240,6 +240,7 @@ export const HeatmapChart: React.FC<HeatmapProps> = ({
         
         return { xValues: xArr, yValues: yArr, matrix: mat, maxValue: max, minValue: min };
     }, [data, xKey, yKey, valueKey]);
+    const hasFlatRange = maxValue === minValue;
 
     const getColor = useCallback((value: number) => {
         if (maxValue === minValue) return HEATMAP_COLORS.mid;
@@ -256,12 +257,19 @@ export const HeatmapChart: React.FC<HeatmapProps> = ({
         }
     }, [maxValue, minValue]);
 
-    const cellWidth = 100 / xValues.length;
-    const cellHeight = 80 / yValues.length;
+    const hasData = xValues.length > 0 && yValues.length > 0;
+    const plotLeft = 12;
+    const plotTop = 8;
+    const plotRight = 88;
+    const plotBottom = 86;
+    const plotWidth = Math.max(1, plotRight - plotLeft);
+    const plotHeight = Math.max(1, plotBottom - plotTop);
+    const cellWidth = hasData ? plotWidth / xValues.length : plotWidth;
+    const cellHeight = hasData ? plotHeight / yValues.length : plotHeight;
 
     return (
         <div className="w-full relative" style={{ height }}>
-            <svg viewBox="0 0 100 100" className="w-full h-full">
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
                 {/* Cells */}
                 {yValues.map((y, yi) => (
                     xValues.map((x, xi) => {
@@ -269,8 +277,8 @@ export const HeatmapChart: React.FC<HeatmapProps> = ({
                         return (
                             <rect
                                 key={`${x}-${y}`}
-                                x={xi * cellWidth + 15}
-                                y={yi * cellHeight + 10}
+                                x={plotLeft + xi * cellWidth}
+                                y={plotTop + yi * cellHeight}
                                 width={cellWidth - 1}
                                 height={cellHeight - 1}
                                 fill={getColor(value)}
@@ -288,13 +296,13 @@ export const HeatmapChart: React.FC<HeatmapProps> = ({
                 {xValues.map((x, i) => (
                     <text
                         key={`x-${i}`}
-                        x={i * cellWidth + 15 + cellWidth / 2}
+                        x={plotLeft + i * cellWidth + cellWidth / 2}
                         y="96"
                         textAnchor="middle"
-                        fontSize="2.5"
+                        fontSize="2.3"
                         fill="var(--text-tertiary)"
                     >
-                        {x.length > 6 ? x.slice(0, 6) : x}
+                        {x.length > 8 ? `${x.slice(0, 8)}..` : x}
                     </text>
                 ))}
                 
@@ -302,13 +310,13 @@ export const HeatmapChart: React.FC<HeatmapProps> = ({
                 {yValues.map((y, i) => (
                     <text
                         key={`y-${i}`}
-                        x="12"
-                        y={i * cellHeight + 10 + cellHeight / 2 + 1}
+                        x="10"
+                        y={plotTop + i * cellHeight + cellHeight / 2 + 0.8}
                         textAnchor="end"
-                        fontSize="2.5"
+                        fontSize="2.3"
                         fill="var(--text-tertiary)"
                     >
-                        {y.length > 8 ? y.slice(0, 8) : y}
+                        {y.length > 10 ? `${y.slice(0, 10)}..` : y}
                     </text>
                 ))}
             </svg>
@@ -323,15 +331,30 @@ export const HeatmapChart: React.FC<HeatmapProps> = ({
             
             {/* Legend */}
             <div className="absolute bottom-0 right-2 flex items-center gap-1 text-[10px] text-[var(--text-tertiary)]">
-                <span>{minValue.toFixed(0)}</span>
-                <div 
-                    className="w-20 h-2 rounded"
-                    style={{ 
-                        background: `linear-gradient(to right, ${HEATMAP_COLORS.low}, ${HEATMAP_COLORS.mid}, ${HEATMAP_COLORS.high})` 
-                    }}
-                />
-                <span>{maxValue.toFixed(0)}</span>
+                {Number.isFinite(minValue) && Number.isFinite(maxValue) ? (
+                    hasFlatRange ? (
+                        <span>Single value: {minValue.toLocaleString()}</span>
+                    ) : (
+                        <>
+                            <span>{minValue.toFixed(0)}</span>
+                            <div
+                                className="w-20 h-2 rounded"
+                                style={{
+                                    background: `linear-gradient(to right, ${HEATMAP_COLORS.low}, ${HEATMAP_COLORS.mid}, ${HEATMAP_COLORS.high})`
+                                }}
+                            />
+                            <span>{maxValue.toFixed(0)}</span>
+                        </>
+                    )
+                ) : (
+                    <span>No values</span>
+                )}
             </div>
+            {yValues.length <= 1 && (
+                <div className="absolute bottom-5 left-2 text-[10px] text-[var(--text-tertiary)]">
+                    Add more row categories to get a full matrix
+                </div>
+            )}
         </div>
     );
 };
@@ -376,7 +399,7 @@ export const ScatterMatrixChart: React.FC<ScatterMatrixProps> = ({
 
     return (
         <div className="w-full relative" style={{ height }}>
-            <svg viewBox="0 0 100 100" className="w-full h-full">
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
                 {/* Grid cells */}
                 {dimensions.slice(0, n).map((dimY, yi) => (
                     dimensions.slice(0, n).map((dimX, xi) => {
@@ -401,11 +424,11 @@ export const ScatterMatrixChart: React.FC<ScatterMatrixProps> = ({
                                         y={cellY + cellSize / 2}
                                         textAnchor="middle"
                                         dominantBaseline="middle"
-                                        fontSize="3"
+                                        fontSize="3.2"
                                         fill="var(--text-secondary)"
                                         fontWeight="500"
                                     >
-                                        {dimX.length > 8 ? dimX.slice(0, 8) + '..' : dimX}
+                                        {dimX.length > 12 ? dimX.slice(0, 12) + '..' : dimX}
                                     </text>
                                 </g>
                             );
@@ -435,9 +458,9 @@ export const ScatterMatrixChart: React.FC<ScatterMatrixProps> = ({
                                             key={i}
                                             cx={px}
                                             cy={py}
-                                            r="0.8"
+                                            r="1.15"
                                             fill={color}
-                                            opacity={0.6}
+                                            opacity={0.72}
                                             onMouseEnter={() => setHoveredPoint(d)}
                                             onMouseLeave={() => setHoveredPoint(null)}
                                         />

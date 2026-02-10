@@ -11,6 +11,38 @@ Cada vez que **subes un package** (por API o por script), se importa como use ca
 
 Este flujo evita errores en despliegue y te da una forma repetible de mover casos de uso entre entornos.
 
+## JSON correcto para importar entidades
+
+El importador `Import Package` de la app es de **Use Case**, no de Knowledge Base.
+
+- JSON valido para este importador: `entities`, `records`, `workflow`, `simulation`, `dashboard`
+- JSON NO valido para este importador: `folders`, `documents` (eso es formato KB)
+
+### Checklist rapido (para que importe de verdad)
+
+1. El JSON debe incluir `entities` con al menos 1 entidad.
+2. Si quieres registros, incluir `records` con `entityId` + `values`.
+3. Si en UI esta activado `dryRun`, no se escribe nada en DB.
+4. Para import real, desactivar `dryRun` y usar `Importar package`.
+
+### Archivos de ejemplo en este repo
+
+- `server/repsol-entities-package.json` (entities base)
+- `server/repsol-knowledge-use-case-package.json` (knowledge mapeado como entities/records)
+- `server/repsol-knowledge-use-case-package-v2.json` (version minima de prueba)
+
+## Troubleshooting
+
+### Error: `Unexpected token '<', "<!DOCTYPE "... is not valid JSON`
+
+Significa que el frontend esperaba JSON y el backend devolvio HTML (login, 404 o ruta mal resuelta).
+
+Revisar:
+
+1. Sesion autenticada en la app.
+2. Endpoint correcto (`/api/use-case/import` o `/api/use-case/validate`).
+3. Configuracion de `API_BASE` y proxy en el entorno.
+
 ## Cómo exportar
 
 ### 1. Export rápido de entities Repsol (script incluido)

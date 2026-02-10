@@ -13,6 +13,13 @@ export interface WidgetDataConfig {
     entityName: string;
     xAxisColumn?: string;
     yAxisColumn?: string;
+    sizeColumn?: string;
+    sourceColumn?: string;
+    targetColumn?: string;
+    dateColumn?: string;
+    severityColumn?: string;
+    labelColumn?: string;
+    trackColumn?: string;
     aggregation?: 'sum' | 'avg' | 'count' | 'min' | 'max';
     groupBy?: string;
     sortBy?: string;
@@ -70,6 +77,13 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
     const [selectedEntityId, setSelectedEntityId] = useState<string>('');
     const [xAxisColumn, setXAxisColumn] = useState<string>('');
     const [yAxisColumn, setYAxisColumn] = useState<string>('');
+    const [sizeColumn, setSizeColumn] = useState<string>('');
+    const [sourceColumn, setSourceColumn] = useState<string>('');
+    const [targetColumn, setTargetColumn] = useState<string>('');
+    const [dateColumn, setDateColumn] = useState<string>('');
+    const [severityColumn, setSeverityColumn] = useState<string>('');
+    const [labelColumn, setLabelColumn] = useState<string>('');
+    const [trackColumn, setTrackColumn] = useState<string>('');
     const [aggregation, setAggregation] = useState<string>('sum');
     const [groupBy, setGroupBy] = useState<string>('');
     const [limit, setLimit] = useState<number>(10);
@@ -87,6 +101,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
     const numericColumns = selectedEntity?.properties.filter(p => p.type === 'number') || [];
     const textColumns = selectedEntity?.properties.filter(p => p.type === 'text') || [];
     const allColumns = selectedEntity?.properties || [];
+    const dateLikeColumns = allColumns.filter(col => /date|fecha|time|timestamp|period|day|month/i.test(col.name));
 
     // Auto-select first numeric column for Y-axis
     useEffect(() => {
@@ -101,6 +116,74 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
             setXAxisColumn(textColumns[0].id);
         }
     }, [textColumns, xAxisColumn]);
+
+    // Heatmap needs a second categorical dimension (Y axis in matrix)
+    useEffect(() => {
+        if (!selectedEntity || template.id !== 'heatmap' || groupBy) return;
+        const candidates = textColumns.filter(col => col.id !== xAxisColumn);
+        if (candidates.length > 0) {
+            setGroupBy(candidates[0].id);
+        } else if (textColumns.length > 0) {
+            setGroupBy(textColumns[0].id);
+        }
+    }, [selectedEntity, template.id, groupBy, textColumns, xAxisColumn]);
+
+    useEffect(() => {
+        if (!selectedEntity || template.id !== 'bubble' || sizeColumn) return;
+        if (numericColumns.length > 1) {
+            const candidate = numericColumns.find(col => col.id !== yAxisColumn);
+            if (candidate) setSizeColumn(candidate.id);
+        }
+    }, [selectedEntity, template.id, sizeColumn, numericColumns, yAxisColumn]);
+
+    useEffect(() => {
+        if (!selectedEntity || template.id !== 'sankey') return;
+        if (!sourceColumn && textColumns.length > 0) {
+            setSourceColumn(textColumns[0].id);
+        }
+        if (!targetColumn && textColumns.length > 1) {
+            setTargetColumn(textColumns[1].id);
+        } else if (!targetColumn && textColumns.length > 0) {
+            setTargetColumn(textColumns[0].id);
+        }
+    }, [selectedEntity, template.id, sourceColumn, targetColumn, textColumns]);
+
+    useEffect(() => {
+        if (!selectedEntity || !['timeline', 'multi_timeline'].includes(template.id)) return;
+        if (!dateColumn) {
+            if (dateLikeColumns.length > 0) {
+                setDateColumn(dateLikeColumns[0].id);
+            } else if (textColumns.length > 0) {
+                setDateColumn(textColumns[0].id);
+            }
+        }
+        if (!severityColumn) {
+            const sev = allColumns.find(col => /severity|criticality|level|criticidad|impact/i.test(col.name));
+            if (sev) setSeverityColumn(sev.id);
+        }
+        if (!labelColumn) {
+            const label = allColumns.find(col => /name|title|descripcion|description|event|alert/i.test(col.name));
+            if (label) setLabelColumn(label.id);
+        }
+        if (template.id === 'multi_timeline' && !trackColumn) {
+            const track = allColumns.find(col => /asset|line|machine|equipo|detector|source|area|unit/i.test(col.name));
+            if (track) {
+                setTrackColumn(track.id);
+            } else if (textColumns.length > 0) {
+                setTrackColumn(textColumns[0].id);
+            }
+        }
+    }, [
+        selectedEntity,
+        template.id,
+        dateColumn,
+        severityColumn,
+        labelColumn,
+        trackColumn,
+        allColumns,
+        dateLikeColumns,
+        textColumns
+    ]);
 
     // Load preview data when config changes
     useEffect(() => {
@@ -137,8 +220,189 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
 
         const xCol = allColumns.find(c => c.id === xAxisColumn);
         const yCol = allColumns.find(c => c.id === yAxisColumn);
+        const groupCol = allColumns.find(c => c.id === groupBy);
+        const sizeCol = allColumns.find(c => c.id === sizeColumn);
+        const sourceCol = allColumns.find(c => c.id === sourceColumn);
+        const targetCol = allColumns.find(c => c.id === targetColumn);
+        const dateCol = allColumns.find(c => c.id === dateColumn);
+        const sevCol = allColumns.find(c => c.id === severityColumn);
+        const labelCol = allColumns.find(c => c.id === labelColumn);
+        const trackCol = allColumns.find(c => c.id === trackColumn);
         
-        if (!yCol) return [];
+        const requiresNumericY = !['timeline', 'multi_timeline'].includes(template.id) && !(template.id === 'sankey' && aggregation === 'count');
+        if (!yCol && requiresNumericY) return [];
+
+        const aggregate = (values: number[]) => {
+            if (values.length === 0) return 0;
+            switch (aggregation) {
+                case 'sum':
+                    return values.reduce((a, b) => a + b, 0);
+                case 'avg':
+                    return values.reduce((a, b) => a + b, 0) / values.length;
+                case 'count':
+                    return values.length;
+                case 'min':
+                    return Math.min(...values);
+                case 'max':
+                    return Math.max(...values);
+                default:
+                    return values.reduce((a, b) => a + b, 0);
+            }
+        };
+
+        if (template.id === 'heatmap' && xAxisColumn && groupBy && xCol && groupCol) {
+            const matrixGroups: Record<string, number[]> = {};
+
+            records.forEach(record => {
+                const xValue = String(record.values?.[xAxisColumn] ?? 'Unknown');
+                const yValue = String(record.values?.[groupBy] ?? 'Unknown');
+                const value = parseFloat(record.values?.[yAxisColumn]) || 0;
+                const key = `${xValue}||${yValue}`;
+                if (!matrixGroups[key]) matrixGroups[key] = [];
+                matrixGroups[key].push(value);
+            });
+
+            return Object.entries(matrixGroups)
+                .map(([pair, values]) => {
+                    const [xValue, yValue] = pair.split('||');
+                    const aggregatedValue = Math.round(aggregate(values) * 100) / 100;
+                    return {
+                        name: xValue,
+                        category: yValue,
+                        value: aggregatedValue,
+                        [xCol.name]: xValue,
+                        [groupCol.name]: yValue,
+                        [yCol.name]: aggregatedValue
+                    };
+                })
+                .slice(0, limit);
+        }
+
+        if (template.id === 'bubble' && xCol && yCol) {
+            return records.slice(0, limit).map((record) => {
+                const xRaw = record.values?.[xAxisColumn];
+                const yRaw = record.values?.[yAxisColumn];
+                const sRaw = sizeCol ? record.values?.[sizeColumn] : undefined;
+                const xValue = parseFloat(xRaw);
+                const yValue = parseFloat(yRaw);
+                const sizeValue = sizeCol ? parseFloat(sRaw) : Math.abs(parseFloat(yRaw) || 0);
+                const safeX = Number.isFinite(xValue) ? xValue : 0;
+                const safeY = Number.isFinite(yValue) ? yValue : 0;
+                const safeSize = Number.isFinite(sizeValue) && sizeValue > 0 ? sizeValue : 1;
+                const label = labelCol ? String(record.values?.[labelColumn] ?? '') : '';
+                return {
+                    [xCol.name]: safeX,
+                    [yCol.name]: safeY,
+                    [(sizeCol?.name || 'size')]: safeSize,
+                    name: label || `Point ${record.id}`,
+                    value: safeY
+                };
+            });
+        }
+
+        if (template.id === 'sankey' && sourceCol && targetCol) {
+            const flowGroups: Record<string, number[]> = {};
+            records.forEach((record) => {
+                const src = String(record.values?.[sourceColumn] ?? 'Unknown');
+                const tgt = String(record.values?.[targetColumn] ?? 'Unknown');
+                const numeric = parseFloat(record.values?.[yAxisColumn]) || 0;
+                const key = `${src}||${tgt}`;
+                if (!flowGroups[key]) flowGroups[key] = [];
+                flowGroups[key].push(aggregation === 'count' ? 1 : numeric);
+            });
+
+            return Object.entries(flowGroups)
+                .map(([key, values]) => {
+                    const [src, tgt] = key.split('||');
+                    const flowValue = Math.max(0, Math.round(aggregate(values) * 100) / 100);
+                    return {
+                        source: src || 'Unknown',
+                        target: tgt || 'Unknown',
+                        value: flowValue,
+                        [sourceCol.name]: src || 'Unknown',
+                        [targetCol.name]: tgt || 'Unknown',
+                        [(yCol?.name || 'value')]: flowValue
+                    };
+                })
+                .filter(item => item.source && item.target)
+                .slice(0, limit);
+        }
+
+        if (template.id === 'timeline' && dateCol) {
+            const normalizeSeverity = (value: string) => {
+                const raw = String(value || '').toLowerCase();
+                if (/high|critical|alta|severa/.test(raw)) return 'high';
+                if (/low|minor|baja/.test(raw)) return 'low';
+                return 'medium';
+            };
+
+            return records
+                .map((record) => {
+                    const rawDate = record.values?.[dateColumn];
+                    const parsedDate = new Date(rawDate);
+                    if (!rawDate || Number.isNaN(parsedDate.getTime())) return null;
+                    const labelValue = labelCol ? String(record.values?.[labelColumn] ?? '') : '';
+                    const severityValue = sevCol ? String(record.values?.[severityColumn] ?? '') : '';
+                    return {
+                        start: parsedDate.toISOString(),
+                        severity: normalizeSeverity(severityValue),
+                        label: labelValue || `Event ${record.id}`,
+                        name: labelValue || `Event ${record.id}`,
+                        value: 1,
+                        [dateCol.name]: parsedDate.toISOString()
+                    };
+                })
+                .filter(Boolean)
+                .sort((a: any, b: any) => new Date(a.start).getTime() - new Date(b.start).getTime())
+                .slice(0, limit);
+        }
+
+        if (template.id === 'multi_timeline' && dateCol) {
+            const normalizeSeverity = (value: string) => {
+                const raw = String(value || '').toLowerCase();
+                if (/high|critical|alta|severa/.test(raw)) return 'high';
+                if (/low|minor|baja/.test(raw)) return 'low';
+                return 'medium';
+            };
+            const trackKey = trackCol?.name || 'asset';
+
+            return records
+                .map((record) => {
+                    const rawDate = record.values?.[dateColumn];
+                    const parsedDate = new Date(rawDate);
+                    if (!rawDate || Number.isNaN(parsedDate.getTime())) return null;
+                    const labelValue = labelCol ? String(record.values?.[labelColumn] ?? '') : '';
+                    const severityValue = sevCol ? String(record.values?.[severityColumn] ?? '') : '';
+                    const trackValue = trackCol ? String(record.values?.[trackColumn] ?? 'Default') : 'Default';
+                    return {
+                        start: parsedDate.toISOString(),
+                        severity: normalizeSeverity(severityValue),
+                        label: labelValue || `Event ${record.id}`,
+                        [trackKey]: trackValue || 'Default',
+                        name: labelValue || `Event ${record.id}`,
+                        value: 1
+                    };
+                })
+                .filter(Boolean)
+                .sort((a: any, b: any) => new Date(a.start).getTime() - new Date(b.start).getTime())
+                .slice(0, limit);
+        }
+
+        if ((template.id === 'parallel' || template.id === 'scatter_matrix') && numericColumns.length > 0) {
+            const dims = numericColumns.slice(0, template.id === 'parallel' ? 6 : 4);
+            return records.slice(0, limit).map((record) => {
+                const row: Record<string, any> = {};
+                dims.forEach((dim) => {
+                    const n = parseFloat(record.values?.[dim.id]);
+                    row[dim.name] = Number.isFinite(n) ? n : 0;
+                });
+                if (xCol) {
+                    row[xCol.name] = String(record.values?.[xAxisColumn] ?? `Record ${record.id}`);
+                    row.name = row[xCol.name];
+                }
+                return row;
+            });
+        }
 
         // Group by X column if specified
         if (xAxisColumn && xCol) {
@@ -153,30 +417,11 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
             });
 
             return Object.entries(groups).map(([name, values]) => {
-                let aggregatedValue: number;
-                switch (aggregation) {
-                    case 'sum':
-                        aggregatedValue = values.reduce((a, b) => a + b, 0);
-                        break;
-                    case 'avg':
-                        aggregatedValue = values.reduce((a, b) => a + b, 0) / values.length;
-                        break;
-                    case 'count':
-                        aggregatedValue = values.length;
-                        break;
-                    case 'min':
-                        aggregatedValue = Math.min(...values);
-                        break;
-                    case 'max':
-                        aggregatedValue = Math.max(...values);
-                        break;
-                    default:
-                        aggregatedValue = values.reduce((a, b) => a + b, 0);
-                }
-                
+                const aggregatedValue = aggregate(values);
                 return {
                     name,
                     value: Math.round(aggregatedValue * 100) / 100,
+                    [xCol.name]: name,
                     [yCol.name]: Math.round(aggregatedValue * 100) / 100
                 };
             }).sort((a, b) => b.value - a.value).slice(0, limit);
@@ -186,6 +431,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
         return records.slice(0, limit).map(record => ({
             name: record.values?.[xAxisColumn] || 'Item',
             value: parseFloat(record.values?.[yAxisColumn]) || 0,
+            [xCol?.name || 'name']: record.values?.[xAxisColumn] || 'Item',
             [yCol.name]: parseFloat(record.values?.[yAxisColumn]) || 0
         }));
     };
@@ -208,6 +454,13 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                 entityName: selectedEntity?.name || '',
                 xAxisColumn,
                 yAxisColumn,
+                sizeColumn,
+                sourceColumn,
+                targetColumn,
+                dateColumn,
+                severityColumn,
+                labelColumn,
+                trackColumn,
                 aggregation: aggregation as any,
                 groupBy,
                 limit
@@ -251,7 +504,133 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
         }
     };
 
-    const isValid = template.id === 'ai_generated' || (selectedEntityId && yAxisColumn);
+    const validationState = useMemo(() => {
+        const errors: string[] = [];
+        const warnings: string[] = [];
+
+        if (template.id === 'ai_generated') return { errors, warnings };
+        if (!selectedEntityId) {
+            errors.push('Selecciona una entidad de datos.');
+            return { errors, warnings };
+        }
+
+        const hasRows = previewData.length > 0;
+        const xColName = allColumns.find(c => c.id === xAxisColumn)?.name;
+        const groupColName = allColumns.find(c => c.id === groupBy)?.name;
+
+        const uniqueCount = (keyCandidates: string[]) => {
+            const values = new Set<string>();
+            previewData.forEach((row) => {
+                for (const key of keyCandidates) {
+                    if (row[key] !== undefined && row[key] !== null && `${row[key]}`.trim() !== '') {
+                        values.add(String(row[key]));
+                        return;
+                    }
+                }
+            });
+            return values.size;
+        };
+
+        switch (template.id) {
+            case 'heatmap': {
+                if (!xAxisColumn || !yAxisColumn || !groupBy) {
+                    errors.push('Heatmap requiere Category (X), Value (Y) y Row Category.');
+                    break;
+                }
+                if (xAxisColumn === groupBy) {
+                    errors.push('En Heatmap, Category (X) y Row Category deben ser columnas distintas.');
+                }
+                if (hasRows) {
+                    const distinctX = uniqueCount([xColName || '', 'name']);
+                    const distinctRows = uniqueCount([groupColName || '', 'category']);
+                    if (distinctX < 2) {
+                        errors.push('Heatmap necesita al menos 2 categorías distintas en X. Prueba otra columna en Category.');
+                    }
+                    if (distinctRows < 2) {
+                        errors.push('Heatmap necesita al menos 2 categorías distintas en Row Category.');
+                    }
+                } else if (!isLoadingPreview) {
+                    warnings.push('No hay filas en la previsualización para este Heatmap.');
+                }
+                break;
+            }
+            case 'sankey': {
+                if (!sourceColumn || !targetColumn) {
+                    errors.push('Sankey requiere Source Column y Target Column.');
+                    break;
+                }
+                if (!(aggregation === 'count' || yAxisColumn)) {
+                    errors.push('Selecciona Value (Y) o usa agregación Count para Sankey.');
+                }
+                if (sourceColumn === targetColumn) {
+                    errors.push('Source y Target deben ser columnas distintas para Sankey.');
+                }
+                if (hasRows) {
+                    const validLinks = previewData.filter(row => row.source && row.target && row.source !== row.target).length;
+                    if (validLinks === 0) {
+                        errors.push('No hay flujos válidos (source -> target). Cambia Source/Target o agregación.');
+                    }
+                }
+                break;
+            }
+            case 'timeline': {
+                if (!dateColumn) {
+                    errors.push('Timeline requiere una columna de fecha/hora.');
+                    break;
+                }
+                if (hasRows) {
+                    const validDates = previewData.filter(row => {
+                        const raw = row.start || row.date || row.timestamp || row.time;
+                        return !Number.isNaN(new Date(raw).getTime());
+                    }).length;
+                    if (validDates === 0) {
+                        errors.push('No se pudo parsear ninguna fecha. Selecciona otra Date/Time Column.');
+                    } else if (validDates < previewData.length) {
+                        warnings.push('Algunas filas tienen fecha inválida y no se dibujarán en Timeline.');
+                    }
+                }
+                break;
+            }
+            case 'multi_timeline': {
+                if (!dateColumn || !trackColumn) {
+                    errors.push('Multi-Track Timeline requiere Date/Time y Track Column.');
+                }
+                break;
+            }
+            case 'bubble': {
+                if (!xAxisColumn || !yAxisColumn) {
+                    errors.push('Bubble requiere X y Y numéricos.');
+                }
+                if (xAxisColumn && yAxisColumn && xAxisColumn === yAxisColumn) {
+                    warnings.push('X y Y usan la misma columna; el gráfico será poco informativo.');
+                }
+                break;
+            }
+            default: {
+                if (!yAxisColumn) {
+                    errors.push('Selecciona Value (Y-Axis).');
+                }
+            }
+        }
+
+        return { errors, warnings };
+    }, [
+        template.id,
+        template.id,
+        selectedEntityId,
+        allColumns,
+        xAxisColumn,
+        yAxisColumn,
+        groupBy,
+        sourceColumn,
+        targetColumn,
+        dateColumn,
+        trackColumn,
+        aggregation,
+        previewData,
+        isLoadingPreview
+    ]);
+    const isValid = validationState.errors.length === 0;
 
     // Render AI Generator UI
     if (template.id === 'ai_generated') {
@@ -414,6 +793,145 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                         </select>
                                     </div>
 
+                                    {/* Heatmap row grouping */}
+                                    {template.id === 'heatmap' && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                                                Row Category (Y-Axis)
+                                            </label>
+                                            <select
+                                                value={groupBy}
+                                                onChange={e => setGroupBy(e.target.value)}
+                                                className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                            >
+                                                <option value="">Select column...</option>
+                                                {allColumns.map(col => (
+                                                    <option key={col.id} value={col.id}>{col.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {template.id === 'bubble' && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                                                Bubble Size (optional)
+                                            </label>
+                                            <select
+                                                value={sizeColumn}
+                                                onChange={e => setSizeColumn(e.target.value)}
+                                                className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                            >
+                                                <option value="">Use Y value as size</option>
+                                                {numericColumns.map(col => (
+                                                    <option key={col.id} value={col.id}>{col.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {template.id === 'sankey' && (
+                                        <>
+                                            <div>
+                                                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                                                    Source Column
+                                                </label>
+                                                <select
+                                                    value={sourceColumn}
+                                                    onChange={e => setSourceColumn(e.target.value)}
+                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                                >
+                                                    <option value="">Select column...</option>
+                                                    {allColumns.map(col => (
+                                                        <option key={col.id} value={col.id}>{col.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                                                    Target Column
+                                                </label>
+                                                <select
+                                                    value={targetColumn}
+                                                    onChange={e => setTargetColumn(e.target.value)}
+                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                                >
+                                                    <option value="">Select column...</option>
+                                                    {allColumns.map(col => (
+                                                        <option key={col.id} value={col.id}>{col.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {(template.id === 'timeline' || template.id === 'multi_timeline') && (
+                                        <>
+                                            <div>
+                                                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                                                    Date/Time Column
+                                                </label>
+                                                <select
+                                                    value={dateColumn}
+                                                    onChange={e => setDateColumn(e.target.value)}
+                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                                >
+                                                    <option value="">Select column...</option>
+                                                    {allColumns.map(col => (
+                                                        <option key={col.id} value={col.id}>{col.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            {template.id === 'multi_timeline' && (
+                                                <div>
+                                                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                                                        Track Column
+                                                    </label>
+                                                    <select
+                                                        value={trackColumn}
+                                                        onChange={e => setTrackColumn(e.target.value)}
+                                                        className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                                    >
+                                                        <option value="">Select column...</option>
+                                                        {allColumns.map(col => (
+                                                            <option key={col.id} value={col.id}>{col.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
+                                            <div>
+                                                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                                                    Severity Column (optional)
+                                                </label>
+                                                <select
+                                                    value={severityColumn}
+                                                    onChange={e => setSeverityColumn(e.target.value)}
+                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                                >
+                                                    <option value="">Default medium</option>
+                                                    {allColumns.map(col => (
+                                                        <option key={col.id} value={col.id}>{col.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                                                    Label Column (optional)
+                                                </label>
+                                                <select
+                                                    value={labelColumn}
+                                                    onChange={e => setLabelColumn(e.target.value)}
+                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                                >
+                                                    <option value="">Use record id</option>
+                                                    {allColumns.map(col => (
+                                                        <option key={col.id} value={col.id}>{col.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </>
+                                    )}
+
                                     {/* Limit */}
                                     <div>
                                         <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
@@ -479,9 +997,15 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                         <div className="space-y-2 max-h-[250px] overflow-y-auto">
                                             {previewData.map((item, index) => (
                                                 <div key={index} className="flex items-center justify-between p-2 bg-[var(--bg-card)] rounded-lg text-xs">
-                                                    <span className="text-[var(--text-primary)] truncate flex-1">{item.name}</span>
+                                                    <span className="text-[var(--text-primary)] truncate flex-1">
+                                                        {item.name || item.source || item.label || item.target || `Item ${index + 1}`}
+                                                    </span>
                                                     <span className="text-[var(--text-secondary)] font-mono ml-2">
-                                                        {typeof item.value === 'number' ? item.value.toLocaleString() : item.value}
+                                                        {typeof item.value === 'number'
+                                                            ? item.value.toLocaleString()
+                                                            : typeof item.start === 'string'
+                                                                ? item.start.slice(0, 10)
+                                                                : item.value ?? '-'}
                                                     </span>
                                                 </div>
                                             ))}
@@ -502,6 +1026,18 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
 
                 {/* Footer */}
                 <div className="px-6 py-4 border-t border-[var(--border-light)] flex items-center justify-end gap-3 shrink-0">
+                    <div className="mr-auto">
+                        {validationState.errors.length > 0 && (
+                            <p className="text-xs text-red-500">
+                                {validationState.errors[0]}
+                            </p>
+                        )}
+                        {validationState.errors.length === 0 && validationState.warnings.length > 0 && (
+                            <p className="text-xs text-amber-500">
+                                {validationState.warnings[0]}
+                            </p>
+                        )}
+                    </div>
                     <button
                         onClick={onCancel}
                         className="px-4 py-2 text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded-lg text-sm font-medium transition-colors"

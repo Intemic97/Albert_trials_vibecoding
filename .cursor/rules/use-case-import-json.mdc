@@ -1,0 +1,32 @@
+---
+description: Regla para exportar JSON importable en Use Case Import
+alwaysApply: true
+---
+
+# Use Case Import JSON (obligatorio)
+
+Cuando se prepare un JSON para la pantalla `Import Package`, usar SIEMPRE formato de Use Case.
+
+## Estructura minima valida
+
+```json
+{
+  "name": "Mi paquete",
+  "entities": [{ "id": "ent_x", "name": "Entidad", "properties": [] }],
+  "records": []
+}
+```
+
+## Reglas clave
+
+- El importador de Use Case SOLO interpreta: `entities`, `records`, `workflow`, `simulation`, `dashboard`.
+- Un JSON de Knowledge Base (`folders`, `documents`) NO se debe usar en ese importador.
+- Si el usuario quiere importar entidades, debe existir `entities.length > 0`.
+- Para probar sin escribir en BD, usar `dryRun`; para crear datos reales, desactivar `dryRun`.
+- Si aparece `Unexpected token '<'`, el endpoint devolvio HTML (login/404/proxy), no JSON.
+
+## Archivos de referencia del repo
+
+- `server/repsol-entities-package.json`
+- `server/repsol-knowledge-use-case-package.json`
+- `server/repsol-knowledge-use-case-package-v2.json`

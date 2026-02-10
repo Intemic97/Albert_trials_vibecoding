@@ -44,6 +44,21 @@ interface ReportTemplate {
     description: string;
     icon: string;
     sections: TemplateSection[];
+    suggestedDocument?: {
+        name: string;
+        description?: string;
+    };
+    suggestedEntities?: Array<{
+        name: string;
+        description?: string;
+        entityType?: string;
+        properties?: Array<{
+            name: string;
+            type: string;
+            unit?: string;
+            defaultValue?: string;
+        }>;
+    }>;
     createdAt?: string;
     updatedAt?: string;
 }
@@ -122,6 +137,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
     const [showAiAssistant, setShowAiAssistant] = useState(false);
     const [aiPrompt, setAiPrompt] = useState('');
     const [isGeneratingTemplate, setIsGeneratingTemplate] = useState(false);
+    const [isApplyingAiBundle, setIsApplyingAiBundle] = useState(false);
     const [aiGeneratedTemplate, setAiGeneratedTemplate] = useState<ReportTemplate | null>(null);
 
     // Fetch all data on mount
@@ -238,50 +254,6 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                     sections: transformSectionsToNested(data.sections || [])
                 };
                 setAiGeneratedTemplate(generatedTemplate);
-            } else if (res.status === 404) {
-                // Fallback: Create a basic template structure from the prompt
-                const words = aiPrompt.toLowerCase().split(' ');
-                const templateName = aiPrompt.split('.')[0].trim() || 'AI Generated Template';
-                const sections: TemplateSection[] = [
-                    {
-                        title: 'Overview',
-                        content: '',
-                        items: [],
-                        isExpanded: true
-                    }
-                ];
-
-                // Try to extract sections from prompt
-                if (words.includes('section') || words.includes('sections')) {
-                    // Simple heuristic: look for common section keywords
-                    const sectionKeywords = ['introduction', 'overview', 'summary', 'analysis', 'conclusion', 'recommendations', 'findings'];
-                    sectionKeywords.forEach(keyword => {
-                        if (words.includes(keyword)) {
-                            sections.push({
-                                title: keyword.charAt(0).toUpperCase() + keyword.slice(1),
-                                content: '',
-                                items: [],
-                                isExpanded: true
-                            });
-                        }
-                    });
-                }
-
-                const fallbackTemplate: ReportTemplate = {
-                    id: 'temp-' + Date.now(),
-                    name: templateName,
-                    description: `Template generated from: ${aiPrompt.substring(0, 100)}...`,
-                    icon: 'Sparkles',
-                    sections: sections.length > 1 ? sections : [
-                        {
-                            title: 'Main Content',
-                            content: '',
-                            items: [],
-                            isExpanded: true
-                        }
-                    ]
-                };
-                setAiGeneratedTemplate(fallbackTemplate);
             } else {
                 const errorText = await res.text();
                 alert(`Error generating template: ${errorText || 'Please try again.'}`);
@@ -301,6 +273,123 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
             setShowTemplateModal(true);
             setAiPrompt('');
             setAiGeneratedTemplate(null);
+        }
+    };
+
+    const makeId = (prefix: string) => `${prefix}_${Math.random().toString(36).slice(2, 11)}`;
+
+    const handleCreateAllWithAI = async () => {
+        if (!aiGeneratedTemplate || isApplyingAiBundle) return;
+
+        setIsApplyingAiBundle(true);
+        try {
+            const templatePayload = {
+                name: aiGeneratedTemplate.name,
+                description: aiGeneratedTemplate.description || '',
+                icon: aiGeneratedTemplate.icon || 'Sparkles',
+                sections: aiGeneratedTemplate.sections
+                    .filter(section => section.title?.trim())
+                    .map(section => ({
+                        title: section.title.trim(),
+                        content: section.content || '',
+                        generationRules: section.generationRules || '',
+                        items: (section.items || [])
+                            .filter(item => item.title?.trim())
+                            .map(item => ({
+                                title: item.title.trim(),
+                                content: item.content || '',
+                                generationRules: item.generationRules || ''
+                            }))
+                    }))
+            };
+
+            const templateRes = await fetch(`${API_BASE}/report-templates`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(templatePayload)
+            });
+
+            if (!templateRes.ok) {
+                const errorText = await templateRes.text();
+                throw new Error(errorText || 'Failed to create template');
+            }
+
+            const createdTemplate = await templateRes.json();
+            const suggestedEntities = aiGeneratedTemplate.suggestedEntities || [];
+            let createdEntities = 0;
+
+            for (const suggestion of suggestedEntities) {
+                if (!suggestion.name?.trim()) continue;
+
+                const entityPayload = {
+                    id: makeId('ent'),
+                    name: suggestion.name.trim(),
+                    description: suggestion.description || '',
+                    author: 'AI Assistant',
+                    lastEdited: new Date().toISOString(),
+                    entityType: suggestion.entityType || 'generic',
+                    properties: (suggestion.properties || [])
+                        .filter(prop => prop.name?.trim())
+                        .map(prop => ({
+                            id: makeId('prop'),
+                            name: prop.name.trim(),
+                            type: prop.type || 'text',
+                            unit: prop.unit || '',
+                            defaultValue: prop.defaultValue || ''
+                        }))
+                };
+
+                const entityRes = await fetch(`${API_BASE}/entities`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(entityPayload)
+                });
+
+                if (entityRes.ok) {
+                    createdEntities += 1;
+                } else {
+                    console.warn('Failed to create suggested entity:', suggestion.name);
+                }
+            }
+
+            const suggestedDoc = aiGeneratedTemplate.suggestedDocument;
+            const reportPayload = {
+                name: suggestedDoc?.name?.trim() || `${aiGeneratedTemplate.name} - Draft`,
+                description: suggestedDoc?.description || '',
+                templateId: createdTemplate.id,
+                reviewerId: null,
+                deadline: null
+            };
+
+            const reportRes = await fetch(`${API_BASE}/reports`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(reportPayload)
+            });
+
+            if (!reportRes.ok) {
+                const errorText = await reportRes.text();
+                throw new Error(errorText || 'Template created, but failed to create document');
+            }
+
+            const createdReport = await reportRes.json();
+            await Promise.all([fetchTemplates(), fetchReports()]);
+
+            setShowAiAssistant(false);
+            setAiPrompt('');
+            setAiGeneratedTemplate(null);
+            alert(`Template and document created. Suggested entities created: ${createdEntities}.`);
+            if (createdReport?.id) {
+                navigate(`/documents/${createdReport.id}`);
+            }
+        } catch (error: any) {
+            console.error('Error creating AI bundle:', error);
+            alert(`Error creating from AI output: ${error?.message || 'Please try again.'}`);
+        } finally {
+            setIsApplyingAiBundle(false);
         }
     };
 
@@ -858,7 +947,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                             autoFocus
                                         />
                                         <p className="text-xs text-[var(--text-secondary)] mt-2">
-                                            Be specific about sections, structure, and content you want included
+                                            Be specific about sections, document goal, and entity data model you want included
                                         </p>
                                     </div>
 
@@ -907,8 +996,13 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                             <span className="font-medium">
                                                 {aiGeneratedTemplate.sections.reduce((sum, s) => sum + s.items.length, 0)}
                                             </span>{' '}
-                                            items
+                                            items • <span className="font-medium">{aiGeneratedTemplate.suggestedEntities?.length || 0}</span> entities
                                         </div>
+                                        {aiGeneratedTemplate.suggestedDocument?.name && (
+                                            <p className="text-xs text-[var(--text-secondary)] mt-2">
+                                                Suggested document: <span className="font-medium">{aiGeneratedTemplate.suggestedDocument.name}</span>
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div className="flex gap-2 justify-end">
@@ -926,6 +1020,20 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                             className="flex items-center gap-2 px-3 py-1.5 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                         >
                                             Use This Template
+                                        </button>
+                                        <button
+                                            onClick={handleCreateAllWithAI}
+                                            disabled={isApplyingAiBundle}
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-lg text-xs font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                        >
+                                            {isApplyingAiBundle ? (
+                                                <>
+                                                    <Loader2 size={14} className="animate-spin" />
+                                                    Creating...
+                                                </>
+                                            ) : (
+                                                <>Create Template + Document + Entities</>
+                                            )}
                                         </button>
                                     </div>
                                 </div>

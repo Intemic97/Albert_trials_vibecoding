@@ -538,6 +538,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         try {
             const id = generateUUID();
             const template = selectedWidgetTemplate || WIDGET_TEMPLATES.find(t => t.id === config.type);
+            const selectedEntity = entities.find(e => e.id === config.dataConfig?.entityId);
+            const findColumnName = (columnId?: string, fallback?: string) => {
+                if (!columnId) return fallback || '';
+                const col = selectedEntity?.properties?.find(p => p.id === columnId);
+                return col?.name || fallback || columnId;
+            };
             
             // Find position for new widget
             const maxY = layout.length > 0 ? Math.max(...layout.map(l => l.y + l.h)) : 0;
@@ -545,18 +551,93 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             const gridY = maxY;
             const gridW = template?.defaultWidth || 6;
             const gridH = template?.defaultHeight || 4;
+
+            const typeMap: Record<string, WidgetConfig['type']> = {
+                bar_chart: 'bar',
+                line_chart: 'line',
+                area_chart: 'area',
+                pie_chart: 'pie',
+                kpi: 'bar',
+                stat: 'bar',
+                table: 'bar',
+                trend: 'line',
+                gauge: 'gauge',
+                parallel: 'parallel',
+                heatmap: 'heatmap',
+                scatter_matrix: 'scatter_matrix',
+                sankey: 'sankey',
+                bubble: 'bubble',
+                timeline: 'timeline',
+                multi_timeline: 'multi_timeline'
+            };
+
+            const resolvedType = typeMap[config.type] || 'bar';
+            const xAxisKey = findColumnName(config.dataConfig?.xAxisColumn, 'name') || 'name';
+            const valueKey = findColumnName(config.dataConfig?.yAxisColumn, 'value') || 'value';
+            const yGroupKey = findColumnName(config.dataConfig?.groupBy, 'category') || 'category';
+            const sizeKey = findColumnName(config.dataConfig?.sizeColumn, 'size') || 'size';
+            const sourceKey = findColumnName(config.dataConfig?.sourceColumn, 'source') || 'source';
+            const targetKey = findColumnName(config.dataConfig?.targetColumn, 'target') || 'target';
+            const dateKey = findColumnName(config.dataConfig?.dateColumn, 'start') || 'start';
+            const severityKey = findColumnName(config.dataConfig?.severityColumn, 'severity') || 'severity';
+            const labelKey = findColumnName(config.dataConfig?.labelColumn, 'label') || 'label';
+            const trackKey = findColumnName(config.dataConfig?.trackColumn, 'asset') || 'asset';
+            const safeData = Array.isArray(config.data) ? config.data : [];
             
             const widgetConfig: WidgetConfig = {
-                type: config.type === 'bar_chart' ? 'bar' : 
-                      config.type === 'line_chart' ? 'line' : 
-                      config.type === 'area_chart' ? 'area' : 
-                      config.type === 'pie_chart' ? 'pie' : 'bar',
+                type: resolvedType,
                 title: config.title,
                 description: config.description || '',
-                data: config.data || [],
-                xAxisKey: 'name',
-                dataKey: 'value',
-                colors: config.colors
+                data: safeData,
+                xAxisKey,
+                dataKey: valueKey,
+                colors: config.colors,
+                ...(resolvedType === 'heatmap' && {
+                    yKey: yGroupKey,
+                    valueKey
+                }),
+                ...(resolvedType === 'bubble' && {
+                    yKey: valueKey,
+                    sizeKey
+                }),
+                ...(resolvedType === 'sankey' && {
+                    valueKey,
+                    nodes: Array.from(
+                        new Set(
+                            safeData.flatMap((row: any) => [
+                                String(row.source || row[sourceKey] || ''),
+                                String(row.target || row[targetKey] || '')
+                            ]).filter(Boolean)
+                        )
+                    ).map((id) => ({ id })),
+                    links: safeData
+                        .map((row: any) => ({
+                            source: String(row.source || row[sourceKey] || ''),
+                            target: String(row.target || row[targetKey] || ''),
+                            value: parseFloat(row.value || row[valueKey]) || 0
+                        }))
+                        .filter((link: any) => link.source && link.target && link.value >= 0)
+                }),
+                ...(resolvedType === 'timeline' && {
+                    events: safeData.map((row: any) => ({
+                        start: row.start || row[dateKey],
+                        end: row.end,
+                        severity: row.severity || row[severityKey] || 'medium',
+                        label: row.label || row[labelKey] || row.name
+                    }))
+                }),
+                ...(resolvedType === 'multi_timeline' && {
+                    colorKey: trackKey
+                }),
+                ...(resolvedType === 'parallel' || resolvedType === 'scatter_matrix'
+                    ? {
+                        dimensions: (selectedEntity?.properties || [])
+                            .filter(p => p.type === 'number')
+                            .map(p => p.name)
+                            .slice(0, resolvedType === 'parallel' ? 6 : 4)
+                    }
+                    : {}),
+                dataConfig: config.dataConfig as any
             };
             
             const res = await fetch(`${API_BASE}/dashboards/${selectedDashboardId}/widgets`, {

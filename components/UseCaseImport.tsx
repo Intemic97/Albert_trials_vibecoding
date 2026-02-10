@@ -37,6 +37,36 @@ export const UseCaseImport: React.FC = () => {
     ? API_BASE
     : `/${API_BASE.replace(/^\/+/, '')}`;
 
+  const parseApiResponse = async (res: Response, fallbackMessage: string) => {
+    const contentType = res.headers.get('content-type') || '';
+    const rawText = await res.text();
+
+    // Happy path: JSON response
+    if (contentType.includes('application/json')) {
+      try {
+        const data = rawText ? JSON.parse(rawText) : {};
+        if (!res.ok) {
+          throw new Error(data?.error || `${fallbackMessage} (HTTP ${res.status})`);
+        }
+        return data;
+      } catch {
+        throw new Error(`Respuesta JSON inválida del servidor (HTTP ${res.status}).`);
+      }
+    }
+
+    // Non-JSON response (usually HTML from login/404/index route)
+    if (!res.ok) {
+      throw new Error(
+        `${fallbackMessage} (HTTP ${res.status}). El servidor devolvió ${contentType || 'contenido no JSON'}.`
+      );
+    }
+
+    const firstLine = (rawText || '').trim().slice(0, 80);
+    throw new Error(
+      `El servidor respondió con formato no compatible (${contentType || 'desconocido'}). Inicio de respuesta: ${firstLine}`
+    );
+  };
+
   const parsedPreview = useMemo(() => {
     if (!jsonText.trim()) return null;
     try {
@@ -78,14 +108,14 @@ export const UseCaseImport: React.FC = () => {
     setValidating(true);
     setResult(null);
     try {
-      const res = await fetch(`${apiRoot}/use-case/validate`, {
+      const endpoint = `${apiRoot}/use-case/validate`;
+      const res = await fetch(endpoint, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(parsedPreview)
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'No se pudo validar');
+      const data = await parseApiResponse(res, `No se pudo validar en ${endpoint}`);
       setResult(data);
     } catch (e: any) {
       setResult({ error: e?.message || 'Error validando' });
@@ -102,14 +132,14 @@ export const UseCaseImport: React.FC = () => {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch(`${apiRoot}/use-case/import${dryRun ? '?dryRun=true' : ''}`, {
+      const endpoint = `${apiRoot}/use-case/import${dryRun ? '?dryRun=true' : ''}`;
+      const res = await fetch(endpoint, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(parsedPreview)
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'No se pudo importar');
+      const data = await parseApiResponse(res, `No se pudo importar en ${endpoint}`);
       setResult(data);
     } catch (e: any) {
       setResult({ error: e?.message || 'Error importando' });

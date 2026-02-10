@@ -87,6 +87,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     const documentFileInputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [extractingDocId, setExtractingDocId] = useState<string | null>(null);
     
     // Import preview state
     const [importStep, setImportStep] = useState<'upload' | 'preview' | 'importing'>('upload');
@@ -478,6 +479,44 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         } catch (error) {
             console.error('Error deleting document:', error);
             showError('Failed to delete document');
+        }
+    };
+
+    const handleExtractDocumentStructure = async (doc: Document) => {
+        if (!doc?.id || extractingDocId) return;
+        setExtractingDocId(doc.id);
+        try {
+            const res = await fetch(`${API_BASE}/knowledge/documents/${doc.id}/extract-structured`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ mode: 'auto' })
+            });
+
+            const contentType = res.headers.get('content-type') || '';
+            const raw = await res.text();
+            const data = contentType.includes('application/json') && raw ? JSON.parse(raw) : {};
+
+            if (!res.ok) {
+                throw new Error(data?.error || 'Failed to extract structured data');
+            }
+
+            const extractedItems =
+                data?.structuredExtraction?.stats?.extractedItems ??
+                (Array.isArray(data?.structuredExtraction?.extractions)
+                    ? data.structuredExtraction.extractions.length
+                    : 0);
+            const provider = data?.structuredExtraction?.provider || 'unknown';
+            success(
+                data?.reused
+                    ? `Structured extraction already available (${provider})`
+                    : `Structured extraction completed: ${extractedItems} items (${provider})`
+            );
+        } catch (error: any) {
+            console.error('Error extracting structured document data:', error);
+            showError('Failed to extract structured data', error?.message);
+        } finally {
+            setExtractingDocId(null);
         }
     };
 
@@ -993,6 +1032,18 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                 >
                                                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                                                         <button
+                                                            onClick={(e) => { e.stopPropagation(); handleExtractDocumentStructure(doc); }}
+                                                            className="p-1 hover:bg-[var(--bg-tertiary)] rounded text-[var(--text-secondary)]"
+                                                            title="Extract structured data"
+                                                            disabled={extractingDocId === doc.id}
+                                                        >
+                                                            {extractingDocId === doc.id ? (
+                                                                <SpinnerGap size={12} weight="light" className="animate-spin" />
+                                                            ) : (
+                                                                <Gear size={12} weight="light" />
+                                                            )}
+                                                        </button>
+                                                        <button
                                                             onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc.id); }}
                                                             className="p-1 hover:bg-red-500/10 rounded text-red-500"
                                                         >
@@ -1079,6 +1130,18 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                         <span className="flex-1 text-sm text-[var(--text-primary)]">{doc.name}</span>
                                         <span className="text-xs text-[var(--text-tertiary)]">{doc.type}</span>
                                         <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleExtractDocumentStructure(doc); }}
+                                                className="p-1 hover:bg-[var(--bg-tertiary)] rounded"
+                                                title="Extract structured data"
+                                                disabled={extractingDocId === doc.id}
+                                            >
+                                                {extractingDocId === doc.id ? (
+                                                    <SpinnerGap size={14} weight="light" className="text-[var(--text-secondary)] animate-spin" />
+                                                ) : (
+                                                    <Gear size={14} weight="light" className="text-[var(--text-secondary)]" />
+                                                )}
+                                            </button>
                                             <button onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc.id); }} className="p-1 hover:bg-red-500/10 rounded">
                                                 <Trash size={14} weight="light" className="text-red-500" />
                                             </button>

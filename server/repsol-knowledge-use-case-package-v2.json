@@ -1,0 +1,55 @@
+{
+  "name": "Repsol KB Use Case v2",
+  "version": "1.0.0",
+  "entities": [
+    {
+      "id": "ent_kb_docs_repsol_v2",
+      "name": "KB Docs Repsol v2",
+      "description": "Entidad de documentos de conocimiento para prueba de import",
+      "author": "System",
+      "lastEdited": "2026-02-10",
+      "properties": [
+        { "id": "p_doc_title_v2", "name": "Title", "type": "text", "defaultValue": "" },
+        { "id": "p_doc_category_v2", "name": "Category", "type": "text", "defaultValue": "" },
+        { "id": "p_doc_owner_v2", "name": "Owner", "type": "text", "defaultValue": "" },
+        { "id": "p_doc_summary_v2", "name": "Summary", "type": "text", "defaultValue": "" },
+        { "id": "p_doc_tags_v2", "name": "Tags", "type": "text", "defaultValue": "" }
+      ]
+    }
+  ],
+  "records": [
+    {
+      "id": "r_doc_v2_001",
+      "entityId": "ent_kb_docs_repsol_v2",
+      "values": {
+        "p_doc_title_v2": "SOP Arranque Extrusion",
+        "p_doc_category_v2": "Operaciones",
+        "p_doc_owner_v2": "Jefatura Operaciones",
+        "p_doc_summary_v2": "Secuencia segura de arranque de linea HDPE/PP.",
+        "p_doc_tags_v2": "sop,operacion,extrusion,arranque"
+      }
+    },
+    {
+      "id": "r_doc_v2_002",
+      "entityId": "ent_kb_docs_repsol_v2",
+      "values": {
+        "p_doc_title_v2": "PTW y LOTO",
+        "p_doc_category_v2": "HSE",
+        "p_doc_owner_v2": "HSE Planta",
+        "p_doc_summary_v2": "Reglas de permisos y aislamiento de energias.",
+        "p_doc_tags_v2": "hse,ptw,loto,seguridad"
+      }
+    },
+    {
+      "id": "r_doc_v2_003",
+      "entityId": "ent_kb_docs_repsol_v2",
+      "values": {
+        "p_doc_title_v2": "Balance Energetico",
+        "p_doc_category_v2": "Energia",
+        "p_doc_owner_v2": "Ingenieria Proceso",
+        "p_doc_summary_v2": "KPIs de intensidad energetica y acciones de mejora.",
+        "p_doc_tags_v2": "energia,kpi,vapor,electricidad"
+      }
+    }
+  ]
+}

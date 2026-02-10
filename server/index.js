@@ -14,6 +14,7 @@ const { gcsService } = require('./gcsService');
 const { prefectClient } = require('./prefectClient');
 const { initPollingService, getPollingService } = require('./executionPolling');
 const { getConnectionHealthChecker } = require('./utils/otConnections');
+const { extractStructuredFromText } = require('./services/langExtractService');
 // Load environment variables - Try multiple methods to ensure it loads
 const envPath = path.join(__dirname, '.env');
 console.log('[ENV] Attempting to load .env from:', envPath);
@@ -3727,6 +3728,98 @@ def process(data):
 });
 
 // OpenAI Widget Generation Endpoint
+const SUPPORTED_WIDGET_TYPES = new Set([
+    'bar',
+    'line',
+    'pie',
+    'area',
+    'donut',
+    'radial',
+    'gauge',
+    'parallel',
+    'heatmap',
+    'scatter_matrix',
+    'sankey',
+    'bubble',
+    'timeline',
+    'multi_timeline'
+]);
+
+function sanitizeWidgetConfig(rawConfig) {
+    const cfg = rawConfig && typeof rawConfig === 'object' ? rawConfig : {};
+    const data = Array.isArray(cfg.data) ? cfg.data.filter(row => row && typeof row === 'object') : [];
+    const first = data[0] || {};
+    const keys = Object.keys(first);
+    const firstStringKey = keys.find((k) => typeof first[k] === 'string') || 'name';
+    const firstNumericKey = keys.find((k) => Number.isFinite(Number(first[k]))) || 'value';
+    const type = SUPPORTED_WIDGET_TYPES.has(cfg.type) ? cfg.type : 'bar';
+
+    const sanitized = {
+        type,
+        title: typeof cfg.title === 'string' && cfg.title.trim() ? cfg.title.trim() : 'AI Widget',
+        description: typeof cfg.description === 'string' ? cfg.description : '',
+        explanation: typeof cfg.explanation === 'string' ? cfg.explanation : '',
+        data,
+        xAxisKey: typeof cfg.xAxisKey === 'string' && cfg.xAxisKey ? cfg.xAxisKey : firstStringKey,
+        dataKey: typeof cfg.dataKey === 'string' || Array.isArray(cfg.dataKey) ? cfg.dataKey : firstNumericKey,
+        colors: Array.isArray(cfg.colors) ? cfg.colors.filter(c => typeof c === 'string') : undefined
+    };
+
+    if (type === 'heatmap') {
+        sanitized.yKey = typeof cfg.yKey === 'string' && cfg.yKey ? cfg.yKey : 'category';
+        sanitized.valueKey = typeof cfg.valueKey === 'string' && cfg.valueKey
+            ? cfg.valueKey
+            : (typeof sanitized.dataKey === 'string' ? sanitized.dataKey : firstNumericKey);
+    }
+
+    if (type === 'bubble') {
+        sanitized.yKey = typeof cfg.yKey === 'string' && cfg.yKey
+            ? cfg.yKey
+            : (typeof sanitized.dataKey === 'string' ? sanitized.dataKey : firstNumericKey);
+        sanitized.sizeKey = typeof cfg.sizeKey === 'string' && cfg.sizeKey ? cfg.sizeKey : 'size';
+    }
+
+    if (type === 'sankey') {
+        const links = Array.isArray(cfg.links)
+            ? cfg.links.filter((l) => l && l.source && l.target).map((l) => ({
+                source: String(l.source),
+                target: String(l.target),
+                value: Number(l.value) || 0
+            }))
+            : data
+                .map((d) => ({
+                    source: d.source || d.from || '',
+                    target: d.target || d.to || '',
+                    value: Number(d.value) || 0
+                }))
+                .filter((l) => l.source && l.target);
+        const nodes = Array.isArray(cfg.nodes)
+            ? cfg.nodes.filter((n) => n && n.id).map((n) => ({ id: String(n.id), value: Number(n.value) || undefined }))
+            : Array.from(new Set(links.flatMap((l) => [l.source, l.target]))).map((id) => ({ id }));
+        sanitized.links = links;
+        sanitized.nodes = nodes;
+        sanitized.valueKey = typeof cfg.valueKey === 'string' && cfg.valueKey ? cfg.valueKey : 'value';
+    }
+
+    if (type === 'timeline') {
+        sanitized.events = Array.isArray(cfg.events)
+            ? cfg.events
+            : data.map((d) => ({
+                start: d.start || d.date || d.timestamp || d.time,
+                end: d.end,
+                severity: d.severity || 'medium',
+                label: d.label || d.name || ''
+            }));
+    }
+
+    if (type === 'multi_timeline') {
+        sanitized.tracks = Array.isArray(cfg.tracks) ? cfg.tracks : undefined;
+        sanitized.colorKey = typeof cfg.colorKey === 'string' && cfg.colorKey ? cfg.colorKey : 'asset';
+    }
+
+    return sanitized;
+}
+
 app.post('/api/generate-widget', authenticateToken, async (req, res) => {
     console.log('Received widget generation request');
     try {
@@ -3915,7 +4008,7 @@ Return ONLY the valid JSON string, no markdown formatting.`
         });
 
         const widgetConfig = JSON.parse(completion.choices[0].message.content);
-        res.json(widgetConfig);
+        res.json(sanitizeWidgetConfig(widgetConfig));
 
     } catch (error) {
         console.error('Error generating widget:', error);
@@ -3996,8 +4089,9 @@ app.post('/api/generate-widget-from-data', authenticateToken, async (req, res) =
         });
 
         const widgetConfig = JSON.parse(completion.choices[0].message.content);
-        console.log('Generated widget config:', widgetConfig.title);
-        res.json(widgetConfig);
+        const sanitizedWidgetConfig = sanitizeWidgetConfig(widgetConfig);
+        console.log('Generated widget config:', sanitizedWidgetConfig.title);
+        res.json(sanitizedWidgetConfig);
 
     } catch (error) {
         console.error('Error generating widget from data:', error);
@@ -5337,6 +5431,86 @@ app.post('/api/knowledge/documents/:id/relate', authenticateToken, async (req, r
     } catch (error) {
         console.error('Error relating document:', error);
         res.status(500).json({ error: 'Failed to relate document' });
+    }
+});
+
+// Structured extraction for a knowledge document (LangExtract + fallback)
+app.post('/api/knowledge/documents/:id/extract-structured', authenticateToken, async (req, res) => {
+    try {
+        const { force = false, mode = 'auto', maxChars = 12000 } = req.body || {};
+
+        const doc = await db.get(
+            `SELECT id, name, extractedText, metadata
+             FROM knowledge_documents
+             WHERE id = ? AND organizationId = ?`,
+            [req.params.id, req.user.orgId]
+        );
+
+        if (!doc) {
+            return res.status(404).json({ error: 'Document not found' });
+        }
+
+        if (!doc.extractedText || !String(doc.extractedText).trim()) {
+            return res.status(400).json({ error: 'Document has no extracted text to process' });
+        }
+
+        const currentMetadata = doc.metadata ? JSON.parse(doc.metadata) : {};
+        if (!force && currentMetadata.structuredExtraction) {
+            return res.json({
+                success: true,
+                reused: true,
+                structuredExtraction: currentMetadata.structuredExtraction
+            });
+        }
+
+        const structuredExtraction = await extractStructuredFromText(doc.extractedText, {
+            mode,
+            maxChars
+        });
+
+        const mergedMetadata = {
+            ...currentMetadata,
+            structuredExtraction,
+            structuredExtractionUpdatedAt: new Date().toISOString()
+        };
+
+        await db.run(
+            'UPDATE knowledge_documents SET metadata = ?, updatedAt = ? WHERE id = ?',
+            [JSON.stringify(mergedMetadata), new Date().toISOString(), req.params.id]
+        );
+
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'update',
+            resourceType: 'document',
+            resourceId: req.params.id,
+            resourceName: doc.name || 'Unknown',
+            details: {
+                operation: 'extract-structured',
+                mode,
+                provider: structuredExtraction.provider || 'unknown',
+                extractedItems:
+                    structuredExtraction?.stats?.extractedItems ||
+                    (Array.isArray(structuredExtraction.extractions) ? structuredExtraction.extractions.length : 0)
+            },
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
+        res.json({
+            success: true,
+            reused: false,
+            structuredExtraction
+        });
+    } catch (error) {
+        console.error('Error extracting structured knowledge:', error);
+        res.status(500).json({
+            error: 'Failed to extract structured data',
+            details: error.message
+        });
     }
 });
 
@@ -7687,6 +7861,265 @@ app.post('/api/request-quotation', authenticateToken, async (req, res) => {
 });
 
 // ==================== REPORT TEMPLATES ENDPOINTS ====================
+
+function normalizeTemplateGenerationResult(raw, prompt) {
+    const safePrompt = String(prompt || '').trim();
+    const baseName = safePrompt
+        ? safePrompt.split(/[.!?]/)[0].slice(0, 80).trim()
+        : 'AI Generated Template';
+
+    const sectionsInput = Array.isArray(raw?.sections) ? raw.sections : [];
+    const normalizedSections = sectionsInput
+        .map((section, index) => {
+            const title = String(section?.title || '').trim();
+            if (!title) return null;
+
+            const itemsInput = Array.isArray(section?.items) ? section.items : [];
+            const items = itemsInput
+                .map((item) => {
+                    const itemTitle = String(item?.title || '').trim();
+                    if (!itemTitle) return null;
+                    return {
+                        title: itemTitle,
+                        content: String(item?.content || '').trim(),
+                        generationRules: String(item?.generationRules || '').trim()
+                    };
+                })
+                .filter(Boolean);
+
+            return {
+                title,
+                content: String(section?.content || '').trim(),
+                generationRules: String(section?.generationRules || '').trim(),
+                items,
+                sortOrder: Number.isFinite(section?.sortOrder) ? Number(section.sortOrder) : index
+            };
+        })
+        .filter(Boolean);
+
+    const sections = normalizedSections.length > 0
+        ? normalizedSections
+        : [
+            {
+                title: 'Executive Summary',
+                content: 'Summary of scope, objectives and key findings.',
+                generationRules: 'Use concise, professional language and include measurable outcomes when possible.',
+                items: [
+                    { title: 'Scope and Objectives', content: '', generationRules: '' },
+                    { title: 'Key Insights', content: '', generationRules: '' }
+                ],
+                sortOrder: 0
+            },
+            {
+                title: 'Analysis',
+                content: 'Main analytical section with evidence and interpretation.',
+                generationRules: 'Reference available records and highlight trends or anomalies.',
+                items: [
+                    { title: 'Data Review', content: '', generationRules: '' },
+                    { title: 'Root Cause Considerations', content: '', generationRules: '' }
+                ],
+                sortOrder: 1
+            },
+            {
+                title: 'Action Plan',
+                content: 'Recommended actions and follow-up.',
+                generationRules: 'Prioritize actions by impact and effort, include owner and due date suggestions.',
+                items: [
+                    { title: 'Corrective Actions', content: '', generationRules: '' },
+                    { title: 'Monitoring KPIs', content: '', generationRules: '' }
+                ],
+                sortOrder: 2
+            }
+        ];
+
+    const suggestedEntitiesInput = Array.isArray(raw?.suggestedEntities) ? raw.suggestedEntities : [];
+    const suggestedEntities = suggestedEntitiesInput
+        .map((entity) => {
+            const name = String(entity?.name || '').trim();
+            if (!name) return null;
+
+            const propertiesInput = Array.isArray(entity?.properties) ? entity.properties : [];
+            const properties = propertiesInput
+                .map((prop) => {
+                    const propName = String(prop?.name || '').trim();
+                    if (!propName) return null;
+                    return {
+                        name: propName,
+                        type: String(prop?.type || 'text').trim() || 'text',
+                        unit: String(prop?.unit || '').trim(),
+                        defaultValue: prop?.defaultValue === undefined || prop?.defaultValue === null
+                            ? ''
+                            : String(prop.defaultValue)
+                    };
+                })
+                .filter(Boolean);
+
+            return {
+                name,
+                description: String(entity?.description || '').trim(),
+                entityType: String(entity?.entityType || 'generic').trim() || 'generic',
+                properties
+            };
+        })
+        .filter(Boolean);
+
+    const fallbackEntities = suggestedEntities.length > 0
+        ? suggestedEntities
+        : [
+            {
+                name: 'Batches',
+                description: 'Production batches with quality and traceability fields.',
+                entityType: 'generic',
+                properties: [
+                    { name: 'Batch code', type: 'text', unit: '', defaultValue: '' },
+                    { name: 'Production date', type: 'date', unit: '', defaultValue: '' },
+                    { name: 'Non-conformity count', type: 'number', unit: 'units', defaultValue: '0' }
+                ]
+            },
+            {
+                name: 'Quality checks',
+                description: 'Inspection and lab checks linked to each production period.',
+                entityType: 'generic',
+                properties: [
+                    { name: 'Check name', type: 'text', unit: '', defaultValue: '' },
+                    { name: 'Result', type: 'text', unit: '', defaultValue: '' },
+                    { name: 'Checked at', type: 'date', unit: '', defaultValue: '' }
+                ]
+            }
+        ];
+
+    const suggestedDocument = raw?.suggestedDocument && typeof raw.suggestedDocument === 'object'
+        ? {
+            name: String(raw.suggestedDocument.name || '').trim() || `${baseName} - Draft`,
+            description: String(raw.suggestedDocument.description || '').trim()
+        }
+        : {
+            name: `${baseName} - Draft`,
+            description: ''
+        };
+
+    const templateName = String(raw?.name || '').trim() || baseName || 'AI Generated Template';
+
+    return {
+        name: templateName,
+        description: String(raw?.description || '').trim() || `Template generated from prompt: ${safePrompt.slice(0, 180)}`,
+        icon: String(raw?.icon || 'Sparkles').trim() || 'Sparkles',
+        sections,
+        suggestedDocument,
+        suggestedEntities: fallbackEntities
+    };
+}
+
+function buildFlatTemplateSections(sections) {
+    const flat = [];
+    for (let i = 0; i < sections.length; i++) {
+        const section = sections[i];
+        const parentId = `sec_${Math.random().toString(36).slice(2, 11)}`;
+        flat.push({
+            id: parentId,
+            parentId: null,
+            title: section.title,
+            content: section.content || '',
+            generationRules: section.generationRules || '',
+            sortOrder: Number.isFinite(section.sortOrder) ? section.sortOrder : i
+        });
+
+        const items = Array.isArray(section.items) ? section.items : [];
+        for (let j = 0; j < items.length; j++) {
+            const item = items[j];
+            flat.push({
+                id: `item_${Math.random().toString(36).slice(2, 11)}`,
+                parentId,
+                title: item.title,
+                content: item.content || '',
+                generationRules: item.generationRules || '',
+                sortOrder: j
+            });
+        }
+    }
+    return flat;
+}
+
+app.post('/api/report-templates/generate', authenticateToken, async (req, res) => {
+    try {
+        const { prompt } = req.body || {};
+        if (!prompt || !String(prompt).trim()) {
+            return res.status(400).json({ error: 'Prompt is required' });
+        }
+
+        let generatedRaw = null;
+        if (process.env.OPENAI_API_KEY) {
+            try {
+                const OpenAI = require('openai');
+                const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+                const completion = await openai.chat.completions.create({
+                    model: 'gpt-4o-mini',
+                    response_format: { type: 'json_object' },
+                    messages: [
+                        {
+                            role: 'system',
+                            content: `You are a reporting architect assistant.
+Return valid JSON only with this shape:
+{
+  "name": "string",
+  "description": "string",
+  "icon": "FileText|FlaskConical|Clipboard|Wrench|AlertTriangle|Sparkles",
+  "suggestedDocument": { "name": "string", "description": "string" },
+  "sections": [
+    {
+      "title": "string",
+      "content": "string",
+      "generationRules": "string",
+      "items": [
+        { "title": "string", "content": "string", "generationRules": "string" }
+      ]
+    }
+  ],
+  "suggestedEntities": [
+    {
+      "name": "string",
+      "description": "string",
+      "entityType": "generic|event|ledger|machine|kpi",
+      "properties": [
+        { "name": "string", "type": "text|number|date|boolean", "unit": "string", "defaultValue": "string" }
+      ]
+    }
+  ]
+}
+Requirements:
+- Return at least 3 sections.
+- Each section should have 1-4 items.
+- Keep names concise and professional.`
+                        },
+                        { role: 'user', content: String(prompt) }
+                    ],
+                    max_tokens: 2500
+                });
+
+                const content = completion.choices?.[0]?.message?.content || '{}';
+                generatedRaw = JSON.parse(content);
+            } catch (openAiError) {
+                console.warn('[report-templates/generate] OpenAI failed, using heuristic fallback:', openAiError?.message);
+            }
+        }
+
+        const normalized = normalizeTemplateGenerationResult(generatedRaw, prompt);
+        const flatSections = buildFlatTemplateSections(normalized.sections);
+
+        return res.json({
+            id: `ai_${Date.now()}`,
+            name: normalized.name,
+            description: normalized.description,
+            icon: normalized.icon,
+            sections: flatSections,
+            suggestedDocument: normalized.suggestedDocument,
+            suggestedEntities: normalized.suggestedEntities
+        });
+    } catch (error) {
+        console.error('Error generating report template with AI:', error);
+        res.status(500).json({ error: 'Failed to generate template' });
+    }
+});
 
 // Get all templates for organization
 app.get('/api/report-templates', authenticateToken, async (req, res) => {

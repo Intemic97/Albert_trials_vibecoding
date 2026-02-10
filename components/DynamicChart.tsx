@@ -38,6 +38,7 @@ export interface WidgetConfig {
     // Gauge configs
     min?: number;
     max?: number;
+    dataConfig?: any;
 }
 
 export interface DateRange {
@@ -69,6 +70,67 @@ const filterDataByDateRange = (data: any[], dateRange?: DateRange): any[] => {
         const itemDate = new Date(item[dateField]);
         return !isNaN(itemDate.getTime()) && itemDate >= startDate && itemDate <= endDate;
     });
+};
+
+const normalizeWidgetConfig = (config: WidgetConfig): WidgetConfig => {
+    const legacyTypeMap: Record<string, WidgetConfig['type']> = {
+        bar_chart: 'bar',
+        line_chart: 'line',
+        area_chart: 'area',
+        pie_chart: 'pie'
+    };
+    const type = legacyTypeMap[config.type as unknown as string] || config.type;
+    const safeData = Array.isArray(config.data) ? config.data : [];
+    const firstRow = safeData[0] || {};
+    const firstKeys = Object.keys(firstRow);
+    const fallbackNumericKey = firstKeys.find((k) => typeof firstRow[k] === 'number') || 'value';
+    const fallbackCategoryKey = firstKeys.find((k) => typeof firstRow[k] === 'string') || 'name';
+
+    const normalized: WidgetConfig = {
+        ...config,
+        type,
+        data: safeData,
+        xAxisKey: config.xAxisKey || fallbackCategoryKey,
+        dataKey: config.dataKey || fallbackNumericKey
+    };
+
+    if (type === 'heatmap') {
+        normalized.yKey = config.yKey || (firstKeys.includes('category') ? 'category' : fallbackCategoryKey);
+        normalized.valueKey = config.valueKey || (typeof normalized.dataKey === 'string' ? normalized.dataKey : fallbackNumericKey);
+    }
+
+    if (type === 'bubble') {
+        normalized.yKey = config.yKey || (typeof normalized.dataKey === 'string' ? normalized.dataKey : fallbackNumericKey);
+        normalized.sizeKey = config.sizeKey || (firstKeys.includes('size') ? 'size' : normalized.yKey);
+    }
+
+    if (type === 'sankey' && (!config.nodes || !config.links)) {
+        const links = safeData
+            .map((d: any) => ({
+                source: String(d.source || d.from || d[normalized.xAxisKey] || ''),
+                target: String(d.target || d.to || ''),
+                value: parseFloat(d[config.valueKey || 'value'] || d[fallbackNumericKey] || '0') || 0
+            }))
+            .filter((l: any) => l.source && l.target);
+        const nodes = Array.from(new Set(links.flatMap((l: any) => [l.source, l.target]))).map((id) => ({ id }));
+        normalized.links = links;
+        normalized.nodes = nodes;
+    }
+
+    if (type === 'timeline' && !config.events) {
+        normalized.events = safeData.map((d: any) => ({
+            start: d.start || d.timestamp || d.date || d.time,
+            end: d.end,
+            severity: d.severity || 'medium',
+            label: d.label || d.name
+        }));
+    }
+
+    if (type === 'multi_timeline' && !config.colorKey) {
+        normalized.colorKey = firstKeys.includes('asset') ? 'asset' : firstKeys.includes('track') ? 'track' : 'category';
+    }
+
+    return normalized;
 };
 
 // Premium color palette - Branding colors elegantes
@@ -230,7 +292,8 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
 };
 
 export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height = 250, dateRange }) => {
-    const { type, data: rawData, xAxisKey, dataKey, colors = DEFAULT_COLORS } = config;
+    const normalizedConfig = useMemo(() => normalizeWidgetConfig(config), [config]);
+    const { type, data: rawData, xAxisKey, dataKey, colors = DEFAULT_COLORS } = normalizedConfig;
     const containerRef = useRef<HTMLDivElement>(null);
     
     // Filter data by date range if provided
@@ -287,6 +350,19 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
         tickLine: { stroke: axisLineColor },
         axisLine: { stroke: axisLineColor },
     };
+
+    const renderGuidedEmptyState = (title: string, details: string[]) => (
+        <div className="flex items-center justify-center h-full text-[var(--text-tertiary)] text-sm px-4">
+            <div className="text-center max-w-md">
+                <p className="text-[var(--text-secondary)] font-medium">{title}</p>
+                {details.map((detail, index) => (
+                    <p key={index} className="text-xs mt-1">
+                        {detail}
+                    </p>
+                ))}
+            </div>
+        </div>
+    );
 
     const onPieEnter = (_: any, index: number) => setActiveIndex(index);
     const onPieLeave = () => setActiveIndex(null);
@@ -526,15 +602,15 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                     <HeatmapChart
                         data={data}
                         xKey={xAxisKey}
-                        yKey={config.yKey || 'category'}
-                        valueKey={config.valueKey || (Array.isArray(dataKey) ? dataKey[0] : dataKey)}
+                        yKey={normalizedConfig.yKey || 'category'}
+                        valueKey={normalizedConfig.valueKey || (Array.isArray(dataKey) ? dataKey[0] : dataKey)}
                         height={height}
                     />
                 );
                 
             case 'scatter_matrix':
                 // Scatter Matrix Chart
-                const scatterDimensions = config.dimensions || 
+                const scatterDimensions = normalizedConfig.dimensions || 
                     (data[0] ? Object.keys(data[0]).filter(k => typeof data[0][k] === 'number').slice(0, 4) : []);
                 return (
                     <ScatterMatrixChart
@@ -547,11 +623,11 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                 
             case 'sankey':
                 // Sankey Diagram
-                if (config.nodes && config.links && config.nodes.length > 0 && config.links.length > 0) {
+                if (normalizedConfig.nodes && normalizedConfig.links && normalizedConfig.nodes.length > 0 && normalizedConfig.links.length > 0) {
                     return (
                         <SankeyChart
-                            nodes={config.nodes}
-                            links={config.links}
+                            nodes={normalizedConfig.nodes}
+                            links={normalizedConfig.links}
                             height={height}
                         />
                     );
@@ -564,18 +640,25 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                 const sankeyLinks = data.map(d => ({
                     source: String(d.source || d.from || d[xAxisKey] || ''),
                     target: String(d.target || d.to || d[actualDataKey] || ''),
-                    value: parseFloat(d[config.valueKey || 'value'] || d[actualDataKey] || '1') || 1
+                    value: parseFloat(d[normalizedConfig.valueKey || 'value'] || d[actualDataKey] || '1') || 1
                 })).filter(l => l.source && l.target && l.source !== l.target);
                 
                 if (sankeyNodes.length === 0 || sankeyLinks.length === 0) {
-                    return (
-                        <div className="flex items-center justify-center h-full text-[var(--text-tertiary)] text-sm">
-                            <div className="text-center">
-                                <p>Sankey chart requires data with source/target relationships</p>
-                                <p className="text-xs mt-1">Expected format: source, target, value</p>
-                            </div>
-                        </div>
-                    );
+                    const hasSomeSource = data.some(d => d.source || d.from || d[xAxisKey]);
+                    const hasSomeTarget = data.some(d => d.target || d.to || d[actualDataKey]);
+                    const hasOnlySelfLoops = data.some(d => {
+                        const source = String(d.source || d.from || d[xAxisKey] || '');
+                        const target = String(d.target || d.to || d[actualDataKey] || '');
+                        return source && target && source === target;
+                    });
+
+                    const details = [
+                        !hasSomeSource ? 'No source field found in current rows.' : '',
+                        !hasSomeTarget ? 'No target field found in current rows.' : '',
+                        hasOnlySelfLoops ? 'Detected source = target loops. Use different source/target columns.' : '',
+                        'Expected shape: source, target, value.'
+                    ].filter(Boolean);
+                    return renderGuidedEmptyState('Sankey needs flow relationships to render.', details);
                 }
                 
                 return (
@@ -592,25 +675,35 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                     <BubbleChart
                         data={data}
                         xKey={xAxisKey}
-                        yKey={config.yKey || (Array.isArray(dataKey) ? dataKey[0] : dataKey)}
-                        sizeKey={config.sizeKey || (Array.isArray(dataKey) && dataKey[1] ? dataKey[1] : 'size')}
-                        colorKey={config.colorKey}
+                        yKey={normalizedConfig.yKey || (Array.isArray(dataKey) ? dataKey[0] : dataKey)}
+                        sizeKey={normalizedConfig.sizeKey || (Array.isArray(dataKey) && dataKey[1] ? dataKey[1] : 'size')}
+                        colorKey={normalizedConfig.colorKey}
                         height={height}
                     />
                 );
                 
             case 'timeline':
                 // Severity Timeline
-                const timelineEvents = config.events || data.map(d => ({
+                const timelineEventsRaw = normalizedConfig.events || data.map(d => ({
                     start: d.start || d.timestamp || d.date || d.time,
                     end: d.end,
                     severity: d.severity || 'medium',
                     label: d.label || d.name || d.description
                 }));
+                const timelineEvents = (timelineEventsRaw as any[]).filter((event) => {
+                    const startValue = event?.start;
+                    return startValue && !Number.isNaN(new Date(startValue).getTime());
+                });
+                if (timelineEvents.length === 0) {
+                    return renderGuidedEmptyState('Timeline requires at least one valid date.', [
+                        'No parseable start date found in current rows.',
+                        'Use a Date/Time column with valid values.'
+                    ]);
+                }
                 return (
                     <SeverityTimelineChart
                         title={config.title}
-                        subtitle={config.subtitle || config.description}
+                        subtitle={normalizedConfig.subtitle || normalizedConfig.description}
                         events={timelineEvents as any}
                         height={height}
                     />
@@ -618,22 +711,29 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                 
             case 'multi_timeline':
                 // Multi-Track Timeline
-                if (config.tracks) {
+                if (normalizedConfig.tracks) {
+                    if (normalizedConfig.tracks.length === 0) {
+                        return renderGuidedEmptyState('No tracks available for Multi-Track Timeline.', [
+                            'Provide rows with track grouping and valid dates.'
+                        ]);
+                    }
                     return (
                         <MultiTrackTimelineChart
-                            tracks={config.tracks}
+                            tracks={normalizedConfig.tracks}
                             height={height}
                         />
                     );
                 }
                 // Auto-generate tracks from data grouped by a key
-                const groupKey = config.colorKey || 'asset' || 'detector' || 'category';
+                const groupKey = normalizedConfig.colorKey || 'asset' || 'detector' || 'category';
                 const groups = new Map<string, any[]>();
                 data.forEach(d => {
                     const key = d[groupKey] || 'Default';
+                    const start = d.start || d.timestamp || d.date;
+                    if (!start || Number.isNaN(new Date(start).getTime())) return;
                     if (!groups.has(key)) groups.set(key, []);
                     groups.get(key)!.push({
-                        start: d.start || d.timestamp || d.date,
+                        start,
                         end: d.end,
                         severity: d.severity || 'medium',
                         label: d.label
@@ -644,6 +744,12 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                     title: id,
                     events
                 }));
+                if (autoTracks.length === 0) {
+                    return renderGuidedEmptyState('Multi-Track Timeline needs valid dated events.', [
+                        'No valid events grouped by track were found.',
+                        'Check track column and date column values.'
+                    ]);
+                }
                 return (
                     <MultiTrackTimelineChart
                         tracks={autoTracks}
@@ -716,8 +822,8 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                                  data.reduce((sum, d) => sum + (parseFloat(d[actualDataKey]) || 0), 0);
                 }
                 
-                const gaugeMin = config.min ?? 0;
-                const gaugeMax = config.max ?? (gaugeValue > 0 ? gaugeValue * 1.2 : 100);
+                const gaugeMin = normalizedConfig.min ?? 0;
+                const gaugeMax = normalizedConfig.max ?? (gaugeValue > 0 ? gaugeValue * 1.2 : 100);
                 const gaugePercentage = Math.min(Math.max(((gaugeValue - gaugeMin) / (gaugeMax - gaugeMin)) * 100, 0), 100);
                 const gaugeColor = gaugePercentage >= 80 ? '#10b981' : gaugePercentage >= 50 ? '#f59e0b' : '#ef4444';
                 
@@ -760,7 +866,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                                 fill={isDarkMode ? '#9ca3af' : '#6b7280'}
                                 fontSize={14}
                             >
-                                {config.subtitle || `${gaugeMin} - ${gaugeMax}`}
+                                {normalizedConfig.subtitle || `${gaugeMin} - ${gaugeMax}`}
                             </text>
                         </RadialBarChart>
                     </ResponsiveContainer>
@@ -773,6 +879,16 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
 
     // Loading state
     const hasValidSize = dimensions.width > 10 && dimensions.height > 10;
+    const isConfigIncomplete = useMemo(() => {
+        if (type === 'heatmap') return !xAxisKey || !normalizedConfig.yKey;
+        if (type === 'bubble') return !xAxisKey || !normalizedConfig.yKey;
+        if (type === 'sankey') return !(normalizedConfig.nodes?.length || data.some((d: any) => d.source || d.target));
+        if (type === 'timeline' || type === 'multi_timeline') {
+            return !Array.isArray(data) || data.length === 0;
+        }
+        return !xAxisKey || !dataKey;
+    }, [type, xAxisKey, dataKey, normalizedConfig.yKey, normalizedConfig.nodes, data]);
+
     if (!isReady || !hasValidSize || !data || data.length === 0) {
         return (
             <div 
@@ -780,7 +896,9 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                 style={{ width: '100%', height: height, minHeight: height }}
                 className="flex items-center justify-center text-[var(--text-tertiary)] text-sm"
             >
-                {!data || data.length === 0 ? 'No data available' : (
+                {!data || data.length === 0 ? (
+                    isConfigIncomplete ? 'Configuration incomplete for this visualization' : 'No data available'
+                ) : (
                     <div className="flex flex-col items-center gap-2">
                         <div className="w-6 h-6 border-2 border-[var(--border-medium)] border-t-[#256A65] rounded-full animate-spin" />
                         <span className="text-xs">Loading chart...</span>

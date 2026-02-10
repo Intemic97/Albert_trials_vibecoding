@@ -1,0 +1,330 @@
+{
+  "name": "Repsol Plastics - Calidad y Circularidad",
+  "version": "1.0.0",
+  "entities": [
+    {
+      "id": "ent_proveedores_circulares",
+      "name": "Proveedores Circulares",
+      "description": "Proveedores de materia prima reciclada, certificaciones y calidad historica.",
+      "author": "System",
+      "lastEdited": "2026-02-10",
+      "entityType": "generic",
+      "properties": [
+        { "id": "p_pc_nombre", "name": "Nombre Proveedor", "type": "text", "defaultValue": "" },
+        { "id": "p_pc_pais", "name": "Pais", "type": "text", "defaultValue": "" },
+        { "id": "p_pc_tipo_material", "name": "Tipo Material", "type": "text", "defaultValue": "" },
+        { "id": "p_pc_certificacion", "name": "Certificacion", "type": "text", "defaultValue": "" },
+        { "id": "p_pc_otd", "name": "OTD Porcentaje", "type": "number", "defaultValue": "0" },
+        { "id": "p_pc_ppm_nc", "name": "PPM No Conformidad", "type": "number", "defaultValue": "0" }
+      ]
+    },
+    {
+      "id": "ent_lotes_material",
+      "name": "Lotes de Material Circular",
+      "description": "Lotes de entrada con composicion reciclada y variables de calidad de recepcion.",
+      "author": "System",
+      "lastEdited": "2026-02-10",
+      "entityType": "generic",
+      "properties": [
+        { "id": "p_lm_codigo", "name": "Codigo Lote", "type": "text", "defaultValue": "" },
+        { "id": "p_lm_proveedor", "name": "Proveedor", "type": "text", "defaultValue": "" },
+        { "id": "p_lm_polimero", "name": "Polimero Base", "type": "text", "defaultValue": "HDPE" },
+        { "id": "p_lm_pct_pcr", "name": "Porcentaje PCR", "type": "number", "defaultValue": "0" },
+        { "id": "p_lm_pct_pir", "name": "Porcentaje PIR", "type": "number", "defaultValue": "0" },
+        { "id": "p_lm_humedad", "name": "Humedad Porcentaje", "type": "number", "defaultValue": "0" },
+        { "id": "p_lm_contaminacion_ppm", "name": "Contaminacion PPM", "type": "number", "defaultValue": "0" },
+        { "id": "p_lm_mfi", "name": "MFI g10min", "type": "number", "defaultValue": "0" },
+        { "id": "p_lm_estado", "name": "Estado Lote", "type": "text", "defaultValue": "Liberado" }
+      ]
+    },
+    {
+      "id": "ent_recetas_compounding",
+      "name": "Recetas de Compounding",
+      "description": "Recetas por grado de producto con objetivos de circularidad y calidad.",
+      "author": "System",
+      "lastEdited": "2026-02-10",
+      "entityType": "generic",
+      "properties": [
+        { "id": "p_rc_codigo", "name": "Codigo Receta", "type": "text", "defaultValue": "" },
+        { "id": "p_rc_producto", "name": "Producto", "type": "text", "defaultValue": "" },
+        { "id": "p_rc_obj_pcr", "name": "Objetivo PCR Porcentaje", "type": "number", "defaultValue": "0" },
+        { "id": "p_rc_obj_pir", "name": "Objetivo PIR Porcentaje", "type": "number", "defaultValue": "0" },
+        { "id": "p_rc_obj_mfi_min", "name": "MFI Min", "type": "number", "defaultValue": "0" },
+        { "id": "p_rc_obj_mfi_max", "name": "MFI Max", "type": "number", "defaultValue": "0" },
+        { "id": "p_rc_obj_deltae_max", "name": "DeltaE Max", "type": "number", "defaultValue": "0" }
+      ]
+    },
+    {
+      "id": "ent_parametros_proceso",
+      "name": "Parametros de Proceso",
+      "description": "Variables operativas por corrida para optimizar calidad con material circular.",
+      "author": "System",
+      "lastEdited": "2026-02-10",
+      "entityType": "generic",
+      "properties": [
+        { "id": "p_pp_corrida", "name": "Id Corrida", "type": "text", "defaultValue": "" },
+        { "id": "p_pp_linea", "name": "Linea", "type": "text", "defaultValue": "" },
+        { "id": "p_pp_receta", "name": "Receta", "type": "text", "defaultValue": "" },
+        { "id": "p_pp_temp_z1", "name": "Temp Zona 1 C", "type": "number", "defaultValue": "0" },
+        { "id": "p_pp_temp_z2", "name": "Temp Zona 2 C", "type": "number", "defaultValue": "0" },
+        { "id": "p_pp_temp_z3", "name": "Temp Zona 3 C", "type": "number", "defaultValue": "0" },
+        { "id": "p_pp_rpm", "name": "RPM Husillo", "type": "number", "defaultValue": "0" },
+        { "id": "p_pp_presion", "name": "Presion Cabezal bar", "type": "number", "defaultValue": "0" },
+        { "id": "p_pp_vacio", "name": "Vacio mbar", "type": "number", "defaultValue": "0" },
+        { "id": "p_pp_scrap", "name": "Scrap Porcentaje", "type": "number", "defaultValue": "0" }
+      ]
+    },
+    {
+      "id": "ent_ensayos_calidad",
+      "name": "Ensayos de Calidad",
+      "description": "Resultados de laboratorio por corrida y lote final.",
+      "author": "System",
+      "lastEdited": "2026-02-10",
+      "entityType": "generic",
+      "properties": [
+        { "id": "p_ec_lote_final", "name": "Lote Final", "type": "text", "defaultValue": "" },
+        { "id": "p_ec_corrida", "name": "Id Corrida", "type": "text", "defaultValue": "" },
+        { "id": "p_ec_mfi", "name": "MFI g10min", "type": "number", "defaultValue": "0" },
+        { "id": "p_ec_densidad", "name": "Densidad gcm3", "type": "number", "defaultValue": "0" },
+        { "id": "p_ec_impacto", "name": "Impacto kJm2", "type": "number", "defaultValue": "0" },
+        { "id": "p_ec_deltae", "name": "DeltaE", "type": "number", "defaultValue": "0" },
+        { "id": "p_ec_olor", "name": "Olor Score", "type": "number", "defaultValue": "0" },
+        { "id": "p_ec_resultado", "name": "Resultado", "type": "text", "defaultValue": "PASS" }
+      ]
+    },
+    {
+      "id": "ent_balance_circularidad",
+      "name": "Balance de Circularidad",
+      "description": "KPIs de circularidad por semana y planta.",
+      "author": "System",
+      "lastEdited": "2026-02-10",
+      "entityType": "generic",
+      "properties": [
+        { "id": "p_bc_semana", "name": "Semana", "type": "text", "defaultValue": "" },
+        { "id": "p_bc_planta", "name": "Planta", "type": "text", "defaultValue": "" },
+        { "id": "p_bc_ton_prod", "name": "Toneladas Producidas", "type": "number", "defaultValue": "0" },
+        { "id": "p_bc_ton_pcr", "name": "Toneladas PCR", "type": "number", "defaultValue": "0" },
+        { "id": "p_bc_ton_pir", "name": "Toneladas PIR", "type": "number", "defaultValue": "0" },
+        { "id": "p_bc_ton_regranulado", "name": "Toneladas Regranulado Interno", "type": "number", "defaultValue": "0" },
+        { "id": "p_bc_pct_circular", "name": "Porcentaje Circularidad", "type": "number", "defaultValue": "0" },
+        { "id": "p_bc_co2e_kg_ton", "name": "CO2e kg por ton", "type": "number", "defaultValue": "0" }
+      ]
+    },
+    {
+      "id": "ent_no_conformidades_circularidad",
+      "name": "No Conformidades de Calidad Circular",
+      "description": "Eventos de calidad asociados a variabilidad de material circular.",
+      "author": "System",
+      "lastEdited": "2026-02-10",
+      "entityType": "generic",
+      "properties": [
+        { "id": "p_nc_codigo", "name": "Codigo NC", "type": "text", "defaultValue": "" },
+        { "id": "p_nc_fecha", "name": "Fecha", "type": "text", "defaultValue": "" },
+        { "id": "p_nc_producto", "name": "Producto", "type": "text", "defaultValue": "" },
+        { "id": "p_nc_tipo", "name": "Tipo Desvio", "type": "text", "defaultValue": "" },
+        { "id": "p_nc_severidad", "name": "Severidad", "type": "text", "defaultValue": "Media" },
+        { "id": "p_nc_causa", "name": "Causa Raiz", "type": "text", "defaultValue": "" },
+        { "id": "p_nc_accion", "name": "Accion Correctiva", "type": "text", "defaultValue": "" },
+        { "id": "p_nc_coste", "name": "Coste EUR", "type": "number", "defaultValue": "0" }
+      ]
+    }
+  ],
+  "records": [
+    {
+      "id": "r_pc_001",
+      "entityId": "ent_proveedores_circulares",
+      "values": {
+        "p_pc_nombre": "CircularPolymers Iberia",
+        "p_pc_pais": "ES",
+        "p_pc_tipo_material": "PCR HDPE",
+        "p_pc_certificacion": "EuCertPlast",
+        "p_pc_otd": "96.5",
+        "p_pc_ppm_nc": "820"
+      }
+    },
+    {
+      "id": "r_pc_002",
+      "entityId": "ent_proveedores_circulares",
+      "values": {
+        "p_pc_nombre": "GreenLoop Materials",
+        "p_pc_pais": "PT",
+        "p_pc_tipo_material": "PCR PP",
+        "p_pc_certificacion": "ISCC PLUS",
+        "p_pc_otd": "93.2",
+        "p_pc_ppm_nc": "1150"
+      }
+    },
+    {
+      "id": "r_lm_001",
+      "entityId": "ent_lotes_material",
+      "values": {
+        "p_lm_codigo": "LM-2026-001",
+        "p_lm_proveedor": "CircularPolymers Iberia",
+        "p_lm_polimero": "HDPE",
+        "p_lm_pct_pcr": "45",
+        "p_lm_pct_pir": "10",
+        "p_lm_humedad": "0.24",
+        "p_lm_contaminacion_ppm": "380",
+        "p_lm_mfi": "7.9",
+        "p_lm_estado": "Liberado"
+      }
+    },
+    {
+      "id": "r_lm_002",
+      "entityId": "ent_lotes_material",
+      "values": {
+        "p_lm_codigo": "LM-2026-002",
+        "p_lm_proveedor": "GreenLoop Materials",
+        "p_lm_polimero": "PP",
+        "p_lm_pct_pcr": "35",
+        "p_lm_pct_pir": "15",
+        "p_lm_humedad": "0.31",
+        "p_lm_contaminacion_ppm": "520",
+        "p_lm_mfi": "11.8",
+        "p_lm_estado": "Cuarentena"
+      }
+    },
+    {
+      "id": "r_rc_001",
+      "entityId": "ent_recetas_compounding",
+      "values": {
+        "p_rc_codigo": "RC-HDPE-BLOW-01",
+        "p_rc_producto": "Bidon HDPE 25L Circular",
+        "p_rc_obj_pcr": "40",
+        "p_rc_obj_pir": "15",
+        "p_rc_obj_mfi_min": "7.5",
+        "p_rc_obj_mfi_max": "9.0",
+        "p_rc_obj_deltae_max": "1.2"
+      }
+    },
+    {
+      "id": "r_rc_002",
+      "entityId": "ent_recetas_compounding",
+      "values": {
+        "p_rc_codigo": "RC-PP-INJ-03",
+        "p_rc_producto": "Caja Logistica PP Circular",
+        "p_rc_obj_pcr": "30",
+        "p_rc_obj_pir": "20",
+        "p_rc_obj_mfi_min": "10.0",
+        "p_rc_obj_mfi_max": "13.0",
+        "p_rc_obj_deltae_max": "1.5"
+      }
+    },
+    {
+      "id": "r_pp_001",
+      "entityId": "ent_parametros_proceso",
+      "values": {
+        "p_pp_corrida": "CR-2026-1451",
+        "p_pp_linea": "EXT-02",
+        "p_pp_receta": "RC-HDPE-BLOW-01",
+        "p_pp_temp_z1": "196",
+        "p_pp_temp_z2": "208",
+        "p_pp_temp_z3": "216",
+        "p_pp_rpm": "74",
+        "p_pp_presion": "182",
+        "p_pp_vacio": "128",
+        "p_pp_scrap": "2.4"
+      }
+    },
+    {
+      "id": "r_pp_002",
+      "entityId": "ent_parametros_proceso",
+      "values": {
+        "p_pp_corrida": "CR-2026-1452",
+        "p_pp_linea": "EXT-02",
+        "p_pp_receta": "RC-HDPE-BLOW-01",
+        "p_pp_temp_z1": "201",
+        "p_pp_temp_z2": "213",
+        "p_pp_temp_z3": "221",
+        "p_pp_rpm": "78",
+        "p_pp_presion": "191",
+        "p_pp_vacio": "121",
+        "p_pp_scrap": "3.1"
+      }
+    },
+    {
+      "id": "r_ec_001",
+      "entityId": "ent_ensayos_calidad",
+      "values": {
+        "p_ec_lote_final": "LF-2026-7731",
+        "p_ec_corrida": "CR-2026-1451",
+        "p_ec_mfi": "8.2",
+        "p_ec_densidad": "0.953",
+        "p_ec_impacto": "14.8",
+        "p_ec_deltae": "0.9",
+        "p_ec_olor": "2.0",
+        "p_ec_resultado": "PASS"
+      }
+    },
+    {
+      "id": "r_ec_002",
+      "entityId": "ent_ensayos_calidad",
+      "values": {
+        "p_ec_lote_final": "LF-2026-7732",
+        "p_ec_corrida": "CR-2026-1452",
+        "p_ec_mfi": "9.4",
+        "p_ec_densidad": "0.951",
+        "p_ec_impacto": "13.9",
+        "p_ec_deltae": "1.6",
+        "p_ec_olor": "3.0",
+        "p_ec_resultado": "FAIL"
+      }
+    },
+    {
+      "id": "r_bc_001",
+      "entityId": "ent_balance_circularidad",
+      "values": {
+        "p_bc_semana": "2026-W05",
+        "p_bc_planta": "Repsol-Polyolefins-Tarragona",
+        "p_bc_ton_prod": "1820",
+        "p_bc_ton_pcr": "610",
+        "p_bc_ton_pir": "245",
+        "p_bc_ton_regranulado": "92",
+        "p_bc_pct_circular": "52.6",
+        "p_bc_co2e_kg_ton": "1210"
+      }
+    },
+    {
+      "id": "r_bc_002",
+      "entityId": "ent_balance_circularidad",
+      "values": {
+        "p_bc_semana": "2026-W06",
+        "p_bc_planta": "Repsol-Polyolefins-Tarragona",
+        "p_bc_ton_prod": "1885",
+        "p_bc_ton_pcr": "655",
+        "p_bc_ton_pir": "260",
+        "p_bc_ton_regranulado": "104",
+        "p_bc_pct_circular": "54.9",
+        "p_bc_co2e_kg_ton": "1168"
+      }
+    },
+    {
+      "id": "r_nc_001",
+      "entityId": "ent_no_conformidades_circularidad",
+      "values": {
+        "p_nc_codigo": "NC-2026-044",
+        "p_nc_fecha": "2026-02-04",
+        "p_nc_producto": "Bidon HDPE 25L Circular",
+        "p_nc_tipo": "Color fuera de especificacion",
+        "p_nc_severidad": "Alta",
+        "p_nc_causa": "Variabilidad de cenizas en lote PCR",
+        "p_nc_accion": "Ajuste de blend + cambio de filtro 120 a 80 mesh",
+        "p_nc_coste": "18400"
+      }
+    },
+    {
+      "id": "r_nc_002",
+      "entityId": "ent_no_conformidades_circularidad",
+      "values": {
+        "p_nc_codigo": "NC-2026-051",
+        "p_nc_fecha": "2026-02-07",
+        "p_nc_producto": "Caja Logistica PP Circular",
+        "p_nc_tipo": "Olor elevado",
+        "p_nc_severidad": "Media",
+        "p_nc_causa": "Humedad de entrada por encima de target",
+        "p_nc_accion": "Aumentar tiempo de secado y controlar dew point",
+        "p_nc_coste": "6200"
+      }
+    }
+  ]
+}
