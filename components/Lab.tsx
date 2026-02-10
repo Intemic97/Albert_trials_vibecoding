@@ -2622,7 +2622,14 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                 
                 <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                     <div className="max-w-6xl mx-auto">
-                        <div className="flex items-center justify-end mb-4" ref={presetsMenuRef}>
+                        <div className="flex items-center justify-end gap-2 mb-4" ref={presetsMenuRef}>
+                            <button
+                                onClick={() => setShowCreateModal(true)}
+                                className="inline-flex items-center gap-2 px-3 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors"
+                            >
+                                <Plus size={14} />
+                                New Experiment
+                            </button>
                             <div className="relative">
                                 <button
                                     onClick={() => setShowPresetsMenu(prev => !prev)}

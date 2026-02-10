@@ -774,7 +774,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
 
                 if (entity && blueprint.records && blueprint.records.length > 0) {
                     const currentRecords = await fetchRecords(entity);
-                    if (currentRecords.length === 0) {
+                    const needsSeed = currentRecords.length < Math.min(20, blueprint.records.length);
+                    if (needsSeed) {
+                        // Delete sparse old records before re-seeding with full dataset
+                        if (currentRecords.length > 0 && currentRecords.length < 20) {
+                            for (const rec of currentRecords) {
+                                await fetch(`${API_BASE}/records/${rec.id}`, {
+                                    method: 'DELETE',
+                                    credentials: 'include'
+                                }).catch(() => {});
+                            }
+                        }
                         for (const row of blueprint.records) {
                             await fetch(`${API_BASE}/entities/${entity.id}/records`, {
                                 method: 'POST',
