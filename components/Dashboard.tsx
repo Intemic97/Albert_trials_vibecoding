@@ -728,6 +728,53 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
             let createdEntitiesCount = 0;
             let seededEntitiesCount = 0;
 
+            const createFreshEntity = async (blueprint: {
+                name: string;
+                description: string;
+                entityType: string;
+                properties: Array<{ name: string; type: 'text' | 'number'; unit?: string; defaultValue?: string | number }>;
+                records?: Array<Record<string, string | number>>;
+            }) => {
+                const entityId = generateUUID();
+                const createEntityRes = await fetch(`${API_BASE}/entities`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        id: entityId,
+                        name: blueprint.name,
+                        description: blueprint.description,
+                        author: 'Preset generator',
+                        lastEdited: 'Just now',
+                        entityType: blueprint.entityType,
+                        properties: blueprint.properties.map((prop) => ({
+                            id: generateUUID(),
+                            name: prop.name,
+                            type: prop.type,
+                            defaultValue: prop.defaultValue ?? (prop.type === 'number' ? '0' : ''),
+                            unit: prop.unit
+                        }))
+                    })
+                });
+                if (!createEntityRes.ok) return undefined;
+                createdEntitiesCount += 1;
+                workingEntities = await fetchEntitiesSnapshot();
+                const created = workingEntities.find((c) => c.id === entityId)
+                    || workingEntities.find((c) => normalizeText(c.name) === normalizeText(blueprint.name));
+                if (created && blueprint.records && blueprint.records.length > 0) {
+                    for (const row of blueprint.records) {
+                        await fetch(`${API_BASE}/entities/${created.id}/records`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify(row)
+                        });
+                    }
+                    seededEntitiesCount += 1;
+                }
+                return created;
+            };
+
             const ensureEntity = async (blueprint: {
                 name: string;
                 description: string;
@@ -736,68 +783,76 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 properties: Array<{ name: string; type: 'text' | 'number'; unit?: string; defaultValue?: string | number }>;
                 records?: Array<Record<string, string | number>>;
             }) => {
+                // First try exact name match for our own "Example - ..." entities
                 let entity = workingEntities.find((candidate) =>
-                    normalizeText(candidate.name) === normalizeText(blueprint.name) ||
-                    includesAny(candidate.name, blueprint.matchTokens)
+                    normalizeText(candidate.name) === normalizeText(blueprint.name)
                 );
 
-                if (!entity) {
-                    const entityId = generateUUID();
-                    const createEntityRes = await fetch(`${API_BASE}/entities`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({
-                            id: entityId,
-                            name: blueprint.name,
-                            description: blueprint.description,
-                            author: 'Preset generator',
-                            lastEdited: 'Just now',
-                            entityType: blueprint.entityType,
-                            properties: blueprint.properties.map((prop) => ({
-                                id: generateUUID(),
-                                name: prop.name,
-                                type: prop.type,
-                                defaultValue: prop.defaultValue ?? (prop.type === 'number' ? '0' : ''),
-                                unit: prop.unit
-                            }))
-                        })
-                    });
-                    if (!createEntityRes.ok) {
-                        throw new Error(`Failed to create required preset entity: ${blueprint.name}`);
-                    }
-                    createdEntitiesCount += 1;
-                    workingEntities = await fetchEntitiesSnapshot();
-                    entity = workingEntities.find((candidate) => candidate.id === entityId)
-                        || workingEntities.find((candidate) => normalizeText(candidate.name) === normalizeText(blueprint.name));
-                }
+                // If found by exact name, check that properties are compatible
+                if (entity) {
+                    const entityPropNames = (entity.properties || []).map((p: any) => normalizeText(p.name));
+                    const blueprintPropNames = blueprint.properties.map((p) => normalizeText(p.name));
+                    const matchingProps = blueprintPropNames.filter((bp) => entityPropNames.includes(bp));
+                    const isCompatible = matchingProps.length >= Math.ceil(blueprintPropNames.length * 0.5);
 
-                if (entity && blueprint.records && blueprint.records.length > 0) {
-                    const currentRecords = await fetchRecords(entity);
-                    const needsSeed = currentRecords.length < Math.min(20, blueprint.records.length);
-                    if (needsSeed) {
-                        // Delete sparse old records before re-seeding with full dataset
-                        if (currentRecords.length > 0 && currentRecords.length < 20) {
+                    if (isCompatible) {
+                        // Entity exists and is compatible — check if needs re-seeding
+                        const currentRecords = await fetchRecords(entity);
+                        if (currentRecords.length < Math.min(20, (blueprint.records || []).length) && blueprint.records) {
+                            // Delete sparse old records
                             for (const rec of currentRecords) {
-                                await fetch(`${API_BASE}/records/${rec.id}`, {
-                                    method: 'DELETE',
-                                    credentials: 'include'
-                                }).catch(() => {});
+                                await fetch(`${API_BASE}/records/${rec.id}`, { method: 'DELETE', credentials: 'include' }).catch(() => {});
                             }
+                            for (const row of blueprint.records) {
+                                await fetch(`${API_BASE}/entities/${entity.id}/records`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    credentials: 'include',
+                                    body: JSON.stringify(row)
+                                });
+                            }
+                            seededEntitiesCount += 1;
                         }
-                        for (const row of blueprint.records) {
-                            await fetch(`${API_BASE}/entities/${entity.id}/records`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                credentials: 'include',
-                                body: JSON.stringify(row)
-                            });
+                        return entity;
+                    }
+                    // Incompatible properties — fall through to create new
+                }
+
+                // Try fuzzy match by tokens (for user-created entities with similar names)
+                if (!entity) {
+                    const fuzzyMatch = workingEntities.find((candidate) =>
+                        includesAny(candidate.name, blueprint.matchTokens)
+                    );
+                    if (fuzzyMatch) {
+                        const entityPropNames = (fuzzyMatch.properties || []).map((p: any) => normalizeText(p.name));
+                        const blueprintPropNames = blueprint.properties.map((p) => normalizeText(p.name));
+                        const matchingProps = blueprintPropNames.filter((bp) => entityPropNames.includes(bp));
+                        const isCompatible = matchingProps.length >= Math.ceil(blueprintPropNames.length * 0.5);
+                        if (isCompatible) {
+                            // Compatible fuzzy match — reseed if needed
+                            const currentRecords = await fetchRecords(fuzzyMatch);
+                            if (currentRecords.length < Math.min(20, (blueprint.records || []).length) && blueprint.records) {
+                                for (const rec of currentRecords) {
+                                    await fetch(`${API_BASE}/records/${rec.id}`, { method: 'DELETE', credentials: 'include' }).catch(() => {});
+                                }
+                                for (const row of blueprint.records) {
+                                    await fetch(`${API_BASE}/entities/${fuzzyMatch.id}/records`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        credentials: 'include',
+                                        body: JSON.stringify(row)
+                                    });
+                                }
+                                seededEntitiesCount += 1;
+                            }
+                            return fuzzyMatch;
                         }
-                        seededEntitiesCount += 1;
+                        // Incompatible fuzzy match — create new entity instead
                     }
                 }
 
-                return entity;
+                // No compatible entity found — create a fresh one
+                return await createFreshEntity(blueprint);
             };
 
             const extrusionEntity = await ensureEntity({
