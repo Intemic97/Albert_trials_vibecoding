@@ -9,7 +9,7 @@
  * Este archivo puede reemplazar eventualmente a Workflows.tsx
  */
 
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   FloppyDisk as Save, 
@@ -19,9 +19,14 @@ import {
   Clock,
   Users,
   Share as Share2,
+  Tag,
+  ArrowCounterClockwise as Undo,
+  ArrowClockwise as Redo,
 } from '@phosphor-icons/react';
 import { useWorkflowStore, useNodeConfigStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
+import { useExecutionProgress } from '../../hooks';
+import { useWorkflowHistory } from './hooks';
 import { API_BASE } from '../../config';
 import { generateUUID } from '../../utils/uuid';
 
@@ -36,6 +41,7 @@ import {
   ExecutionHistoryModal, 
   TemplatesGalleryModal,
   WorkflowRunnerModal,
+  TagsModal,
 } from './modals';
 
 // Types & Constants
@@ -95,8 +101,50 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
   
   const [isSaving, setIsSaving] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
-  const [recentNodes, setRecentNodes] = useState<string[]>([]);
+  const [showTagsModal, setShowTagsModal] = useState(false);
   const [viewingDataNodeId, setViewingDataNodeId] = useState<string | null>(null);
+  const lastExecutionIdRef = useRef<string | null>(null);
+  const isUndoRedoRef = useRef(false);
+
+  // Undo/Redo - sync with Zustand store
+  const markAsChanged = useWorkflowStore(state => state.markAsChanged);
+  const { canUndo, canRedo, undo, redo, pushState, clearHistory } = useWorkflowHistory({
+    maxHistoryLength: 50,
+    onStateChange: useCallback((state) => {
+      isUndoRedoRef.current = true;
+      setNodes(state.nodes);
+      setConnections(state.connections);
+      markAsChanged();
+      requestAnimationFrame(() => { isUndoRedoRef.current = false; });
+    }, [setNodes, setConnections, markAsChanged]),
+  });
+
+  // Execution progress - sync WebSocket updates to node statuses
+  const handleExecutionProgress = useCallback((progress: { workflowId?: string; executionId?: string; logs?: Array<{ nodeId: string; status: string }>; currentNodeId?: string; status?: string }) => {
+    if (!workflow.id || progress.workflowId !== workflow.id) return;
+    const logs = progress.logs || [];
+    logs.forEach(log => {
+      const nodeStatus = log.status === 'completed' ? 'completed' : log.status === 'error' ? 'error' : log.status === 'running' ? 'running' : null;
+      if (nodeStatus) {
+        updateNode(log.nodeId, { status: nodeStatus as any });
+      }
+    });
+    if (progress.currentNodeId && progress.status === 'running') {
+      updateNode(progress.currentNodeId, { status: 'running' });
+    }
+  }, [workflow.id, updateNode]);
+
+  const handleExecutionComplete = useCallback((progress: { workflowId?: string; status?: string }) => {
+    if (progress.workflowId !== workflow.id) return;
+    if (progress.status === 'completed' || progress.status === 'failed') {
+      lastExecutionIdRef.current = null;
+    }
+  }, [workflow.id]);
+
+  useExecutionProgress({
+    onProgress: handleExecutionProgress,
+    onComplete: handleExecutionComplete,
+  });
   
   // =========================================================================
   // EFFECTS
@@ -110,6 +158,50 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
       resetWorkflow();
     }
   }, [urlWorkflowId]);
+
+  // Push state to undo history when nodes/connections change (debounced)
+  const lastHistoryKeyRef = useRef('');
+  useEffect(() => {
+    if (isUndoRedoRef.current) return;
+    if (nodes.length === 0 && connections.length === 0) return;
+    const stateKey = JSON.stringify({ n: nodes.length, c: connections.length, ids: nodes.map(n => n.id).sort().join(',') });
+    if (stateKey === lastHistoryKeyRef.current) return;
+    const timer = setTimeout(() => {
+      lastHistoryKeyRef.current = stateKey;
+      pushState({ nodes, connections });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [nodes, connections, pushState]);
+
+  // Clear history when workflow is reset or when URL workflow changes
+  const prevUrlIdRef = useRef(urlWorkflowId);
+  useEffect(() => {
+    if (urlWorkflowId !== prevUrlIdRef.current) {
+      prevUrlIdRef.current = urlWorkflowId;
+      clearHistory();
+      lastHistoryKeyRef.current = '';
+    } else if (nodes.length === 0 && connections.length === 0) {
+      clearHistory();
+      lastHistoryKeyRef.current = '';
+    }
+  }, [urlWorkflowId, nodes.length, connections.length, clearHistory]);
+
+  // Keyboard shortcuts: Ctrl+Z Undo, Ctrl+Shift+Z Redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      if (e.key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
   
   // Warn on unsaved changes
   useEffect(() => {
@@ -130,17 +222,18 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
   
   const fetchWorkflow = async (id: string) => {
     try {
-      const response = await fetch(`${API_BASE}/api/workflows/${id}`, {
+      const response = await fetch(`${API_BASE}/workflows/${id}`, {
         credentials: 'include',
       });
       
       if (response.ok) {
         const data = await response.json();
+        const workflowData = data.data || {};
         loadWorkflow(
           data.id,
           data.name,
-          data.nodes || [],
-          data.connections || [],
+          workflowData.nodes || [],
+          workflowData.connections || [],
           {
             description: data.description,
             tags: data.tags || [],
@@ -157,25 +250,20 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
     setIsSaving(true);
     
     try {
-      const payload = {
-        name: workflow.name,
-        description: workflow.description,
-        nodes,
-        connections,
-        tags: workflow.tags,
-        isPublic: workflow.isPublic,
-      };
-      
       const isNew = !workflow.id;
       const url = isNew 
-        ? `${API_BASE}/api/workflows`
-        : `${API_BASE}/api/workflows/${workflow.id}`;
+        ? `${API_BASE}/workflows`
+        : `${API_BASE}/workflows/${workflow.id}`;
+      
+      const apiPayload = isNew
+        ? { name: workflow.name, data: { nodes, connections }, tags: workflow.tags || [], createdByName: user?.name || user?.email?.split('@')[0] || 'Unknown' }
+        : { name: workflow.name, data: { nodes, connections }, tags: workflow.tags || [], lastEditedByName: user?.name || user?.email?.split('@')[0] || 'Unknown' };
       
       const response = await fetch(url, {
         method: isNew ? 'POST' : 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(apiPayload),
       });
       
       if (response.ok) {
@@ -183,7 +271,7 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
         
         if (isNew && data.id) {
           setWorkflowMeta({ id: data.id });
-          navigate(`/workflows/${data.id}`, { replace: true });
+          navigate(`/workflows-v2/${data.id}`, { replace: true });
         }
         
         markAsSaved();
@@ -208,21 +296,51 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
         updateNode(node.id, { status: 'idle', executionResult: undefined });
       });
       
-      // Execute via API
-      const response = await fetch(`${API_BASE}/api/workflows/${workflow.id}/execute`, {
+      // Execute via API (use /api/workflow/:id/execute - singular - and usePrefect for background execution)
+      const response = await fetch(`${API_BASE}/workflow/${workflow.id}/execute`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({ inputs: {}, usePrefect: true }),
       });
       
       if (response.ok) {
-        await response.json();
-        // Execution completed successfully
+        const data = await response.json();
+        if (data.executionId) {
+          lastExecutionIdRef.current = data.executionId;
+        }
       }
     } catch (error) {
       console.error('Error running workflow:', error);
     } finally {
       setIsRunning(false);
     }
+  };
+
+  const handleRunWorkflowWithInputs = async (inputs: Record<string, any>) => {
+    if (!workflow.id) throw new Error('Workflow not saved');
+    await saveWorkflow();
+    nodes.forEach(node => {
+      updateNode(node.id, { status: 'idle', executionResult: undefined });
+    });
+    const response = await fetch(`${API_BASE}/workflow/${workflow.id}/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ inputs, usePrefect: true }),
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Execution failed');
+    }
+    const data = await response.json();
+    if (data.executionId) {
+      lastExecutionIdRef.current = data.executionId;
+    }
+    return {
+      executionId: data.executionId,
+      backgroundExecution: data.usingPrefect || data.backgroundExecution,
+    };
   };
   
   // =========================================================================
@@ -247,16 +365,57 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
   };
   
   const handleNodeRun = async (nodeId: string) => {
-    updateNode(nodeId, { status: 'running' });
-    
-    // Simulate node execution
-    setTimeout(() => {
-      updateNode(nodeId, { 
-        status: 'completed', 
-        executionResult: 'Success',
-        data: [{ id: 1, name: 'Sample', value: 100 }, { id: 2, name: 'Data', value: 200 }]
-      });
-    }, 1000);
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    updateNode(nodeId, { status: 'running', executionResult: undefined });
+
+    // Use real API when workflow is saved
+    if (workflow.id) {
+      try {
+        const response = await fetch(`${API_BASE}/workflow/${workflow.id}/execute-node`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            nodeId,
+            nodeType: node.type,
+            node: { ...node, config: node.config || {} },
+            inputData: {},
+            recursive: false,
+          }),
+        });
+        const data = await response.json();
+        if (response.ok && data.success !== false) {
+          const output = data.output ?? data.result;
+          updateNode(nodeId, {
+            status: 'completed',
+            executionResult: output ? (typeof output === 'string' ? output : JSON.stringify(output).slice(0, 200)) : 'Success',
+            data: Array.isArray(output) ? output : output?.data ?? (output ? [output] : undefined),
+          });
+        } else {
+          updateNode(nodeId, {
+            status: 'error',
+            executionResult: data.error || 'Execution failed',
+          });
+        }
+      } catch (error) {
+        console.error('Node execution error:', error);
+        updateNode(nodeId, {
+          status: 'error',
+          executionResult: error instanceof Error ? error.message : 'Execution failed',
+        });
+      }
+    } else {
+      // Fallback: simulate when workflow not yet saved
+      setTimeout(() => {
+        updateNode(nodeId, {
+          status: 'completed',
+          executionResult: 'Success',
+          data: [{ id: 1, name: 'Sample', value: 100 }, { id: 2, name: 'Data', value: 200 }],
+        });
+      }, 1000);
+    }
   };
   
   const handleViewNodeData = (nodeId: string) => {
@@ -283,12 +442,33 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
     }
   };
   
-  const handlePaletteDragStart = (item: any) => {
-    // Track recent nodes
-    setRecentNodes(prev => {
-      const filtered = prev.filter(t => t !== item.type);
-      return [item.type, ...filtered].slice(0, 5);
+  const handlePaletteDragStart = () => {};
+
+  // "Run with inputs" solo tiene sentido cuando el workflow tiene nodos que aceptan input
+  const hasInputNodes = useMemo(
+    () => nodes.some((n) => ['manualInput', 'excelInput', 'pdfInput', 'webhook'].includes(n.type)),
+    [nodes]
+  );
+
+  const handleSaveTags = async (newTags: string[]) => {
+    if (!workflow.id) return;
+    const res = await fetch(`${API_BASE}/workflows/${workflow.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        name: workflow.name,
+        data: { nodes, connections },
+        tags: newTags,
+        lastEditedByName: user?.name || user?.email?.split('@')[0] || 'Unknown',
+      }),
     });
+    if (res.ok) {
+      setWorkflowMeta({ tags: newTags });
+      markAsSaved();
+    } else {
+      throw new Error('Failed to save tags');
+    }
   };
   
   // =========================================================================
@@ -296,9 +476,9 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
   // =========================================================================
   
   return (
-    <div className="flex flex-col h-full bg-[var(--bg-primary)]">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden bg-[var(--bg-primary)]">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)] bg-[var(--bg-card)]">
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)] bg-[var(--bg-card)]">
         <div className="flex items-center gap-3">
           <button
             onClick={handleBack}
@@ -318,9 +498,36 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
           {hasUnsavedChanges && (
             <span className="text-xs text-amber-500 font-medium">Unsaved</span>
           )}
+          
+          <button
+            onClick={() => setShowTagsModal(true)}
+            disabled={!workflow.id}
+            className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors disabled:opacity-50"
+            title="Manage Tags"
+          >
+            <Tag size={18} className="text-[var(--text-secondary)]" weight="light" />
+          </button>
         </div>
         
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-0.5 mr-1">
+            <button
+              onClick={() => undo()}
+              disabled={!canUndo}
+              className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo size={16} className="text-[var(--text-secondary)]" />
+            </button>
+            <button
+              onClick={() => redo()}
+              disabled={!canRedo}
+              className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              <Redo size={16} className="text-[var(--text-secondary)]" />
+            </button>
+          </div>
           <button
             onClick={() => setShowExecutionHistory(true)}
             className="flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-sm text-[var(--text-secondary)]"
@@ -356,25 +563,36 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
             <Play size={16} weight="fill" />
             {isRunning ? 'Running...' : 'Run'}
           </button>
+          
+          {hasInputNodes && (
+            <button
+              onClick={() => setShowRunnerModal(true)}
+              disabled={nodes.length === 0 || !workflow.id}
+              className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors disabled:opacity-50"
+              title="Provide values for Manual Input, Excel, PDF or Webhook nodes"
+            >
+              <Share2 size={16} weight="light" />
+              Run with inputs
+            </button>
+          )}
         </div>
       </div>
       
-      {/* Main content */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Sidebar - Node Palette */}
-        <div className={`${ui.isSidebarCollapsed ? 'w-12' : 'w-64'} border-r border-[var(--border-light)] bg-[var(--bg-card)] overflow-y-auto transition-all duration-200`}>
+      {/* Main content - canvas fixed, sidebar scrolls */}
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        {/* Sidebar - Node Palette (scrollable when many categories) */}
+        <div className={`flex-shrink-0 min-h-0 ${ui.isSidebarCollapsed ? 'w-12' : 'w-64'} border-r border-[var(--border-light)] bg-[var(--bg-card)] flex flex-col overflow-hidden transition-all duration-200`}>
           <NodePalette
             isCollapsed={ui.isSidebarCollapsed}
             onToggleCollapse={toggleSidebar}
-            recentNodes={recentNodes as any}
             onDragStart={handlePaletteDragStart}
             onDragEnd={() => {}}
           />
         </div>
         
-        {/* Canvas */}
+        {/* Canvas - fixed, no scroll, fills remaining space */}
         <div 
-          className="flex-1 relative"
+          className="flex-1 min-h-0 relative overflow-hidden"
           onDragOver={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -382,17 +600,25 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
           onDrop={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            const itemType = e.dataTransfer.getData('application/workflow-node');
-            if (itemType) {
-              const item = DRAGGABLE_ITEMS.find((i) => i.type === itemType);
-              if (item) {
+            const raw = e.dataTransfer.getData('application/workflow-node');
+            if (!raw) return;
+            let item: { type: string; label: string } | null = null;
+            try {
+              const parsed = JSON.parse(raw);
+              if (parsed?.type && parsed?.label) item = parsed;
+            } catch {
+              item = { type: raw, label: DRAGGABLE_ITEMS.find((i) => i.type === raw)?.label || raw };
+            }
+            if (item) {
+              const def = DRAGGABLE_ITEMS.find((i) => i.type === item!.type && i.label === item!.label) || DRAGGABLE_ITEMS.find((i) => i.type === item!.type);
+              if (def) {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
                 const newNode: WorkflowNode = {
                   id: generateUUID(),
-                  type: item.type as any,
-                  label: item.label,
+                  type: def.type as any,
+                  label: def.label,
                   x: x,
                   y: y,
                   status: 'idle',
@@ -454,6 +680,27 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
             setShowTemplatesGallery(false);
           }}
           isCopying={false}
+        />
+      )}
+      
+      {showTagsModal && (
+        <TagsModal
+          isOpen={showTagsModal}
+          onClose={() => setShowTagsModal(false)}
+          initialTags={workflow.tags || []}
+          onSave={handleSaveTags}
+          disabled={!workflow.id}
+        />
+      )}
+      
+      {ui.showRunnerModal && (
+        <WorkflowRunnerModal
+          isOpen={ui.showRunnerModal}
+          onClose={() => setShowRunnerModal(false)}
+          workflowId={workflow.id || ''}
+          workflowName={workflow.name}
+          nodes={nodes}
+          onRun={handleRunWorkflowWithInputs}
         />
       )}
     </div>

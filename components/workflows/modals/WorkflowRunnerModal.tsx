@@ -62,14 +62,14 @@ const getInputNodesFromWorkflow = (nodes: WorkflowNode[]): NodeInput[] => {
                 required: true,
                 placeholder: node.config?.inputVarName || 'Enter value'
             });
-        } else if (node.type === 'excel' || node.type === 'pdf') {
+        } else if (node.type === 'excelInput' || node.type === 'pdfInput') {
             inputNodes.push({
                 nodeId: node.id,
                 nodeType: node.type,
-                nodeName: node.label || (node.type === 'excel' ? 'Excel Input' : 'PDF Input'),
+                nodeName: node.label || (node.type === 'excelInput' ? 'Excel/CSV Input' : 'PDF Input'),
                 inputType: 'file',
                 required: true,
-                placeholder: node.type === 'excel' ? 'Select Excel/CSV file' : 'Select PDF file'
+                placeholder: node.type === 'excelInput' ? 'Select Excel/CSV file' : 'Select PDF file'
             });
         } else if (node.type === 'webhook') {
             inputNodes.push({
@@ -101,8 +101,8 @@ const InputField: React.FC<InputFieldProps> = ({ input, value, onChange }) => {
 
     const getIcon = () => {
         switch (input.nodeType) {
-            case 'excel':
-            case 'pdf':
+            case 'excelInput':
+            case 'pdfInput':
                 return FileText;
             default:
                 return Database;
@@ -147,7 +147,7 @@ const InputField: React.FC<InputFieldProps> = ({ input, value, onChange }) => {
                         <div className="space-y-2">
                             <input
                                 type="file"
-                                accept={input.nodeType === 'excel' ? '.xlsx,.xls,.csv' : '.pdf'}
+                                accept={input.nodeType === 'excelInput' ? '.xlsx,.xls,.csv' : '.pdf'}
                                 onChange={(e) => onChange(e.target.files?.[0] || null)}
                                 className="w-full text-sm text-[var(--text-secondary)] file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-[#256A65]/10 file:text-[#256A65] hover:file:bg-[#256A65]/20 file:cursor-pointer cursor-pointer"
                             />

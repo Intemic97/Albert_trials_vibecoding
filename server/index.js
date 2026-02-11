@@ -15,6 +15,7 @@ const { prefectClient } = require('./prefectClient');
 const { initPollingService, getPollingService } = require('./executionPolling');
 const { getConnectionHealthChecker } = require('./utils/otConnections');
 const { extractStructuredFromText } = require('./services/langExtractService');
+const workflowScheduler = require('./services/workflowScheduler');
 // Load environment variables - Try multiple methods to ensure it loads
 const envPath = path.join(__dirname, '.env');
 console.log('[ENV] Attempting to load .env from:', envPath);
@@ -653,6 +654,22 @@ initDb().then(database => {
             console.log('[OT] Connection health checker started');
         } catch (error) {
             console.error('[OT] Failed to start health checker:', error);
+        }
+
+        // Start workflow scheduler (runs scheduled workflows every minute)
+        try {
+            const executeScheduledWorkflow = async (workflowId, inputs, organizationId) => {
+                try {
+                    await prefectClient.executeWorkflow(workflowId, inputs || {}, organizationId);
+                } catch (prefectErr) {
+                    console.warn('[WorkflowScheduler] Prefect unavailable, using local executor');
+                    const executor = new WorkflowExecutor(db, null, organizationId, null);
+                    await executor.executeWorkflow(workflowId, inputs || {}, organizationId);
+                }
+            };
+            workflowScheduler.start(executeScheduledWorkflow);
+        } catch (error) {
+            console.error('[WorkflowScheduler] Failed to start:', error);
         }
     });
 }).catch(err => {
@@ -6608,6 +6625,13 @@ app.post('/api/workflows', authenticateToken, async (req, res) => {
             userAgent: req.headers['user-agent']
         });
 
+        // Sync schedule config if workflow has Schedule trigger
+        try {
+            await workflowScheduler.syncWorkflowSchedule(db, id, req.user.orgId, data);
+        } catch (schedErr) {
+            console.warn('[WorkflowScheduler] Sync failed:', schedErr.message);
+        }
+
         res.json({ id, name, tags: tags || [], createdAt: now, updatedAt: now, createdBy: req.user.sub, createdByName: createdByName || 'Unknown' });
     } catch (error) {
         console.error('Error saving workflow:', error);
@@ -6639,6 +6663,13 @@ app.put('/api/workflows/:id', authenticateToken, async (req, res) => {
             ipAddress: req.ip || req.headers['x-forwarded-for'],
             userAgent: req.headers['user-agent']
         });
+
+        // Sync schedule config for workflows with Schedule trigger
+        try {
+            await workflowScheduler.syncWorkflowSchedule(db, id, req.user.orgId, data);
+        } catch (schedErr) {
+            console.warn('[WorkflowScheduler] Sync failed:', schedErr.message);
+        }
 
         res.json({ message: 'Workflow updated' });
     } catch (error) {

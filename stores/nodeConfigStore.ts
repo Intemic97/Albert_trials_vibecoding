@@ -157,6 +157,7 @@ export interface SaveRecordsConfig {
 // ============================================================================
 
 type ConfiguringNodeType = 
+  | 'trigger'
   | 'condition'
   | 'llm'
   | 'python'

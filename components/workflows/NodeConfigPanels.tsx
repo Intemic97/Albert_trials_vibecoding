@@ -22,6 +22,7 @@ import {
   Plus,
   Trash,
   CaretDown,
+  Clock,
 } from '@phosphor-icons/react';
 import { useWorkflowStore, useNodeConfigStore } from '../../stores';
 import {
@@ -32,6 +33,7 @@ import {
   ConfigSelect,
   ConfigButton,
 } from '../NodeConfigSidePanel';
+import { LLMConfigModal, PythonConfigModal, ConditionConfigModal, SaveRecordsConfigModal } from './modals';
 
 // ============================================================================
 // TYPES
@@ -78,8 +80,10 @@ export const NodeConfigPanels: React.FC<NodeConfigPanelsProps> = ({
     
     case 'condition':
       return (
-        <ConditionConfig
+        <ConditionConfigModalAdapter
           node={node}
+          nodes={nodes}
+          connections={connections}
           onSave={(config) => {
             updateNode(node.id, { config });
             closeConfig();
@@ -90,8 +94,9 @@ export const NodeConfigPanels: React.FC<NodeConfigPanelsProps> = ({
     
     case 'llm':
       return (
-        <LLMConfig
+        <LLMConfigModalAdapter
           node={node}
+          entities={entities}
           onSave={(config) => {
             updateNode(node.id, { config });
             closeConfig();
@@ -102,7 +107,7 @@ export const NodeConfigPanels: React.FC<NodeConfigPanelsProps> = ({
     
     case 'python':
       return (
-        <PythonConfig
+        <PythonConfigModalAdapter
           node={node}
           onSave={(config) => {
             updateNode(node.id, { config });
@@ -124,6 +129,20 @@ export const NodeConfigPanels: React.FC<NodeConfigPanelsProps> = ({
         />
       );
     
+    case 'saveRecords':
+      return (
+        <SaveRecordsConfigModalAdapter
+          node={node}
+          entities={entities}
+          onSave={(config) => {
+            updateNode(node.id, { config });
+            closeConfig();
+          }}
+          onClose={closeConfig}
+        />
+      );
+
+    case 'sendEmail':
     case 'email':
       return (
         <EmailConfig
@@ -148,6 +167,30 @@ export const NodeConfigPanels: React.FC<NodeConfigPanelsProps> = ({
         />
       );
     
+    case 'trigger':
+      if (node?.label === 'Schedule' || node?.label?.startsWith('Schedule:')) {
+        return (
+          <ScheduleConfig
+            node={node}
+            onSave={(config) => {
+              updateNode(node.id, { config, label: config.label });
+              closeConfig();
+            }}
+            onClose={closeConfig}
+          />
+        );
+      }
+      return (
+        <GenericConfig
+          node={node}
+          onSave={(config) => {
+            updateNode(node.id, { config });
+            closeConfig();
+          }}
+          onClose={closeConfig}
+        />
+      );
+    
     default:
       return (
         <GenericConfig
@@ -160,6 +203,112 @@ export const NodeConfigPanels: React.FC<NodeConfigPanelsProps> = ({
         />
       );
   }
+};
+
+// ============================================================================
+// MODAL ADAPTERS (reuse modals with node/onSave/onClose interface)
+// ============================================================================
+
+const LLMConfigModalAdapter: React.FC<{ node: any; entities: any[]; onSave: (c: any) => void; onClose: () => void }> = ({ node, entities, onSave, onClose }) => {
+  const c = node.config || {};
+  const [llmPrompt, setLlmPrompt] = useState(c.llmPrompt || c.prompt || '');
+  const [llmContextEntities, setLlmContextEntities] = useState<string[]>(c.llmContextEntities || []);
+  const [llmIncludeInput, setLlmIncludeInput] = useState(c.llmIncludeInput !== false);
+  return (
+    <LLMConfigModal
+      isOpen={true}
+      llmPrompt={llmPrompt}
+      llmContextEntities={llmContextEntities}
+      llmIncludeInput={llmIncludeInput}
+      entities={entities.map((e: any) => ({ id: e.id, name: e.name, type: e.type || 'entity' }))}
+      onLLMPromptChange={setLlmPrompt}
+      onLLMContextEntitiesChange={setLlmContextEntities}
+      onLLMIncludeInputChange={setLlmIncludeInput}
+      onSave={() => onSave({ llmPrompt, llmContextEntities, llmIncludeInput })}
+      onClose={onClose}
+    />
+  );
+};
+
+const PythonConfigModalAdapter: React.FC<{ node: any; onSave: (c: any) => void; onClose: () => void }> = ({ node, onSave, onClose }) => {
+  const c = node.config || {};
+  const [pythonCode, setPythonCode] = useState(c.pythonCode || c.code || '');
+  const [pythonAiPrompt, setPythonAiPrompt] = useState(c.pythonAiPrompt || '');
+  return (
+    <PythonConfigModal
+      isOpen={true}
+      pythonCode={pythonCode}
+      pythonAiPrompt={pythonAiPrompt}
+      onPythonCodeChange={setPythonCode}
+      onPythonAiPromptChange={setPythonAiPrompt}
+      onSave={() => onSave({ pythonCode, code: pythonCode })}
+      onClose={onClose}
+    />
+  );
+};
+
+const ConditionConfigModalAdapter: React.FC<{ node: any; nodes: any[]; connections: any[]; onSave: (c: any) => void; onClose: () => void }> = ({
+  node, nodes, connections, onSave, onClose,
+}) => {
+  const c = node.config || {};
+  const [conditionField, setConditionField] = useState(c.conditionField || c.field || '');
+  const [conditionOperator, setConditionOperator] = useState(c.conditionOperator || c.operator || 'equals');
+  const [conditionValue, setConditionValue] = useState(c.conditionValue || c.value || '');
+  const [processingMode, setProcessingMode] = useState<'batch' | 'perRow'>(c.processingMode || 'batch');
+  const [additionalConditions, setAdditionalConditions] = useState(c.additionalConditions || []);
+  const [logicalOperator, setLogicalOperator] = useState<'AND' | 'OR'>(c.logicalOperator || 'AND');
+  return (
+    <ConditionConfigModal
+      isOpen={true}
+      nodeId={node.id}
+      nodes={nodes}
+      connections={connections}
+      conditionField={conditionField}
+      conditionOperator={conditionOperator}
+      conditionValue={conditionValue}
+      processingMode={processingMode}
+      additionalConditions={additionalConditions}
+      logicalOperator={logicalOperator}
+      onConditionFieldChange={setConditionField}
+      onConditionOperatorChange={setConditionOperator}
+      onConditionValueChange={setConditionValue}
+      onProcessingModeChange={setProcessingMode}
+      onAdditionalConditionsChange={setAdditionalConditions}
+      onLogicalOperatorChange={setLogicalOperator}
+      onSave={() => {
+        // Map snake_case operators to executor's camelCase (not_equals->notEquals, etc.)
+        const opMap: Record<string, string> = {
+          not_equals: 'notEquals', greater_than: 'greaterThan', less_than: 'lessThan',
+          greater_or_equal: 'greaterOrEqual', less_or_equal: 'lessOrEqual',
+          is_empty: 'isEmpty', is_not_empty: 'isNotEmpty', not_contains: 'notContains',
+          starts_with: 'startsWith', ends_with: 'endsWith',
+        };
+        onSave({
+          conditionField,
+          conditionOperator: opMap[conditionOperator] || conditionOperator,
+          conditionValue,
+          processingMode,
+          additionalConditions,
+          logicalOperator,
+        });
+      }}
+      onClose={onClose}
+    />
+  );
+};
+
+const SaveRecordsConfigModalAdapter: React.FC<{ node: any; entities: any[]; onSave: (c: any) => void; onClose: () => void }> = ({ node, entities, onSave, onClose }) => {
+  const c = node.config || {};
+  return (
+    <SaveRecordsConfigModal
+      isOpen={true}
+      entityId={c.entityId}
+      saveMode={c.saveMode || 'insert'}
+      availableEntities={entities.map((e: any) => ({ id: e.id, name: e.name }))}
+      onSave={(config) => onSave(config)}
+      onClose={onClose}
+    />
+  );
 };
 
 // ============================================================================
@@ -445,8 +594,101 @@ const LLMConfig: React.FC<LLMConfigProps> = ({
 };
 
 // ============================================================================
+// SCHEDULE CONFIG
+// ============================================================================
+
+interface ScheduleConfigProps {
+  node: any;
+  onSave: (config: any) => void;
+  onClose: () => void;
+}
+
+const ScheduleConfig: React.FC<ScheduleConfigProps> = ({
+  node,
+  onSave,
+  onClose,
+}) => {
+  const [intervalValue, setIntervalValue] = useState(node.config?.scheduleIntervalValue || node.config?.scheduleInterval?.replace(/\D/g, '') || '5');
+  const [intervalUnit, setIntervalUnit] = useState<'minutes' | 'hours' | 'days'>(node.config?.scheduleIntervalUnit || (
+    node.config?.scheduleInterval?.endsWith('h') ? 'hours' : node.config?.scheduleInterval?.endsWith('d') ? 'days' : 'minutes'
+  ));
+  const [enabled, setEnabled] = useState(node.config?.scheduleEnabled !== false);
+
+  const handleSave = () => {
+    const unitChar = intervalUnit.charAt(0);
+    const scheduleInterval = `${intervalValue}${unitChar}`;
+    const label = `Schedule: Every ${intervalValue} ${intervalUnit}`;
+    onSave({
+      scheduleInterval,
+      scheduleIntervalValue: intervalValue,
+      scheduleIntervalUnit: intervalUnit,
+      scheduleEnabled: enabled,
+      scheduleType: 'interval',
+      label,
+    });
+  };
+
+  return (
+    <NodeConfigSidePanel
+      isOpen={true}
+      onClose={onClose}
+      title="Configure Schedule"
+      icon={Clock}
+      footer={
+        <div className="flex gap-2">
+          <ConfigButton variant="secondary" onClick={onClose}>
+            Cancel
+          </ConfigButton>
+          <ConfigButton variant="primary" onClick={handleSave}>
+            <Save size={14} />
+            Save Schedule
+          </ConfigButton>
+        </div>
+      }
+    >
+      <ConfigField label="Run workflow every" description="The workflow will run automatically at this interval.">
+        <div className="flex gap-2">
+          <input
+            type="number"
+            min="1"
+            max="999"
+            value={intervalValue}
+            onChange={(e) => setIntervalValue(e.target.value)}
+            className="w-20 px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+          />
+          <ConfigSelect
+            value={intervalUnit}
+            onChange={(v) => setIntervalUnit(v as 'minutes' | 'hours' | 'days')}
+            options={[
+              { value: 'minutes', label: 'Minutes' },
+              { value: 'hours', label: 'Hours' },
+              { value: 'days', label: 'Days' },
+            ]}
+          />
+        </div>
+      </ConfigField>
+      <ConfigField label="Enabled" description="Turn off to pause scheduled runs.">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+            className="rounded border-[var(--border-light)]"
+          />
+          <span className="text-sm text-[var(--text-primary)]">Schedule is active</span>
+        </label>
+      </ConfigField>
+    </NodeConfigSidePanel>
+  );
+};
+
+// ============================================================================
 // PYTHON CONFIG
 // ============================================================================
+
+const PYTHON_DEFAULT_CODE = `def process(data):
+    # Modify data here
+    return data`;
 
 interface PythonConfigProps {
   node: any;
@@ -459,11 +701,7 @@ const PythonConfig: React.FC<PythonConfigProps> = ({
   onSave,
   onClose,
 }) => {
-  const [code, setCode] = useState(node.config?.code || `# Input data is available as 'data' variable
-# Return your result at the end
-
-result = data
-return result`);
+  const [code, setCode] = useState(node.config?.code || node.config?.pythonCode || PYTHON_DEFAULT_CODE);
   
   return (
     <NodeConfigSidePanel
@@ -479,7 +717,7 @@ return result`);
           </ConfigButton>
           <ConfigButton
             variant="primary"
-            onClick={() => onSave({ code })}
+            onClick={() => onSave({ code, pythonCode: code })}
           >
             <Save size={14} />
             Save Code
@@ -489,23 +727,25 @@ return result`);
     >
       <ConfigField 
         label="Python Code" 
-        description="Write your transformation code. Input data is available as 'data' variable."
+        description="Write your transformation code. Define def process(data): ... and return the result."
       >
         <textarea
           value={code}
           onChange={(e) => setCode(e.target.value)}
           rows={20}
-          className="w-full px-3 py-2 text-xs font-mono text-[var(--text-primary)] bg-[#1e1e2e] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#256A65] resize-none"
+          className="w-full px-3 py-2.5 text-sm font-mono text-[var(--text-primary)] bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] placeholder:text-[var(--text-tertiary)] resize-none"
           style={{ tabSize: 4 }}
+          placeholder={PYTHON_DEFAULT_CODE}
+          spellCheck={false}
         />
       </ConfigField>
       
       <div className="p-3 bg-[var(--bg-tertiary)] rounded-lg text-xs">
         <p className="font-medium text-[var(--text-secondary)] mb-2">Available variables:</p>
         <ul className="space-y-1 text-[var(--text-tertiary)]">
-          <li><code className="text-[#256A65]">data</code> - Input data from previous node</li>
-          <li><code className="text-[#256A65]">pd</code> - Pandas library</li>
-          <li><code className="text-[#256A65]">np</code> - NumPy library</li>
+          <li><code className="px-1.5 py-0.5 bg-[var(--bg-secondary)] rounded text-[#256A65] font-mono">data</code> - Input data from previous node</li>
+          <li><code className="px-1.5 py-0.5 bg-[var(--bg-secondary)] rounded text-[#256A65] font-mono">pd</code> - Pandas library</li>
+          <li><code className="px-1.5 py-0.5 bg-[var(--bg-secondary)] rounded text-[#256A65] font-mono">np</code> - NumPy library</li>
         </ul>
       </div>
     </NodeConfigSidePanel>
@@ -527,10 +767,11 @@ const HttpConfig: React.FC<HttpConfigProps> = ({
   onSave,
   onClose,
 }) => {
-  const [method, setMethod] = useState(node.config?.method || 'GET');
-  const [url, setUrl] = useState(node.config?.url || '');
-  const [headers, setHeaders] = useState(node.config?.headers || '{}');
-  const [body, setBody] = useState(node.config?.body || '');
+  const c = node.config || {};
+  const [method, setMethod] = useState(c.httpMethod || c.method || 'GET');
+  const [url, setUrl] = useState(c.httpUrl || c.url || '');
+  const [headers, setHeaders] = useState(typeof c.headers === 'string' ? c.headers : JSON.stringify(c.headers || {}, null, 2));
+  const [body, setBody] = useState(c.body || '');
   
   return (
     <NodeConfigSidePanel
@@ -545,12 +786,18 @@ const HttpConfig: React.FC<HttpConfigProps> = ({
           </ConfigButton>
           <ConfigButton
             variant="primary"
-            onClick={() => onSave({
-              method,
-              url,
-              headers: JSON.parse(headers || '{}'),
-              body,
-            })}
+            onClick={() => {
+              try {
+                onSave({
+                  httpUrl: url,
+                  httpMethod: method,
+                  headers: JSON.parse(headers || '{}'),
+                  body,
+                });
+              } catch {
+                onSave({ httpUrl: url, httpMethod: method });
+              }
+            }}
             disabled={!url}
           >
             <Save size={14} />
@@ -624,9 +871,10 @@ const EmailConfig: React.FC<EmailConfigProps> = ({
   onSave,
   onClose,
 }) => {
-  const [to, setTo] = useState(node.config?.to || '');
-  const [subject, setSubject] = useState(node.config?.subject || '');
-  const [body, setBody] = useState(node.config?.body || '');
+  const c = node.config || {};
+  const [to, setTo] = useState(c.emailTo || c.to || '');
+  const [subject, setSubject] = useState(c.emailSubject || c.subject || '');
+  const [body, setBody] = useState(c.emailBody || c.body || '');
   
   return (
     <NodeConfigSidePanel
@@ -641,7 +889,7 @@ const EmailConfig: React.FC<EmailConfigProps> = ({
           </ConfigButton>
           <ConfigButton
             variant="primary"
-            onClick={() => onSave({ to, subject, body })}
+            onClick={() => onSave({ emailTo: to, emailSubject: subject, emailBody: body })}
             disabled={!to || !subject}
           >
             <Save size={14} />

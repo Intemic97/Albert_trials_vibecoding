@@ -1,18 +1,17 @@
 import React, { useState, useMemo } from 'react';
-import { MagnifyingGlass, CaretDown, CaretRight, CaretDoubleLeft, CaretDoubleRight, ClockCounterClockwise } from '@phosphor-icons/react';
+import { MagnifyingGlass, CaretDown, CaretRight, CaretDoubleLeft, CaretDoubleRight } from '@phosphor-icons/react';
 import { DraggableItem, NodeType } from './types';
 import { DRAGGABLE_ITEMS } from './constants';
 
 interface NodePaletteProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
-  recentNodes: NodeType[];
+  recentNodes?: NodeType[];
   onDragStart: (item: DraggableItem) => void;
   onDragEnd: () => void;
 }
 
 const CATEGORIES = [
-  { id: 'Recents', label: 'Recents', defaultOpen: true },
   { id: 'Triggers', label: 'Triggers', defaultOpen: false },
   { id: 'Data', label: 'Data Sources', defaultOpen: false },
   { id: 'Logic', label: 'Data Operations', defaultOpen: false },
@@ -63,13 +62,6 @@ export const NodePalette: React.FC<NodePaletteProps> = ({
     
     return groups;
   }, [filteredItems]);
-
-  // Get recent items
-  const recentItems = useMemo(() => {
-    return recentNodes
-      .map(type => DRAGGABLE_ITEMS.find(item => item.type === type))
-      .filter(Boolean) as DraggableItem[];
-  }, [recentNodes]);
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategories(prev => ({
@@ -122,41 +114,7 @@ export const NodePalette: React.FC<NodePaletteProps> = ({
 
       {/* Categories */}
       <div className="flex-1 overflow-y-auto bg-[var(--bg-card)] custom-scrollbar">
-        {/* Recents */}
-        {recentItems.length > 0 && !searchQuery && (
-          <div className="border-b border-[var(--border-light)]">
-            <button
-              onClick={() => toggleCategory('Recents')}
-              className="w-full flex items-center justify-between px-4 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] transition-colors text-left"
-            >
-              <div className="flex items-center gap-2">
-                <ClockCounterClockwise size={14} className="text-[var(--text-tertiary)]" weight="light" />
-                <span className="text-xs font-medium text-[var(--text-secondary)]">Recents</span>
-              </div>
-              {expandedCategories['Recents'] ? (
-                <CaretDown size={14} className="text-[var(--text-tertiary)]" weight="light" />
-              ) : (
-                <CaretRight size={14} className="text-[var(--text-tertiary)]" weight="light" />
-              )}
-            </button>
-            
-            {expandedCategories['Recents'] && (
-              <div className="p-2 space-y-1">
-                {recentItems.slice(0, 5).map((item, idx) => (
-                  <PaletteItem
-                    key={`recent-${idx}`}
-                    item={item}
-                    onDragStart={onDragStart}
-                    onDragEnd={onDragEnd}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Other categories */}
-        {CATEGORIES.filter(cat => cat.id !== 'Recents').map((category) => {
+        {CATEGORIES.map((category) => {
           const items = groupedItems[category.id] || [];
           if (items.length === 0 && !searchQuery) return null;
 
@@ -207,7 +165,8 @@ const PaletteItem: React.FC<PaletteItemProps> = ({ item, onDragStart, onDragEnd 
   const Icon = item.icon;
   
   const handleDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.setData('application/workflow-node', item.type);
+    // Pass type+label so Schedule vs Manual Trigger are distinguished (both use type 'trigger')
+    e.dataTransfer.setData('application/workflow-node', JSON.stringify({ type: item.type, label: item.label }));
     e.dataTransfer.effectAllowed = 'copy';
     onDragStart(item);
   };

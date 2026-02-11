@@ -194,6 +194,7 @@ function AuthenticatedApp() {
     const currentView = getCurrentView();
     const hideSidebarForRoutes = location.pathname.match(/^\/documents\/[^/]+$/) ||
         location.pathname.match(/^\/workflow\/[^/]+$/) ||
+        location.pathname.match(/^\/workflows-v2(\/|$)/) ||
         location.pathname.match(/^\/copilots/) ||
         location.pathname.match(/^\/documentation/);
 
@@ -1558,7 +1559,7 @@ function AuthenticatedApp() {
                 />
             )}
 
-            <div className="flex-1 flex flex-col min-h-screen overflow-hidden z-30">
+            <div className="flex-1 flex flex-col min-h-0 max-h-screen overflow-hidden z-30">
                 {!hideSidebarForRoutes && (
                     <TopNav activeView={currentView} />
                 )}
@@ -1591,12 +1592,16 @@ function AuthenticatedApp() {
                     <Route path="/workflow/:workflowId" element={
                         <Workflows entities={entities} onViewChange={handleNavigate} />
                     } />
-                    {/* New modular workflow editor (v2) - for testing */}
+                    {/* New modular workflow editor (v2) */}
                     <Route path="/workflows-v2" element={
-                        <WorkflowEditor entities={entities} onViewChange={handleNavigate} />
+                        <div className="flex-1 flex flex-col min-h-0 overflow-hidden h-full">
+                            <WorkflowEditor entities={entities} onViewChange={handleNavigate} />
+                        </div>
                     } />
                     <Route path="/workflows-v2/:workflowId" element={
-                        <WorkflowEditor entities={entities} onViewChange={handleNavigate} />
+                        <div className="flex-1 flex flex-col min-h-0 overflow-hidden h-full">
+                            <WorkflowEditor entities={entities} onViewChange={handleNavigate} />
+                        </div>
                     } />
                     <Route path="/templates" element={
                         <Reporting entities={entities} companyInfo={undefined} onViewChange={handleNavigate} view="templates" />

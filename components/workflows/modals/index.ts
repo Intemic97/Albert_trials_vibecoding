@@ -38,3 +38,4 @@ export { GoogleSheetsConfigModal } from './GoogleSheetsConfigModal';
 export { ExecutionHistoryModal } from './ExecutionHistoryModal';
 export { WorkflowRunnerModal } from './WorkflowRunnerModal';
 export { TemplatesGalleryModal } from './TemplatesGalleryModal';
+export { TagsModal } from './TagsModal';

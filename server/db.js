@@ -638,6 +638,22 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  // Create workflow_schedules table for periodic workflow execution
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS workflow_schedules (
+      id TEXT PRIMARY KEY,
+      workflowId TEXT NOT NULL UNIQUE,
+      organizationId TEXT NOT NULL,
+      intervalMs INTEGER NOT NULL,
+      lastRunAt TEXT,
+      enabled INTEGER DEFAULT 1,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(workflowId) REFERENCES workflows(id) ON DELETE CASCADE,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+    )
+  `);
+
   // Migration: Add triggerType column to workflow_executions table if missing
   try {
     await db.exec(`ALTER TABLE workflow_executions ADD COLUMN triggerType TEXT DEFAULT 'manual'`);

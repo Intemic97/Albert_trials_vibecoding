@@ -207,19 +207,26 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     
     if (!canvasRef.current) return;
     
-    const itemType = e.dataTransfer.getData('application/workflow-node');
-    if (!itemType) return;
-    
-    const item = DRAGGABLE_ITEMS.find(i => i.type === itemType);
+    const raw = e.dataTransfer.getData('application/workflow-node');
+    if (!raw) return;
+    let item: { type: string; label: string } | null = null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.type && parsed?.label) item = parsed;
+    } catch {
+      item = { type: raw, label: DRAGGABLE_ITEMS.find(i => i.type === raw)?.label || raw };
+    }
     if (!item) return;
-    
+    const def = DRAGGABLE_ITEMS.find(i => i.type === item!.type && i.label === item!.label) || DRAGGABLE_ITEMS.find(i => i.type === item!.type);
+    if (!def) return;
+
     const rect = canvasRef.current.getBoundingClientRect();
     const canvasPos = screenToCanvas(e.clientX, e.clientY, rect);
-    
+
     const newNode: WorkflowNode = {
       id: generateUUID(),
-      type: item.type as any,
-      label: item.label,
+      type: def.type as any,
+      label: def.label,
       x: canvasPos.x,
       y: canvasPos.y,
       status: 'idle',
@@ -246,6 +253,33 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
       x: canvasPos.x,
       y: canvasPos.y,
       status: 'idle',
+    };
+    
+    addNode(newNode);
+    selectNode(newNode.id);
+  }, [screenToCanvas, addNode, selectNode]);
+
+  const handleAddSchedule = useCallback(() => {
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const canvasPos = screenToCanvas(centerX + rect.left, centerY + rect.top, rect);
+    
+    const newNode: WorkflowNode = {
+      id: generateUUID(),
+      type: 'trigger',
+      label: 'Schedule',
+      x: canvasPos.x,
+      y: canvasPos.y,
+      status: 'idle',
+      config: {
+        scheduleInterval: '5m',
+        scheduleIntervalValue: '5',
+        scheduleIntervalUnit: 'minutes',
+        scheduleEnabled: true,
+        scheduleType: 'interval',
+      },
     };
     
     addNode(newNode);
@@ -366,13 +400,21 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
             <span className="h-px flex-1 bg-[var(--bg-tertiary)]" />
           </div>
           
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <button
               onClick={handleAddTrigger}
               className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-all text-sm font-medium text-[var(--text-primary)]"
             >
               <Play size={16} className="text-[var(--text-secondary)]" />
               Add Trigger
+            </button>
+            <button
+              onClick={handleAddSchedule}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-all text-sm font-medium text-[var(--text-primary)]"
+              title="Run workflow automatically on a schedule (every X minutes/hours)"
+            >
+              <Workflow size={16} className="text-[var(--text-secondary)]" />
+              Add Schedule
             </button>
             <button
               onClick={handleAddDataSource}
@@ -396,9 +438,22 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   // =========================================================================
   const renderZoomControls = () => (
     <div className="absolute bottom-4 left-4 z-30 flex items-center gap-1 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-sm">
+      {onOpenAIAssistant && (
+        <>
+          <button
+            onClick={onOpenAIAssistant}
+            className="flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--bg-hover)] rounded-l-lg transition-colors"
+            title="AI Workflow Assistant"
+          >
+            <Sparkles size={16} className="text-[var(--text-primary)]" weight="light" />
+            <span className="text-sm font-medium text-[var(--text-primary)]">Ask</span>
+          </button>
+          <div className="w-px h-6 bg-[var(--border-light)]" />
+        </>
+      )}
       <button
         onClick={zoomOut}
-        className="p-2 hover:bg-[var(--bg-hover)] rounded-l-lg transition-colors"
+        className={`p-2 hover:bg-[var(--bg-hover)] transition-colors ${!onOpenAIAssistant ? 'rounded-l-lg' : ''}`}
         title="Zoom out (Ctrl+-)"
       >
         <ZoomOut size={16} className="text-[var(--text-secondary)]" />
