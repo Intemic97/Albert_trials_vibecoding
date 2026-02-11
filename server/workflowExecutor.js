@@ -253,6 +253,7 @@ class WorkflowExecutor {
             excelInput: () => this.handleExcelInput(node, inputData),
             pdfInput: () => this.handlePdfInput(node, inputData),
             saveRecords: () => this.handleSaveRecords(node, inputData),
+            action: () => this.handleRenameColumns(node, inputData),
             addField: () => this.handleAddField(node, inputData),
             condition: () => this.handleCondition(node, inputData),
             join: () => this.handleJoin(node, inputData),
@@ -670,6 +671,41 @@ class WorkflowExecutor {
             console.error('[SaveToEntity] Error:', error);
             throw error;
         }
+    }
+
+    async handleRenameColumns(node, inputData) {
+        const renames = node.config?.columnRenames || [];
+        
+        if (!renames.length) {
+            return {
+                success: true,
+                message: 'No column renames configured',
+                outputData: inputData
+            };
+        }
+
+        if (!inputData || !Array.isArray(inputData)) {
+            return {
+                success: true,
+                message: 'No input data to rename',
+                outputData: inputData || []
+            };
+        }
+
+        const renamedData = inputData.map(row => {
+            const newRow = {};
+            for (const key of Object.keys(row)) {
+                const rename = renames.find(r => r.oldName === key);
+                newRow[rename ? rename.newName : key] = row[key];
+            }
+            return newRow;
+        });
+
+        return {
+            success: true,
+            message: `Renamed ${renames.length} column(s): ${renames.map(r => `${r.oldName} → ${r.newName}`).join(', ')}`,
+            outputData: renamedData
+        };
     }
 
     async handleAddField(node, inputData) {

@@ -35,7 +35,8 @@ import {
   Cpu,
   WifiHigh,
   Pi,
-  Atom
+  Atom,
+  TextAa
 } from '@phosphor-icons/react';
 import { DraggableItem, NodeType } from './types';
 
@@ -91,7 +92,7 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   { type: 'googleSheets', label: 'Google Sheets', icon: GoogleLogo, description: 'Read/write data from Google Sheets', category: 'Data' },
   { type: 'dataVisualization', label: 'Data Visualization', icon: ChartBar, description: 'Generate charts from data using AI', category: 'Actions' },
   { type: 'pdfReport', label: 'PDF Report Generator', icon: FilePdf, description: 'Generate structured PDF reports from data', category: 'Actions' },
-  { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },
+  { type: 'action', label: 'Rename Columns', icon: TextAa, description: 'Rename columns in a dataset', category: 'Logic' },
   { type: 'output', label: 'Workflow Output', icon: CheckCircle, description: 'Set the final output', category: 'Actions' },
   
   // Other
@@ -115,7 +116,7 @@ export const NODE_CATEGORIES = [
  */
 export const NODE_ICONS: Record<NodeType, React.ElementType> = {
   trigger: Play,
-  action: CheckCircle,
+  action: TextAa,
   condition: WarningCircle,
   fetchData: Database,
   addField: CheckCircle,

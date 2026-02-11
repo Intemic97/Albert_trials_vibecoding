@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { FlowArrow as Workflow, Lightning as Zap, Play, CheckCircle, WarningCircle as AlertCircle, ArrowRight, ArrowLeft, X, FloppyDisk as Save, FolderOpen, Trash, PlayCircle, Check, XCircle, Database, Wrench, MagnifyingGlass as Search, CaretDoubleLeft as ChevronsLeft, CaretDoubleRight as ChevronsRight, Sparkle as Sparkles, Code, PencilSimple as Edit, SignOut as LogOut, ChatCircle as MessageSquare, Globe, Leaf, Share as Share2, UserCheck, GitMerge, FileXls as FileSpreadsheet, FileText, UploadSimple as Upload, Columns, DotsSixVertical as GripVertical, Users, Envelope as Mail, BookOpen, Copy, Eye, Clock, ClockCounterClockwise as History, ArrowsOut as Maximize2, MagnifyingGlassPlus as ZoomIn, MagnifyingGlassMinus as ZoomOut, Robot as Bot, DeviceMobile as Smartphone, ChartBar as BarChart3, User, Calendar, CaretRight as ChevronRight, CaretDown as ChevronDown, CaretUp as ChevronUp, Plus, Folder, ShieldCheck as Shield, Terminal, Tag, DotsThreeVertical as MoreVertical, WebhooksLogo as Webhook, Flask as FlaskConical, TrendUp, Bell, FilePdf, Bug, Pi, WhatsappLogo } from '@phosphor-icons/react';
+import { FlowArrow as Workflow, Lightning as Zap, Play, CheckCircle, WarningCircle as AlertCircle, ArrowRight, ArrowLeft, X, FloppyDisk as Save, FolderOpen, Trash, PlayCircle, Check, XCircle, Database, Wrench, MagnifyingGlass as Search, CaretDoubleLeft as ChevronsLeft, CaretDoubleRight as ChevronsRight, Sparkle as Sparkles, Code, PencilSimple as Edit, SignOut as LogOut, ChatCircle as MessageSquare, Globe, Leaf, Share as Share2, UserCheck, GitMerge, FileXls as FileSpreadsheet, FileText, UploadSimple as Upload, Columns, DotsSixVertical as GripVertical, Users, Envelope as Mail, BookOpen, Copy, Eye, Clock, ClockCounterClockwise as History, ArrowsOut as Maximize2, MagnifyingGlassPlus as ZoomIn, MagnifyingGlassMinus as ZoomOut, Robot as Bot, DeviceMobile as Smartphone, ChartBar as BarChart3, User, Calendar, CaretRight as ChevronRight, CaretDown as ChevronDown, CaretUp as ChevronUp, Plus, Folder, ShieldCheck as Shield, Terminal, Tag, DotsThreeVertical as MoreVertical, WebhooksLogo as Webhook, Flask as FlaskConical, TrendUp, Bell, FilePdf, Bug, Pi, WhatsappLogo, TextAa } from '@phosphor-icons/react';
 import { NodeConfigSidePanel } from './NodeConfigSidePanel';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { PromptInput } from './PromptInput';
@@ -323,6 +323,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [whatsappTwilioAuthToken, setWhatsappTwilioAuthToken] = useState<string>('');
     const [whatsappTwilioFromNumber, setWhatsappTwilioFromNumber] = useState<string>('');
     const [showWhatsAppTwilioSettings, setShowWhatsAppTwilioSettings] = useState<boolean>(false);
+
+    // Rename Columns Node State
+    const [configuringRenameColumnsNodeId, setConfiguringRenameColumnsNodeId] = useState<string | null>(null);
+    const [columnRenames, setColumnRenames] = useState<{ oldName: string; newName: string }[]>([{ oldName: '', newName: '' }]);
 
     // Data Visualization Node State
     const [configuringVisualizationNodeId, setConfiguringVisualizationNodeId] = useState<string | null>(null);
@@ -2230,6 +2234,40 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setConfiguringWhatsAppNodeId(null);
     };
 
+    const openRenameColumnsConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'action') {
+            setConfiguringRenameColumnsNodeId(nodeId);
+            const existing = node.config?.columnRenames;
+            if (existing && existing.length > 0) {
+                setColumnRenames(existing);
+            } else {
+                setColumnRenames([{ oldName: '', newName: '' }]);
+            }
+        }
+    };
+
+    const saveRenameColumnsConfig = () => {
+        if (!configuringRenameColumnsNodeId) return;
+
+        const validRenames = columnRenames.filter(r => r.oldName.trim() && r.newName.trim());
+        setNodes(prev => prev.map(n =>
+            n.id === configuringRenameColumnsNodeId
+                ? {
+                    ...n,
+                    label: validRenames.length > 0
+                        ? `Rename: ${validRenames.map(r => `${r.oldName} → ${r.newName}`).slice(0, 2).join(', ')}${validRenames.length > 2 ? '...' : ''}`
+                        : 'Rename Columns',
+                    config: {
+                        ...n.config,
+                        columnRenames: validRenames,
+                    }
+                }
+                : n
+        ));
+        setConfiguringRenameColumnsNodeId(null);
+    };
+
     const openVisualizationConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
         if (node && node.type === 'dataVisualization') {
@@ -3000,7 +3038,22 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     result = 'Triggered!';
                     break;
                 case 'action':
-                    result = 'Action executed!';
+                    // Rename Columns logic
+                    if (node.config?.columnRenames && node.config.columnRenames.length > 0 && inputData && Array.isArray(inputData)) {
+                        const renames = node.config.columnRenames as { oldName: string; newName: string }[];
+                        nodeData = inputData.map((row: any) => {
+                            const newRow: any = {};
+                            for (const key of Object.keys(row)) {
+                                const rename = renames.find(r => r.oldName === key);
+                                newRow[rename ? rename.newName : key] = row[key];
+                            }
+                            return newRow;
+                        });
+                        result = `Renamed ${renames.length} column(s): ${renames.map(r => `${r.oldName} → ${r.newName}`).join(', ')}`;
+                    } else {
+                        nodeData = inputData;
+                        result = 'No column renames configured';
+                    }
                     break;
                 case 'condition':
                     // Evaluate condition (supports multiple conditions with AND/OR)
@@ -5108,8 +5161,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 return !!node.config?.assignedUserId;
             case 'comment':
                 return !!node.config?.commentText;
-            case 'trigger':
             case 'action':
+                return (node.config?.columnRenames?.length || 0) > 0;
+            case 'trigger':
             case 'output':
             case 'agent':
             case 'opcua':
@@ -5175,7 +5229,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const getNodeIconColor = (type: string): string => {
         switch (type) {
             case 'trigger': return 'text-cyan-600';
-            case 'action': return 'text-blue-600';
+            case 'action': return 'text-amber-600';
             case 'condition': return 'text-[var(--text-secondary)]';
             case 'fetchData': return 'text-indigo-600';
             case 'humanApproval': return 'text-sky-600';
@@ -6151,6 +6205,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openConditionConfig(node.id);
                                             } else if (node.type === 'addField') {
                                                 openAddFieldConfig(node.id);
+                                            } else if (node.type === 'action') {
+                                                openRenameColumnsConfig(node.id);
                                             } else if (node.type === 'saveRecords') {
                                                 openSaveRecordsConfig(node.id);
                                             } else if (node.type === 'agent') {
@@ -6346,6 +6402,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     openConditionConfig(node.id);
                                                                 } else if (node.type === 'addField') {
                                                                     openAddFieldConfig(node.id);
+                                                                } else if (node.type === 'action') {
+                                                                    openRenameColumnsConfig(node.id);
                                                                 } else if (node.type === 'saveRecords') {
                                                                     openSaveConfig(node.id);
                                                                 } else if (node.type === 'llm') {
@@ -8668,6 +8726,183 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 What would you like this node to do?
                                             </button>
                                         </div>
+                                </NodeConfigSidePanel>
+                            );
+                        })()}
+
+                        {/* Rename Columns Configuration Modal */}
+                        {configuringRenameColumnsNodeId && (() => {
+                            // Get input data columns from parent node
+                            const parentConnRC = connections.find(c => c.toNodeId === configuringRenameColumnsNodeId);
+                            const parentNodeRC = parentConnRC ? nodes.find(n => n.id === parentConnRC.fromNodeId) : null;
+                            let inputColumnsRC: string[] = [];
+                            
+                            if (parentNodeRC) {
+                                let parentData: any[] = [];
+                                if (parentNodeRC.type === 'splitColumns' && parentNodeRC.outputData) {
+                                    parentData = parentConnRC.outputType === 'B'
+                                        ? parentNodeRC.outputData.outputB || []
+                                        : parentNodeRC.outputData.outputA || [];
+                                } else {
+                                    parentData = parentNodeRC.outputData || parentNodeRC.config?.parsedData || [];
+                                }
+                                if (Array.isArray(parentData) && parentData.length > 0) {
+                                    inputColumnsRC = Object.keys(parentData[0]).filter(
+                                        k => !['id', 'createdAt', 'updatedAt', 'entityId', 'metadata', 'raw', '__index'].includes(k)
+                                    );
+                                }
+                            }
+
+                            return (
+                                <NodeConfigSidePanel
+                                    isOpen={!!configuringRenameColumnsNodeId}
+                                    onClose={() => setConfiguringRenameColumnsNodeId(null)}
+                                    title="Rename Columns"
+                                    icon={TextAa}
+                                    width="w-[550px]"
+                                    footer={
+                                        <>
+                                            <button
+                                                onClick={() => setConfiguringRenameColumnsNodeId(null)}
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveRenameColumnsConfig}
+                                                disabled={!columnRenames.some(r => r.oldName.trim() && r.newName.trim())}
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Save
+                                            </button>
+                                        </>
+                                    }
+                                >
+                                    <div className="space-y-4">
+                                        {inputColumnsRC.length === 0 && (
+                                            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                                                <p className="text-xs text-amber-700 dark:text-amber-300">
+                                                    ⚠️ No input data detected. Run the parent node first to auto-detect available columns, or type column names manually.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <div className="space-y-3">
+                                            {columnRenames.map((rename, idx) => (
+                                                <div key={idx} className="flex items-center gap-2">
+                                                    <div className="flex-1">
+                                                        {idx === 0 && (
+                                                            <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1 uppercase tracking-wider">
+                                                                Original Column
+                                                            </label>
+                                                        )}
+                                                        {inputColumnsRC.length > 0 ? (
+                                                            <select
+                                                                value={rename.oldName}
+                                                                onChange={(e) => {
+                                                                    const updated = [...columnRenames];
+                                                                    updated[idx] = { ...updated[idx], oldName: e.target.value };
+                                                                    setColumnRenames(updated);
+                                                                }}
+                                                                className="w-full px-2.5 py-2 text-sm bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 text-[var(--text-primary)]"
+                                                            >
+                                                                <option value="">Select column...</option>
+                                                                {inputColumnsRC.map(col => (
+                                                                    <option key={col} value={col} disabled={columnRenames.some((r, i) => i !== idx && r.oldName === col)}>
+                                                                        {col}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        ) : (
+                                                            <input
+                                                                type="text"
+                                                                value={rename.oldName}
+                                                                onChange={(e) => {
+                                                                    const updated = [...columnRenames];
+                                                                    updated[idx] = { ...updated[idx], oldName: e.target.value };
+                                                                    setColumnRenames(updated);
+                                                                }}
+                                                                placeholder="Column name"
+                                                                className="w-full px-2.5 py-2 text-sm bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 text-[var(--text-primary)]"
+                                                            />
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex items-center pt-4">
+                                                        <ArrowRight size={14} className="text-[var(--text-tertiary)]" />
+                                                    </div>
+
+                                                    <div className="flex-1">
+                                                        {idx === 0 && (
+                                                            <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1 uppercase tracking-wider">
+                                                                New Name
+                                                            </label>
+                                                        )}
+                                                        <input
+                                                            type="text"
+                                                            value={rename.newName}
+                                                            onChange={(e) => {
+                                                                const updated = [...columnRenames];
+                                                                updated[idx] = { ...updated[idx], newName: e.target.value };
+                                                                setColumnRenames(updated);
+                                                            }}
+                                                            placeholder="New column name"
+                                                            className="w-full px-2.5 py-2 text-sm bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 text-[var(--text-primary)]"
+                                                        />
+                                                    </div>
+
+                                                    {columnRenames.length > 1 && (
+                                                        <button
+                                                            onClick={() => {
+                                                                const updated = columnRenames.filter((_, i) => i !== idx);
+                                                                setColumnRenames(updated);
+                                                            }}
+                                                            className="flex items-center justify-center w-7 h-7 mt-4 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                                                        >
+                                                            <Trash size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <button
+                                            onClick={() => setColumnRenames(prev => [...prev, { oldName: '', newName: '' }])}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-dashed border-[var(--border-medium)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors w-full justify-center"
+                                        >
+                                            <Plus size={12} />
+                                            Add another column to rename
+                                        </button>
+
+                                        {/* Preview of configured renames */}
+                                        {columnRenames.some(r => r.oldName.trim() && r.newName.trim()) && (
+                                            <div className="p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
+                                                <p className="text-[10px] font-medium text-[var(--text-secondary)] mb-2 uppercase tracking-wider">Preview</p>
+                                                <div className="space-y-1">
+                                                    {columnRenames
+                                                        .filter(r => r.oldName.trim() && r.newName.trim())
+                                                        .map((r, i) => (
+                                                            <div key={i} className="flex items-center gap-2 text-xs">
+                                                                <span className="font-mono text-[var(--text-primary)] bg-[var(--bg-primary)] px-1.5 py-0.5 rounded">{r.oldName}</span>
+                                                                <ArrowRight size={10} className="text-[var(--text-tertiary)]" />
+                                                                <span className="font-mono text-amber-600 dark:text-amber-400 bg-[var(--bg-primary)] px-1.5 py-0.5 rounded">{r.newName}</span>
+                                                            </div>
+                                                        ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Feedback Link */}
+                                    <div className="pt-3 border-t border-[var(--border-light)]">
+                                        <button
+                                            onClick={() => openFeedbackPopup('action', 'Rename Columns')}
+                                            className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
+                                        >
+                                            <MessageSquare size={12} weight="light" />
+                                            What would you like this node to do?
+                                        </button>
+                                    </div>
                                 </NodeConfigSidePanel>
                             );
                         })()}

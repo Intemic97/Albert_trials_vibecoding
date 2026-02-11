@@ -142,6 +142,8 @@ export interface NodeConfig {
   whatsappTwilioAccountSid?: string;
   whatsappTwilioAuthToken?: string;
   whatsappTwilioFromNumber?: string;
+  // For Rename Columns nodes:
+  columnRenames?: { oldName: string; newName: string }[];
   // For Data Visualization nodes:
   visualizationPrompt?: string;
   generatedWidget?: WidgetConfig;

@@ -62,7 +62,7 @@ export const getNodeColor = (type: string, status?: string): string => {
 export const getNodeIconColor = (type: string): string => {
     const colorMap: { [key: string]: string } = {
         'trigger': 'text-cyan-600',
-        'action': 'text-blue-600',
+        'action': 'text-amber-600',
         'condition': 'text-[var(--text-secondary)]',
         'fetchData': 'text-indigo-600',
         'humanApproval': 'text-sky-600',
@@ -149,7 +149,7 @@ export const isNodeConfigured = (node: WorkflowNode): boolean => {
         'humanApproval': (n) => !!n.config?.assignedUserId,
         'comment': (n) => !!n.config?.commentText,
         'trigger': () => true,
-        'action': () => true,
+        'action': (n) => (n.config?.columnRenames?.length || 0) > 0,
         'output': () => true,
         'agent': () => true,
         'opcua': () => true,
