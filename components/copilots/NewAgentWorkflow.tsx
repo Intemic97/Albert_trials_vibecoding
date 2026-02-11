@@ -14,6 +14,27 @@ interface NewAgentWorkflowProps {
   onComplete: () => void;
 }
 
+const AGENT_ICONS = [
+  { emoji: '🏭', label: 'Producción/Industrial' },
+  { emoji: '🍷', label: 'Alimentación/Bebidas' },
+  { emoji: '💰', label: 'Finanzas' },
+  { emoji: '📊', label: 'Analytics/Datos' },
+  { emoji: '⚙️', label: 'Operaciones' },
+  { emoji: '🔬', label: 'Laboratorio/I+D' },
+  { emoji: '🚛', label: 'Logística' },
+  { emoji: '⚡', label: 'Energía' },
+  { emoji: '🛡️', label: 'Seguridad' },
+  { emoji: '📈', label: 'Ventas' },
+  { emoji: '👥', label: 'RRHH' },
+  { emoji: '⚖️', label: 'Legal/Compliance' },
+  { emoji: '🎯', label: 'Estrategia' },
+  { emoji: '🔧', label: 'Mantenimiento' },
+  { emoji: '📦', label: 'Inventario' },
+  { emoji: '🌍', label: 'Sostenibilidad' },
+  { emoji: '🤖', label: 'General' },
+  { emoji: '💡', label: 'Innovación' }
+];
+
 export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onComplete }) => {
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
@@ -25,6 +46,7 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
   const [entities, setEntities] = useState<Entity[]>([]);
   const [folders, setFolders] = useState<KnowledgeFolder[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showIconPicker, setShowIconPicker] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -106,13 +128,49 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
               <div className="flex items-start gap-6">
                 <div className="flex flex-col items-center gap-3">
                   <label className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Icono</label>
-                  <input
-                    value={icon}
-                    onChange={e => setIcon(e.target.value)}
-                    className="w-20 h-20 text-4xl text-center border-2 border-[var(--border-light)] rounded-xl bg-[var(--bg-tertiary)]/30 hover:border-[var(--border-medium)] focus:border-[var(--bg-selected)] focus:ring-2 focus:ring-[var(--bg-selected)]/20 transition-all outline-none"
-                    placeholder="🤖"
-                    maxLength={2}
-                  />
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowIconPicker(!showIconPicker)}
+                      className="w-20 h-20 text-4xl flex items-center justify-center border-2 border-[var(--border-light)] rounded-xl bg-[var(--bg-tertiary)]/30 hover:border-[var(--border-medium)] transition-all cursor-pointer"
+                    >
+                      {icon || '🤖'}
+                    </button>
+                    {showIconPicker && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setShowIconPicker(false)} />
+                        <div className="absolute top-full left-0 mt-2 w-72 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-2xl z-20 p-3">
+                          <div className="grid grid-cols-6 gap-2">
+                            {AGENT_ICONS.map(({ emoji, label }) => (
+                              <button
+                                key={emoji}
+                                onClick={() => {
+                                  setIcon(emoji);
+                                  setShowIconPicker(false);
+                                }}
+                                className={`w-10 h-10 text-2xl flex items-center justify-center rounded-lg transition-all ${
+                                  icon === emoji 
+                                    ? 'bg-[var(--bg-selected)] ring-2 ring-[var(--bg-selected)]/30' 
+                                    : 'hover:bg-[var(--bg-hover)]'
+                                }`}
+                                title={label}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="mt-3 pt-3 border-t border-[var(--border-light)]">
+                            <input
+                              value={icon}
+                              onChange={e => setIcon(e.target.value)}
+                              className="w-full px-3 py-2 text-center text-xl border border-[var(--border-light)] rounded-lg bg-[var(--bg-card)] focus:border-[var(--border-medium)] focus:ring-1 focus:ring-[var(--border-medium)] outline-none"
+                              placeholder="o escribe emoji..."
+                              maxLength={2}
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div className="flex-1 space-y-4">
                   <div>
