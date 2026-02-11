@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft, Folder, Star, Export, Tag, FileText } from '@phosphor-icons/react';
+import { AgentsModal } from './copilots/AgentsModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { API_BASE } from '../config';
 import { Entity, Property } from '../types';
@@ -93,6 +94,13 @@ const IntemicIcon: React.FC<{ size?: number; className?: string }> = ({ size = 1
     );
 };
 
+interface AgentMessage {
+    fromAgent: string;
+    toAgent: string;
+    type: string;
+    content: string;
+}
+
 interface Message {
     id: string;
     role: 'user' | 'assistant';
@@ -101,6 +109,7 @@ interface Message {
     data?: any;
     explanation?: string;
     entitiesUsed?: string[];
+    agentConversation?: AgentMessage[];
 }
 
 interface Chat {
@@ -136,6 +145,7 @@ export const Copilots: React.FC = () => {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [expandedExplanations, setExpandedExplanations] = useState<Set<string>>(new Set());
+    const [expandedAgentConversations, setExpandedAgentConversations] = useState<Set<string>>(new Set());
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editingTitle, setEditingTitle] = useState('');
@@ -157,6 +167,7 @@ export const Copilots: React.FC = () => {
     const [showTagMenu, setShowTagMenu] = useState<string | null>(null);
     const [newTagInput, setNewTagInput] = useState('');
     const [showExportModal, setShowExportModal] = useState(false);
+    const [showAgentsModal, setShowAgentsModal] = useState(false);
     const [allTags, setAllTags] = useState<string[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -283,11 +294,12 @@ export const Copilots: React.FC = () => {
                             role: m.role,
                             content: m.content || '',
                             timestamp: m.timestamp ? (m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp) : new Date().toISOString(),
-                            data: m.data,
-                            explanation: m.explanation,
-                            entitiesUsed: m.entitiesUsed
-                        })),
-                        createdAt: chat.createdAt ? (chat.createdAt instanceof Date ? chat.createdAt.toISOString() : chat.createdAt) : new Date().toISOString(),
+                    data: m.data,
+                    explanation: m.explanation,
+                    entitiesUsed: m.entitiesUsed,
+                    agentConversation: m.agentConversation
+                })),
+                createdAt: chat.createdAt ? (chat.createdAt instanceof Date ? chat.createdAt.toISOString() : chat.createdAt) : new Date().toISOString(),
                         updatedAt: chat.updatedAt ? (chat.updatedAt instanceof Date ? chat.updatedAt.toISOString() : chat.updatedAt) : new Date().toISOString(),
                         instructions: chat.instructions || null,
                         allowedEntities: Array.isArray(chat.allowedEntities) && chat.allowedEntities.length > 0 ? chat.allowedEntities : null,
@@ -350,7 +362,8 @@ export const Copilots: React.FC = () => {
                                 timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
                                 data: msg.data,
                                 explanation: msg.explanation,
-                                entitiesUsed: msg.entitiesUsed
+                                entitiesUsed: msg.entitiesUsed,
+                                agentConversation: msg.agentConversation
                             })) : []
                         };
                     } catch (parseError) {
@@ -381,7 +394,8 @@ export const Copilots: React.FC = () => {
                     timestamp: m.timestamp ? (m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp) : new Date().toISOString(),
                     data: m.data,
                     explanation: m.explanation,
-                    entitiesUsed: m.entitiesUsed
+                    entitiesUsed: m.entitiesUsed,
+                    agentConversation: m.agentConversation
                 })),
                 createdAt: chat.createdAt ? (chat.createdAt instanceof Date ? chat.createdAt.toISOString() : chat.createdAt) : new Date().toISOString(),
                 updatedAt: chat.updatedAt ? (chat.updatedAt instanceof Date ? chat.updatedAt.toISOString() : chat.updatedAt) : new Date().toISOString(),
@@ -740,7 +754,7 @@ export const Copilots: React.FC = () => {
             
             console.log('[Copilots] Extracted entity mentions:', mentionedEntityNames, '-> IDs:', mentionedEntityIds);
 
-            const response = await fetch(`${API_BASE}/database/ask`, {
+            const response = await fetch(`${API_BASE}/copilot/ask`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -753,7 +767,8 @@ export const Copilots: React.FC = () => {
                     chatId: currentChat.id,
                     instructions: currentChat.instructions,
                     allowedEntities: currentChat.allowedEntities,
-                    mentionedEntities: mentionedEntityIds.length > 0 ? mentionedEntityIds : undefined
+                    mentionedEntities: mentionedEntityIds.length > 0 ? mentionedEntityIds : undefined,
+                    useMultiAgent: true
                 })
             });
 
@@ -766,7 +781,8 @@ export const Copilots: React.FC = () => {
                 timestamp: new Date(),
                 data: data.queryResults,
                 explanation: data.explanation,
-                entitiesUsed: data.entitiesUsed
+                entitiesUsed: data.entitiesUsed,
+                agentConversation: data.agentConversation
             };
 
             const finalChat = {
@@ -1238,13 +1254,22 @@ export const Copilots: React.FC = () => {
                                 className="w-full pl-9 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                             />
                         </div>
-                        <button
-                            onClick={handleCreateCopilot}
-                            className="w-full flex items-center justify-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
-                        >
-                            <Sparkle size={14} className="mr-2" weight="light" />
-                            New Copilot
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleCreateCopilot}
+                                className="flex-1 flex items-center justify-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
+                            >
+                                <Sparkle size={14} className="mr-2" weight="light" />
+                                New Copilot
+                            </button>
+                            <button
+                                onClick={() => setShowAgentsModal(true)}
+                                className="flex items-center justify-center px-3 py-1.5 border border-[var(--border-light)] hover:bg-[var(--bg-hover)] rounded-lg text-xs transition-colors"
+                                title="Configurar agentes"
+                            >
+                                <Robot size={14} weight="light" />
+                            </button>
+                        </div>
                         
                         {/* Filter Pills */}
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -1667,6 +1692,39 @@ export const Copilots: React.FC = () => {
                                                                         ))}
                                                                     </div>
                                                                 )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Ver razonamiento - conversación entre agentes */}
+                                                {message.role === 'assistant' && message.agentConversation && message.agentConversation.length > 0 && (
+                                                    <div className="mt-4 pt-4 border-t border-[var(--border-light)]">
+                                                        <button
+                                                            onClick={() => setExpandedAgentConversations(prev => {
+                                                                const next = new Set(prev);
+                                                                if (next.has(message.id)) next.delete(message.id);
+                                                                else next.add(message.id);
+                                                                return next;
+                                                            })}
+                                                            className="flex items-center gap-2 text-sm text-violet-600 hover:text-violet-700 font-medium transition-colors"
+                                                        >
+                                                            <ChatCircle size={14} weight="light" />
+                                                            Ver razonamiento ({message.agentConversation.length} mensajes entre agentes)
+                                                        </button>
+                                                        {expandedAgentConversations.has(message.id) && (
+                                                            <div className="mt-3 space-y-2">
+                                                                {message.agentConversation.map((a, idx) => (
+                                                                    <div key={idx} className="p-3 bg-violet-50 rounded-lg text-xs border border-violet-100">
+                                                                        <span className="font-medium text-violet-700">{a.fromAgent}</span>
+                                                                        <span className="text-[var(--text-tertiary)]"> → </span>
+                                                                        <span className="font-medium text-violet-700">{a.toAgent}</span>
+                                                                        <span className="text-[var(--text-tertiary)]"> ({a.type})</span>
+                                                                        <p className="mt-2 text-[var(--text-secondary)] whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+                                                                            {a.content?.length > 300 ? a.content.slice(0, 300) + '...' : a.content}
+                                                                        </p>
+                                                                    </div>
+                                                                ))}
                                                             </div>
                                                         )}
                                                     </div>
@@ -2185,6 +2243,8 @@ export const Copilots: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {showAgentsModal && <AgentsModal onClose={() => setShowAgentsModal(false)} />}
             
             {/* Toast Notifications */}
             <ToastContainer notifications={notifications} onDismiss={removeNotification} position="bottom-right" />

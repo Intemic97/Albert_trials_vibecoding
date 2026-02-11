@@ -16,6 +16,8 @@ const { initPollingService, getPollingService } = require('./executionPolling');
 const { getConnectionHealthChecker } = require('./utils/otConnections');
 const { extractStructuredFromText } = require('./services/langExtractService');
 const workflowScheduler = require('./services/workflowScheduler');
+const agentOrchestrator = require('./services/agentOrchestrator');
+const agentService = require('./services/agentService');
 // Load environment variables - Try multiple methods to ensure it loads
 const envPath = path.join(__dirname, '.env');
 console.log('[ENV] Attempting to load .env from:', envPath);
@@ -2753,6 +2755,7 @@ app.get('/api/copilot/chats', authenticateToken, async (req, res) => {
                     messages: chat.messages ? JSON.parse(chat.messages) : [],
                     instructions: chat.instructions || null,
                     allowedEntities: chat.allowedEntities ? JSON.parse(chat.allowedEntities) : null,
+                    agentIds: chat.agentIds ? JSON.parse(chat.agentIds) : null,
                     isFavorite: chat.isFavorite === 1,
                     tags: chat.tags ? JSON.parse(chat.tags) : [],
                     createdAt: chat.createdAt ? new Date(chat.createdAt) : new Date(),
@@ -2765,6 +2768,7 @@ app.get('/api/copilot/chats', authenticateToken, async (req, res) => {
                     messages: [],
                     instructions: chat.instructions || null,
                     allowedEntities: null,
+                    agentIds: null,
                     isFavorite: false,
                     tags: [],
                     createdAt: chat.createdAt ? new Date(chat.createdAt) : new Date(),
@@ -2914,6 +2918,198 @@ app.delete('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => 
     } catch (error) {
         console.error('[Copilot] Error deleting chat:', error);
         res.status(500).json({ error: 'Failed to delete chat' });
+    }
+});
+
+// ==================== MULTI-AGENT COPILOT ====================
+
+// List agents for org
+app.get('/api/copilot/agents', authenticateToken, async (req, res) => {
+    try {
+        const agents = await agentService.list(db, req.user.orgId);
+        res.json({ agents });
+    } catch (error) {
+        console.error('[Copilot Agents] Error listing:', error);
+        res.status(500).json({ error: 'Failed to list agents' });
+    }
+});
+
+// Get single agent
+app.get('/api/copilot/agents/:id', authenticateToken, async (req, res) => {
+    try {
+        const agent = await agentService.get(db, req.params.id, req.user.orgId);
+        if (!agent) return res.status(404).json({ error: 'Agent not found' });
+        res.json(agent);
+    } catch (error) {
+        console.error('[Copilot Agents] Error get:', error);
+        res.status(500).json({ error: 'Failed to get agent' });
+    }
+});
+
+// Create agent
+app.post('/api/copilot/agents', authenticateToken, async (req, res) => {
+    try {
+        const agent = await agentService.create(db, req.user.orgId, req.body);
+        res.status(201).json(agent);
+    } catch (error) {
+        console.error('[Copilot Agents] Error create:', error);
+        res.status(500).json({ error: error.message || 'Failed to create agent' });
+    }
+});
+
+// Update agent
+app.put('/api/copilot/agents/:id', authenticateToken, async (req, res) => {
+    try {
+        const agent = await agentService.update(db, req.params.id, req.user.orgId, req.body);
+        if (!agent) return res.status(404).json({ error: 'Agent not found' });
+        res.json(agent);
+    } catch (error) {
+        if (error.message === 'System agents cannot be modified') {
+            return res.status(400).json({ error: error.message });
+        }
+        console.error('[Copilot Agents] Error update:', error);
+        res.status(500).json({ error: 'Failed to update agent' });
+    }
+});
+
+// Delete agent
+app.delete('/api/copilot/agents/:id', authenticateToken, async (req, res) => {
+    try {
+        await agentService.remove(db, req.params.id, req.user.orgId);
+        res.json({ success: true });
+    } catch (error) {
+        if (error.message === 'System agents cannot be deleted') {
+            return res.status(400).json({ error: error.message });
+        }
+        console.error('[Copilot Agents] Error delete:', error);
+        res.status(500).json({ error: 'Failed to delete agent' });
+    }
+});
+
+function mergeEntitiesForAsk(allowed, mentioned) {
+    if (mentioned && mentioned.length > 0) {
+        if (allowed && allowed.length > 0) return [...new Set([...allowed, ...mentioned])];
+        return mentioned;
+    }
+    return allowed;
+}
+
+// Multi-agent ask (orchestrator + analyst + specialist + synthesis)
+app.post('/api/copilot/ask', authenticateToken, async (req, res) => {
+    console.log('[Copilot Ask] Request received');
+    try {
+        const { question, conversationHistory, chatId, instructions, allowedEntities, mentionedEntities, useMultiAgent = true } = req.body;
+        const orgId = req.user.orgId;
+
+        if (!question) {
+            return res.status(400).json({ error: 'Question is required' });
+        }
+        if (!process.env.OPENAI_API_KEY) {
+            return res.status(500).json({ error: 'OpenAI API Key not configured' });
+        }
+
+        let chatInstructions = instructions;
+        let chatAllowedEntities = allowedEntities;
+        if (chatId) {
+            const chat = await db.get(
+                'SELECT instructions, allowedEntities FROM copilot_chats WHERE id = ? AND organizationId = ?',
+                [chatId, orgId]
+            );
+            if (chat) {
+                chatInstructions = chatInstructions || chat.instructions;
+                chatAllowedEntities = chatAllowedEntities || (chat.allowedEntities ? JSON.parse(chat.allowedEntities) : null);
+            }
+        }
+
+        if (useMultiAgent) {
+            try {
+                const result = await agentOrchestrator.process(db, {
+                    orgId,
+                    userMessage: question,
+                    chatId,
+                    conversationHistory: conversationHistory || [],
+                    instructions: chatInstructions,
+                    allowedEntities: chatAllowedEntities,
+                    mentionedEntities: mentionedEntities || []
+                });
+                return res.json({
+                    answer: result.answer,
+                    explanation: result.explanation,
+                    entitiesUsed: result.entitiesUsed,
+                    agentConversation: result.agentConversation,
+                    entitiesAnalyzed: result.entitiesUsed?.length || 0,
+                    totalRecords: 0
+                });
+            } catch (orchError) {
+                console.warn('[Copilot Ask] Multi-agent failed, falling back to single LLM:', orchError.message);
+            }
+        }
+
+        const { buildDatabaseContext } = require('./services/agentPromptBuilder');
+        const effectiveEntities = mergeEntitiesForAsk(chatAllowedEntities, mentionedEntities || []);
+        const databaseContext = await buildDatabaseContext(db, orgId, effectiveEntities);
+        const customInstructions = chatInstructions
+            ? `\n\nCUSTOM INSTRUCTIONS:\n${chatInstructions}\n\n`
+            : '';
+        const systemPrompt = `You are a helpful database assistant. You have access to the user's database.
+
+DATABASE SCHEMA AND DATA:
+${JSON.stringify(databaseContext, null, 2)}
+${customInstructions}
+
+Respond in valid JSON: { "answer": "...", "explanation": "...", "entitiesUsed": [...] }`;
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                ...(conversationHistory || []).slice(-6).map(m => ({ role: m.role, content: m.content })),
+                { role: 'user', content: question }
+            ],
+            temperature: 0.3,
+            max_tokens: 1500,
+            response_format: { type: 'json_object' }
+        });
+        const text = completion.choices[0]?.message?.content || '{}';
+        let parsed;
+        try { parsed = JSON.parse(text); } catch (_) {
+            parsed = { answer: text, explanation: '', entitiesUsed: Object.keys(databaseContext) };
+        }
+        return res.json({
+            answer: parsed.answer || text,
+            explanation: parsed.explanation || '',
+            entitiesUsed: parsed.entitiesUsed || Object.keys(databaseContext),
+            agentConversation: [],
+            entitiesAnalyzed: Object.keys(databaseContext).length,
+            totalRecords: Object.values(databaseContext).reduce((s, e) => s + (e.recordCount || 0), 0)
+        });
+    } catch (error) {
+        console.error('[Copilot Ask] Error:', error);
+        res.status(500).json({
+            error: 'Failed to process your question.',
+            details: error.message
+        });
+    }
+});
+
+// Get agent conversation for a chat turn
+app.get('/api/copilot/chats/:chatId/turns/:turnIndex/agent-conversation', authenticateToken, async (req, res) => {
+    try {
+        const { chatId, turnIndex } = req.params;
+        const chat = await db.get(
+            'SELECT id FROM copilot_chats WHERE id = ? AND organizationId = ?',
+            [chatId, req.user.orgId]
+        );
+        if (!chat) return res.status(404).json({ error: 'Chat not found' });
+        const rows = await db.all(
+            'SELECT * FROM agent_conversations WHERE chatId = ? AND turnIndex = ? ORDER BY createdAt ASC',
+            [chatId, parseInt(turnIndex, 10)]
+        );
+        res.json({ messages: rows });
+    } catch (error) {
+        console.error('[Copilot] Error fetching agent conversation:', error);
+        res.status(500).json({ error: 'Failed to fetch conversation' });
     }
 });
 
