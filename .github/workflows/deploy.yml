@@ -24,6 +24,12 @@ jobs:
             git fetch --all
             git reset --hard origin/main
 
+            if [ ! -f server/.env ]; then
+              echo "⚠️  server/.env no existe. Copiando server/.env.example..."
+              cp server/.env.example server/.env
+              echo "⚠️  EDITA server/.env con tus valores reales y ejecuta: pm2 restart miapp-api"
+            fi
+
             echo "== Install deps =="
             npm ci
 

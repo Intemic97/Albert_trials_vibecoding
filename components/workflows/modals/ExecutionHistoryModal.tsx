@@ -413,6 +413,7 @@ export const ExecutionHistoryModal: React.FC<ExecutionHistoryModalProps> = ({
     const [executions, setExecutions] = useState<ExecutionRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [fetchError, setFetchError] = useState<string | null>(null);
 
     useEffect(() => {
         if (isOpen && workflowId) {
@@ -429,6 +430,7 @@ export const ExecutionHistoryModal: React.FC<ExecutionHistoryModalProps> = ({
 
     const fetchExecutions = async () => {
         setIsLoading(true);
+        setFetchError(null);
         try {
             const res = await fetch(`${API_BASE}/workflow/${workflowId}/executions`, {
                 credentials: 'include'
@@ -436,21 +438,38 @@ export const ExecutionHistoryModal: React.FC<ExecutionHistoryModalProps> = ({
             
             if (res.ok) {
                 const data = await res.json();
-                setExecutions(data);
+                const parsed = Array.isArray(data) ? data : data.executions || [];
+                setExecutions(parsed.map((e: any) => ({
+                    ...e,
+                    workflowId: e.workflowId || workflowId,
+                    workflowName: e.workflowName || workflowName,
+                    triggeredBy: e.triggeredBy || 'unknown',
+                    triggeredByName: e.triggeredByName || 'Unknown',
+                    duration: e.duration ?? (e.startedAt && e.completedAt
+                        ? new Date(e.completedAt).getTime() - new Date(e.startedAt).getTime()
+                        : undefined),
+                })));
             } else {
-                // Use mock data if endpoint doesn't exist
-                setExecutions(generateMockExecutions());
+                const errText = await res.text();
+                setFetchError(errText || `HTTP ${res.status}`);
+                setExecutions([]);
             }
         } catch (error) {
             console.error('Failed to fetch executions:', error);
-            setExecutions(generateMockExecutions());
+            setFetchError(error instanceof Error ? error.message : 'Network error');
+            setExecutions([]);
         } finally {
             setIsLoading(false);
         }
     };
 
-    // Generate mock data for demo
-    const generateMockExecutions = (): ExecutionRecord[] => {
+    // Reset error when modal closes
+    useEffect(() => {
+        if (!isOpen) setFetchError(null);
+    }, [isOpen]);
+
+    // Legacy mock generator (unused - kept for reference)
+    const _generateMockExecutions = (): ExecutionRecord[] => {
         const now = Date.now();
         return [
             {
@@ -591,6 +610,13 @@ export const ExecutionHistoryModal: React.FC<ExecutionHistoryModalProps> = ({
                             {isLoading ? (
                                 <div className="flex items-center justify-center py-12">
                                     <SpinnerGap size={24} className="animate-spin text-[var(--text-tertiary)]" weight="light" />
+                                </div>
+                            ) : fetchError ? (
+                                <div className="text-center py-12 px-4">
+                                    <XCircle size={28} className="mx-auto text-red-400 mb-3" weight="fill" />
+                                    <p className="text-sm font-medium text-red-400">Error al cargar historial</p>
+                                    <p className="text-xs text-[var(--text-tertiary)] mt-2">{fetchError}</p>
+                                    <p className="text-xs text-[var(--text-tertiary)] mt-2">Verifica conexión con el API en producción.</p>
                                 </div>
                             ) : executions.length === 0 ? (
                                 <div className="text-center py-12 px-4">
