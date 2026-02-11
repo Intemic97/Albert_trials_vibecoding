@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Robot, ArrowRight, ArrowLeft, Check, Database, Folder, Sparkle, SpinnerGap, Info } from '@phosphor-icons/react';
+import { X, Robot, ArrowRight, ArrowLeft, Check, Database, Folder, Sparkle, SpinnerGap, Info, Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning, ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Barcode, FileText, Buildings, Atom, Cpu, ChartLine, CloudArrowUp, GraduationCap, MagnifyingGlass } from '@phosphor-icons/react';
 import { API_BASE } from '../../config';
 import { Entity } from '../../types';
 
@@ -15,30 +15,36 @@ interface NewAgentWorkflowProps {
 }
 
 const AGENT_ICONS = [
-  { emoji: '🏭', label: 'Producción/Industrial' },
-  { emoji: '🍷', label: 'Alimentación/Bebidas' },
-  { emoji: '💰', label: 'Finanzas' },
-  { emoji: '📊', label: 'Analytics/Datos' },
-  { emoji: '⚙️', label: 'Operaciones' },
-  { emoji: '🔬', label: 'Laboratorio/I+D' },
-  { emoji: '🚛', label: 'Logística' },
-  { emoji: '⚡', label: 'Energía' },
-  { emoji: '🛡️', label: 'Seguridad' },
-  { emoji: '📈', label: 'Ventas' },
-  { emoji: '👥', label: 'RRHH' },
-  { emoji: '⚖️', label: 'Legal/Compliance' },
-  { emoji: '🎯', label: 'Estrategia' },
-  { emoji: '🔧', label: 'Mantenimiento' },
-  { emoji: '📦', label: 'Inventario' },
-  { emoji: '🌍', label: 'Sostenibilidad' },
-  { emoji: '🤖', label: 'General' },
-  { emoji: '💡', label: 'Innovación' }
+  { icon: Factory, name: 'Factory', label: 'Producción/Industrial' },
+  { icon: Wine, name: 'Wine', label: 'Alimentación/Bebidas' },
+  { icon: CurrencyDollar, name: 'CurrencyDollar', label: 'Finanzas' },
+  { icon: ChartBar, name: 'ChartBar', label: 'Analytics/Datos' },
+  { icon: Gear, name: 'Gear', label: 'Operaciones' },
+  { icon: FlaskConical, name: 'FlaskConical', label: 'Laboratorio/I+D' },
+  { icon: Truck, name: 'Truck', label: 'Logística' },
+  { icon: Lightning, name: 'Lightning', label: 'Energía' },
+  { icon: ShieldCheck, name: 'ShieldCheck', label: 'Seguridad' },
+  { icon: TrendUp, name: 'TrendUp', label: 'Ventas' },
+  { icon: Users, name: 'Users', label: 'RRHH' },
+  { icon: Scales, name: 'Scales', label: 'Legal/Compliance' },
+  { icon: Target, name: 'Target', label: 'Estrategia' },
+  { icon: Wrench, name: 'Wrench', label: 'Mantenimiento' },
+  { icon: Package, name: 'Package', label: 'Inventario' },
+  { icon: Globe, name: 'Globe', label: 'Sostenibilidad' },
+  { icon: Robot, name: 'Robot', label: 'General' },
+  { icon: Lightbulb, name: 'Lightbulb', label: 'Innovación' },
+  { icon: Barcode, name: 'Barcode', label: 'Códigos/SKU' },
+  { icon: FileText, name: 'FileText', label: 'Documentación' },
+  { icon: Buildings, name: 'Buildings', label: 'Real Estate' },
+  { icon: Atom, name: 'Atom', label: 'Química' },
+  { icon: Cpu, name: 'Cpu', label: 'IT/Tech' },
+  { icon: ChartLine, name: 'ChartLine', label: 'Forecasting' }
 ];
 
 export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onComplete }) => {
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
-  const [icon, setIcon] = useState('🤖');
+  const [icon, setIcon] = useState('Robot');
   const [description, setDescription] = useState('');
   const [instructions, setInstructions] = useState('');
   const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
@@ -47,6 +53,13 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
   const [folders, setFolders] = useState<KnowledgeFolder[]>([]);
   const [loading, setLoading] = useState(false);
   const [showIconPicker, setShowIconPicker] = useState(false);
+
+  const getIconComponent = (iconName: string) => {
+    const iconData = AGENT_ICONS.find(i => i.name === iconName);
+    return iconData?.icon || Robot;
+  };
+
+  const IconComponent = getIconComponent(icon);
 
   useEffect(() => {
     Promise.all([
@@ -69,7 +82,7 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim() || null,
-          icon: icon || '🤖',
+          icon: icon || 'Robot',
           instructions: instructions.trim() || null,
           allowedEntities: selectedEntities.length > 0 ? selectedEntities : null,
           folderIds: selectedFolders.length > 0 ? selectedFolders : null
@@ -131,41 +144,33 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
                   <div className="relative">
                     <button
                       onClick={() => setShowIconPicker(!showIconPicker)}
-                      className="w-20 h-20 text-4xl flex items-center justify-center border-2 border-[var(--border-light)] rounded-xl bg-[var(--bg-tertiary)]/30 hover:border-[var(--border-medium)] transition-all cursor-pointer"
+                      className="w-20 h-20 flex items-center justify-center border-2 border-[var(--border-light)] rounded-xl bg-[var(--bg-tertiary)]/30 hover:border-[var(--border-medium)] transition-all cursor-pointer group"
                     >
-                      {icon || '🤖'}
+                      <IconComponent size={32} className="text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" weight="light" />
                     </button>
                     {showIconPicker && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setShowIconPicker(false)} />
-                        <div className="absolute top-full left-0 mt-2 w-72 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-2xl z-20 p-3">
-                          <div className="grid grid-cols-6 gap-2">
-                            {AGENT_ICONS.map(({ emoji, label }) => (
+                        <div className="absolute top-full left-0 mt-2 w-80 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-2xl z-20 p-4">
+                          <p className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-3">Selecciona icono</p>
+                          <div className="grid grid-cols-6 gap-2 max-h-64 overflow-y-auto custom-scrollbar">
+                            {AGENT_ICONS.map(({ icon: IconComp, name: iconName, label }) => (
                               <button
-                                key={emoji}
+                                key={iconName}
                                 onClick={() => {
-                                  setIcon(emoji);
+                                  setIcon(iconName);
                                   setShowIconPicker(false);
                                 }}
-                                className={`w-10 h-10 text-2xl flex items-center justify-center rounded-lg transition-all ${
-                                  icon === emoji 
-                                    ? 'bg-[var(--bg-selected)] ring-2 ring-[var(--bg-selected)]/30' 
-                                    : 'hover:bg-[var(--bg-hover)]'
+                                className={`w-12 h-12 flex items-center justify-center rounded-lg transition-all ${
+                                  icon === iconName 
+                                    ? 'bg-[var(--bg-selected)] text-white ring-2 ring-[var(--bg-selected)]/30' 
+                                    : 'hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                 }`}
                                 title={label}
                               >
-                                {emoji}
+                                <IconComp size={20} weight="light" />
                               </button>
                             ))}
-                          </div>
-                          <div className="mt-3 pt-3 border-t border-[var(--border-light)]">
-                            <input
-                              value={icon}
-                              onChange={e => setIcon(e.target.value)}
-                              className="w-full px-3 py-2 text-center text-xl border border-[var(--border-light)] rounded-lg bg-[var(--bg-card)] focus:border-[var(--border-medium)] focus:ring-1 focus:ring-[var(--border-medium)] outline-none"
-                              placeholder="o escribe emoji..."
-                              maxLength={2}
-                            />
                           </div>
                         </div>
                       </>

@@ -1,7 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { X, Robot, Plus, Sparkle, GearSix, Trash, Database, Folder } from '@phosphor-icons/react';
+import { X, Robot, Plus, Sparkle, GearSix, Trash, Database, Folder, Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning, ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Barcode, FileText, Buildings, Atom, Cpu, ChartLine } from '@phosphor-icons/react';
 import { API_BASE } from '../../config';
 import { AgentConfigModal } from './AgentConfigModal';
+import { NewAgentWorkflow } from './NewAgentWorkflow';
+
+const ICON_MAP: Record<string, any> = {
+  Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning,
+  ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe,
+  Lightbulb, Robot, Barcode, FileText, Buildings, Atom, Cpu, ChartLine
+};
+
+const getIconComponent = (iconName: string) => {
+  return ICON_MAP[iconName] || Robot;
+};
 
 interface Agent {
   id: string;
@@ -26,12 +37,9 @@ interface AgentLibraryProps {
 export const AgentLibrary: React.FC<AgentLibraryProps> = ({ onClose, onSelectAgent, selectedAgentId }) => {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [showCreateWorkflow, setShowCreateWorkflow] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
-  const [newName, setNewName] = useState('');
-  const [newIcon, setNewIcon] = useState('🤖');
-  const [newDescription, setNewDescription] = useState('');
 
   useEffect(() => {
     loadAgents();
@@ -51,30 +59,6 @@ export const AgentLibrary: React.FC<AgentLibraryProps> = ({ onClose, onSelectAge
     }
   };
 
-  const handleCreate = async () => {
-    if (!newName.trim()) return;
-    try {
-      const res = await fetch(`${API_BASE}/copilot/agents`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: newName.trim(),
-          description: newDescription.trim() || null,
-          icon: newIcon || '🤖'
-        })
-      });
-      if (res.ok) {
-        await loadAgents();
-        setShowCreateModal(false);
-        setNewName('');
-        setNewDescription('');
-        setNewIcon('🤖');
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar este agente? Los chats que lo usan seguirán funcionando pero sin configuración específica.')) return;
@@ -107,8 +91,8 @@ export const AgentLibrary: React.FC<AgentLibraryProps> = ({ onClose, onSelectAge
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm transition-colors"
+              onClick={() => setShowCreateWorkflow(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
             >
               <Plus size={16} weight="bold" />
               Nuevo Agente
@@ -128,8 +112,8 @@ export const AgentLibrary: React.FC<AgentLibraryProps> = ({ onClose, onSelectAge
               <Robot size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" weight="light" />
               <p className="text-[var(--text-secondary)] mb-4">No hay agentes configurados</p>
               <button
-                onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm"
+                onClick={() => setShowCreateWorkflow(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium shadow-sm"
               >
                 <Plus size={16} />
                 Crear primer agente
@@ -137,18 +121,22 @@ export const AgentLibrary: React.FC<AgentLibraryProps> = ({ onClose, onSelectAge
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {agents.map(agent => (
+              {agents.map(agent => {
+                const AgentIcon = getIconComponent(agent.icon);
+                return (
                 <div
                   key={agent.id}
                   className={`group p-5 bg-[var(--bg-tertiary)]/30 border rounded-xl transition-all ${
                     selectedAgentId === agent.id
-                      ? 'border-teal-500 shadow-md'
+                      ? 'border-[var(--bg-selected)] shadow-md'
                       : 'border-[var(--border-light)] hover:border-[var(--border-medium)] hover:shadow-md'
                   }`}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-start gap-3">
-                      <div className="text-3xl">{agent.icon}</div>
+                      <div className={`p-2 rounded-xl ${selectedAgentId === agent.id ? 'bg-[var(--bg-selected)] text-white' : 'bg-[var(--bg-hover)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'} transition-colors`}>
+                        <AgentIcon size={24} weight="light" />
+                      </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-medium text-sm mb-1 truncate">{agent.name}</h4>
                         <p className="text-xs text-[var(--text-secondary)] line-clamp-2 min-h-[2rem]">
@@ -179,98 +167,49 @@ export const AgentLibrary: React.FC<AgentLibraryProps> = ({ onClose, onSelectAge
                     {onSelectAgent && (
                       <button
                         onClick={() => {
-                          onSelectAgent(agent.id);
-                          onClose();
-                        }}
-                        className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                          selectedAgentId === agent.id
-                            ? 'bg-teal-600 text-white'
-                            : 'bg-[var(--bg-selected)] hover:bg-[#555555] text-white'
-                        }`}
-                      >
-                        {selectedAgentId === agent.id ? 'Seleccionado' : 'Usar'}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleConfig(agent)}
-                      className="px-3 py-1.5 border border-[var(--border-medium)] hover:bg-[var(--bg-hover)] rounded-lg text-xs transition-colors"
-                      title="Configurar"
-                    >
-                      <GearSix size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(agent.id)}
-                      className="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs transition-colors"
-                      title="Eliminar"
-                    >
-                      <Trash size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                      onSelectAgent(agent.id);
+                      onClose();
+                    }}
+                    className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      selectedAgentId === agent.id
+                        ? 'bg-[var(--bg-selected)] text-white ring-2 ring-[var(--bg-selected)]/30'
+                        : 'bg-[var(--bg-selected)] hover:bg-[#555555] text-white'
+                    }`}
+                  >
+                    {selectedAgentId === agent.id ? 'Seleccionado' : 'Usar'}
+                  </button>
+                )}
+                <button
+                  onClick={() => handleConfig(agent)}
+                  className="px-3 py-1.5 border border-[var(--border-medium)] hover:bg-[var(--bg-hover)] rounded-lg text-xs transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  title="Configurar"
+                >
+                  <GearSix size={14} />
+                </button>
+                <button
+                  onClick={() => handleDelete(agent.id)}
+                  className="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs transition-colors"
+                  title="Eliminar"
+                >
+                  <Trash size={14} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
             </div>
           )}
         </div>
       </div>
 
-      {/* Create Agent Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={() => setShowCreateModal(false)}>
-          <div className="bg-[var(--bg-card)] rounded-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="p-6 border-b border-[var(--border-light)]">
-              <h3 className="text-lg font-medium" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Nuevo Agente</h3>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Icono</label>
-                <input
-                  value={newIcon}
-                  onChange={e => setNewIcon(e.target.value)}
-                  className="w-20 px-3 py-2 border border-[var(--border-medium)] rounded-lg text-2xl text-center bg-[var(--bg-card)]"
-                  placeholder="🤖"
-                  maxLength={2}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Nombre</label>
-                <input
-                  value={newName}
-                  onChange={e => setNewName(e.target.value)}
-                  className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg bg-[var(--bg-card)]"
-                  placeholder="ej. Agente Repsol, Especialista Producción..."
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Descripción</label>
-                <textarea
-                  value={newDescription}
-                  onChange={e => setNewDescription(e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg bg-[var(--bg-card)] resize-none text-sm"
-                  placeholder="Especializado en producción industrial, seguridad y optimización..."
-                />
-              </div>
-              <p className="text-xs text-[var(--text-tertiary)]">
-                Después de crear, podrás configurar entidades, knowledge base y prompts personalizados.
-              </p>
-            </div>
-            <div className="p-6 border-t border-[var(--border-light)] flex justify-end gap-3">
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 border border-[var(--border-medium)] hover:bg-[var(--bg-hover)] rounded-lg text-sm"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleCreate}
-                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm"
-              >
-                Crear
-              </button>
-            </div>
-          </div>
-        </div>
+      {showCreateWorkflow && (
+        <NewAgentWorkflow
+          onClose={() => setShowCreateWorkflow(false)}
+          onComplete={async () => {
+            await loadAgents();
+            setShowCreateWorkflow(false);
+          }}
+        />
       )}
 
       {/* Config Modal */}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft, Folder, Star, Export, Tag, FileText, CaretLeft, CaretDown, CaretRight } from '@phosphor-icons/react';
+import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft, Folder, Star, Export, Tag, FileText, CaretLeft, CaretDown, CaretRight, Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning, ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb } from '@phosphor-icons/react';
 import { AgentLibrary } from './copilots/AgentLibrary';
 import { AgentConfigModal } from './copilots/AgentConfigModal';
 import { NewAgentWorkflow } from './copilots/NewAgentWorkflow';
@@ -1202,7 +1202,17 @@ export const Copilots: React.FC = () => {
                     {currentAgent && (
                         <>
                             <div className="flex items-center gap-2 px-2 py-1 bg-[var(--bg-tertiary)]/30 rounded-lg">
-                                <span className="text-sm">{currentAgent.icon}</span>
+                                {(() => {
+                                    const getIcon = (iconName: string) => {
+                                        const iconMap: Record<string, any> = {
+                                            Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning,
+                                            ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Robot
+                                        };
+                                        return iconMap[iconName] || Robot;
+                                    };
+                                    const AgentIcon = getIcon(currentAgent.icon);
+                                    return <AgentIcon size={14} weight="light" className="text-[var(--text-secondary)]" />;
+                                })()}
                                 <span className="text-xs text-[var(--text-secondary)]">{currentAgent.name}</span>
                             </div>
                             <div className="h-6 w-px bg-[var(--bg-selected)]"></div>
@@ -1567,13 +1577,22 @@ export const Copilots: React.FC = () => {
                                         No hay agentes creados.
                                         <button
                                             onClick={() => setShowNewAgentModal(true)}
-                                            className="block mx-auto mt-2 px-3 py-1.5 bg-teal-600/10 text-teal-600 rounded-lg hover:bg-teal-600/20 transition-colors"
+                                            className="block mx-auto mt-2 px-3 py-1.5 bg-[var(--bg-selected)]/10 text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-selected)]/20 transition-colors font-medium"
                                         >
                                             Crear primer agente
                                         </button>
                                     </div>
                                 ) : (
-                                    agents.map(agent => (
+                                    agents.map(agent => {
+                                        const getIcon = (iconName: string) => {
+                                            const iconMap: Record<string, any> = {
+                                                Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning,
+                                                ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Robot
+                                            };
+                                            return iconMap[iconName] || Robot;
+                                        };
+                                        const AgentIcon = getIcon(agent.icon);
+                                        return (
                                         <div
                                             key={agent.id}
                                             className="group flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-[var(--bg-card)]/70 transition-all"
@@ -1582,7 +1601,9 @@ export const Copilots: React.FC = () => {
                                                 setShowAgentLibrary(true);
                                             }}
                                         >
-                                            <div className="text-xl">{agent.icon}</div>
+                                            <div className="p-1.5 rounded-lg bg-[var(--bg-hover)] group-hover:bg-[var(--bg-selected)] text-[var(--text-secondary)] group-hover:text-white transition-colors">
+                                                <AgentIcon size={16} weight="light" />
+                                            </div>
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-normal truncate text-[var(--text-primary)]">{agent.name}</p>
                                                 <p className="text-xs text-[var(--text-tertiary)] truncate">{agent.description || 'Agente especializado'}</p>
@@ -1601,7 +1622,8 @@ export const Copilots: React.FC = () => {
                                                 </button>
                                             </div>
                                         </div>
-                                    ))
+                                    );
+                                })
                                 )}
                             </div>
                         )}
