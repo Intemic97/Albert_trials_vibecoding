@@ -1334,56 +1334,57 @@ export const Copilots: React.FC = () => {
                         </button>
 
                         {showChatsSection && (
+                            <>
                             <div className="px-3 pb-3">
                                 {/* Filter Pills */}
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            <button
-                                onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                                className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
-                                    showFavoritesOnly 
-                                        ? 'bg-amber-500/20 text-amber-500' 
-                                        : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]'
-                                }`}
-                            >
-                                <Star size={12} weight={showFavoritesOnly ? "fill" : "regular"} />
-                                Favorites
-                            </button>
-                            {allTags.length > 0 && (
-                                <div className="flex items-center gap-1 flex-wrap">
-                                    {allTags.slice(0, 3).map(tag => (
+                                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                    <button
+                                        onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                                        className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
+                                            showFavoritesOnly 
+                                                ? 'bg-amber-500/20 text-amber-500' 
+                                                : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]'
+                                        }`}
+                                    >
+                                        <Star size={12} weight={showFavoritesOnly ? "fill" : "regular"} />
+                                        Favorites
+                                    </button>
+                                    {allTags.length > 0 && (
+                                        <div className="flex items-center gap-1 flex-wrap">
+                                            {allTags.slice(0, 3).map(tag => (
+                                                <button
+                                                    key={tag}
+                                                    onClick={() => setFilterTag(filterTag === tag ? null : tag)}
+                                                    className={`px-2 py-1 rounded-md text-xs transition-colors ${
+                                                        filterTag === tag 
+                                                            ? 'text-white' 
+                                                            : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]'
+                                                    }`}
+                                                    style={{ 
+                                                        backgroundColor: filterTag === tag ? (TAG_COLORS[tag] || TAG_COLORS.default) : undefined 
+                                                    }}
+                                                >
+                                                    #{tag}
+                                                </button>
+                                            ))}
+                                            {allTags.length > 3 && (
+                                                <span className="text-xs text-[var(--text-tertiary)]">+{allTags.length - 3}</span>
+                                            )}
+                                        </div>
+                                    )}
+                                    {(showFavoritesOnly || filterTag) && (
                                         <button
-                                            key={tag}
-                                            onClick={() => setFilterTag(filterTag === tag ? null : tag)}
-                                            className={`px-2 py-1 rounded-md text-xs transition-colors ${
-                                                filterTag === tag 
-                                                    ? 'text-white' 
-                                                    : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]'
-                                            }`}
-                                            style={{ 
-                                                backgroundColor: filterTag === tag ? (TAG_COLORS[tag] || TAG_COLORS.default) : undefined 
-                                            }}
+                                            onClick={() => { setShowFavoritesOnly(false); setFilterTag(null); }}
+                                            className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                                         >
-                                            #{tag}
+                                            Clear
                                         </button>
-                                    ))}
-                                    {allTags.length > 3 && (
-                                        <span className="text-xs text-[var(--text-tertiary)]">+{allTags.length - 3}</span>
                                     )}
                                 </div>
-                            )}
-                            {(showFavoritesOnly || filterTag) && (
-                                <button
-                                    onClick={() => { setShowFavoritesOnly(false); setFilterTag(null); }}
-                                    className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-                                >
-                                    Clear
-                                </button>
-                            )}
-                        </div>
-                    </div>
+                            </div>
 
-                    {/* Chat List */}
-                    <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
+                            {/* Chat List */}
+                            <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
                         {filteredChats.map(chat => (
                             <div
                                 key={chat.id}
@@ -1531,8 +1532,8 @@ export const Copilots: React.FC = () => {
                                 </div>
                             </div>
                         ))}
-                    </div>
                             </div>
+                            </>
                         )}
                     </div>
 
