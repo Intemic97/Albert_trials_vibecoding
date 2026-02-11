@@ -53,6 +53,7 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
   const [folders, setFolders] = useState<KnowledgeFolder[]>([]);
   const [loading, setLoading] = useState(false);
   const [showIconPicker, setShowIconPicker] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const getIconComponent = (iconName: string) => {
     const iconData = AGENT_ICONS.find(i => i.name === iconName);
@@ -74,6 +75,7 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
   const handleCreate = async () => {
     if (!name.trim()) return;
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`${API_BASE}/copilot/agents`, {
         method: 'POST',
@@ -88,11 +90,18 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
           folderIds: selectedFolders.length > 0 ? selectedFolders : null
         })
       });
-      if (res.ok) {
-        onComplete();
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Error desconocido' }));
+        throw new Error(errorData.error || `Error ${res.status}: ${res.statusText}`);
       }
+      
+      const data = await res.json();
+      console.log('Agente creado:', data);
+      onComplete();
     } catch (err) {
-      console.error(err);
+      console.error('Error creando agente:', err);
+      setError(err instanceof Error ? err.message : 'No se pudo crear el agente');
     } finally {
       setLoading(false);
     }
@@ -332,7 +341,20 @@ Prioriza siempre la seguridad y menciona unidades de medida cuando analices dato
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-5 border-t border-[var(--border-light)] flex items-center justify-between bg-[var(--bg-card)]">
+        <div className="px-6 py-5 border-t border-[var(--border-light)] bg-[var(--bg-card)]">
+          {error && (
+            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+              <X size={16} className="text-red-600 mt-0.5 flex-shrink-0" weight="bold" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-red-800 font-medium">Error al crear agente</p>
+                <p className="text-xs text-red-600 mt-1">{error}</p>
+              </div>
+              <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+          )}
+          <div className="flex items-center justify-between">
           <button
             onClick={() => step > 1 ? setStep(step - 1) : onClose()}
             className="flex items-center gap-2 px-4 py-2 border border-[var(--border-light)] hover:bg-[var(--bg-hover)] rounded-lg text-sm transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -375,6 +397,7 @@ Prioriza siempre la seguridad y menciona unidades de medida cuando analices dato
               </>
             )}
           </button>
+          </div>
         </div>
       </div>
     </div>
