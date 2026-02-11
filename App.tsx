@@ -180,7 +180,8 @@ function AuthenticatedApp() {
         if (path.startsWith('/database')) return 'database';
         if (path.startsWith('/templates')) return 'templates';
         if (path.startsWith('/documents')) return 'documents';
-        if (path.startsWith('/copilots')) return 'copilots';
+        if (path.startsWith('/inteligencia')) return 'inteligencia';
+        if (path.startsWith('/copilots')) return 'inteligencia'; // Redirect old URLs
         if (path.startsWith('/logs')) return 'logs';
         if (path.startsWith('/connections')) return 'connections';
         if (path.startsWith('/industrial')) return 'industrial';
@@ -195,6 +196,7 @@ function AuthenticatedApp() {
     const hideSidebarForRoutes = location.pathname.match(/^\/documents\/[^/]+$/) ||
         location.pathname.match(/^\/workflow\/[^/]+$/) ||
         location.pathname.match(/^\/workflows-v2(\/|$)/) ||
+        location.pathname.match(/^\/inteligencia/) ||
         location.pathname.match(/^\/copilots/) ||
         location.pathname.match(/^\/documentation/);
 
@@ -1612,8 +1614,12 @@ function AuthenticatedApp() {
                     <Route path="/documents/:reportId" element={
                         <ReportEditor entities={entities} companyInfo={undefined} onViewChange={handleNavigate} />
                     } />
-                    <Route path="/copilots" element={
+                    <Route path="/inteligencia" element={
                         <Copilots />
+                    } />
+                    {/* Redirect old copilots URL */}
+                    <Route path="/copilots" element={
+                        <Navigate to="/inteligencia" replace />
                     } />
                     <Route path="/logs" element={
                         <LogsAndAlerts />

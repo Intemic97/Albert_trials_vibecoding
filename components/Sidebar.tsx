@@ -48,7 +48,7 @@ const viewToRoute: Record<string, string> = {
   'templates': '/templates',
   'documents': '/documents',
   'reports': '/reports',
-  'copilots': '/copilots',
+  'inteligencia': '/inteligencia',
   'logs': '/logs',
   'connections': '/connections',
   'industrial': '/industrial',
@@ -386,7 +386,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
                   if (searchScope === 'workflows') {
                     navigate(`/workflows?q=${query}`);
                   } else if (searchScope === 'chats') {
-                    navigate(`/copilots?q=${query}`);
+                    navigate(`/inteligencia?q=${query}`);
                   } else {
                     navigate(`/database?q=${query}`);
                   }
@@ -448,7 +448,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
                       <button
                         key={item.id}
                         onClick={() => {
-                          navigate(`/copilots?chatId=${item.id}`);
+                          navigate(`/inteligencia?chatId=${item.id}`);
                           setShowResults(false);
                         }}
                         className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--bg-hover)] text-left transition-colors"
@@ -515,7 +515,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
           <SectionLabel label="Analyze" />
           <div className="space-y-0.5">
             <NavItem icon={SquaresFour} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
-            <NavItem icon={Sparkle} label="Copilots" view="copilots" active={activeView === 'copilots'} />
+            <NavItem icon={Sparkle} label="Inteligencia" view="inteligencia" active={activeView === 'inteligencia'} />
             <NavItem icon={Flask} label="Lab" view="lab" active={activeView === 'lab'} betaTag />
           </div>
 

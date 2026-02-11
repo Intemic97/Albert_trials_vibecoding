@@ -324,7 +324,7 @@ export const Copilots: React.FC = () => {
                 if (chat.messages.length > 0 || chat.instructions || (chat.allowedEntities && chat.allowedEntities.length > 0)) {
                     const payload = {
                         id: chat.id,
-                        title: chat.title || 'New Copilot',
+                        title: chat.title || 'Nuevo Chat',
                         messages: chat.messages.map(m => ({
                             id: m.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                             role: m.role,
@@ -384,7 +384,7 @@ export const Copilots: React.FC = () => {
                         // Server already parses messages and allowedEntities
                         return {
                             id: chat.id,
-                            title: chat.title || 'New Copilot',
+                            title: chat.title || 'Nuevo Chat',
                             createdAt: chat.createdAt ? new Date(chat.createdAt) : new Date(),
                             updatedAt: chat.updatedAt ? new Date(chat.updatedAt) : new Date(),
                             instructions: chat.instructions || undefined,
@@ -1245,7 +1245,7 @@ export const Copilots: React.FC = () => {
                                     }}
                                     className="text-sm font-normal text-[var(--text-primary)] hover:text-[var(--text-primary)] active:text-[var(--text-primary)] focus:outline-none transition-colors bg-transparent active:bg-transparent appearance-none"
                                 >
-                                    {currentChat.title || 'New Copilot'}
+                                    {currentChat.title || 'Nuevo Chat'}
                                 </button>
                             ) : (
                                 <span className="text-sm font-normal text-[var(--text-primary)]">Copilots</span>
@@ -2059,8 +2059,8 @@ export const Copilots: React.FC = () => {
                                     <Sparkle size={18} className="text-white" weight="light" />
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Create New Copilot</h3>
-                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Configure your AI assistant with custom instructions and data access</p>
+                                    <h3 className="text-base font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Crear Nuevo Chat</h3>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Configura tu asistente IA con instrucciones personalizadas y acceso a datos</p>
                                 </div>
                             </div>
                         </div>
@@ -2070,7 +2070,7 @@ export const Copilots: React.FC = () => {
                             {/* Name */}
                             <div>
                                 <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
-                                    Copilot Name <span className="text-red-500">*</span>
+                                    Nombre del Chat <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
@@ -2254,7 +2254,7 @@ export const Copilots: React.FC = () => {
                                 className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Sparkle size={14} weight="light" />
-                                Create Copilot
+                                Crear Chat
                             </button>
                         </div>
                     </div>
