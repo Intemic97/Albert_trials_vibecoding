@@ -215,14 +215,14 @@ Todos los chats comparten el contexto y configuración del Agente Industrial. Si
 ```
 Name: Agente Logística
 Icon: 🍷
-Description: Especializado en enología, cosecha y exportaciones
-Instructions: Eres un experto en vinos. Habla de temperatura, acidez, variedades de uva, crianza.
-AllowedEntities: [Vinos, Cosechas, Barricas, Exportaciones]
-FolderIds: [Catas históricas, Fichas técnicas]
+Description: Especializado en distribución, inventario y exportaciones
+Instructions: Eres un experto en logística. Habla de almacenamiento, rutas, tiempos de entrega.
+AllowedEntities: [Productos, Almacenes, Pedidos, Exportaciones]
+FolderIds: [Políticas logística, Fichas técnicas]
 
 Prompts:
-- Analyst: "Al analizar cosechas, menciona variedades de uva, clima y rendimiento."
-- Specialist: "Al recomendar crianza, considera perfil del vino y mercado objetivo. Sugiere maridajes."
+- Analyst: "Al analizar inventario, menciona rotación, stock y puntos de reorden."
+- Specialist: "Al recomendar rutas, considera costos, tiempos y capacidad. Sugiere optimizaciones."
 ```
 
 **Usar en chats:**
