@@ -118,7 +118,7 @@ async function seedDefaults(db, orgId) {
     id: `agent_default_${orgId.slice(0, 12).replace(/[-]/g, '')}`,
     name: 'Asistente General',
     description: 'Tu copiloto para consultas generales sobre entidades y datos',
-    icon: '💬',
+    icon: 'Robot',
     instructions: 'Ayuda al usuario a navegar sus entidades, encontrar records y responder preguntas sobre sus datos.'
   };
   const existing = await db.get('SELECT id FROM copilot_agents WHERE id = ?', [defaultAgent.id]);
