@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft, Folder, Star, Export, Tag, FileText, CaretLeft } from '@phosphor-icons/react';
+import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft, Folder, Star, Export, Tag, FileText, CaretLeft, CaretDown, CaretRight } from '@phosphor-icons/react';
 import { AgentLibrary } from './copilots/AgentLibrary';
+import { AgentConfigModal } from './copilots/AgentConfigModal';
+import { NewAgentWorkflow } from './copilots/NewAgentWorkflow';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { API_BASE } from '../config';
 import { Entity, Property } from '../types';
@@ -161,6 +163,9 @@ export const Copilots: React.FC = () => {
     const [showAgentLibrary, setShowAgentLibrary] = useState(false);
     const [showAgentConfig, setShowAgentConfig] = useState(false);
     const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
+    const [showChatsSection, setShowChatsSection] = useState(true);
+    const [showAgentsSection, setShowAgentsSection] = useState(true);
+    const [showNewAgentModal, setShowNewAgentModal] = useState(false);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [expandedExplanations, setExpandedExplanations] = useState<Set<string>>(new Set());
@@ -1303,24 +1308,34 @@ export const Copilots: React.FC = () => {
                                 className="w-full pl-9 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                             />
                         </div>
-                        <div className="space-y-2">
+                    </div>
+
+                    {/* Tus Chats Section */}
+                    <div className="border-b border-[var(--border-light)]">
+                        <button
+                            onClick={() => setShowChatsSection(!showChatsSection)}
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--bg-hover)] transition-colors"
+                        >
+                            <div className="flex items-center gap-2">
+                                {showChatsSection ? <CaretDown size={14} weight="bold" /> : <CaretRight size={14} weight="bold" />}
+                                <span className="text-sm font-medium text-[var(--text-primary)]">Tus chats</span>
+                                <span className="text-xs text-[var(--text-tertiary)]">({filteredChats.length})</span>
+                            </div>
                             <button
-                                onClick={handleCreateCopilot}
-                                className="w-full flex items-center justify-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCreateCopilot();
+                                }}
+                                className="p-1 hover:bg-[var(--bg-selected)] rounded transition-colors"
+                                title="Nuevo chat"
                             >
-                                <Sparkle size={14} className="mr-2" weight="light" />
-                                Nuevo Chat
+                                <Plus size={14} weight="bold" className="text-[var(--text-secondary)]" />
                             </button>
-                            <button
-                                onClick={() => setShowAgentLibrary(true)}
-                                className="w-full flex items-center justify-center px-3 py-1.5 border border-[var(--border-light)] hover:bg-[var(--bg-hover)] rounded-lg text-xs font-medium transition-colors"
-                            >
-                                <Robot size={14} className="mr-2" weight="light" />
-                                Librería de Agentes
-                            </button>
-                        </div>
-                        
-                        {/* Filter Pills */}
+                        </button>
+
+                        {showChatsSection && (
+                            <div className="px-3 pb-3">
+                                {/* Filter Pills */}
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                             <button
                                 onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
@@ -1516,6 +1531,79 @@ export const Copilots: React.FC = () => {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Agentes Section */}
+                    <div className="border-b border-[var(--border-light)]">
+                        <button
+                            onClick={() => setShowAgentsSection(!showAgentsSection)}
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--bg-hover)] transition-colors"
+                        >
+                            <div className="flex items-center gap-2">
+                                {showAgentsSection ? <CaretDown size={14} weight="bold" /> : <CaretRight size={14} weight="bold" />}
+                                <span className="text-sm font-medium text-[var(--text-primary)]">Agentes</span>
+                                <span className="text-xs text-[var(--text-tertiary)]">({agents.length})</span>
+                            </div>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowNewAgentModal(true);
+                                }}
+                                className="p-1 hover:bg-[var(--bg-selected)] rounded transition-colors"
+                                title="Nuevo agente"
+                            >
+                                <Plus size={14} weight="bold" className="text-[var(--text-secondary)]" />
+                            </button>
+                        </button>
+
+                        {showAgentsSection && (
+                            <div className="px-3 pb-3 space-y-1">
+                                {agents.length === 0 ? (
+                                    <div className="p-4 text-center text-xs text-[var(--text-tertiary)]">
+                                        No hay agentes creados.
+                                        <button
+                                            onClick={() => setShowNewAgentModal(true)}
+                                            className="block mx-auto mt-2 px-3 py-1.5 bg-teal-600/10 text-teal-600 rounded-lg hover:bg-teal-600/20 transition-colors"
+                                        >
+                                            Crear primer agente
+                                        </button>
+                                    </div>
+                                ) : (
+                                    agents.map(agent => (
+                                        <div
+                                            key={agent.id}
+                                            className="group flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-[var(--bg-card)]/70 transition-all"
+                                            onClick={() => {
+                                                setSelectedAgentForChat(agent.id);
+                                                setShowAgentLibrary(true);
+                                            }}
+                                        >
+                                            <div className="text-xl">{agent.icon}</div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-normal truncate text-[var(--text-primary)]">{agent.name}</p>
+                                                <p className="text-xs text-[var(--text-tertiary)] truncate">{agent.description || 'Agente especializado'}</p>
+                                            </div>
+                                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEditingAgentId(agent.id);
+                                                        setShowAgentConfig(true);
+                                                    }}
+                                                    className="p-1 hover:bg-[var(--bg-hover)] rounded transition-all"
+                                                    title="Configurar agente"
+                                                >
+                                                    <GearSix size={12} className="text-[var(--text-tertiary)]" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -2392,6 +2480,23 @@ export const Copilots: React.FC = () => {
                     selectedAgentId={selectedAgentForChat}
                 />
             )}
+
+            {showAgentConfig && editingAgentId && (
+                <AgentConfigModal
+                    agent={agents.find(a => a.id === editingAgentId)!}
+                    onClose={() => {
+                        setShowAgentConfig(false);
+                        setEditingAgentId(null);
+                    }}
+                    onSave={async () => {
+                        await loadAgents();
+                        setShowAgentConfig(false);
+                        setEditingAgentId(null);
+                    }}
+                />
+            )}
+
+            {showNewAgentModal && <NewAgentWorkflow onClose={() => setShowNewAgentModal(false)} onComplete={async () => { await loadAgents(); setShowNewAgentModal(false); }} />}
             
             {/* Toast Notifications */}
             <ToastContainer notifications={notifications} onDismiss={removeNotification} position="bottom-right" />
