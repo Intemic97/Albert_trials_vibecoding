@@ -1670,9 +1670,10 @@ export const Copilots: React.FC = () => {
                                                     style={{ 
                                                         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
                                                         lineHeight: '1.6',
-                                                        letterSpacing: '0.01em'
+                                                        letterSpacing: '0.01em',
+                                                        minHeight: '64px',
+                                                        maxHeight: '200px'
                                                     }}
-                                                    style={{ minHeight: '64px', maxHeight: '200px' }}
                                                     disabled={isLoading}
                                                 />
                                                 {/* Mention suggestions popover */}
