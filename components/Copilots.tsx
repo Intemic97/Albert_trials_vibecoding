@@ -2089,8 +2089,19 @@ export const Copilots: React.FC = () => {
                                 <div className="flex gap-2">
                                     {selectedAgentForChat ? (
                                         <>
-                                            <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-teal-50 border border-teal-200 rounded-lg">
-                                                <span className="text-2xl">{agents.find(a => a.id === selectedAgentForChat)?.icon || '🤖'}</span>
+                                            <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-[var(--bg-selected)]/10 border border-[var(--bg-selected)]/30 rounded-lg">
+                                                {(() => {
+                                                    const agentIcon = agents.find(a => a.id === selectedAgentForChat)?.icon || 'Robot';
+                                                    const getIcon = (iconName: string) => {
+                                                        const iconMap: Record<string, any> = {
+                                                            Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning,
+                                                            ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Robot
+                                                        };
+                                                        return iconMap[iconName] || Robot;
+                                                    };
+                                                    const AgentIconComp = getIcon(agentIcon);
+                                                    return <div className="p-2 rounded-lg bg-[var(--bg-selected)] text-white"><AgentIconComp size={20} weight="light" /></div>;
+                                                })()}
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-medium text-[var(--text-primary)]">
                                                         {agents.find(a => a.id === selectedAgentForChat)?.name || 'Agente'}
@@ -2286,8 +2297,19 @@ export const Copilots: React.FC = () => {
                                 <div className="flex gap-2">
                                     {selectedAgentForChat ? (
                                         <>
-                                            <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-teal-50 border border-teal-200 rounded-lg">
-                                                <span className="text-2xl">{agents.find(a => a.id === selectedAgentForChat)?.icon || '🤖'}</span>
+                                            <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-[var(--bg-selected)]/10 border border-[var(--bg-selected)]/30 rounded-lg">
+                                                {(() => {
+                                                    const agentIcon = agents.find(a => a.id === selectedAgentForChat)?.icon || 'Robot';
+                                                    const getIcon = (iconName: string) => {
+                                                        const iconMap: Record<string, any> = {
+                                                            Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning,
+                                                            ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Robot
+                                                        };
+                                                        return iconMap[iconName] || Robot;
+                                                    };
+                                                    const AgentIconComp = getIcon(agentIcon);
+                                                    return <div className="p-2 rounded-lg bg-[var(--bg-selected)] text-white"><AgentIconComp size={20} weight="light" /></div>;
+                                                })()}
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-medium text-[var(--text-primary)]">
                                                         {agents.find(a => a.id === selectedAgentForChat)?.name || 'Agente'}
