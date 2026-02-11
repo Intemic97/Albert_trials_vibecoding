@@ -73,35 +73,47 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
   }, []);
 
   const handleCreate = async () => {
-    if (!name.trim()) return;
+    if (!name.trim()) {
+      setError('El nombre del agente es obligatorio');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
+    
+    const payload = {
+      name: name.trim(),
+      description: description.trim() || null,
+      icon: icon || 'Robot',
+      instructions: instructions.trim() || null,
+      allowedEntities: selectedEntities.length > 0 ? selectedEntities : null,
+      folderIds: selectedFolders.length > 0 ? selectedFolders : null
+    };
+    
+    console.log('Creando agente con payload:', payload);
+    
     try {
       const res = await fetch(`${API_BASE}/copilot/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || null,
-          icon: icon || 'Robot',
-          instructions: instructions.trim() || null,
-          allowedEntities: selectedEntities.length > 0 ? selectedEntities : null,
-          folderIds: selectedFolders.length > 0 ? selectedFolders : null
-        })
+        body: JSON.stringify(payload)
       });
+      
+      console.log('Respuesta del servidor:', res.status, res.statusText);
       
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ error: 'Error desconocido' }));
+        console.error('Error del servidor:', errorData);
         throw new Error(errorData.error || `Error ${res.status}: ${res.statusText}`);
       }
       
       const data = await res.json();
-      console.log('Agente creado:', data);
+      console.log('Agente creado exitosamente:', data);
       onComplete();
     } catch (err) {
       console.error('Error creando agente:', err);
-      setError(err instanceof Error ? err.message : 'No se pudo crear el agente');
+      setError(err instanceof Error ? err.message : 'No se pudo crear el agente. Verifica la consola para más detalles.');
     } finally {
       setLoading(false);
     }
