@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft, Folder, Star, Export, Tag, FileText, CaretLeft, CaretDown, CaretRight, Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning, ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb } from '@phosphor-icons/react';
+import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft, Folder, Star, Export, Tag, FileText, CaretLeft, CaretDown, CaretRight, Factory, Wine, CurrencyDollar, ChartBar, Gear, Flask, Truck, Lightning, ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb } from '@phosphor-icons/react';
 import { AgentLibrary } from './copilots/AgentLibrary';
 import { AgentConfigModal } from './copilots/AgentConfigModal';
 import { NewAgentWorkflow } from './copilots/NewAgentWorkflow';
@@ -1205,7 +1205,7 @@ export const Copilots: React.FC = () => {
                                 {(() => {
                                     const getIcon = (iconName: string) => {
                                         const iconMap: Record<string, any> = {
-                                            Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning,
+                                            Factory, Wine, CurrencyDollar, ChartBar, Gear, Flask, Truck, Lightning,
                                             ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Robot
                                         };
                                         return iconMap[iconName] || Robot;
@@ -1586,7 +1586,7 @@ export const Copilots: React.FC = () => {
                                     agents.map(agent => {
                                         const getIcon = (iconName: string) => {
                                             const iconMap: Record<string, any> = {
-                                                Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning,
+                                                Factory, Wine, CurrencyDollar, ChartBar, Gear, Flask, Truck, Lightning,
                                                 ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Robot
                                             };
                                             return iconMap[iconName] || Robot;

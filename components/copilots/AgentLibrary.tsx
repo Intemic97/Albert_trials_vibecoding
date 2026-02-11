@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Robot, Plus, Sparkle, GearSix, Trash, Database, Folder, Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning, ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Barcode, FileText, Buildings, Atom, Cpu, ChartLine } from '@phosphor-icons/react';
+import { X, Robot, Plus, Sparkle, GearSix, Trash, Database, Folder, Factory, Wine, CurrencyDollar, ChartBar, Gear, Flask, Truck, Lightning, ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Barcode, FileText, Buildings, Atom, Cpu, ChartLine } from '@phosphor-icons/react';
 import { API_BASE } from '../../config';
 import { AgentConfigModal } from './AgentConfigModal';
 import { NewAgentWorkflow } from './NewAgentWorkflow';
 
 const ICON_MAP: Record<string, any> = {
-  Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning,
+  Factory, Wine, CurrencyDollar, ChartBar, Gear, Flask, Truck, Lightning,
   ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe,
   Lightbulb, Robot, Barcode, FileText, Buildings, Atom, Cpu, ChartLine
 };

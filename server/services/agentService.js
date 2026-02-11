@@ -28,7 +28,7 @@ function parseAgent(row) {
     ...row,
     allowedEntities: row.allowedEntities ? safeParse(row.allowedEntities, []) : [],
     folderIds: row.folderIds ? safeParse(row.folderIds, []) : [],
-    icon: row.icon || '🤖'
+    icon: row.icon || 'Robot'
   };
 }
 

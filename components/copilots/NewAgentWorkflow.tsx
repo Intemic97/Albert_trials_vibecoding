@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Robot, ArrowRight, ArrowLeft, Check, Database, Folder, Sparkle, SpinnerGap, Info, Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning, ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Barcode, FileText, Buildings, Atom, Cpu, ChartLine, CloudArrowUp, GraduationCap, MagnifyingGlass } from '@phosphor-icons/react';
+import { X, Robot, ArrowRight, ArrowLeft, Check, Database, Folder, Sparkle, SpinnerGap, Info, Factory, Wine, CurrencyDollar, ChartBar, Gear, Flask, Truck, Lightning, ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Barcode, FileText, Buildings, Atom, Cpu, ChartLine } from '@phosphor-icons/react';
 import { API_BASE } from '../../config';
 import { Entity } from '../../types';
 
@@ -20,7 +20,7 @@ const AGENT_ICONS = [
   { icon: CurrencyDollar, name: 'CurrencyDollar', label: 'Finanzas' },
   { icon: ChartBar, name: 'ChartBar', label: 'Analytics/Datos' },
   { icon: Gear, name: 'Gear', label: 'Operaciones' },
-  { icon: FlaskConical, name: 'FlaskConical', label: 'Laboratorio/I+D' },
+  { icon: Flask, name: 'Flask', label: 'Laboratorio/I+D' },
   { icon: Truck, name: 'Truck', label: 'Logística' },
   { icon: Lightning, name: 'Lightning', label: 'Energía' },
   { icon: ShieldCheck, name: 'ShieldCheck', label: 'Seguridad' },
