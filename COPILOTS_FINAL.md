@@ -184,11 +184,11 @@ Modal con 5 tabs:
 
 ## 💡 Casos de Uso
 
-### Ejemplo 1: Agente Repsol (Producción Industrial)
+### Ejemplo 1: Agente Industrial (Producción)
 
 **Crear template:**
 ```
-Name: Agente Repsol
+Name: Agente Industrial
 Icon: 🏭
 Description: Especializado en producción, refinería y seguridad industrial
 Instructions: Eres un experto en plantas industriales. Prioriza seguridad, normativas EU y eficiencia.
@@ -209,11 +209,11 @@ Todos los chats comparten el contexto y configuración del Agente Industrial. Si
 
 ---
 
-### Ejemplo 2: Agente Vallformosa (Bodega)
+### Ejemplo 2: Agente Logística (Distribución)
 
 **Crear template:**
 ```
-Name: Agente Vallformosa
+Name: Agente Logística
 Icon: 🍷
 Description: Especializado en enología, cosecha y exportaciones
 Instructions: Eres un experto en vinos. Habla de temperatura, acidez, variedades de uva, crianza.
