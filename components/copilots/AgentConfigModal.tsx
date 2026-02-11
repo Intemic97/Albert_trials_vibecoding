@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Robot, Sparkle, Database, Folder } from '@phosphor-icons/react';
+import { X, Robot, Sparkle, Database, Folder, Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning, ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb } from '@phosphor-icons/react';
 import { API_BASE } from '../../config';
 import { Entity } from '../../types';
 
@@ -28,6 +28,15 @@ interface AgentConfigModalProps {
   onClose: () => void;
   onSave: (agent: Agent) => void;
 }
+
+const ICON_MAP: Record<string, any> = {
+  Factory, Wine, CurrencyDollar, ChartBar, Gear, FlaskConical, Truck, Lightning,
+  ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Robot
+};
+
+const getIconComponent = (iconName: string) => {
+  return ICON_MAP[iconName] || Robot;
+};
 
 export const AgentConfigModal: React.FC<AgentConfigModalProps> = ({ agent, onClose, onSave }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'orchestrator' | 'analyst' | 'specialist' | 'synthesis'>('general');
@@ -99,7 +108,14 @@ export const AgentConfigModal: React.FC<AgentConfigModalProps> = ({ agent, onClo
         {/* Header */}
         <div className="p-6 border-b border-[var(--border-light)] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="text-3xl">{icon}</div>
+            {(() => {
+              const IconComponent = getIconComponent(icon);
+              return (
+                <div className="w-12 h-12 rounded-xl bg-[var(--bg-selected)] flex items-center justify-center">
+                  <IconComponent size={24} className="text-white" weight="light" />
+                </div>
+              );
+            })()}
             <div>
               <h3 className="text-lg font-medium" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Configurar Agente</h3>
               <p className="text-xs text-[var(--text-secondary)]">{name}</p>
@@ -142,13 +158,15 @@ export const AgentConfigModal: React.FC<AgentConfigModalProps> = ({ agent, onClo
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Icono</label>
-                <input
-                  value={icon}
-                  onChange={e => setIcon(e.target.value)}
-                  className="w-20 px-3 py-2 border border-[var(--border-medium)] rounded-lg bg-[var(--bg-card)] text-2xl text-center"
-                  placeholder="🤖"
-                  maxLength={2}
-                />
+                <p className="text-xs text-[var(--text-tertiary)] mb-2">El icono no se puede cambiar después de crear el agente</p>
+                {(() => {
+                  const IconComponent = getIconComponent(icon);
+                  return (
+                    <div className="w-16 h-16 rounded-xl bg-[var(--bg-tertiary)]/50 flex items-center justify-center">
+                      <IconComponent size={28} className="text-[var(--text-secondary)]" weight="light" />
+                    </div>
+                  );
+                })()}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Descripción</label>
