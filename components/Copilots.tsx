@@ -163,8 +163,7 @@ export const Copilots: React.FC = () => {
     const [showAgentLibrary, setShowAgentLibrary] = useState(false);
     const [showAgentConfig, setShowAgentConfig] = useState(false);
     const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
-    const [showChatsSection, setShowChatsSection] = useState(true);
-    const [showAgentsSection, setShowAgentsSection] = useState(true);
+    const [activeTab, setActiveTab] = useState<'chats' | 'agents'>('chats');
     const [showNewAgentModal, setShowNewAgentModal] = useState(false);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -1320,34 +1319,58 @@ export const Copilots: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Tus Chats Section */}
+                    {/* Tabs */}
                     <div className="border-b border-[var(--border-light)]">
-                        <button
-                            onClick={() => setShowChatsSection(!showChatsSection)}
-                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--bg-hover)] transition-colors"
-                        >
-                            <div className="flex items-center gap-2">
-                                {showChatsSection ? <CaretDown size={14} weight="bold" /> : <CaretRight size={14} weight="bold" />}
-                                <span className="text-sm font-medium text-[var(--text-primary)]">Tus chats</span>
-                                <span className="text-xs text-[var(--text-tertiary)]">({filteredChats.length})</span>
-                            </div>
+                        <div className="flex">
                             <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCreateCopilot();
-                                }}
-                                className="p-1 hover:bg-[var(--bg-selected)] rounded transition-colors"
-                                title="Nuevo chat"
+                                onClick={() => setActiveTab('chats')}
+                                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
+                                    activeTab === 'chats'
+                                        ? 'text-[var(--text-primary)]'
+                                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                                }`}
                             >
-                                <Plus size={14} weight="bold" className="text-[var(--text-secondary)]" />
+                                <div className="flex items-center justify-center gap-2">
+                                    <span>Chats</span>
+                                    <span className="text-xs">({filteredChats.length})</span>
+                                </div>
+                                {activeTab === 'chats' && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--bg-selected)]"></div>
+                                )}
                             </button>
-                        </button>
+                            <button
+                                onClick={() => setActiveTab('agents')}
+                                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
+                                    activeTab === 'agents'
+                                        ? 'text-[var(--text-primary)]'
+                                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                                }`}
+                            >
+                                <div className="flex items-center justify-center gap-2">
+                                    <span>Agentes</span>
+                                    <span className="text-xs">({agents.length})</span>
+                                </div>
+                                {activeTab === 'agents' && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--bg-selected)]"></div>
+                                )}
+                            </button>
+                        </div>
+                    </div>
 
-                        {showChatsSection && (
-                            <>
-                            <div className="px-3 pb-3">
+                    {/* Tab Content - Chats */}
+                    {activeTab === 'chats' && (
+                        <>
+                            <div className="px-3 pt-3">
+                                <button
+                                    onClick={handleCreateCopilot}
+                                    className="w-full mb-3 px-4 py-2.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2"
+                                >
+                                    <Plus size={16} weight="bold" />
+                                    Nuevo Chat
+                                </button>
+
                                 {/* Filter Pills */}
-                                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                <div className="flex items-center gap-2 mb-2 flex-wrap">
                                     <button
                                         onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
                                         className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
@@ -1394,54 +1417,69 @@ export const Copilots: React.FC = () => {
                             </div>
 
                             {/* Chat List */}
-                            <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
-                        {filteredChats.map(chat => (
-                            <div
-                                key={chat.id}
-                                className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${
-                                    activeChat === chat.id
-                                        ? 'bg-[var(--bg-card)] shadow-sm border border-[var(--border-light)]'
-                                        : 'hover:bg-[var(--bg-card)]/70'
-                                }`}
-                                onClick={() => setActiveChat(chat.id)}
-                            >
-                                {/* Favorite Star */}
-                                {chat.isFavorite && (
-                                    <Star size={12} weight="fill" className="absolute top-1.5 left-1.5 text-amber-500" />
-                                )}
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-                                    activeChat === chat.id
-                                        ? 'bg-[var(--bg-selected)] text-white'
-                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] group-hover:bg-[var(--bg-selected)]'
-                                }`}>
-                                    <IntemicIcon size={14} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-normal truncate text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>{chat.title}</p>
-                                    <div className="flex items-center justify-between gap-2 mt-0.5">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-[var(--text-secondary)]">
-                                                {chat.messages.length} {chat.messages.length === 1 ? 'msg' : 'msgs'}
-                                            </span>
-                                            {chat.tags && chat.tags.length > 0 && (
-                                                <div className="flex items-center gap-1">
-                                                    {chat.tags.slice(0, 2).map(tag => (
+                            <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-1 custom-scrollbar">
+                                {filteredChats.map(chat => {
+                                    const chatAgent = chat.agentId ? agents.find(a => a.id === chat.agentId) : null;
+                                    const getIcon = (iconName: string) => {
+                                        const iconMap: Record<string, any> = {
+                                            Factory, Wine, CurrencyDollar, ChartBar, Gear, Flask, Truck, Lightning,
+                                            ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Robot
+                                        };
+                                        return iconMap[iconName] || Robot;
+                                    };
+                                    
+                                    return (
+                                    <div
+                                        key={chat.id}
+                                        className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${
+                                            activeChat === chat.id
+                                                ? 'bg-[var(--bg-card)] shadow-sm border border-[var(--border-light)]'
+                                                : 'hover:bg-[var(--bg-card)]/70'
+                                        }`}
+                                        onClick={() => setActiveChat(chat.id)}
+                                    >
+                                        {/* Favorite Star */}
+                                        {chat.isFavorite && (
+                                            <Star size={12} weight="fill" className="absolute top-1.5 left-1.5 text-amber-500" />
+                                        )}
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                                            activeChat === chat.id
+                                                ? 'bg-[var(--bg-selected)] text-white'
+                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] group-hover:bg-[var(--bg-selected)]'
+                                        }`}>
+                                            <IntemicIcon size={14} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-normal truncate text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>{chat.title}</p>
+                                            <div className="flex items-center justify-between gap-2 mt-0.5">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-[var(--text-secondary)]">
+                                                        {chat.messages.length} {chat.messages.length === 1 ? 'msg' : 'msgs'}
+                                                    </span>
+                                                    {/* Agent Tag */}
+                                                    {chatAgent && (
+                                                        <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-selected)]/10 text-[var(--text-secondary)]">
+                                                            {(() => {
+                                                                const AgentIcon = getIcon(chatAgent.icon);
+                                                                return <AgentIcon size={10} weight="bold" />;
+                                                            })()}
+                                                            {chatAgent.name}
+                                                        </span>
+                                                    )}
+                                                    {/* Regular Tags */}
+                                                    {chat.tags && chat.tags.slice(0, chatAgent ? 1 : 2).map(tag => (
                                                         <span 
-                                                            key={tag} 
-                                                            className="px-1.5 py-0.5 rounded text-[10px] text-white"
-                                                            style={{ backgroundColor: TAG_COLORS[tag] || TAG_COLORS.default }}
+                                                            key={tag}
+                                                            className="text-[10px] px-1.5 py-0.5 rounded"
+                                                            style={{ backgroundColor: `${TAG_COLORS[tag] || TAG_COLORS.default}20`, color: TAG_COLORS[tag] || TAG_COLORS.default }}
                                                         >
                                                             {tag}
                                                         </span>
                                                     ))}
-                                                    {chat.tags.length > 2 && (
-                                                        <span className="text-[10px] text-[var(--text-tertiary)]">+{chat.tags.length - 2}</span>
-                                                    )}
                                                 </div>
-                                            )}
+                                            </div>
                                         </div>
-                                        {/* Hover action buttons - now inline with message count */}
-                                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -1539,48 +1577,28 @@ export const Copilots: React.FC = () => {
                                             </button>
                                         </div>
                                     </div>
-                                </div>
+                                );
+                                })}
                             </div>
-                        ))}
-                            </div>
-                            </>
-                        )}
-                    </div>
+                        </>
+                    )}
 
-                    {/* Agentes Section */}
-                    <div className="border-b border-[var(--border-light)]">
-                        <button
-                            onClick={() => setShowAgentsSection(!showAgentsSection)}
-                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--bg-hover)] transition-colors"
-                        >
-                            <div className="flex items-center gap-2">
-                                {showAgentsSection ? <CaretDown size={14} weight="bold" /> : <CaretRight size={14} weight="bold" />}
-                                <span className="text-sm font-medium text-[var(--text-primary)]">Agentes</span>
-                                <span className="text-xs text-[var(--text-tertiary)]">({agents.length})</span>
-                            </div>
+                    {/* Tab Content - Agents */}
+                    {activeTab === 'agents' && (
+                        <div className="px-3 pt-3 flex flex-col h-full">
                             <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowNewAgentModal(true);
-                                }}
-                                className="p-1 hover:bg-[var(--bg-selected)] rounded transition-colors"
-                                title="Nuevo agente"
+                                onClick={() => setShowNewAgentModal(true)}
+                                className="w-full mb-3 px-4 py-2.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2"
                             >
-                                <Plus size={14} weight="bold" className="text-[var(--text-secondary)]" />
+                                <Plus size={16} weight="bold" />
+                                Nuevo Agente
                             </button>
-                        </button>
 
-                        {showAgentsSection && (
-                            <div className="px-3 pb-3 space-y-1">
+                            {/* Agent List */}
+                            <div className="flex-1 overflow-y-auto pb-3 space-y-1 custom-scrollbar">
                                 {agents.length === 0 ? (
                                     <div className="p-4 text-center text-xs text-[var(--text-tertiary)]">
                                         No hay agentes creados.
-                                        <button
-                                            onClick={() => setShowNewAgentModal(true)}
-                                            className="block mx-auto mt-2 px-3 py-1.5 bg-[var(--bg-selected)]/10 text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-selected)]/20 transition-colors font-medium"
-                                        >
-                                            Crear primer agente
-                                        </button>
                                     </div>
                                 ) : (
                                     agents.map(agent => {
@@ -1593,41 +1611,41 @@ export const Copilots: React.FC = () => {
                                         };
                                         const AgentIcon = getIcon(agent.icon);
                                         return (
-                                        <div
-                                            key={agent.id}
-                                            className="group flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-[var(--bg-card)]/70 transition-all"
-                                            onClick={() => {
-                                                setSelectedAgentForChat(agent.id);
-                                                setShowAgentLibrary(true);
-                                            }}
-                                        >
-                                            <div className="p-1.5 rounded-lg bg-[var(--bg-hover)] group-hover:bg-[var(--bg-selected)] text-[var(--text-secondary)] group-hover:text-white transition-colors">
-                                                <AgentIcon size={16} weight="light" />
+                                            <div
+                                                key={agent.id}
+                                                className="group flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-[var(--bg-card)]/70 transition-all"
+                                                onClick={() => {
+                                                    setSelectedAgentForChat(agent.id);
+                                                    setShowAgentLibrary(true);
+                                                }}
+                                            >
+                                                <div className="p-1.5 rounded-lg bg-[var(--bg-hover)] group-hover:bg-[var(--bg-selected)] text-[var(--text-secondary)] group-hover:text-white transition-colors">
+                                                    <AgentIcon size={16} weight="light" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-normal truncate text-[var(--text-primary)]">{agent.name}</p>
+                                                    <p className="text-xs text-[var(--text-tertiary)] truncate">{agent.description || 'Agente especializado'}</p>
+                                                </div>
+                                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingAgentId(agent.id);
+                                                            setShowAgentConfig(true);
+                                                        }}
+                                                        className="p-1 hover:bg-[var(--bg-hover)] rounded transition-all"
+                                                        title="Configurar agente"
+                                                    >
+                                                        <GearSix size={12} className="text-[var(--text-tertiary)]" />
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-normal truncate text-[var(--text-primary)]">{agent.name}</p>
-                                                <p className="text-xs text-[var(--text-tertiary)] truncate">{agent.description || 'Agente especializado'}</p>
-                                            </div>
-                                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setEditingAgentId(agent.id);
-                                                        setShowAgentConfig(true);
-                                                    }}
-                                                    className="p-1 hover:bg-[var(--bg-hover)] rounded transition-all"
-                                                    title="Configurar agente"
-                                                >
-                                                    <GearSix size={12} className="text-[var(--text-tertiary)]" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })
+                                        );
+                                    })
                                 )}
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Toggle Sidebar Button (when closed) */}
