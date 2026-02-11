@@ -2076,7 +2076,7 @@ export const Copilots: React.FC = () => {
                                     type="text"
                                     value={copilotName}
                                     onChange={(e) => setCopilotName(e.target.value)}
-                                    placeholder="e.g., Sales Assistant, Customer Support Bot"
+                                    placeholder="ej., Asistente de Ventas, Bot de Soporte"
                                     className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)] transition-all"
                                     autoFocus
                                 />

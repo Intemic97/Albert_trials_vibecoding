@@ -7,12 +7,12 @@
 Los **Agentes** son ahora los contenedores principales (equipos/workspaces especializados), y los **Chats** son conversaciones que viven dentro de cada agente.
 
 ```
-Agente Repsol 🏭
+Agente Industrial 🏭
 ├─ Chat: Análisis producción Q1
 ├─ Chat: Optimización refinería
 └─ Chat: Seguridad planta Barcelona
 
-Agente Vallformosa 🍷
+Agente Logística 🍷
 ├─ Chat: Cosecha 2024
 ├─ Chat: Control calidad
 └─ Chat: Exportaciones
@@ -31,7 +31,7 @@ Agente Finanzas 💰
 CREATE TABLE copilot_agents (
   id TEXT PRIMARY KEY,
   organizationId TEXT NOT NULL,
-  name TEXT NOT NULL,                  -- ej. "Agente Repsol"
+  name TEXT NOT NULL,                  -- ej. "Agente Industrial"
   description TEXT,                    -- Descripción breve
   icon TEXT DEFAULT '🤖',              -- Emoji identificador
   instructions TEXT,                   -- Instrucciones base para todos los chats
@@ -240,7 +240,7 @@ const filteredChats = chats
 
 #### Breadcrumb Header
 ```
-[← Agentes]  |  [🤖 Agente Repsol]  |  [Configurar agente]
+[← Agentes]  |  [🤖 Agente Industrial]  |  [Configurar agente]
 ```
 
 #### API Call con agentId
@@ -257,10 +257,10 @@ fetch(`${API_BASE}/copilot/ask`, {
 
 ---
 
-## Caso de Uso: Repsol
+## Caso de Uso: Empresa Industrial
 
-1. **Crear Agente Repsol**:
-   - Name: "Agente Repsol"
+1. **Crear Agente Industrial**:
+   - Name: "Agente Industrial"
    - Icon: 🏭
    - Description: "Especializado en producción, refinería y seguridad industrial"
    - Instructions: "Eres un experto en plantas industriales. Prioriza seguridad, normativas y eficiencia."
@@ -285,10 +285,10 @@ fetch(`${API_BASE}/copilot/ask`, {
 
 ---
 
-## Caso de Uso: Vallformosa (Bodega)
+## Caso de Uso: Empresa de Distribución
 
-1. **Crear Agente Vallformosa**:
-   - Name: "Agente Vallformosa"
+1. **Crear Agente Logística**:
+   - Name: "Agente Logística"
    - Icon: 🍷
    - Description: "Especializado en enología, cosecha y exportaciones"
    - Instructions: "Eres un experto en vinos. Habla de temperatura, acidez, variedades de uva, crianza."

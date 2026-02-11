@@ -1,6 +1,6 @@
 /**
  * Agent Service - CRUD for copilot agents (refactored: agents are top-level containers)
- * Each agent represents a workspace/team (ej. "Agente Repsol", "Agente Finanzas")
+ * Each agent represents a workspace/team (ej. "Asistente Producción", "Agente Finanzas")
  * with its own configured roles (orchestrator, analyst, specialist, synthesis prompts)
  */
 

@@ -205,7 +205,7 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
                       value={name}
                       onChange={e => setName(e.target.value)}
                       className="w-full px-4 py-3 border border-[var(--border-light)] rounded-lg bg-[var(--bg-card)] focus:border-[var(--border-medium)] focus:ring-1 focus:ring-[var(--border-medium)] transition-all text-base text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none"
-                      placeholder="ej. Agente Repsol, Especialista Producción..."
+                      placeholder="ej. Asistente Producción, Especialista Finanzas..."
                       autoFocus
                     />
                   </div>
@@ -238,7 +238,7 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
                   onChange={e => setInstructions(e.target.value)}
                   rows={8}
                   className="w-full px-4 py-3 border border-[var(--border-light)] rounded-lg bg-[var(--bg-card)] resize-none focus:border-[var(--border-medium)] focus:ring-1 focus:ring-[var(--border-medium)] transition-all text-sm font-mono text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none"
-                  placeholder={`Ejemplo para Agente Repsol:
+                  placeholder={`Ejemplo para Asistente Industrial:
 
 Eres un experto en plantas industriales de producción. Tu objetivo es ayudar con:
 - Análisis de métricas de producción y seguridad

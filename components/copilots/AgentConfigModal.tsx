@@ -153,7 +153,7 @@ export const AgentConfigModal: React.FC<AgentConfigModalProps> = ({ agent, onClo
                   value={name}
                   onChange={e => setName(e.target.value)}
                   className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg bg-[var(--bg-card)] focus:ring-1 focus:ring-teal-500"
-                  placeholder="ej. Agente Repsol"
+                  placeholder="ej. Asistente Producción"
                 />
               </div>
               <div>

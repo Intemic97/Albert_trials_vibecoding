@@ -8,14 +8,14 @@ Los **Chats** son conversaciones independientes, y pueden usar opcionalmente un 
 
 ```
 Chats (principal):
-├─ Chat: Análisis producción Q1 (usa Agente Repsol 🏭)
-├─ Chat: Cosecha 2024 (usa Agente Vallformosa 🍷)
+├─ Chat: Análisis producción Q1 (usa Agente Industrial 🏭)
+├─ Chat: Inventario 2024 (usa Agente Logística 🍷)
 ├─ Chat: Presupuesto 2024 (usa Agente Finanzas 💰)
 └─ Chat: Consulta general (sin agente, configuración manual)
 
 Librería de Agentes (templates compartidos):
-├─ 🏭 Agente Repsol (producción, seguridad, normativas)
-├─ 🍷 Agente Vallformosa (enología, cosecha, exportaciones)
+├─ 🏭 Agente Industrial (producción, seguridad, normativas)
+├─ 🍷 Agente Logística (distribución, inventario, exportaciones)
 ├─ 💰 Agente Finanzas (análisis financiero, presupuestos)
 └─ 📊 Agente Marketing (campañas, métricas, audiencia)
 ```
@@ -58,7 +58,7 @@ Librería de Agentes (templates compartidos):
 CREATE TABLE copilot_agents (
   id TEXT PRIMARY KEY,
   organizationId TEXT NOT NULL,
-  name TEXT NOT NULL,                  -- ej. "Agente Repsol"
+  name TEXT NOT NULL,                  -- ej. "Agente Industrial"
   description TEXT,                    -- Descripción breve
   icon TEXT DEFAULT '🤖',              -- Emoji identificador
   instructions TEXT,                   -- Instrucciones base compartidas
@@ -201,11 +201,11 @@ Prompts personalizados:
 ```
 
 **Usar en chats:**
-- Usuario crea "Chat: Análisis producción Q1" → selecciona Agente Repsol
-- Usuario crea "Chat: Incidentes seguridad" → selecciona Agente Repsol
-- Usuario crea "Chat: Optimización refinería Barcelona" → selecciona Agente Repsol
+- Usuario crea "Chat: Análisis producción Q1" → selecciona Agente Industrial
+- Usuario crea "Chat: Incidentes seguridad" → selecciona Agente Industrial
+- Usuario crea "Chat: Optimización planta A" → selecciona Agente Industrial
 
-Todos los chats comparten el contexto y configuración del Agente Repsol. Si se actualiza el agente (ej. añadir nueva carpeta de docs), afecta a todos.
+Todos los chats comparten el contexto y configuración del Agente Industrial. Si se actualiza el agente (ej. añadir nueva carpeta de docs), afecta a todos.
 
 ---
 
@@ -226,9 +226,9 @@ Prompts:
 ```
 
 **Usar en chats:**
-- "Chat: Cosecha 2024 Cabernet" → Agente Vallformosa
-- "Chat: Control calidad lote A" → Agente Vallformosa
-- "Chat: Exportaciones Q1" → Agente Vallformosa
+- "Chat: Inventario Q1" → Agente Logística
+- "Chat: Control calidad lote A" → Agente Logística
+- "Chat: Exportaciones regionales" → Agente Logística
 
 ---
 
@@ -269,8 +269,8 @@ Chats (principal)
 ### Crear Agente Template:
 1. Sidebar → "Librería de Agentes"
 2. Grid de templates → "Nuevo Agente"
-3. Introducir: icon 🏭, nombre "Agente Repsol", descripción
-4. Click en card "Agente Repsol" → "Configurar"
+3. Introducir: icon 🏭, nombre "Agente Industrial", descripción
+4. Click en card "Agente Industrial" → "Configurar"
 5. Tab "General": seleccionar entidades, carpetas de knowledge
 6. Tab "Analyst": escribir prompt personalizado
 7. Tab "Specialist": escribir prompt personalizado
