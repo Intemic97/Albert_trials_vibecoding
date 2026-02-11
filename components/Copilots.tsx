@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft, Folder, Star, Export, Tag, FileText } from '@phosphor-icons/react';
+import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft, Folder, Star, Export, Tag, FileText, CaretLeft, CaretDown, CaretRight, Factory, Wine, CurrencyDollar, ChartBar, Gear, Flask, Truck, Lightning, ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb } from '@phosphor-icons/react';
+import { AgentLibrary } from './copilots/AgentLibrary';
+import { AgentConfigModal } from './copilots/AgentConfigModal';
+import { NewAgentWorkflow } from './copilots/NewAgentWorkflow';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { API_BASE } from '../config';
 import { Entity, Property } from '../types';
@@ -93,6 +96,13 @@ const IntemicIcon: React.FC<{ size?: number; className?: string }> = ({ size = 1
     );
 };
 
+interface AgentMessage {
+    fromAgent: string;
+    toAgent: string;
+    type: string;
+    content: string;
+}
+
 interface Message {
     id: string;
     role: 'user' | 'assistant';
@@ -101,6 +111,7 @@ interface Message {
     data?: any;
     explanation?: string;
     entitiesUsed?: string[];
+    agentConversation?: AgentMessage[];
 }
 
 interface Chat {
@@ -113,6 +124,21 @@ interface Chat {
     allowedEntities?: string[];
     isFavorite?: boolean;
     tags?: string[];
+    agentId?: string;
+}
+
+interface Agent {
+    id: string;
+    name: string;
+    description?: string;
+    icon: string;
+    instructions?: string;
+    allowedEntities?: string[];
+    folderIds?: string[];
+    orchestratorPrompt?: string;
+    analystPrompt?: string;
+    specialistPrompt?: string;
+    synthesisPrompt?: string;
 }
 
 // Predefined tag colors
@@ -131,11 +157,19 @@ export const Copilots: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { notifications, removeNotification, error: showError, warning } = useNotifications(3000);
+    const [agents, setAgents] = useState<Agent[]>([]);
     const [chats, setChats] = useState<Chat[]>([]);
     const [activeChat, setActiveChat] = useState<string | null>(null);
+    const [showAgentLibrary, setShowAgentLibrary] = useState(false);
+    const [showAgentConfig, setShowAgentConfig] = useState(false);
+    const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
+    const [showChatsSection, setShowChatsSection] = useState(true);
+    const [showAgentsSection, setShowAgentsSection] = useState(true);
+    const [showNewAgentModal, setShowNewAgentModal] = useState(false);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [expandedExplanations, setExpandedExplanations] = useState<Set<string>>(new Set());
+    const [expandedAgentConversations, setExpandedAgentConversations] = useState<Set<string>>(new Set());
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editingTitle, setEditingTitle] = useState('');
@@ -157,6 +191,7 @@ export const Copilots: React.FC = () => {
     const [showTagMenu, setShowTagMenu] = useState<string | null>(null);
     const [newTagInput, setNewTagInput] = useState('');
     const [showExportModal, setShowExportModal] = useState(false);
+    const [selectedAgentForChat, setSelectedAgentForChat] = useState<string | null>(null);
     const [allTags, setAllTags] = useState<string[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -186,11 +221,12 @@ export const Copilots: React.FC = () => {
     });
     const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
 
-    // Load chats from backend on mount (only once)
+    // Load agents and chats on mount
     useEffect(() => {
         let mounted = true;
         
         const initialize = async () => {
+            await loadAgents();
             await loadEntities();
             if (mounted) {
                 await loadChats();
@@ -202,7 +238,19 @@ export const Copilots: React.FC = () => {
         return () => {
             mounted = false;
         };
-    }, []); // Empty dependency array - only run on mount
+    }, []);
+
+    const loadAgents = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/copilot/agents`, { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                setAgents(data.agents || []);
+            }
+        } catch (err) {
+            console.error('Error loading agents:', err);
+        }
+    };
 
     const loadEntities = async () => {
         try {
@@ -283,11 +331,12 @@ export const Copilots: React.FC = () => {
                             role: m.role,
                             content: m.content || '',
                             timestamp: m.timestamp ? (m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp) : new Date().toISOString(),
-                            data: m.data,
-                            explanation: m.explanation,
-                            entitiesUsed: m.entitiesUsed
-                        })),
-                        createdAt: chat.createdAt ? (chat.createdAt instanceof Date ? chat.createdAt.toISOString() : chat.createdAt) : new Date().toISOString(),
+                    data: m.data,
+                    explanation: m.explanation,
+                    entitiesUsed: m.entitiesUsed,
+                    agentConversation: m.agentConversation
+                })),
+                createdAt: chat.createdAt ? (chat.createdAt instanceof Date ? chat.createdAt.toISOString() : chat.createdAt) : new Date().toISOString(),
                         updatedAt: chat.updatedAt ? (chat.updatedAt instanceof Date ? chat.updatedAt.toISOString() : chat.updatedAt) : new Date().toISOString(),
                         instructions: chat.instructions || null,
                         allowedEntities: Array.isArray(chat.allowedEntities) && chat.allowedEntities.length > 0 ? chat.allowedEntities : null,
@@ -341,6 +390,7 @@ export const Copilots: React.FC = () => {
                             updatedAt: chat.updatedAt ? new Date(chat.updatedAt) : new Date(),
                             instructions: chat.instructions || undefined,
                             allowedEntities: Array.isArray(chat.allowedEntities) ? chat.allowedEntities : [],
+                            agentId: chat.agentId || undefined,
                             isFavorite: chat.isFavorite || false,
                             tags: Array.isArray(chat.tags) ? chat.tags : [],
                             messages: Array.isArray(chat.messages) ? chat.messages.map((msg: any) => ({
@@ -350,7 +400,8 @@ export const Copilots: React.FC = () => {
                                 timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
                                 data: msg.data,
                                 explanation: msg.explanation,
-                                entitiesUsed: msg.entitiesUsed
+                                entitiesUsed: msg.entitiesUsed,
+                                agentConversation: msg.agentConversation
                             })) : []
                         };
                     } catch (parseError) {
@@ -381,12 +432,14 @@ export const Copilots: React.FC = () => {
                     timestamp: m.timestamp ? (m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp) : new Date().toISOString(),
                     data: m.data,
                     explanation: m.explanation,
-                    entitiesUsed: m.entitiesUsed
+                    entitiesUsed: m.entitiesUsed,
+                    agentConversation: m.agentConversation
                 })),
                 createdAt: chat.createdAt ? (chat.createdAt instanceof Date ? chat.createdAt.toISOString() : chat.createdAt) : new Date().toISOString(),
                 updatedAt: chat.updatedAt ? (chat.updatedAt instanceof Date ? chat.updatedAt.toISOString() : chat.updatedAt) : new Date().toISOString(),
                 instructions: chat.instructions || null,
                 allowedEntities: Array.isArray(chat.allowedEntities) && chat.allowedEntities.length > 0 ? chat.allowedEntities : null,
+                agentId: chat.agentId || null,
                 isFavorite: chat.isFavorite || false,
                 tags: Array.isArray(chat.tags) && chat.tags.length > 0 ? chat.tags : null
             };
@@ -413,7 +466,8 @@ export const Copilots: React.FC = () => {
         setShowCopilotModal(true);
     };
 
-    const createNewChat = async (name?: string, instructions?: string, entities?: string[]): Promise<Chat> => {
+    const createNewChat = async (name?: string, instructions?: string, entities?: string[], agentIdOverride?: string): Promise<Chat> => {
+        const chatAgentId = agentIdOverride || selectedAgentForChat;
         const defaultInstructions = instructions || "You are a helpful database assistant. Help users navigate through your entities, find records, and answer questions about relationships between tables.";
         const welcomeMessage = instructions 
             ? `Hello! I'm ${name || 'your Copilot'}. ${instructions}\n\nWhat would you like to know?`
@@ -431,7 +485,8 @@ export const Copilots: React.FC = () => {
             createdAt: new Date(),
             updatedAt: new Date(),
             instructions: defaultInstructions,
-            allowedEntities: entities || []
+            allowedEntities: entities || [],
+            agentId: chatAgentId || undefined
         };
 
         setChats(prev => [newChat, ...prev]);
@@ -451,7 +506,8 @@ export const Copilots: React.FC = () => {
                 createdAt: newChat.createdAt.toISOString(),
                 updatedAt: newChat.updatedAt.toISOString(),
                 instructions: newChat.instructions || null,
-                allowedEntities: newChat.allowedEntities && newChat.allowedEntities.length > 0 ? newChat.allowedEntities : null
+                allowedEntities: newChat.allowedEntities && newChat.allowedEntities.length > 0 ? newChat.allowedEntities : null,
+                agentId: newChat.agentId || null
             };
             await fetch(`${API_BASE}/copilot/chats`, {
                 method: 'POST',
@@ -740,7 +796,7 @@ export const Copilots: React.FC = () => {
             
             console.log('[Copilots] Extracted entity mentions:', mentionedEntityNames, '-> IDs:', mentionedEntityIds);
 
-            const response = await fetch(`${API_BASE}/database/ask`, {
+                const response = await fetch(`${API_BASE}/copilot/ask`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -751,9 +807,11 @@ export const Copilots: React.FC = () => {
                         content: m.content
                     })),
                     chatId: currentChat.id,
+                    agentId: currentChat.agentId,
                     instructions: currentChat.instructions,
                     allowedEntities: currentChat.allowedEntities,
-                    mentionedEntities: mentionedEntityIds.length > 0 ? mentionedEntityIds : undefined
+                    mentionedEntities: mentionedEntityIds.length > 0 ? mentionedEntityIds : undefined,
+                    useMultiAgent: true
                 })
             });
 
@@ -766,7 +824,8 @@ export const Copilots: React.FC = () => {
                 timestamp: new Date(),
                 data: data.queryResults,
                 explanation: data.explanation,
-                entitiesUsed: data.entitiesUsed
+                entitiesUsed: data.entitiesUsed,
+                agentConversation: data.agentConversation
             };
 
             const finalChat = {
@@ -1125,6 +1184,8 @@ export const Copilots: React.FC = () => {
         );
     };
 
+    const currentAgent = agents.find(a => a.id === currentChat?.agentId);
+
     return (
         <div className="h-screen flex flex-col bg-[var(--bg-primary)]">
             {/* Top Bar */}
@@ -1138,6 +1199,25 @@ export const Copilots: React.FC = () => {
                         <span className="font-medium">Back</span>
                     </button>
                     <div className="h-6 w-px bg-[var(--bg-selected)]"></div>
+                    {currentAgent && (
+                        <>
+                            <div className="flex items-center gap-2 px-2 py-1 bg-[var(--bg-tertiary)]/30 rounded-lg">
+                                {(() => {
+                                    const getIcon = (iconName: string) => {
+                                        const iconMap: Record<string, any> = {
+                                            Factory, Wine, CurrencyDollar, ChartBar, Gear, Flask, Truck, Lightning,
+                                            ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Robot
+                                        };
+                                        return iconMap[iconName] || Robot;
+                                    };
+                                    const AgentIcon = getIcon(currentAgent.icon);
+                                    return <AgentIcon size={14} weight="light" className="text-[var(--text-secondary)]" />;
+                                })()}
+                                <span className="text-xs text-[var(--text-secondary)]">{currentAgent.name}</span>
+                            </div>
+                            <div className="h-6 w-px bg-[var(--bg-selected)]"></div>
+                        </>
+                    )}
                     <div className="flex items-center gap-2">
                         {isEditingTitle ? (
                             <input
@@ -1219,7 +1299,7 @@ export const Copilots: React.FC = () => {
                     {/* Sidebar Header */}
                     <div className="p-4 border-b border-[var(--border-light)] shrink-0 bg-[var(--bg-card)]">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xs font-light text-[var(--text-tertiary)] uppercase tracking-wider" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Your Copilots</h2>
+                            <h2 className="text-xs font-light text-[var(--text-tertiary)] uppercase tracking-wider" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Conversaciones</h2>
                             <button
                                 onClick={() => setIsSidebarOpen(false)}
                                 className="p-1.5 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
@@ -1238,63 +1318,83 @@ export const Copilots: React.FC = () => {
                                 className="w-full pl-9 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                             />
                         </div>
-                        <button
-                            onClick={handleCreateCopilot}
-                            className="w-full flex items-center justify-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
-                        >
-                            <Sparkle size={14} className="mr-2" weight="light" />
-                            New Copilot
-                        </button>
-                        
-                        {/* Filter Pills */}
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            <button
-                                onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                                className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
-                                    showFavoritesOnly 
-                                        ? 'bg-amber-500/20 text-amber-500' 
-                                        : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]'
-                                }`}
-                            >
-                                <Star size={12} weight={showFavoritesOnly ? "fill" : "regular"} />
-                                Favorites
-                            </button>
-                            {allTags.length > 0 && (
-                                <div className="flex items-center gap-1 flex-wrap">
-                                    {allTags.slice(0, 3).map(tag => (
-                                        <button
-                                            key={tag}
-                                            onClick={() => setFilterTag(filterTag === tag ? null : tag)}
-                                            className={`px-2 py-1 rounded-md text-xs transition-colors ${
-                                                filterTag === tag 
-                                                    ? 'text-white' 
-                                                    : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]'
-                                            }`}
-                                            style={{ 
-                                                backgroundColor: filterTag === tag ? (TAG_COLORS[tag] || TAG_COLORS.default) : undefined 
-                                            }}
-                                        >
-                                            #{tag}
-                                        </button>
-                                    ))}
-                                    {allTags.length > 3 && (
-                                        <span className="text-xs text-[var(--text-tertiary)]">+{allTags.length - 3}</span>
-                                    )}
-                                </div>
-                            )}
-                            {(showFavoritesOnly || filterTag) && (
-                                <button
-                                    onClick={() => { setShowFavoritesOnly(false); setFilterTag(null); }}
-                                    className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-                                >
-                                    Clear
-                                </button>
-                            )}
-                        </div>
                     </div>
 
-                    {/* Chat List */}
-                    <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
+                    {/* Tus Chats Section */}
+                    <div className="border-b border-[var(--border-light)]">
+                        <button
+                            onClick={() => setShowChatsSection(!showChatsSection)}
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--bg-hover)] transition-colors"
+                        >
+                            <div className="flex items-center gap-2">
+                                {showChatsSection ? <CaretDown size={14} weight="bold" /> : <CaretRight size={14} weight="bold" />}
+                                <span className="text-sm font-medium text-[var(--text-primary)]">Tus chats</span>
+                                <span className="text-xs text-[var(--text-tertiary)]">({filteredChats.length})</span>
+                            </div>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCreateCopilot();
+                                }}
+                                className="p-1 hover:bg-[var(--bg-selected)] rounded transition-colors"
+                                title="Nuevo chat"
+                            >
+                                <Plus size={14} weight="bold" className="text-[var(--text-secondary)]" />
+                            </button>
+                        </button>
+
+                        {showChatsSection && (
+                            <>
+                            <div className="px-3 pb-3">
+                                {/* Filter Pills */}
+                                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                    <button
+                                        onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                                        className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
+                                            showFavoritesOnly 
+                                                ? 'bg-amber-500/20 text-amber-500' 
+                                                : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]'
+                                        }`}
+                                    >
+                                        <Star size={12} weight={showFavoritesOnly ? "fill" : "regular"} />
+                                        Favorites
+                                    </button>
+                                    {allTags.length > 0 && (
+                                        <div className="flex items-center gap-1 flex-wrap">
+                                            {allTags.slice(0, 3).map(tag => (
+                                                <button
+                                                    key={tag}
+                                                    onClick={() => setFilterTag(filterTag === tag ? null : tag)}
+                                                    className={`px-2 py-1 rounded-md text-xs transition-colors ${
+                                                        filterTag === tag 
+                                                            ? 'text-white' 
+                                                            : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]'
+                                                    }`}
+                                                    style={{ 
+                                                        backgroundColor: filterTag === tag ? (TAG_COLORS[tag] || TAG_COLORS.default) : undefined 
+                                                    }}
+                                                >
+                                                    #{tag}
+                                                </button>
+                                            ))}
+                                            {allTags.length > 3 && (
+                                                <span className="text-xs text-[var(--text-tertiary)]">+{allTags.length - 3}</span>
+                                            )}
+                                        </div>
+                                    )}
+                                    {(showFavoritesOnly || filterTag) && (
+                                        <button
+                                            onClick={() => { setShowFavoritesOnly(false); setFilterTag(null); }}
+                                            className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Chat List */}
+                            <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
                         {filteredChats.map(chat => (
                             <div
                                 key={chat.id}
@@ -1442,6 +1542,91 @@ export const Copilots: React.FC = () => {
                                 </div>
                             </div>
                         ))}
+                            </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Agentes Section */}
+                    <div className="border-b border-[var(--border-light)]">
+                        <button
+                            onClick={() => setShowAgentsSection(!showAgentsSection)}
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--bg-hover)] transition-colors"
+                        >
+                            <div className="flex items-center gap-2">
+                                {showAgentsSection ? <CaretDown size={14} weight="bold" /> : <CaretRight size={14} weight="bold" />}
+                                <span className="text-sm font-medium text-[var(--text-primary)]">Agentes</span>
+                                <span className="text-xs text-[var(--text-tertiary)]">({agents.length})</span>
+                            </div>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowNewAgentModal(true);
+                                }}
+                                className="p-1 hover:bg-[var(--bg-selected)] rounded transition-colors"
+                                title="Nuevo agente"
+                            >
+                                <Plus size={14} weight="bold" className="text-[var(--text-secondary)]" />
+                            </button>
+                        </button>
+
+                        {showAgentsSection && (
+                            <div className="px-3 pb-3 space-y-1">
+                                {agents.length === 0 ? (
+                                    <div className="p-4 text-center text-xs text-[var(--text-tertiary)]">
+                                        No hay agentes creados.
+                                        <button
+                                            onClick={() => setShowNewAgentModal(true)}
+                                            className="block mx-auto mt-2 px-3 py-1.5 bg-[var(--bg-selected)]/10 text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-selected)]/20 transition-colors font-medium"
+                                        >
+                                            Crear primer agente
+                                        </button>
+                                    </div>
+                                ) : (
+                                    agents.map(agent => {
+                                        const getIcon = (iconName: string) => {
+                                            const iconMap: Record<string, any> = {
+                                                Factory, Wine, CurrencyDollar, ChartBar, Gear, Flask, Truck, Lightning,
+                                                ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Robot
+                                            };
+                                            return iconMap[iconName] || Robot;
+                                        };
+                                        const AgentIcon = getIcon(agent.icon);
+                                        return (
+                                        <div
+                                            key={agent.id}
+                                            className="group flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-[var(--bg-card)]/70 transition-all"
+                                            onClick={() => {
+                                                setSelectedAgentForChat(agent.id);
+                                                setShowAgentLibrary(true);
+                                            }}
+                                        >
+                                            <div className="p-1.5 rounded-lg bg-[var(--bg-hover)] group-hover:bg-[var(--bg-selected)] text-[var(--text-secondary)] group-hover:text-white transition-colors">
+                                                <AgentIcon size={16} weight="light" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-normal truncate text-[var(--text-primary)]">{agent.name}</p>
+                                                <p className="text-xs text-[var(--text-tertiary)] truncate">{agent.description || 'Agente especializado'}</p>
+                                            </div>
+                                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEditingAgentId(agent.id);
+                                                        setShowAgentConfig(true);
+                                                    }}
+                                                    className="p-1 hover:bg-[var(--bg-hover)] rounded transition-all"
+                                                    title="Configurar agente"
+                                                >
+                                                    <GearSix size={12} className="text-[var(--text-tertiary)]" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -1485,9 +1670,10 @@ export const Copilots: React.FC = () => {
                                                     style={{ 
                                                         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
                                                         lineHeight: '1.6',
-                                                        letterSpacing: '0.01em'
+                                                        letterSpacing: '0.01em',
+                                                        minHeight: '64px',
+                                                        maxHeight: '200px'
                                                     }}
-                                                    style={{ minHeight: '64px', maxHeight: '200px' }}
                                                     disabled={isLoading}
                                                 />
                                                 {/* Mention suggestions popover */}
@@ -1667,6 +1853,39 @@ export const Copilots: React.FC = () => {
                                                                         ))}
                                                                     </div>
                                                                 )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Ver razonamiento - conversación entre agentes */}
+                                                {message.role === 'assistant' && message.agentConversation && message.agentConversation.length > 0 && (
+                                                    <div className="mt-4 pt-4 border-t border-[var(--border-light)]">
+                                                        <button
+                                                            onClick={() => setExpandedAgentConversations(prev => {
+                                                                const next = new Set(prev);
+                                                                if (next.has(message.id)) next.delete(message.id);
+                                                                else next.add(message.id);
+                                                                return next;
+                                                            })}
+                                                            className="flex items-center gap-2 text-sm text-violet-600 hover:text-violet-700 font-medium transition-colors"
+                                                        >
+                                                            <ChatCircle size={14} weight="light" />
+                                                            Ver razonamiento ({message.agentConversation.length} mensajes entre agentes)
+                                                        </button>
+                                                        {expandedAgentConversations.has(message.id) && (
+                                                            <div className="mt-3 space-y-2">
+                                                                {message.agentConversation.map((a, idx) => (
+                                                                    <div key={idx} className="p-3 bg-violet-50 rounded-lg text-xs border border-violet-100">
+                                                                        <span className="font-medium text-violet-700">{a.fromAgent}</span>
+                                                                        <span className="text-[var(--text-tertiary)]"> → </span>
+                                                                        <span className="font-medium text-violet-700">{a.toAgent}</span>
+                                                                        <span className="text-[var(--text-tertiary)]"> ({a.type})</span>
+                                                                        <p className="mt-2 text-[var(--text-secondary)] whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+                                                                            {a.content?.length > 300 ? a.content.slice(0, 300) + '...' : a.content}
+                                                                        </p>
+                                                                    </div>
+                                                                ))}
                                                             </div>
                                                         )}
                                                     </div>
@@ -1862,6 +2081,62 @@ export const Copilots: React.FC = () => {
                                 </p>
                             </div>
 
+                            {/* Agent Template Section */}
+                            <div className="space-y-2.5">
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                                    Agente Especializado
+                                    <span className="ml-1.5 text-xs text-[var(--text-tertiary)] font-normal">(Opcional) Usa un template con configuración predefinida</span>
+                                </label>
+                                <div className="flex gap-2">
+                                    {selectedAgentForChat ? (
+                                        <>
+                                            <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-[var(--bg-selected)]/10 border border-[var(--bg-selected)]/30 rounded-lg">
+                                                {(() => {
+                                                    const agentIcon = agents.find(a => a.id === selectedAgentForChat)?.icon || 'Robot';
+                                                    const getIcon = (iconName: string) => {
+                                                        const iconMap: Record<string, any> = {
+                                                            Factory, Wine, CurrencyDollar, ChartBar, Gear, Flask, Truck, Lightning,
+                                                            ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Robot
+                                                        };
+                                                        return iconMap[iconName] || Robot;
+                                                    };
+                                                    const AgentIconComp = getIcon(agentIcon);
+                                                    return <div className="p-2 rounded-lg bg-[var(--bg-selected)] text-white"><AgentIconComp size={20} weight="light" /></div>;
+                                                })()}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                                                        {agents.find(a => a.id === selectedAgentForChat)?.name || 'Agente'}
+                                                    </p>
+                                                    <p className="text-xs text-[var(--text-secondary)] line-clamp-1">
+                                                        {agents.find(a => a.id === selectedAgentForChat)?.description || ''}
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={() => setSelectedAgentForChat(null)}
+                                                    className="p-1.5 hover:bg-red-100 rounded-lg text-red-600 transition-colors"
+                                                    title="Quitar agente"
+                                                >
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <button
+                                            onClick={() => setShowAgentLibrary(true)}
+                                            className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-[var(--border-medium)] hover:border-teal-500 hover:bg-teal-50/50 rounded-lg text-sm text-[var(--text-secondary)] hover:text-teal-600 transition-colors"
+                                        >
+                                            <Robot size={18} weight="light" />
+                                            Seleccionar agente de la librería
+                                        </button>
+                                    )}
+                                </div>
+                                {selectedAgentForChat && (
+                                    <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                                        Este chat usará la configuración, entidades y knowledge base del agente seleccionado.
+                                    </p>
+                                )}
+                            </div>
+
                             {/* Entity Selection */}
                             <div>
                                 <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
@@ -2012,6 +2287,62 @@ export const Copilots: React.FC = () => {
                                 <p className="text-xs text-[var(--text-secondary)] mt-2">
                                     Describe the copilot's role, tone, and focus areas. Mention which datasets it should prioritize.
                                 </p>
+                            </div>
+
+                            {/* Agent Template Section */}
+                            <div className="space-y-2.5">
+                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                                    Agente Especializado
+                                    <span className="ml-1.5 text-xs text-[var(--text-tertiary)] font-normal">(Opcional) Usa un template con configuración predefinida</span>
+                                </label>
+                                <div className="flex gap-2">
+                                    {selectedAgentForChat ? (
+                                        <>
+                                            <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-[var(--bg-selected)]/10 border border-[var(--bg-selected)]/30 rounded-lg">
+                                                {(() => {
+                                                    const agentIcon = agents.find(a => a.id === selectedAgentForChat)?.icon || 'Robot';
+                                                    const getIcon = (iconName: string) => {
+                                                        const iconMap: Record<string, any> = {
+                                                            Factory, Wine, CurrencyDollar, ChartBar, Gear, Flask, Truck, Lightning,
+                                                            ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Robot
+                                                        };
+                                                        return iconMap[iconName] || Robot;
+                                                    };
+                                                    const AgentIconComp = getIcon(agentIcon);
+                                                    return <div className="p-2 rounded-lg bg-[var(--bg-selected)] text-white"><AgentIconComp size={20} weight="light" /></div>;
+                                                })()}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                                                        {agents.find(a => a.id === selectedAgentForChat)?.name || 'Agente'}
+                                                    </p>
+                                                    <p className="text-xs text-[var(--text-secondary)] line-clamp-1">
+                                                        {agents.find(a => a.id === selectedAgentForChat)?.description || ''}
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={() => setSelectedAgentForChat(null)}
+                                                    className="p-1.5 hover:bg-red-100 rounded-lg text-red-600 transition-colors"
+                                                    title="Quitar agente"
+                                                >
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <button
+                                            onClick={() => setShowAgentLibrary(true)}
+                                            className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-[var(--border-medium)] hover:border-teal-500 hover:bg-teal-50/50 rounded-lg text-sm text-[var(--text-secondary)] hover:text-teal-600 transition-colors"
+                                        >
+                                            <Robot size={18} weight="light" />
+                                            Seleccionar agente de la librería
+                                        </button>
+                                    )}
+                                </div>
+                                {selectedAgentForChat && (
+                                    <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                                        Este chat usará la configuración, entidades y knowledge base del agente seleccionado.
+                                    </p>
+                                )}
                             </div>
 
                             {/* Entity Selection */}
@@ -2185,6 +2516,33 @@ export const Copilots: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {showAgentLibrary && (
+                <AgentLibrary
+                    onClose={() => setShowAgentLibrary(false)}
+                    onSelectAgent={(agentId) => {
+                        setSelectedAgentForChat(agentId);
+                    }}
+                    selectedAgentId={selectedAgentForChat}
+                />
+            )}
+
+            {showAgentConfig && editingAgentId && (
+                <AgentConfigModal
+                    agent={agents.find(a => a.id === editingAgentId)!}
+                    onClose={() => {
+                        setShowAgentConfig(false);
+                        setEditingAgentId(null);
+                    }}
+                    onSave={async () => {
+                        await loadAgents();
+                        setShowAgentConfig(false);
+                        setEditingAgentId(null);
+                    }}
+                />
+            )}
+
+            {showNewAgentModal && <NewAgentWorkflow onClose={() => setShowNewAgentModal(false)} onComplete={async () => { await loadAgents(); setShowNewAgentModal(false); }} />}
             
             {/* Toast Notifications */}
             <ToastContainer notifications={notifications} onDismiss={removeNotification} position="bottom-right" />

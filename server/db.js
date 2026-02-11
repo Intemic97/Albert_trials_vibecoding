@@ -816,6 +816,83 @@ async function initDb() {
     // Column already exists, ignore
   }
 
+  try {
+    await db.exec(`ALTER TABLE copilot_chats ADD COLUMN agentIds TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  try {
+    await db.exec(`ALTER TABLE copilot_chats ADD COLUMN agentId TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migrate old copilot_agents schema to new (if old columns exist)
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN description TEXT`);
+  } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN icon TEXT DEFAULT '🤖'`);
+  } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN orchestratorPrompt TEXT`);
+  } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN analystPrompt TEXT`);
+  } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN specialistPrompt TEXT`);
+  } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN synthesisPrompt TEXT`);
+  } catch (e) {}
+
+  // Multi-agent: copilot_agents table (refactored: agents are now top-level containers)
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS copilot_agents (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      icon TEXT DEFAULT '🤖',
+      instructions TEXT,
+      allowedEntities TEXT,
+      folderIds TEXT,
+      orchestratorPrompt TEXT,
+      analystPrompt TEXT,
+      specialistPrompt TEXT,
+      synthesisPrompt TEXT,
+      sortOrder INTEGER DEFAULT 0,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Multi-agent: agent_conversations (inter-agent messages per turn)
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_conversations (
+      id TEXT PRIMARY KEY,
+      chatId TEXT NOT NULL,
+      turnIndex INTEGER NOT NULL,
+      messageId TEXT,
+      fromAgent TEXT NOT NULL,
+      toAgent TEXT NOT NULL,
+      type TEXT,
+      content TEXT,
+      metadata TEXT,
+      createdAt TEXT,
+      FOREIGN KEY(chatId) REFERENCES copilot_chats(id) ON DELETE CASCADE
+    )
+  `);
+
+  try {
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_conversations_chat ON agent_conversations(chatId, turnIndex)`);
+  } catch (e) {
+    // Index might already exist
+  }
+
   // Migration: Add grid layout columns to widgets table
   try {
     await db.exec(`ALTER TABLE widgets ADD COLUMN gridX INTEGER DEFAULT 0`);
