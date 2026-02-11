@@ -26,7 +26,8 @@ export type NodeType =
   | 'splitColumns' 
   | 'mysql' 
   | 'sendEmail' 
-  | 'sendSMS' 
+  | 'sendSMS'
+  | 'sendWhatsApp' 
   | 'dataVisualization' 
   | 'webhook' 
   | 'sapFetch' 
@@ -135,6 +136,12 @@ export interface NodeConfig {
   twilioAccountSid?: string;
   twilioAuthToken?: string;
   twilioFromNumber?: string;
+  // For Send WhatsApp nodes:
+  whatsappTo?: string;
+  whatsappBody?: string;
+  whatsappTwilioAccountSid?: string;
+  whatsappTwilioAuthToken?: string;
+  whatsappTwilioFromNumber?: string;
   // For Data Visualization nodes:
   visualizationPrompt?: string;
   generatedWidget?: WidgetConfig;

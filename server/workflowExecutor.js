@@ -261,6 +261,7 @@ class WorkflowExecutor {
             mysql: () => this.handleMySQL(node, inputData),
             sendEmail: () => this.handleSendEmail(node, inputData),
             sendSMS: () => this.handleSendSMS(node, inputData),
+            sendWhatsApp: () => this.handleSendWhatsApp(node, inputData),
             sendSlack: () => this.handleSendSlack(node, inputData),
             sendDiscord: () => this.handleSendDiscord(node, inputData),
             sendTeams: () => this.handleSendTeams(node, inputData),
@@ -969,6 +970,36 @@ class WorkflowExecutor {
             };
         } catch (error) {
             throw new Error(`Failed to send SMS: ${error.message}`);
+        }
+    }
+
+    async handleSendWhatsApp(node, inputData) {
+        const config = node.config || {};
+        const { whatsappTo, whatsappBody, whatsappTwilioAccountSid, whatsappTwilioAuthToken, whatsappTwilioFromNumber } = config;
+
+        if (!whatsappTo || !whatsappTwilioAccountSid || !whatsappTwilioAuthToken || !whatsappTwilioFromNumber) {
+            throw new Error('WhatsApp configuration incomplete. Please provide Twilio credentials and phone numbers.');
+        }
+
+        try {
+            const twilio = require('twilio');
+            const client = twilio(whatsappTwilioAccountSid, whatsappTwilioAuthToken);
+
+            const message = await client.messages.create({
+                body: whatsappBody || '',
+                from: `whatsapp:${whatsappTwilioFromNumber}`,
+                to: `whatsapp:${whatsappTo}`
+            });
+
+            return {
+                success: true,
+                message: `WhatsApp sent to ${whatsappTo}`,
+                outputData: inputData,
+                messageSid: message.sid,
+                status: message.status
+            };
+        } catch (error) {
+            throw new Error(`Failed to send WhatsApp: ${error.message}`);
         }
     }
 

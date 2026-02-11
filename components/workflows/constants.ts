@@ -29,6 +29,7 @@ import {
   DiscordLogo,
   MicrosoftTeamsLogo,
   TelegramLogo,
+  WhatsappLogo,
   GoogleLogo,
   Factory,
   Cpu,
@@ -82,6 +83,7 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   // Actions
   { type: 'sendEmail', label: 'Send Email', icon: Envelope, description: 'Send an email notification', category: 'Actions' },
   { type: 'sendSMS', label: 'Send SMS', icon: DeviceMobile, description: 'Send an SMS text message via Twilio', category: 'Actions' },
+  { type: 'sendWhatsApp', label: 'Send WhatsApp', icon: WhatsappLogo, description: 'Send a WhatsApp message via Twilio', category: 'Actions' },
   { type: 'sendSlack', label: 'Send Slack', icon: SlackLogo, description: 'Send a message to Slack channel', category: 'Actions' },
   { type: 'sendDiscord', label: 'Send Discord', icon: DiscordLogo, description: 'Send a message to Discord channel', category: 'Actions' },
   { type: 'sendTeams', label: 'Send Teams', icon: MicrosoftTeamsLogo, description: 'Send a message to Microsoft Teams', category: 'Actions' },
@@ -134,6 +136,7 @@ export const NODE_ICONS: Record<NodeType, React.ElementType> = {
   mysql: Database,
   sendEmail: Envelope,
   sendSMS: DeviceMobile,
+  sendWhatsApp: WhatsappLogo,
   dataVisualization: ChartBar,
   webhook: Globe,
   sapFetch: Database,

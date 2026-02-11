@@ -117,6 +117,8 @@ export const getNodeSummary = (node: WorkflowNode): string | null => {
       return node.config?.emailTo || null;
     case 'sendSMS':
       return node.config?.smsTo || null;
+    case 'sendWhatsApp':
+      return node.config?.whatsappTo || null;
     default:
       return null;
   }

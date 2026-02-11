@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { FlowArrow as Workflow, Lightning as Zap, Play, CheckCircle, WarningCircle as AlertCircle, ArrowRight, ArrowLeft, X, FloppyDisk as Save, FolderOpen, Trash, PlayCircle, Check, XCircle, Database, Wrench, MagnifyingGlass as Search, CaretDoubleLeft as ChevronsLeft, CaretDoubleRight as ChevronsRight, Sparkle as Sparkles, Code, PencilSimple as Edit, SignOut as LogOut, ChatCircle as MessageSquare, Globe, Leaf, Share as Share2, UserCheck, GitMerge, FileXls as FileSpreadsheet, FileText, UploadSimple as Upload, Columns, DotsSixVertical as GripVertical, Users, Envelope as Mail, BookOpen, Copy, Eye, Clock, ClockCounterClockwise as History, ArrowsOut as Maximize2, MagnifyingGlassPlus as ZoomIn, MagnifyingGlassMinus as ZoomOut, Robot as Bot, DeviceMobile as Smartphone, ChartBar as BarChart3, User, Calendar, CaretRight as ChevronRight, CaretDown as ChevronDown, CaretUp as ChevronUp, Plus, Folder, ShieldCheck as Shield, Terminal, Tag, DotsThreeVertical as MoreVertical, WebhooksLogo as Webhook, Flask as FlaskConical, TrendUp, Bell, FilePdf, Bug, Pi } from '@phosphor-icons/react';
+import { FlowArrow as Workflow, Lightning as Zap, Play, CheckCircle, WarningCircle as AlertCircle, ArrowRight, ArrowLeft, X, FloppyDisk as Save, FolderOpen, Trash, PlayCircle, Check, XCircle, Database, Wrench, MagnifyingGlass as Search, CaretDoubleLeft as ChevronsLeft, CaretDoubleRight as ChevronsRight, Sparkle as Sparkles, Code, PencilSimple as Edit, SignOut as LogOut, ChatCircle as MessageSquare, Globe, Leaf, Share as Share2, UserCheck, GitMerge, FileXls as FileSpreadsheet, FileText, UploadSimple as Upload, Columns, DotsSixVertical as GripVertical, Users, Envelope as Mail, BookOpen, Copy, Eye, Clock, ClockCounterClockwise as History, ArrowsOut as Maximize2, MagnifyingGlassPlus as ZoomIn, MagnifyingGlassMinus as ZoomOut, Robot as Bot, DeviceMobile as Smartphone, ChartBar as BarChart3, User, Calendar, CaretRight as ChevronRight, CaretDown as ChevronDown, CaretUp as ChevronUp, Plus, Folder, ShieldCheck as Shield, Terminal, Tag, DotsThreeVertical as MoreVertical, WebhooksLogo as Webhook, Flask as FlaskConical, TrendUp, Bell, FilePdf, Bug, Pi, WhatsappLogo } from '@phosphor-icons/react';
 import { NodeConfigSidePanel } from './NodeConfigSidePanel';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { PromptInput } from './PromptInput';
@@ -314,6 +314,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [twilioAuthToken, setTwilioAuthToken] = useState<string>('');
     const [twilioFromNumber, setTwilioFromNumber] = useState<string>('');
     const [showSMSTwilioSettings, setShowSMSTwilioSettings] = useState<boolean>(false);
+
+    // Send WhatsApp Node State
+    const [configuringWhatsAppNodeId, setConfiguringWhatsAppNodeId] = useState<string | null>(null);
+    const [whatsappTo, setWhatsappTo] = useState<string>('');
+    const [whatsappBody, setWhatsappBody] = useState<string>('');
+    const [whatsappTwilioAccountSid, setWhatsappTwilioAccountSid] = useState<string>('');
+    const [whatsappTwilioAuthToken, setWhatsappTwilioAuthToken] = useState<string>('');
+    const [whatsappTwilioFromNumber, setWhatsappTwilioFromNumber] = useState<string>('');
+    const [showWhatsAppTwilioSettings, setShowWhatsAppTwilioSettings] = useState<boolean>(false);
 
     // Data Visualization Node State
     const [configuringVisualizationNodeId, setConfiguringVisualizationNodeId] = useState<string | null>(null);
@@ -2187,6 +2196,40 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setConfiguringSMSNodeId(null);
     };
 
+    const openWhatsAppConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'sendWhatsApp') {
+            setConfiguringWhatsAppNodeId(nodeId);
+            setWhatsappTo(node.config?.whatsappTo || '');
+            setWhatsappBody(node.config?.whatsappBody || '');
+            setWhatsappTwilioAccountSid(node.config?.whatsappTwilioAccountSid || '');
+            setWhatsappTwilioAuthToken(node.config?.whatsappTwilioAuthToken || '');
+            setWhatsappTwilioFromNumber(node.config?.whatsappTwilioFromNumber || '');
+        }
+    };
+
+    const saveWhatsAppConfig = () => {
+        if (!configuringWhatsAppNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringWhatsAppNodeId
+                ? {
+                    ...n,
+                    label: whatsappTo ? `WhatsApp to: ${whatsappTo.slice(-4)}...` : 'Send WhatsApp',
+                    config: {
+                        ...n.config,
+                        whatsappTo,
+                        whatsappBody,
+                        whatsappTwilioAccountSid: whatsappTwilioAccountSid || undefined,
+                        whatsappTwilioAuthToken: whatsappTwilioAuthToken || undefined,
+                        whatsappTwilioFromNumber: whatsappTwilioFromNumber || undefined,
+                    }
+                }
+                : n
+        ));
+        setConfiguringWhatsAppNodeId(null);
+    };
+
     const openVisualizationConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
         if (node && node.type === 'dataVisualization') {
@@ -3741,6 +3784,54 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         result = 'Phone number not configured';
                     }
                     break;
+                case 'sendWhatsApp':
+                    if (node.config?.whatsappTo) {
+                        try {
+                            const replaceVariablesWA = (text: string, data: any) => {
+                                if (!text || !data) return text;
+                                let result = text;
+                                const record = Array.isArray(data) ? data[0] : data;
+                                if (record && typeof record === 'object') {
+                                    Object.keys(record).forEach(key => {
+                                        const regex = new RegExp(`\\{${key}\\}`, 'g');
+                                        result = result.replace(regex, String(record[key] ?? ''));
+                                    });
+                                }
+                                return result;
+                            };
+
+                            const waData = {
+                                to: replaceVariablesWA(node.config.whatsappTo, inputData),
+                                body: replaceVariablesWA(node.config.whatsappBody || '', inputData),
+                                accountSid: node.config.whatsappTwilioAccountSid,
+                                authToken: node.config.whatsappTwilioAuthToken,
+                                fromNumber: node.config.whatsappTwilioFromNumber
+                            };
+
+                            const response = await fetch(`${API_BASE}/whatsapp/send`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(waData),
+                                credentials: 'include'
+                            });
+
+                            if (response.ok) {
+                                const data = await response.json();
+                                nodeData = inputData || [{ whatsappSent: true, to: waData.to }];
+                                result = `WhatsApp sent to ${waData.to}`;
+                            } else {
+                                const errorData = await response.json();
+                                throw new Error(errorData.error || 'Failed to send WhatsApp');
+                            }
+                        } catch (error) {
+                            console.error('WhatsApp send error:', error);
+                            result = `Error: ${error.message || 'Failed to send WhatsApp'}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'WhatsApp number not configured';
+                    }
+                    break;
                 case 'dataVisualization':
                     if (node.config?.generatedWidget) {
                         nodeData = inputData;
@@ -5005,6 +5096,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 return !!node.config?.emailTo;
             case 'sendSMS':
                 return !!node.config?.smsTo;
+            case 'sendWhatsApp':
+                return !!node.config?.whatsappTo;
             case 'dataVisualization':
                 return !!node.config?.generatedWidget;
             case 'esios':
@@ -5107,6 +5200,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'pdfInput': return 'text-indigo-600';
             case 'sendEmail': return 'text-blue-600';
             case 'sendSMS': return 'text-blue-600';
+            case 'sendWhatsApp': return 'text-green-600';
             case 'dataVisualization': return 'text-indigo-600';
             case 'webhook': return 'text-cyan-600';
             case 'agent': return 'text-purple-600';
@@ -5471,7 +5565,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             'Models': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['llm', 'statisticalAnalysis', 'franmit'].includes(i.type)) },
                                             'Code': { icon: Code, items: DRAGGABLE_ITEMS.filter(i => ['python'].includes(i.type)) },
                                             'Output & Logging': { icon: LogOut, items: DRAGGABLE_ITEMS.filter(i => ['output', 'saveRecords'].includes(i.type)) },
-                                            'Notifications': { icon: Mail, items: DRAGGABLE_ITEMS.filter(i => ['sendEmail', 'sendSMS', 'pdfReport'].includes(i.type)) },
+                                            'Notifications': { icon: Mail, items: DRAGGABLE_ITEMS.filter(i => ['sendEmail', 'sendSMS', 'sendWhatsApp', 'pdfReport'].includes(i.type)) },
                                             'Utils': { icon: Wrench, items: DRAGGABLE_ITEMS.filter(i => ['comment'].includes(i.type)) },
                                         };
 
@@ -6087,6 +6181,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openEmailConfig(node.id);
                                             } else if (node.type === 'sendSMS') {
                                                 openSMSConfig(node.id);
+                                            } else if (node.type === 'sendWhatsApp') {
+                                                openWhatsAppConfig(node.id);
                                             } else if (node.type === 'dataVisualization') {
                                                 openVisualizationConfig(node.id);
                                             } else if (node.type === 'esios') {
@@ -6286,6 +6382,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     openEmailConfig(node.id);
                                                                 } else if (node.type === 'sendSMS') {
                                                                     openSMSConfig(node.id);
+                                                                } else if (node.type === 'sendWhatsApp') {
+                                                                    openWhatsAppConfig(node.id);
                                                                 } else if (node.type === 'dataVisualization') {
                                                                     openVisualizationConfig(node.id);
                                                                 } else if (node.type === 'esios') {
@@ -8409,6 +8507,161 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <div className="pt-3 border-t border-[var(--border-light)]">
                                             <button
                                                 onClick={() => openFeedbackPopup('sendSMS', 'Send SMS')}
+                                                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
+                                            >
+                                                <MessageSquare size={12} weight="light" />
+                                                What would you like this node to do?
+                                            </button>
+                                        </div>
+                                </NodeConfigSidePanel>
+                            );
+                        })()}
+
+                        {/* Send WhatsApp Configuration Modal */}
+                        {configuringWhatsAppNodeId && (() => {
+                            // Get input data from parent node for @ mentions
+                            const parentConnectionWA = connections.find(c => c.toNodeId === configuringWhatsAppNodeId);
+                            const parentNodeWA = parentConnectionWA ? nodes.find(n => n.id === parentConnectionWA.fromNodeId) : null;
+                            let inputDataForWA: any[] = [];
+                            
+                            if (parentNodeWA) {
+                                if (parentNodeWA.type === 'splitColumns' && parentNodeWA.outputData) {
+                                    inputDataForWA = parentConnectionWA.outputType === 'B' 
+                                        ? parentNodeWA.outputData.outputB || []
+                                        : parentNodeWA.outputData.outputA || [];
+                                } else {
+                                    inputDataForWA = parentNodeWA.outputData || parentNodeWA.config?.parsedData || [];
+                                }
+                            }
+
+                            return (
+                                <NodeConfigSidePanel
+                                    isOpen={!!configuringWhatsAppNodeId}
+                                    onClose={() => setConfiguringWhatsAppNodeId(null)}
+                                    title="Send WhatsApp"
+                                    icon={WhatsappLogo}
+                                    width="w-[550px]"
+                                    footer={
+                                        <>
+                                            <button
+                                                onClick={() => setConfiguringWhatsAppNodeId(null)}
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveWhatsAppConfig}
+                                                disabled={!whatsappTo.trim()}
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Save
+                                            </button>
+                                        </>
+                                    }
+                                >
+                                        <div className="space-y-5">
+                                            <div>
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                    To (phone number with country code)
+                                                </label>
+                                                <div className="h-16">
+                                                    <PromptInput
+                                                        entities={entities}
+                                                        onGenerate={() => {}}
+                                                        isGenerating={false}
+                                                        initialValue={whatsappTo}
+                                                        placeholder="+34612345678 — Use @ to mention Input Data"
+                                                        hideButton={true}
+                                                        onChange={(val) => setWhatsappTo(val)}
+                                                        className="h-full [&_textarea]:!h-10 [&_textarea]:!min-h-0 [&_textarea]:!p-2 [&_textarea]:!text-sm"
+                                                        inputData={inputDataForWA}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                    Message Body
+                                                </label>
+                                                <div className="h-32">
+                                                    <PromptInput
+                                                        entities={entities}
+                                                        onGenerate={() => {}}
+                                                        isGenerating={false}
+                                                        initialValue={whatsappBody}
+                                                        placeholder="Write your WhatsApp message here...&#10;&#10;Use @ to mention Input Data or entities."
+                                                        hideButton={true}
+                                                        onChange={(val) => setWhatsappBody(val)}
+                                                        className="h-full"
+                                                        inputData={inputDataForWA}
+                                                    />
+                                                </div>
+                                                <p className="text-[10px] text-[var(--text-secondary)] mt-1">
+                                                    WhatsApp messages support rich text formatting and up to 4096 characters
+                                                </p>
+                                            </div>
+
+                                            {/* Twilio Settings (collapsible) */}
+                                            <div className="border border-[var(--border-light)] rounded-lg">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowWhatsAppTwilioSettings(!showWhatsAppTwilioSettings)}
+                                                    className="w-full px-4 py-2 flex items-center justify-between text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                                >
+                                                    <span>⚙️ Twilio Settings</span>
+                                                    <span>{showWhatsAppTwilioSettings ? '▲' : '▼'}</span>
+                                                </button>
+                                                
+                                                {showWhatsAppTwilioSettings && (
+                                                    <div className="p-4 border-t border-[var(--border-light)] space-y-3">
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                                                                Account SID
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={whatsappTwilioAccountSid}
+                                                                onChange={(e) => setWhatsappTwilioAccountSid(e.target.value)}
+                                                                placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                                                className="w-full px-2 py-1.5 text-sm border border-[var(--border-medium)] rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                                                                Auth Token
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={whatsappTwilioAuthToken}
+                                                                onChange={(e) => setWhatsappTwilioAuthToken(e.target.value)}
+                                                                placeholder="••••••••••••"
+                                                                className="w-full px-2 py-1.5 text-sm border border-[var(--border-medium)] rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                                                                From Number (WhatsApp-enabled Twilio number)
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={whatsappTwilioFromNumber}
+                                                                onChange={(e) => setWhatsappTwilioFromNumber(e.target.value)}
+                                                                placeholder="+14155238886"
+                                                                className="w-full px-2 py-1.5 text-sm border border-[var(--border-medium)] rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                                                            />
+                                                            <p className="text-[10px] text-[var(--text-secondary)] mt-1">
+                                                                Use your Twilio WhatsApp Sandbox number or a registered WhatsApp Business number. Get it from twilio.com/console
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Feedback Link */}
+                                        <div className="pt-3 border-t border-[var(--border-light)]">
+                                            <button
+                                                onClick={() => openFeedbackPopup('sendWhatsApp', 'Send WhatsApp')}
                                                 className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
                                             >
                                                 <MessageSquare size={12} weight="light" />
