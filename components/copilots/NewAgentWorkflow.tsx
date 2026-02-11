@@ -41,6 +41,64 @@ const AGENT_ICONS = [
   { icon: ChartLine, name: 'ChartLine', label: 'Forecasting' }
 ];
 
+const AGENT_TEMPLATES = [
+  {
+    name: 'Asistente Industrial',
+    icon: 'Factory',
+    description: 'Especializado en producción y seguridad industrial',
+    instructions: `Eres un experto en plantas industriales de producción. Tu objetivo es ayudar con:
+- Análisis de métricas de producción y seguridad
+- Optimización de procesos respetando normativas
+- Interpretación de datos de mantenimiento preventivo
+
+Prioriza siempre la seguridad y menciona unidades de medida cuando analices datos.`
+  },
+  {
+    name: 'Analista Financiero',
+    icon: 'CurrencyDollar',
+    description: 'Experto en análisis financiero y reporting',
+    instructions: `Eres un analista financiero experto. Te especializas en:
+- Análisis de estados financieros y ratios
+- Proyecciones y forecasting financiero
+- Identificación de tendencias y KPIs clave
+
+Siempre proporciona contexto numérico y comparativas cuando analices datos.`
+  },
+  {
+    name: 'Especialista Logística',
+    icon: 'Truck',
+    description: 'Gestión de inventario y distribución',
+    instructions: `Eres un experto en logística y cadena de suministro. Ayudas con:
+- Optimización de inventarios y almacenamiento
+- Análisis de rutas y tiempos de entrega
+- Gestión de pedidos y stock
+
+Enfócate en eficiencia, costos y tiempos de respuesta.`
+  },
+  {
+    name: 'Analista de Datos',
+    icon: 'ChartBar',
+    description: 'Análisis y visualización de datos',
+    instructions: `Eres un analista de datos especializado. Tu rol incluye:
+- Análisis estadístico y detección de patrones
+- Interpretación de dashboards y métricas
+- Recomendaciones basadas en datos
+
+Proporciona insights accionables y visualizaciones claras.`
+  },
+  {
+    name: 'Asistente RRHH',
+    icon: 'Users',
+    description: 'Gestión de talento y recursos humanos',
+    instructions: `Eres un especialista en recursos humanos. Apoyas en:
+- Gestión de talento y evaluaciones de desempeño
+- Análisis de métricas de RRHH (rotación, ausentismo)
+- Planificación de workforce y organigramas
+
+Mantén un tono profesional y considera aspectos de confidencialidad.`
+  }
+];
+
 export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onComplete }) => {
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
@@ -54,6 +112,9 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
   const [loading, setLoading] = useState(false);
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [generatingInstructions, setGeneratingInstructions] = useState(false);
+  const [userPrompt, setUserPrompt] = useState('');
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const getIconComponent = (iconName: string) => {
     const iconData = AGENT_ICONS.find(i => i.name === iconName);
@@ -71,6 +132,38 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
       setFolders(folds);
     });
   }, []);
+
+  const handleGenerateInstructions = async () => {
+    if (!userPrompt.trim()) return;
+    
+    setGeneratingInstructions(true);
+    setError(null);
+    
+    try {
+      const res = await fetch(`${API_BASE}/copilot/agents/generate-instructions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          userDescription: userPrompt.trim(),
+          agentName: name || 'Agente',
+          agentDescription: description || ''
+        })
+      });
+      
+      if (!res.ok) {
+        throw new Error('Error al generar instrucciones');
+      }
+      
+      const data = await res.json();
+      setInstructions(data.instructions || '');
+    } catch (err) {
+      console.error('Error generando instrucciones:', err);
+      setError('No se pudieron generar las instrucciones. Intenta de nuevo.');
+    } finally {
+      setGeneratingInstructions(false);
+    }
+  };
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -231,6 +324,91 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
                 <p className="text-sm text-[var(--text-secondary)]">Define cómo debe comportarse y responder este agente</p>
               </div>
               
+              {/* Templates y Generación IA */}
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setShowTemplates(!showTemplates)}
+                  className="flex-1 px-4 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2"
+                >
+                  <Lightbulb size={16} weight="light" />
+                  Templates
+                </button>
+                <button
+                  onClick={() => {
+                    if (!userPrompt.trim()) {
+                      setError('Describe qué quieres que haga el agente');
+                      return;
+                    }
+                    handleGenerateInstructions();
+                  }}
+                  disabled={generatingInstructions}
+                  className="flex-1 px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {generatingInstructions ? (
+                    <SpinnerGap size={16} className="animate-spin" weight="light" />
+                  ) : (
+                    <Sparkle size={16} weight="light" />
+                  )}
+                  Generar con IA
+                </button>
+              </div>
+
+              {/* Templates Dropdown */}
+              {showTemplates && (
+                <div className="p-4 bg-[var(--bg-tertiary)]/30 border border-[var(--border-light)] rounded-lg space-y-2">
+                  <p className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-3">Selecciona un template</p>
+                  {AGENT_TEMPLATES.map(template => (
+                    <button
+                      key={template.name}
+                      onClick={() => {
+                        setName(name || template.name);
+                        setIcon(template.icon);
+                        setDescription(description || template.description);
+                        setInstructions(template.instructions);
+                        setShowTemplates(false);
+                      }}
+                      className="w-full text-left px-4 py-3 bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] rounded-lg transition-all border border-[var(--border-light)] hover:border-[var(--border-medium)]"
+                    >
+                      <div className="flex items-center gap-3">
+                        {(() => {
+                          const getIcon = (iconName: string) => {
+                            const iconData = AGENT_ICONS.find(i => i.name === iconName);
+                            return iconData?.icon || Robot;
+                          };
+                          const TemplateIcon = getIcon(template.icon);
+                          return (
+                            <div className="w-10 h-10 rounded-lg bg-[var(--bg-selected)] flex items-center justify-center">
+                              <TemplateIcon size={20} className="text-white" weight="light" />
+                            </div>
+                          );
+                        })()}
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-[var(--text-primary)]">{template.name}</p>
+                          <p className="text-xs text-[var(--text-secondary)] mt-0.5">{template.description}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Input para descripción IA */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                  Describe qué quieres que haga el agente
+                </label>
+                <input
+                  value={userPrompt}
+                  onChange={e => setUserPrompt(e.target.value)}
+                  placeholder="ej. Un agente que analice ventas por región y sugiera estrategias de crecimiento..."
+                  className="w-full px-4 py-3 border border-[var(--border-light)] rounded-lg bg-[var(--bg-card)] focus:border-[var(--border-medium)] focus:ring-1 focus:ring-[var(--border-medium)] transition-all text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none"
+                />
+                <p className="text-xs text-[var(--text-tertiary)] mt-2 flex items-start gap-2">
+                  <Info size={12} className="mt-0.5 shrink-0" weight="light" />
+                  <span>Describe brevemente el rol y objetivo del agente para generar instrucciones con IA</span>
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Instrucciones base</label>
                 <textarea
@@ -238,14 +416,9 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
                   onChange={e => setInstructions(e.target.value)}
                   rows={8}
                   className="w-full px-4 py-3 border border-[var(--border-light)] rounded-lg bg-[var(--bg-card)] resize-none focus:border-[var(--border-medium)] focus:ring-1 focus:ring-[var(--border-medium)] transition-all text-sm font-mono text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none"
-                  placeholder={`Ejemplo para Asistente Industrial:
+                  placeholder={`Las instrucciones aparecerán aquí...
 
-Eres un experto en plantas industriales de producción. Tu objetivo es ayudar con:
-- Análisis de métricas de producción y seguridad
-- Optimización de procesos respetando normativas EU
-- Interpretación de datos de mantenimiento preventivo
-
-Prioriza siempre la seguridad y menciona unidades de medida cuando analices datos.`}
+O escríbelas manualmente si prefieres.`}
                 />
                 <p className="text-xs text-[var(--text-tertiary)] mt-3 flex items-start gap-2">
                   <Info size={14} className="mt-0.5 shrink-0" weight="light" />

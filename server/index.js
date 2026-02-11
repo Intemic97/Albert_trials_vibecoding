@@ -2949,6 +2949,65 @@ app.get('/api/copilot/agents/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// Generate agent instructions with AI
+app.post('/api/copilot/agents/generate-instructions', authenticateToken, async (req, res) => {
+    try {
+        const { userDescription, agentName, agentDescription } = req.body;
+        
+        if (!userDescription) {
+            return res.status(400).json({ error: 'userDescription is required' });
+        }
+
+        const systemPrompt = `Eres un experto en diseñar agentes de IA especializados para empresas. 
+Tu tarea es generar instrucciones claras y profesionales para un agente basándote en la descripción del usuario.
+
+Las instrucciones deben:
+- Ser claras y específicas sobre el rol del agente
+- Incluir 3-5 puntos clave de lo que hace
+- Usar viñetas para facilitar lectura
+- Ser profesionales pero concisas
+- Incluir orientaciones sobre cómo debe responder o analizar
+
+NO incluyas saludos ni despedidas, solo las instrucciones directas.`;
+
+        const userPrompt = `Genera instrucciones para un agente con estas características:
+
+Nombre: ${agentName || 'Agente especializado'}
+${agentDescription ? `Descripción: ${agentDescription}` : ''}
+
+Lo que el usuario quiere que haga:
+${userDescription}
+
+Genera las instrucciones del agente:`;
+
+        const response = await axios.post(
+            'https://api.openai.com/v1/chat/completions',
+            {
+                model: 'gpt-4o-mini',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                temperature: 0.7,
+                max_tokens: 500
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        const instructions = response.data.choices[0]?.message?.content?.trim() || '';
+        
+        res.json({ instructions });
+    } catch (error) {
+        console.error('[Copilot Agents] Error generating instructions:', error.response?.data || error.message);
+        res.status(500).json({ error: 'Failed to generate instructions' });
+    }
+});
+
 // Create agent
 app.post('/api/copilot/agents', authenticateToken, async (req, res) => {
     try {
