@@ -1,25 +1,21 @@
 /**
- * Agent Service - CRUD for copilot agents
+ * Agent Service - CRUD for copilot agents (refactored: agents are top-level containers)
+ * Each agent represents a workspace/team (ej. "Agente Repsol", "Agente Finanzas")
+ * with its own configured roles (orchestrator, analyst, specialist, synthesis prompts)
  */
 
 const crypto = require('crypto');
 
 function generateId() {
-  return `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+  return `agent_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
 }
 
-const SYSTEM_AGENT_ROLES = ['orchestrator', 'analyst', 'specialist', 'synthesis'];
-
 async function list(db, orgId) {
-  const custom = await db.all(
-    'SELECT * FROM copilot_agents WHERE organizationId = ? AND (isSystem = 0 OR isSystem IS NULL) ORDER BY sortOrder ASC, name ASC',
+  const agents = await db.all(
+    'SELECT * FROM copilot_agents WHERE organizationId = ? ORDER BY sortOrder ASC, name ASC',
     [orgId]
   );
-  const system = await db.all(
-    'SELECT * FROM copilot_agents WHERE organizationId = ? AND isSystem = 1 ORDER BY sortOrder ASC',
-    [orgId]
-  );
-  const parsed = [...system, ...custom].map(parseAgent);
+  const parsed = agents.map(parseAgent);
   if (parsed.length === 0) {
     await seedDefaults(db, orgId);
     return list(db, orgId);
@@ -32,9 +28,7 @@ function parseAgent(row) {
     ...row,
     allowedEntities: row.allowedEntities ? safeParse(row.allowedEntities, []) : [],
     folderIds: row.folderIds ? safeParse(row.folderIds, []) : [],
-    isSystem: !!row.isSystem,
-    temperature: row.temperature != null ? row.temperature : 0.3,
-    maxTokens: row.maxTokens != null ? row.maxTokens : 1500
+    icon: row.icon || '🤖'
   };
 }
 
@@ -58,20 +52,21 @@ async function create(db, orgId, payload) {
   const id = payload.id || generateId();
   const now = new Date().toISOString();
   await db.run(
-    `INSERT INTO copilot_agents (id, organizationId, name, role, systemPrompt, modelOverride, temperature, maxTokens, allowedEntities, folderIds, isSystem, sortOrder, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO copilot_agents (id, organizationId, name, description, icon, instructions, allowedEntities, folderIds, orchestratorPrompt, analystPrompt, specialistPrompt, synthesisPrompt, sortOrder, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       orgId,
-      payload.name || 'Unnamed Agent',
-      payload.role || 'specialist',
-      payload.systemPrompt || null,
-      payload.modelOverride || null,
-      payload.temperature ?? 0.3,
-      payload.maxTokens ?? 1500,
+      payload.name || 'Nuevo Agente',
+      payload.description || null,
+      payload.icon || '🤖',
+      payload.instructions || null,
       payload.allowedEntities ? JSON.stringify(payload.allowedEntities) : null,
       payload.folderIds ? JSON.stringify(payload.folderIds) : null,
-      0,
+      payload.orchestratorPrompt || null,
+      payload.analystPrompt || null,
+      payload.specialistPrompt || null,
+      payload.synthesisPrompt || null,
       payload.sortOrder ?? 0,
       now,
       now
@@ -83,13 +78,10 @@ async function create(db, orgId, payload) {
 async function update(db, id, orgId, payload) {
   const existing = await get(db, id, orgId);
   if (!existing) return null;
-  if (existing.isSystem) {
-    throw new Error('System agents cannot be modified');
-  }
   const now = new Date().toISOString();
   const updates = [];
   const params = [];
-  const fields = ['name', 'role', 'systemPrompt', 'modelOverride', 'temperature', 'maxTokens', 'allowedEntities', 'folderIds', 'sortOrder'];
+  const fields = ['name', 'description', 'icon', 'instructions', 'allowedEntities', 'folderIds', 'orchestratorPrompt', 'analystPrompt', 'specialistPrompt', 'synthesisPrompt', 'sortOrder'];
   for (const f of fields) {
     if (payload[f] !== undefined) {
       if (f === 'allowedEntities' || f === 'folderIds') {
@@ -114,31 +106,24 @@ async function update(db, id, orgId, payload) {
 async function remove(db, id, orgId) {
   const existing = await get(db, id, orgId);
   if (!existing) return false;
-  if (existing.isSystem) {
-    throw new Error('System agents cannot be deleted');
-  }
+  // Delete all chats belonging to this agent
+  await db.run('DELETE FROM copilot_chats WHERE agentId = ?', [id]);
   await db.run('DELETE FROM copilot_agents WHERE id = ? AND organizationId = ?', [id, orgId]);
   return true;
 }
 
 async function seedDefaults(db, orgId) {
   const now = new Date().toISOString();
-  const roles = [
-    { role: 'orchestrator', name: 'Orquestador', isSystem: 1 },
-    { role: 'analyst', name: 'Analista de Datos', isSystem: 0 },
-    { role: 'specialist', name: 'Especialista de Dominio', isSystem: 0 },
-    { role: 'synthesis', name: 'Síntesis', isSystem: 1 }
-  ];
-  for (let i = 0; i < roles.length; i++) {
-    const id = `system_${roles[i].role}_${orgId.slice(0, 12).replace(/[-]/g, '')}`;
-    const existing = await db.get('SELECT id FROM copilot_agents WHERE id = ?', [id]);
-    if (!existing) {
-      await db.run(
-        `INSERT INTO copilot_agents (id, organizationId, name, role, systemPrompt, modelOverride, temperature, maxTokens, isSystem, sortOrder, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, NULL, NULL, 0.3, 1500, ?, ?, ?, ?)`,
-        [id, orgId, roles[i].name, roles[i].role, roles[i].isSystem, i, now, now]
-      );
-    }
+  const defaultAgent = {
+    id: `agent_default_${orgId.slice(0, 12).replace(/[-]/g, '')}`,
+    name: 'Asistente General',
+    description: 'Tu copiloto para consultas generales sobre entidades y datos',
+    icon: '💬',
+    instructions: 'Ayuda al usuario a navegar sus entidades, encontrar records y responder preguntas sobre sus datos.'
+  };
+  const existing = await db.get('SELECT id FROM copilot_agents WHERE id = ?', [defaultAgent.id]);
+  if (!existing) {
+    await create(db, orgId, defaultAgent);
   }
 }
 

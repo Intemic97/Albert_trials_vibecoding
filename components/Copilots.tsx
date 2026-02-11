@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft, Folder, Star, Export, Tag, FileText } from '@phosphor-icons/react';
-import { AgentsModal } from './copilots/AgentsModal';
+import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft, Folder, Star, Export, Tag, FileText, CaretLeft } from '@phosphor-icons/react';
+import { AgentsList } from './copilots/AgentsList';
+import { AgentConfigModal } from './copilots/AgentConfigModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { API_BASE } from '../config';
 import { Entity, Property } from '../types';
@@ -122,6 +123,21 @@ interface Chat {
     allowedEntities?: string[];
     isFavorite?: boolean;
     tags?: string[];
+    agentId?: string;
+}
+
+interface Agent {
+    id: string;
+    name: string;
+    description?: string;
+    icon: string;
+    instructions?: string;
+    allowedEntities?: string[];
+    folderIds?: string[];
+    orchestratorPrompt?: string;
+    analystPrompt?: string;
+    specialistPrompt?: string;
+    synthesisPrompt?: string;
 }
 
 // Predefined tag colors
@@ -140,8 +156,11 @@ export const Copilots: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { notifications, removeNotification, error: showError, warning } = useNotifications(3000);
+    const [agents, setAgents] = useState<Agent[]>([]);
+    const [activeAgent, setActiveAgent] = useState<string | null>(null);
     const [chats, setChats] = useState<Chat[]>([]);
     const [activeChat, setActiveChat] = useState<string | null>(null);
+    const [showAgentConfig, setShowAgentConfig] = useState(false);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [expandedExplanations, setExpandedExplanations] = useState<Set<string>>(new Set());
@@ -167,7 +186,10 @@ export const Copilots: React.FC = () => {
     const [showTagMenu, setShowTagMenu] = useState<string | null>(null);
     const [newTagInput, setNewTagInput] = useState('');
     const [showExportModal, setShowExportModal] = useState(false);
-    const [showAgentsModal, setShowAgentsModal] = useState(false);
+    const [showCreateAgentModal, setShowCreateAgentModal] = useState(false);
+    const [newAgentName, setNewAgentName] = useState('');
+    const [newAgentIcon, setNewAgentIcon] = useState('🤖');
+    const [newAgentDescription, setNewAgentDescription] = useState('');
     const [allTags, setAllTags] = useState<string[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -197,11 +219,12 @@ export const Copilots: React.FC = () => {
     });
     const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
 
-    // Load chats from backend on mount (only once)
+    // Load agents and chats on mount
     useEffect(() => {
         let mounted = true;
         
         const initialize = async () => {
+            await loadAgents();
             await loadEntities();
             if (mounted) {
                 await loadChats();
@@ -213,7 +236,19 @@ export const Copilots: React.FC = () => {
         return () => {
             mounted = false;
         };
-    }, []); // Empty dependency array - only run on mount
+    }, []);
+
+    const loadAgents = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/copilot/agents`, { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                setAgents(data.agents || []);
+            }
+        } catch (err) {
+            console.error('Error loading agents:', err);
+        }
+    };
 
     const loadEntities = async () => {
         try {
@@ -353,6 +388,7 @@ export const Copilots: React.FC = () => {
                             updatedAt: chat.updatedAt ? new Date(chat.updatedAt) : new Date(),
                             instructions: chat.instructions || undefined,
                             allowedEntities: Array.isArray(chat.allowedEntities) ? chat.allowedEntities : [],
+                            agentId: chat.agentId || undefined,
                             isFavorite: chat.isFavorite || false,
                             tags: Array.isArray(chat.tags) ? chat.tags : [],
                             messages: Array.isArray(chat.messages) ? chat.messages.map((msg: any) => ({
@@ -401,6 +437,7 @@ export const Copilots: React.FC = () => {
                 updatedAt: chat.updatedAt ? (chat.updatedAt instanceof Date ? chat.updatedAt.toISOString() : chat.updatedAt) : new Date().toISOString(),
                 instructions: chat.instructions || null,
                 allowedEntities: Array.isArray(chat.allowedEntities) && chat.allowedEntities.length > 0 ? chat.allowedEntities : null,
+                agentId: chat.agentId || null,
                 isFavorite: chat.isFavorite || false,
                 tags: Array.isArray(chat.tags) && chat.tags.length > 0 ? chat.tags : null
             };
@@ -427,7 +464,8 @@ export const Copilots: React.FC = () => {
         setShowCopilotModal(true);
     };
 
-    const createNewChat = async (name?: string, instructions?: string, entities?: string[]): Promise<Chat> => {
+    const createNewChat = async (name?: string, instructions?: string, entities?: string[], agentIdOverride?: string): Promise<Chat> => {
+        const chatAgentId = agentIdOverride || activeAgent;
         const defaultInstructions = instructions || "You are a helpful database assistant. Help users navigate through your entities, find records, and answer questions about relationships between tables.";
         const welcomeMessage = instructions 
             ? `Hello! I'm ${name || 'your Copilot'}. ${instructions}\n\nWhat would you like to know?`
@@ -445,7 +483,8 @@ export const Copilots: React.FC = () => {
             createdAt: new Date(),
             updatedAt: new Date(),
             instructions: defaultInstructions,
-            allowedEntities: entities || []
+            allowedEntities: entities || [],
+            agentId: chatAgentId || undefined
         };
 
         setChats(prev => [newChat, ...prev]);
@@ -465,7 +504,8 @@ export const Copilots: React.FC = () => {
                 createdAt: newChat.createdAt.toISOString(),
                 updatedAt: newChat.updatedAt.toISOString(),
                 instructions: newChat.instructions || null,
-                allowedEntities: newChat.allowedEntities && newChat.allowedEntities.length > 0 ? newChat.allowedEntities : null
+                allowedEntities: newChat.allowedEntities && newChat.allowedEntities.length > 0 ? newChat.allowedEntities : null,
+                agentId: newChat.agentId || null
             };
             await fetch(`${API_BASE}/copilot/chats`, {
                 method: 'POST',
@@ -540,6 +580,45 @@ export const Copilots: React.FC = () => {
                 ? prev.filter(id => id !== entityId)
                 : [...prev, entityId]
         );
+    };
+
+    const handleSelectAgent = (agentId: string) => {
+        setActiveAgent(agentId);
+        setActiveChat(null);
+    };
+
+    const handleCreateAgent = () => {
+        setNewAgentName('');
+        setNewAgentDescription('');
+        setNewAgentIcon('🤖');
+        setShowCreateAgentModal(true);
+    };
+
+    const handleSaveNewAgent = async () => {
+        if (!newAgentName.trim()) {
+            warning('Falta nombre', 'Por favor introduce un nombre para el agente');
+            return;
+        }
+        try {
+            const res = await fetch(`${API_BASE}/copilot/agents`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    name: newAgentName.trim(),
+                    description: newAgentDescription.trim() || null,
+                    icon: newAgentIcon || '🤖'
+                })
+            });
+            if (res.ok) {
+                const newAgent = await res.json();
+                await loadAgents();
+                setActiveAgent(newAgent.id);
+                setShowCreateAgentModal(false);
+            }
+        } catch (err) {
+            showError('Error', 'No se pudo crear el agente');
+        }
     };
 
     const deleteChat = async (chatId: string) => {
@@ -765,6 +844,7 @@ export const Copilots: React.FC = () => {
                         content: m.content
                     })),
                     chatId: currentChat.id,
+                    agentId: activeAgent,
                     instructions: currentChat.instructions,
                     allowedEntities: currentChat.allowedEntities,
                     mentionedEntities: mentionedEntityIds.length > 0 ? mentionedEntityIds : undefined,
@@ -1068,6 +1148,8 @@ export const Copilots: React.FC = () => {
     // Filter and sort chats
     const filteredChats = chats
         .filter(chat => {
+            // Agent filter
+            if (activeAgent && chat.agentId !== activeAgent) return false;
             // Search filter
             const searchMatch = !chatQuery && !chatSearchQuery || 
                 chat.title.toLowerCase().includes((chatQuery || chatSearchQuery).toLowerCase());
@@ -1141,17 +1223,101 @@ export const Copilots: React.FC = () => {
         );
     };
 
+    const currentAgent = agents.find(a => a.id === activeAgent);
+
+    // If no active agent, show agents list
+    if (!activeAgent) {
+        return (
+            <div className="h-screen flex flex-col bg-[var(--bg-primary)]">
+                <AgentsList onSelectAgent={handleSelectAgent} onCreateAgent={handleCreateAgent} />
+                
+                {/* Create Agent Modal */}
+                {showCreateAgentModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowCreateAgentModal(false)}>
+                        <div className="bg-[var(--bg-card)] rounded-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+                            <div className="p-6 border-b border-[var(--border-light)]">
+                                <h3 className="text-lg font-medium" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Nuevo Agente</h3>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Icono</label>
+                                    <input
+                                        value={newAgentIcon}
+                                        onChange={e => setNewAgentIcon(e.target.value)}
+                                        className="w-20 px-3 py-2 border border-[var(--border-medium)] rounded-lg text-2xl text-center"
+                                        placeholder="🤖"
+                                        maxLength={2}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Nombre</label>
+                                    <input
+                                        value={newAgentName}
+                                        onChange={e => setNewAgentName(e.target.value)}
+                                        className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg bg-[var(--bg-card)]"
+                                        placeholder="ej. Agente Repsol"
+                                        autoFocus
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Descripción</label>
+                                    <textarea
+                                        value={newAgentDescription}
+                                        onChange={e => setNewAgentDescription(e.target.value)}
+                                        rows={3}
+                                        className="w-full px-3 py-2 border border-[var(--border-medium)] rounded-lg bg-[var(--bg-card)] resize-none text-sm"
+                                        placeholder="Especializado en producción industrial y optimización..."
+                                    />
+                                </div>
+                            </div>
+                            <div className="p-6 border-t border-[var(--border-light)] flex justify-end gap-3">
+                                <button
+                                    onClick={() => setShowCreateAgentModal(false)}
+                                    className="px-4 py-2 border border-[var(--border-medium)] hover:bg-[var(--bg-hover)] rounded-lg text-sm"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleSaveNewAgent}
+                                    className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm"
+                                >
+                                    Crear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                <ToastContainer notifications={notifications} onDismiss={removeNotification} position="bottom-right" />
+            </div>
+        );
+    }
+
+    // If active agent, show chats view
     return (
         <div className="h-screen flex flex-col bg-[var(--bg-primary)]">
             {/* Top Bar */}
             <div className="h-12 bg-[var(--bg-primary)] border-b border-[var(--border-light)] flex items-center justify-between px-6 shrink-0">
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={() => navigate('/overview')}
+                        onClick={() => setActiveAgent(null)}
                         className="flex items-center gap-2 px-2 py-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors text-sm"
                     >
-                        <ArrowLeft size={14} weight="light" />
-                        <span className="font-medium">Back</span>
+                        <CaretLeft size={16} weight="bold" />
+                        <span className="font-medium">Agentes</span>
+                    </button>
+                    <div className="h-6 w-px bg-[var(--bg-selected)]"></div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xl">{currentAgent?.icon || '🤖'}</span>
+                        <span className="font-medium text-sm">{currentAgent?.name || 'Agente'}</span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setShowAgentConfig(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+                    >
+                        <GearSix size={14} />
+                        Configurar agente
                     </button>
                     <div className="h-6 w-px bg-[var(--bg-selected)]"></div>
                     <div className="flex items-center gap-2">
@@ -1235,7 +1401,7 @@ export const Copilots: React.FC = () => {
                     {/* Sidebar Header */}
                     <div className="p-4 border-b border-[var(--border-light)] shrink-0 bg-[var(--bg-card)]">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xs font-light text-[var(--text-tertiary)] uppercase tracking-wider" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Your Copilots</h2>
+                            <h2 className="text-xs font-light text-[var(--text-tertiary)] uppercase tracking-wider" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Conversaciones</h2>
                             <button
                                 onClick={() => setIsSidebarOpen(false)}
                                 className="p-1.5 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
@@ -1254,22 +1420,13 @@ export const Copilots: React.FC = () => {
                                 className="w-full pl-9 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                             />
                         </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={handleCreateCopilot}
-                                className="flex-1 flex items-center justify-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
-                            >
-                                <Sparkle size={14} className="mr-2" weight="light" />
-                                New Copilot
-                            </button>
-                            <button
-                                onClick={() => setShowAgentsModal(true)}
-                                className="flex items-center justify-center px-3 py-1.5 border border-[var(--border-light)] hover:bg-[var(--bg-hover)] rounded-lg text-xs transition-colors"
-                                title="Configurar agentes"
-                            >
-                                <Robot size={14} weight="light" />
-                            </button>
-                        </div>
+                        <button
+                            onClick={handleCreateCopilot}
+                            className="w-full flex items-center justify-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
+                        >
+                            <Plus size={14} className="mr-2" weight="bold" />
+                            Nuevo Chat
+                        </button>
                         
                         {/* Filter Pills */}
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -2244,7 +2401,16 @@ export const Copilots: React.FC = () => {
                 </div>
             )}
 
-            {showAgentsModal && <AgentsModal onClose={() => setShowAgentsModal(false)} />}
+            {showAgentConfig && currentAgent && (
+                <AgentConfigModal
+                    agent={currentAgent}
+                    onClose={() => setShowAgentConfig(false)}
+                    onSave={async (updated) => {
+                        await loadAgents();
+                        setShowAgentConfig(false);
+                    }}
+                />
+            )}
             
             {/* Toast Notifications */}
             <ToastContainer notifications={notifications} onDismiss={removeNotification} position="bottom-right" />

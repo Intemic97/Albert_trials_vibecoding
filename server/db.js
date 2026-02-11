@@ -822,20 +822,47 @@ async function initDb() {
     // Column already exists, ignore
   }
 
-  // Multi-agent: copilot_agents table
+  try {
+    await db.exec(`ALTER TABLE copilot_chats ADD COLUMN agentId TEXT`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migrate old copilot_agents schema to new (if old columns exist)
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN description TEXT`);
+  } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN icon TEXT DEFAULT '🤖'`);
+  } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN orchestratorPrompt TEXT`);
+  } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN analystPrompt TEXT`);
+  } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN specialistPrompt TEXT`);
+  } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN synthesisPrompt TEXT`);
+  } catch (e) {}
+
+  // Multi-agent: copilot_agents table (refactored: agents are now top-level containers)
   await db.exec(`
     CREATE TABLE IF NOT EXISTS copilot_agents (
       id TEXT PRIMARY KEY,
       organizationId TEXT NOT NULL,
       name TEXT NOT NULL,
-      role TEXT NOT NULL,
-      systemPrompt TEXT,
-      modelOverride TEXT,
-      temperature REAL DEFAULT 0.3,
-      maxTokens INTEGER DEFAULT 1500,
+      description TEXT,
+      icon TEXT DEFAULT '🤖',
+      instructions TEXT,
       allowedEntities TEXT,
       folderIds TEXT,
-      isSystem INTEGER DEFAULT 0,
+      orchestratorPrompt TEXT,
+      analystPrompt TEXT,
+      specialistPrompt TEXT,
+      synthesisPrompt TEXT,
       sortOrder INTEGER DEFAULT 0,
       createdAt TEXT,
       updatedAt TEXT,

@@ -2797,7 +2797,7 @@ app.post('/api/copilot/chats', authenticateToken, async (req, res) => {
         await db.run(
             `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, instructions, allowedEntities, isFavorite, tags, createdAt, updatedAt)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
+                [
                 id, 
                 userId, 
                 orgId, 
@@ -2805,6 +2805,7 @@ app.post('/api/copilot/chats', authenticateToken, async (req, res) => {
                 JSON.stringify(messages), 
                 instructions || null,
                 allowedEntities ? JSON.stringify(allowedEntities) : null,
+                agentId || null,
                 isFavorite ? 1 : 0,
                 tags ? JSON.stringify(tags) : null,
                 createdAt, 
@@ -2854,8 +2855,8 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
             // Chat doesn't exist, create it (upsert behavior)
             console.log('[Copilot] Chat not found, creating new chat:', chatId);
             await db.run(
-                `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, instructions, allowedEntities, isFavorite, tags, createdAt, updatedAt)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, instructions, allowedEntities, agentId, isFavorite, tags, createdAt, updatedAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     chatId,
                     userId,
@@ -2864,6 +2865,7 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
                     JSON.stringify(messages),
                     instructions || null,
                     allowedEntities ? JSON.stringify(allowedEntities) : null,
+                    agentId || null,
                     isFavorite ? 1 : 0,
                     tags ? JSON.stringify(tags) : null,
                     createdAt || updatedAt || new Date().toISOString(),
@@ -2873,12 +2875,13 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
         } else {
             // Chat exists, update it
             await db.run(
-                `UPDATE copilot_chats SET title = ?, messages = ?, instructions = ?, allowedEntities = ?, isFavorite = ?, tags = ?, updatedAt = ? WHERE id = ?`,
+                `UPDATE copilot_chats SET title = ?, messages = ?, instructions = ?, allowedEntities = ?, agentId = ?, isFavorite = ?, tags = ?, updatedAt = ? WHERE id = ?`,
                 [
                     title, 
                     JSON.stringify(messages), 
                     instructions || null,
                     allowedEntities ? JSON.stringify(allowedEntities) : null,
+                    agentId || null,
                     isFavorite ? 1 : 0,
                     tags ? JSON.stringify(tags) : null,
                     updatedAt, 
@@ -3023,8 +3026,21 @@ app.post('/api/copilot/ask', authenticateToken, async (req, res) => {
 
         if (useMultiAgent) {
             try {
+                let agentId = req.body.agentId;
+                if (!agentId && chatId) {
+                    const chat = await db.get('SELECT agentId FROM copilot_chats WHERE id = ? AND organizationId = ?', [chatId, orgId]);
+                    agentId = chat?.agentId;
+                }
+                if (!agentId) {
+                    const agents = await agentService.list(db, orgId);
+                    agentId = agents[0]?.id;
+                }
+                if (!agentId) {
+                    throw new Error('No agent available. Create an agent first.');
+                }
                 const result = await agentOrchestrator.process(db, {
                     orgId,
+                    agentId,
                     userMessage: question,
                     chatId,
                     conversationHistory: conversationHistory || [],
