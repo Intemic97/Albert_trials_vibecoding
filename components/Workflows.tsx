@@ -3104,7 +3104,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             
                             // Convert to array format for node output
                             nodeData = Array.isArray(results) ? results : [results];
-                            result = `FranMIT reactor model executed: ${nodeData.length} row(s)`;
+                            
+                            // Include warnings in the execution result message
+                            const warnings = data.warnings || [];
+                            const errors = data.errors || [];
+                            let statusMsg = `FranMIT reactor model executed: ${nodeData.length} row(s)`;
+                            if (warnings.length > 0) {
+                                statusMsg += `\n⚠️ ${warnings.length} warning(s): ${warnings[0]}`;
+                            }
+                            if (errors.length > 0) {
+                                statusMsg += `\n❌ ${errors.length} row(s) with errors`;
+                            }
+                            result = statusMsg;
                         } else {
                             const errorData = await response.json();
                             const error: any = new Error(errorData.error || 'FranMIT execution failed');

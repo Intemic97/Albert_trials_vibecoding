@@ -668,6 +668,52 @@ def extract_clean_outputs(raw):
         'Caudal_vol_m3_s': safe_round(last_valid(raw.get("qv", [])), 6),
     }
 
+def validate_receta_inputs(receta):
+    """Validate that receta input values are within physically meaningful ranges.
+    Returns list of warnings. Raises ValueError for critical issues."""
+    warnings = []
+    
+    # Physical range checks (typical operating ranges for slurry polymerization reactor)
+    range_checks = {
+        "Q_cat":       (0, 50,     "kg/h catalyst flow"),
+        "Q_cocat":     (0, 100,    "kg/h co-catalyst flow"),
+        "Q_but":       (0, 20000,  "kg/h butene flow"),
+        "Q_et":        (1, 30000,  "kg/h ethylene flow"),  # Must be > 0
+        "Q_H2":        (0, 500,    "kg/h hydrogen flow"),
+        "Q_hx":        (1, 80000,  "kg/h hexane flow"),    # Must be > 0
+        "T":           (50, 500,   "K temperature"),       # Must be reasonable
+        "ratio_h2_et": (0, 10,     "H2/Et ratio"),
+    }
+    
+    for key, (lo, hi, desc) in range_checks.items():
+        val = receta.get(key, 0)
+        if not isinstance(val, (int, float)):
+            try:
+                val = float(val)
+            except (ValueError, TypeError):
+                warnings.append(f"  {key}={receta.get(key)!r} is not numeric ({desc})")
+                continue
+        
+        if val < lo:
+            warnings.append(f"  {key}={val} is below minimum {lo} ({desc})")
+        elif val > hi:
+            warnings.append(f"  {key}={val} is above maximum {hi} ({desc})")
+    
+    # Critical: if Q_et or Q_hx are zero/tiny, model will diverge
+    q_et = float(receta.get("Q_et", 0))
+    q_hx = float(receta.get("Q_hx", 0))
+    q_cat = float(receta.get("Q_cat", 0))
+    
+    if q_et < 0.01:
+        warnings.append(f"  CRITICAL: Q_et={q_et} ≈ 0 → no monomer, no polymerization possible")
+    if q_hx < 0.01:
+        warnings.append(f"  CRITICAL: Q_hx={q_hx} ≈ 0 → no solvent, pressure/concentration will diverge")
+    if q_cat < 1e-6:
+        warnings.append(f"  WARNING: Q_cat={q_cat} ≈ 0 → no catalyst, no reaction will occur")
+    
+    return warnings
+
+
 def solve_single_receta_clean(receta, reactor_config, qins):
     """Solve a single receta and return clean outputs."""
     receta = to_numeric(receta)
@@ -675,9 +721,24 @@ def solve_single_receta_clean(receta, reactor_config, qins):
     qins = to_numeric(qins)
     
     required_keys = ["Q_cat", "Q_cocat", "Q_but", "Q_et", "Q_H2", "Q_hx", "T", "ratio_h2_et"]
-    for key in required_keys:
-        if key not in receta:
-            raise ValueError(f"'{key}' not present in receta input")
+    missing = [k for k in required_keys if k not in receta]
+    if missing:
+        # Log what keys ARE present to help debug column name mismatches
+        present_keys = sorted(receta.keys())
+        raise ValueError(
+            f"Missing required keys: {missing}. "
+            f"Present keys: {present_keys}. "
+            f"Check that entity column names match exactly: {required_keys}"
+        )
+    
+    # Log input values to stderr for debugging (captured by server)
+    sys.stderr.write(f"[Franmit] Receta inputs: " + 
+        ", ".join(f"{k}={receta.get(k)}" for k in required_keys) + "\n")
+    
+    # Validate ranges
+    warnings = validate_receta_inputs(receta)
+    if warnings:
+        sys.stderr.write(f"[Franmit] Input validation warnings:\n" + "\n".join(warnings) + "\n")
     
     grado = receta.get("grado", "M5206")
     recetas_dict = {grado: receta}
@@ -688,7 +749,46 @@ def solve_single_receta_clean(receta, reactor_config, qins):
     first_key = list(outs_dict.keys())[0]
     raw = outs_dict[first_key]
     
-    return extract_clean_outputs(raw)
+    clean = extract_clean_outputs(raw)
+    
+    # Post-solve validation: flag physically impossible results
+    mw = clean.get("Mw_g_mol", 0)
+    mn = clean.get("Mn_g_mol", 0)
+    mi = clean.get("MI_2.16", 0)
+    pres = clean.get("Presion_bar", 0)
+    prod = clean.get("Produccion_kg_h", 0)
+    pdi = clean.get("PDI", 0)
+    
+    issues = []
+    
+    if mw < 100:  # Mw < 100 means essentially no polymerization
+        issues.append(f"Mw={mw} (too low, no real polymerization)")
+        sys.stderr.write(f"[Franmit] WARNING: Mw={mw} < 100 → no polymerization occurred. "
+                        f"Check Q_cat, Q_et, Q_hx values.\n")
+    
+    if abs(pres) > 100:  # Typical reactor pressure 5-40 bar
+        issues.append(f"P={pres} bar (unrealistic)")
+        sys.stderr.write(f"[Franmit] WARNING: P={pres} bar → out of physical range (typical: 5-40 bar).\n")
+    
+    if mi > 1e6:  # MI > 1M is unrealistic (typical: 0.01 - 1000)
+        issues.append(f"MI={mi:.2e} (unrealistic)")
+        sys.stderr.write(f"[Franmit] WARNING: MI_2.16={mi} → unrealistic melt index.\n")
+    
+    if pdi > 0 and (pdi < 1.0 or pdi > 50):  # PDI < 1 is physically impossible
+        issues.append(f"PDI={pdi} (physically impossible)")
+        sys.stderr.write(f"[Franmit] WARNING: PDI={pdi} → physically impossible.\n")
+    
+    if mn > 0 and mw > 0 and mn > mw:  # Mn > Mw is impossible
+        issues.append(f"Mn={mn} > Mw={mw} (impossible)")
+        sys.stderr.write(f"[Franmit] WARNING: Mn={mn} > Mw={mw} → physically impossible.\n")
+    
+    if prod < 0:
+        issues.append(f"Production={prod} kg/h (negative)")
+    
+    if issues:
+        clean["_warning"] = "Unreliable results: " + "; ".join(issues) + ". Check input values."
+    
+    return clean
 
 if __name__ == "__main__":
     try:

@@ -3523,9 +3523,9 @@ app.post('/api/franmit/execute', authenticateToken, async (req, res) => {
         // Build input data for Python script
         const zeros8 = [0, 0, 0, 0, 0, 0, 0, 0];
         const defaultQins = {
-            'Q_H2o': 0, 'Q_Hxo': 0,
-            'Q_Po': [...zeros8], 'Q_Yo': [...zeros8], 'Q_Y1': [...zeros8],
-            'Q_To': [...zeros8], 'Q_T1': [...zeros8], 'Q_T2': [...zeros8],
+                'Q_H2o': 0, 'Q_Hxo': 0,
+                'Q_Po': [...zeros8], 'Q_Yo': [...zeros8], 'Q_Y1': [...zeros8],
+                'Q_To': [...zeros8], 'Q_T1': [...zeros8], 'Q_T2': [...zeros8],
         };
         
         const inputData = isBatch
@@ -3542,7 +3542,25 @@ app.post('/api/franmit/execute', authenticateToken, async (req, res) => {
                 qins: qins || defaultQins
             };
         
-        console.log('[Franmit] Input data:', JSON.stringify(inputData).substring(0, 400));
+        // Log detailed input for debugging
+        const requiredKeys = ['Q_cat', 'Q_cocat', 'Q_but', 'Q_et', 'Q_H2', 'Q_hx', 'T', 'ratio_h2_et'];
+        if (isBatch && recetas.length > 0) {
+            const firstRow = recetas[0];
+            const presentKeys = Object.keys(firstRow);
+            const missingKeys = requiredKeys.filter(k => !(k in firstRow));
+            console.log(`[Franmit] First receta keys (${presentKeys.length}):`, presentKeys.join(', '));
+            if (missingKeys.length > 0) {
+                console.warn(`[Franmit] ⚠️ MISSING required keys in receta:`, missingKeys.join(', '));
+            }
+            console.log(`[Franmit] First receta values:`, 
+                requiredKeys.map(k => `${k}=${firstRow[k] ?? 'MISSING'}`).join(', '));
+        } else if (!isBatch && receta) {
+            const presentKeys = Object.keys(receta);
+            console.log(`[Franmit] Receta keys (${presentKeys.length}):`, presentKeys.join(', '));
+            console.log(`[Franmit] Receta values:`, 
+                requiredKeys.map(k => `${k}=${receta[k] ?? 'MISSING'}`).join(', '));
+        }
+        console.log('[Franmit] Input data (truncated):', JSON.stringify(inputData).substring(0, 600));
 
         // Path to Python script
         const scriptPath = path.join(__dirname, 'franmit_model.py');
@@ -3589,9 +3607,19 @@ app.post('/api/franmit/execute', authenticateToken, async (req, res) => {
         pythonProcess.on('close', (code) => {
             clearTimeout(timeout);
             
-            // Log stderr warnings (numpy RuntimeWarnings are expected)
+            // Log stderr warnings (includes input validation + numpy RuntimeWarnings)
             if (stderrData) {
-                console.log('[Franmit] Python stderr (warnings):', stderrData.substring(0, 500));
+                // Show full validation warnings (they're important for debugging)
+                const lines = stderrData.split('\n').filter(l => l.trim());
+                const validationLines = lines.filter(l => l.includes('[Franmit]'));
+                const otherLines = lines.filter(l => !l.includes('[Franmit]'));
+                if (validationLines.length > 0) {
+                    console.log('[Franmit] Python validation output:');
+                    validationLines.forEach(l => console.log('  ', l));
+                }
+                if (otherLines.length > 0) {
+                    console.log('[Franmit] Python warnings:', otherLines.slice(0, 5).join(' | '));
+                }
             }
 
             try {
@@ -3608,10 +3636,18 @@ app.post('/api/franmit/execute', authenticateToken, async (req, res) => {
                         console.log('[Franmit] Some rows had errors:', result.errors);
                     }
                     
+                    // Check for _warning fields in results (from Python validation)
+                    const warningResults = sanitizedResults.filter(r => r._warning);
+                    if (warningResults.length > 0) {
+                        console.warn(`[Franmit] ⚠️ ${warningResults.length} result(s) have warnings`);
+                        warningResults.forEach((r, i) => console.warn(`  Row ${i}: ${r._warning}`));
+                    }
+                    
                     console.log(`[Franmit] Reactor model completed: ${sanitizedResults.length} result(s)`);
                     res.json({
                         success: true,
                         results: sanitizedResults,
+                        warnings: warningResults.map(r => r._warning).filter(Boolean),
                         errors: result.errors || [],
                         display: ''
                     });
