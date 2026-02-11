@@ -525,7 +525,23 @@ class WorkflowExecutor {
     }
 
     /**
-     * Save records to entity using the entities API structure
+     * Infer property type from a JS value
+     */
+    inferPropertyType(value) {
+        if (value === null || value === undefined) return 'text';
+        if (typeof value === 'number') return 'number';
+        if (typeof value === 'boolean') return 'text';
+        if (typeof value === 'string') {
+            if (/^\d{4}-\d{2}-\d{2}/.test(value)) return 'date';
+            const num = Number(value);
+            if (!isNaN(num) && value.trim() !== '') return 'number';
+        }
+        return 'text';
+    }
+
+    /**
+     * Save records to entity using the entities API structure.
+     * Auto-creates missing properties when data columns don't match existing ones.
      */
     async saveToEntity(entityId, inputData, isTimeSeriesData) {
         try {
@@ -541,24 +557,64 @@ class WorkflowExecutor {
                 });
             }
 
-            // Save each record (in a real implementation, this would call the API)
-            // For now, we'll use the database directly
+            // --- Auto-create missing properties ---
+            // Collect all unique keys from all records
+            const skipKeys = new Set(['id', 'createdAt', 'updatedAt', 'entityId', 'metadata', 'raw', '__index']);
+            const allKeys = new Set();
+            for (const record of normalizedRecords) {
+                if (record && typeof record === 'object') {
+                    for (const key of Object.keys(record)) {
+                        if (!skipKeys.has(key)) allKeys.add(key);
+                    }
+                }
+            }
+
+            // Get existing properties once
+            let properties = await this.db.all(
+                'SELECT id, name, type FROM properties WHERE entityId = ?',
+                [entityId]
+            );
+            const existingNames = new Set(properties.map(p => p.name.toLowerCase()));
+
+            // Create any missing properties
+            let createdProps = 0;
+            for (const key of allKeys) {
+                if (!existingNames.has(key.toLowerCase())) {
+                    // Find a sample value to infer type
+                    let sampleValue = undefined;
+                    for (const rec of normalizedRecords) {
+                        if (rec[key] !== null && rec[key] !== undefined) { sampleValue = rec[key]; break; }
+                    }
+                    const propId = generateId();
+                    const propType = this.inferPropertyType(sampleValue);
+                    await this.db.run(
+                        'INSERT INTO properties (id, entityId, name, type, defaultValue) VALUES (?, ?, ?, ?, ?)',
+                        [propId, entityId, key, propType, '']
+                    );
+                    createdProps++;
+                }
+            }
+
+            // Re-fetch properties if we created new ones
+            if (createdProps > 0) {
+                properties = await this.db.all(
+                    'SELECT id, name, type FROM properties WHERE entityId = ?',
+                    [entityId]
+                );
+                console.log(`[SaveToEntity] Auto-created ${createdProps} new properties for entity ${entityId}`);
+            }
+
+            // Build property name mapping
+            const propertyMap = {};
+            properties.forEach(prop => {
+                propertyMap[prop.name.toLowerCase()] = prop;
+            });
+
+            // Save each record
             let savedCount = 0;
             const savedIds = [];
 
             for (const record of normalizedRecords) {
-                // Get entity properties
-                const properties = await this.db.all(
-                    'SELECT id, name, type FROM properties WHERE entityId = ?',
-                    [entityId]
-                );
-
-                // Create property name mapping
-                const propertyMap = {};
-                properties.forEach(prop => {
-                    propertyMap[prop.name.toLowerCase()] = prop;
-                });
-
                 // Create record
                 const recordId = generateId();
                 const createdAt = record.timestamp || record.createdAt || new Date().toISOString();
@@ -570,7 +626,7 @@ class WorkflowExecutor {
 
                 // Save property values
                 for (const [key, val] of Object.entries(record)) {
-                    if (key === 'id' || key === 'createdAt' || key === 'entityId' || key === 'timestamp') {
+                    if (skipKeys.has(key)) {
                         // Handle timestamp specially if needed
                         if (key === 'timestamp') {
                             const timestampProp = propertyMap['timestamp'] || propertyMap['time'] || propertyMap['createdat'];
@@ -602,10 +658,11 @@ class WorkflowExecutor {
 
             return {
                 success: true,
-                message: `Saved ${savedCount} record(s) to entity '${entityId}'${isTimeSeriesData ? ' (time-series optimized)' : ''}`,
+                message: `Saved ${savedCount} record(s) to entity '${entityId}'${createdProps > 0 ? ` (${createdProps} properties auto-created)` : ''}${isTimeSeriesData ? ' (time-series optimized)' : ''}`,
                 outputData: inputData,
                 savedIds,
                 entityId,
+                createdProperties: createdProps,
                 isTimeSeries: isTimeSeriesData
             };
         } catch (error) {

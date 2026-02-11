@@ -211,6 +211,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [addFieldValue, setAddFieldValue] = useState<string>('');
     const [configuringSaveNodeId, setConfiguringSaveNodeId] = useState<string | null>(null);
     const [saveEntityId, setSaveEntityId] = useState<string>('');
+    const [isCreatingNewEntity, setIsCreatingNewEntity] = useState(false);
+    const [newEntityName, setNewEntityName] = useState('');
+    const [isCreatingEntity, setIsCreatingEntity] = useState(false);
+    const [localCreatedEntities, setLocalCreatedEntities] = useState<Array<{ id: string; name: string; properties?: any[] }>>([]);
 
     // Sidebar State
     const [searchQuery, setSearchQuery] = useState('');
@@ -1512,13 +1516,152 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             setConfiguringSaveNodeId(nodeId);
             setSaveEntityId(node.config?.entityId || '');
             setNodeCustomTitle(node.config?.customName || '');
+            setIsCreatingNewEntity(false);
+            setNewEntityName('');
         }
     };
+
+    /** Infer property type from a JS value */
+    const inferPropertyType = (value: any): string => {
+        if (value === null || value === undefined) return 'text';
+        if (typeof value === 'number') return 'number';
+        if (typeof value === 'boolean') return 'text';
+        if (typeof value === 'string') {
+            if (/^\d{4}-\d{2}-\d{2}/.test(value)) return 'date';
+            const num = Number(value);
+            if (!isNaN(num) && value.trim() !== '') return 'number';
+        }
+        return 'text';
+    };
+
+    /** Get output data from the parent node connected to a given node.
+     *  Falls back to synthesizing from node.config when not yet executed. */
+    const getParentNodeOutputData = (nodeId: string): any[] | null => {
+        const incoming = connections.filter(c => c.toNodeId === nodeId);
+        for (const conn of incoming) {
+            const parent = nodes.find(n => n.id === conn.fromNodeId);
+            if (!parent) continue;
+
+            // 1. Try already-executed output data
+            const executed = parent.outputData || parent.data;
+            if (executed) {
+                const data = parent.type === 'splitColumns'
+                    ? (conn as any).outputType === 'B' ? executed.outputB : executed.outputA
+                    : executed;
+                if (Array.isArray(data) && data.length > 0) return data;
+                if (data && typeof data === 'object' && !Array.isArray(data)) return [data];
+            }
+
+            // 2. Fallback: synthesize from node config for known types
+            if (parent.type === 'manualInput' && parent.config?.inputVarName) {
+                const varName = parent.config.inputVarName;
+                const varValue = parent.config.inputVarValue || '';
+                const parsed = !isNaN(Number(varValue)) && varValue.trim() !== '' ? Number(varValue) : varValue;
+                return [{ [varName]: parsed }];
+            }
+            if (parent.type === 'excelInput' && parent.config?.parsedData && parent.config.parsedData.length > 0) {
+                return parent.config.parsedData;
+            }
+            if (parent.type === 'excelInput' && parent.config?.previewData && parent.config.previewData.length > 0) {
+                return parent.config.previewData;
+            }
+            if (parent.type === 'excelInput' && parent.config?.headers && parent.config.headers.length > 0) {
+                // Build a synthetic row with column names
+                const row: Record<string, string> = {};
+                parent.config.headers.forEach((h: string) => { row[h] = ''; });
+                return [row];
+            }
+        }
+        return null;
+    };
+
+    /** Create a new entity with auto-detected properties from parent node data */
+    const handleCreateNewEntity = async () => {
+        if (!newEntityName.trim() || !configuringSaveNodeId) return;
+        setIsCreatingEntity(true);
+
+        try {
+            const entityId = generateUUID();
+            const now = new Date().toISOString();
+
+            // Detect properties from parent node output
+            const parentData = getParentNodeOutputData(configuringSaveNodeId);
+            const properties: Array<{ id: string; name: string; type: string; defaultValue: string }> = [];
+
+            if (parentData && parentData.length > 0) {
+                // Sample first rows to detect columns & types
+                const sample = parentData.slice(0, Math.min(5, parentData.length));
+                const allKeys = new Set<string>();
+                sample.forEach(row => {
+                    if (row && typeof row === 'object') {
+                        Object.keys(row).forEach(k => allKeys.add(k));
+                    }
+                });
+
+                // Skip internal/meta keys
+                const skipKeys = new Set(['id', 'createdAt', 'updatedAt', 'entityId', 'metadata', 'raw', '__index']);
+                allKeys.forEach(key => {
+                    if (skipKeys.has(key)) return;
+                    // Find first non-null value to infer type
+                    let sampleValue: any = undefined;
+                    for (const row of sample) {
+                        if (row[key] !== null && row[key] !== undefined) {
+                            sampleValue = row[key];
+                            break;
+                        }
+                    }
+                    properties.push({
+                        id: generateUUID(),
+                        name: key,
+                        type: inferPropertyType(sampleValue),
+                        defaultValue: ''
+                    });
+                });
+            }
+
+            // Call API to create entity
+            const res = await fetch(`${API_BASE}/entities`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    id: entityId,
+                    name: newEntityName.trim(),
+                    description: `Created from workflow`,
+                    author: 'Workflow',
+                    lastEdited: now,
+                    entityType: 'generic',
+                    properties
+                })
+            });
+
+            if (!res.ok) throw new Error('Failed to create entity');
+
+            // Add to local cache so the dropdown shows it immediately
+            setLocalCreatedEntities(prev => [...prev, { id: entityId, name: newEntityName.trim(), properties }]);
+
+            // Select the newly created entity
+            setSaveEntityId(entityId);
+            setIsCreatingNewEntity(false);
+            setNewEntityName('');
+        } catch (error) {
+            console.error('Error creating entity:', error);
+        } finally {
+            setIsCreatingEntity(false);
+        }
+    };
+
+    /** Merged entities list: props + locally created ones */
+    const allEntities = React.useMemo(() => {
+        const ids = new Set(entities.map(e => e.id));
+        const extra = localCreatedEntities.filter(e => !ids.has(e.id));
+        return [...entities, ...extra];
+    }, [entities, localCreatedEntities]);
 
     const saveSaveRecordsConfig = () => {
         if (!configuringSaveNodeId || !saveEntityId) return;
 
-        const entity = entities.find(e => e.id === saveEntityId);
+        const entity = allEntities.find(e => e.id === saveEntityId);
         const defaultLabel = `Save to ${entity?.name || 'Database'}`;
         const finalLabel = nodeCustomTitle.trim() || defaultLabel;
         
@@ -10112,13 +10255,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         {configuringSaveNodeId && (
                             <NodeConfigSidePanel
                                     isOpen={!!configuringSaveNodeId}
-                                onClose={() => setConfiguringSaveNodeId(null)}
+                                onClose={() => { setConfiguringSaveNodeId(null); setIsCreatingNewEntity(false); setNewEntityName(''); }}
                                 title="Save to Database"
                                 icon={Database}
                                 footer={
                                     <>
                                         <button
-                                            onClick={() => setConfiguringSaveNodeId(null)}
+                                            onClick={() => { setConfiguringSaveNodeId(null); setIsCreatingNewEntity(false); setNewEntityName(''); }}
                                             className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                         >
                                             Cancel
@@ -10133,22 +10276,119 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </>
                                 }
                             >
-                                <div className="space-y-6">
+                                <div className="space-y-4">
                                     <div>
                                         <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Select Entity
                                         </label>
                                         <select
                                             value={saveEntityId}
-                                            onChange={(e) => setSaveEntityId(e.target.value)}
+                                            onChange={(e) => { setSaveEntityId(e.target.value); setIsCreatingNewEntity(false); }}
                                             className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
                                         >
                                             <option value="">Choose entity...</option>
-                                            {entities.map(entity => (
+                                            {allEntities.map(entity => (
                                                 <option key={entity.id} value={entity.id}>{entity.name}</option>
                                             ))}
                                         </select>
                                     </div>
+
+                                    {/* + New Database */}
+                                    {!isCreatingNewEntity ? (
+                                        <button
+                                            onClick={() => { setIsCreatingNewEntity(true); setSaveEntityId(''); }}
+                                            className="flex items-center gap-1.5 text-xs text-[var(--accent-primary)] hover:text-[var(--accent-secondary)] font-medium transition-colors"
+                                        >
+                                            <Plus size={14} weight="bold" />
+                                            New database
+                                        </button>
+                                    ) : (
+                                        <div className="border border-[var(--border-light)] rounded-lg p-3 space-y-3 bg-[var(--bg-tertiary)]">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)]">
+                                                New Database Name
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={newEntityName}
+                                                onChange={(e) => setNewEntityName(e.target.value)}
+                                                placeholder="e.g. Viticultors Output"
+                                                autoFocus
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] bg-[var(--bg-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+                                                onKeyDown={(e) => { if (e.key === 'Enter' && newEntityName.trim()) handleCreateNewEntity(); }}
+                                            />
+
+                                            {/* Preview detected columns */}
+                                            {(() => {
+                                                const parentData = configuringSaveNodeId ? getParentNodeOutputData(configuringSaveNodeId) : null;
+                                                if (!parentData || parentData.length === 0) return null;
+                                                const sample = parentData[0];
+                                                const keys = Object.keys(sample).filter(k => !['id', 'createdAt', 'updatedAt', 'entityId', 'metadata', 'raw', '__index'].includes(k));
+                                                if (keys.length === 0) return null;
+                                                return (
+                                                    <div>
+                                                        <p className="text-[10px] text-[var(--text-tertiary)] mb-1.5">
+                                                            {keys.length} properties detected from upstream data:
+                                                        </p>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {keys.slice(0, 20).map(k => (
+                                                                <span key={k} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-[var(--bg-primary)] border border-[var(--border-light)] text-[var(--text-secondary)] font-mono">
+                                                                    {k}
+                                                                </span>
+                                                            ))}
+                                                            {keys.length > 20 && (
+                                                                <span className="text-[10px] text-[var(--text-tertiary)]">+{keys.length - 20} more</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => { setIsCreatingNewEntity(false); setNewEntityName(''); }}
+                                                    className="px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    onClick={handleCreateNewEntity}
+                                                    disabled={!newEntityName.trim() || isCreatingEntity}
+                                                    className="flex items-center gap-1.5 px-3 py-1 bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {isCreatingEntity ? (
+                                                        <>
+                                                            <span className="animate-spin inline-block w-3 h-3 border border-white border-t-transparent rounded-full" />
+                                                            Creating...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Plus size={12} weight="bold" />
+                                                            Create
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Show selected entity info */}
+                                    {saveEntityId && !isCreatingNewEntity && (() => {
+                                        const selectedEntity = allEntities.find(e => e.id === saveEntityId);
+                                        if (!selectedEntity) return null;
+                                        const propCount = selectedEntity.properties?.length || 0;
+                                        return (
+                                            <div className="p-2.5 border border-[var(--border-light)] rounded-lg bg-[var(--bg-tertiary)]">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <Database size={12} className="text-[var(--text-secondary)]" />
+                                                    <span className="text-xs font-medium text-[var(--text-primary)]">{selectedEntity.name}</span>
+                                                </div>
+                                                <p className="text-[10px] text-[var(--text-tertiary)]">
+                                                    {propCount} {propCount === 1 ? 'property' : 'properties'}
+                                                    {selectedEntity.description ? ` · ${selectedEntity.description}` : ''}
+                                                </p>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </NodeConfigSidePanel>
                         )}
