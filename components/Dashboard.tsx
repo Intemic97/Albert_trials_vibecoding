@@ -2063,7 +2063,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     }
                 } else {
                     setSelectedDashboardId(null);
-                    await handleCreateProcessExampleDashboard('hdpe_transition_monitoring', true);
                 }
             }
         } catch (error) {
@@ -2286,25 +2285,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         }
     };
 
-    const handleDeleteDashboard = async () => {
-        if (!selectedDashboardId) return;
+    const handleDeleteDashboard = async (dashboardId?: string) => {
+        const targetId = dashboardId || selectedDashboardId;
+        if (!targetId) return;
         if (!confirm('Are you sure you want to delete this dashboard and all its widgets?')) return;
         
         try {
-            const res = await fetch(`${API_BASE}/dashboards/${selectedDashboardId}`, {
+            const res = await fetch(`${API_BASE}/dashboards/${targetId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
 
             if (res.ok) {
-                const remaining = dashboards.filter(d => d.id !== selectedDashboardId);
+                const remaining = dashboards.filter(d => d.id !== targetId);
                 setDashboards(remaining);
-                if (remaining.length > 0) {
-                    selectDashboard(remaining[0].id);
-                } else {
-                    setSelectedDashboardId(null);
-                    navigate('/dashboard', { replace: true });
+                if (targetId === selectedDashboardId) {
+                    if (remaining.length > 0) {
+                        selectDashboard(remaining[0].id);
+                    } else {
+                        setSelectedDashboardId(null);
+                        navigate('/dashboard', { replace: true });
+                    }
                 }
+                success('Dashboard deleted');
             }
         } catch (error) {
             console.error('Error deleting dashboard:', error);
