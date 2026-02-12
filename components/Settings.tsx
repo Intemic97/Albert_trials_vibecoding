@@ -645,15 +645,13 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                     <h2 className="text-lg font-normal text-slate-800">Team Members</h2>
                                     <p className="text-[var(--text-secondary)] text-sm">Manage who has access to this workspace.</p>
                                 </div>
-                                {currentOrg?.role === 'admin' && (
-                                    <button
-                                        onClick={() => setIsInviting(true)}
-                                        className="flex items-center px-4 py-2 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
-                                    >
-                                        <Plus size={16} weight="light" className="mr-2" />
-                                        Invite Member
-                                    </button>
-                                )}
+                                <button
+                                    onClick={() => setIsInviting(true)}
+                                    className="flex items-center px-4 py-2 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                                >
+                                    <Plus size={16} weight="light" className="mr-2" />
+                                    Invite Member
+                                </button>
                             </div>
 
                             {feedback && (

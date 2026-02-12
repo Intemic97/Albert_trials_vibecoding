@@ -1024,6 +1024,42 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         // useEffect will handle setting currentView to 'canvas' based on /workflow/new URL
     };
 
+    // Close ALL config panels — prevents overlapping side panels
+    const closeAllConfigs = () => {
+        setConfiguringNodeId(null);
+        setConfiguringConditionNodeId(null);
+        setConfiguringAddFieldNodeId(null);
+        setConfiguringSaveNodeId(null);
+        setConfiguringLLMNodeId(null);
+        setConfiguringPythonNodeId(null);
+        setConfiguringJoinNodeId(null);
+        setConfiguringSplitColumnsNodeId(null);
+        setConfiguringExcelNodeId(null);
+        setConfiguringPdfNodeId(null);
+        setConfiguringManualInputNodeId(null);
+        setConfiguringHttpNodeId(null);
+        setConfiguringWebhookNodeId(null);
+        setConfiguringMySQLNodeId(null);
+        setConfiguringSAPNodeId(null);
+        setConfiguringEmailNodeId(null);
+        setConfiguringSMSNodeId(null);
+        setConfiguringWhatsAppNodeId(null);
+        setConfiguringRenameColumnsNodeId(null);
+        setConfiguringVisualizationNodeId(null);
+        setConfiguringScheduleNodeId(null);
+        setConfiguringOpcuaNodeId(null);
+        setConfiguringMqttNodeId(null);
+        setConfiguringOsiPiNodeId(null);
+        setConfiguringFranmitNodeId(null);
+        setConfiguringEsiosNodeId(null);
+        setConfiguringClimatiqNodeId(null);
+        setConfiguringHumanApprovalNodeId(null);
+        setConfiguringLIMSNodeId(null);
+        setConfiguringStatisticalNodeId(null);
+        setConfiguringAlertAgentNodeId(null);
+        setConfiguringPdfReportNodeId(null);
+    };
+
     const openNodeConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
         if (node && node.type === 'fetchData') {
@@ -6201,6 +6237,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                             
                                             // Don't open modal if node was dragged
                                             if (nodeDragged) return;
+
+                                            // Close any open config panel before opening a new one
+                                            closeAllConfigs();
 
                                             // Open config for configurable nodes
                                             if (node.type === 'fetchData') {
