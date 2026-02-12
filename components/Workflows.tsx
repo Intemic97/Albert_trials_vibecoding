@@ -75,9 +75,10 @@ interface WorkflowSuggestion {
 interface WorkflowsProps {
     entities: any[];
     onViewChange?: (view: string) => void;
+    onEntityCreated?: () => void;
 }
 
-export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) => {
+export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, onEntityCreated }) => {
     const { workflowId: urlWorkflowId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -1652,6 +1653,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
 
             // Add to local cache so the dropdown shows it immediately
             setLocalCreatedEntities(prev => [...prev, { id: entityId, name: newEntityName.trim(), properties }]);
+
+            // Notify parent (App.tsx) to refresh global entities list
+            onEntityCreated?.();
 
             // Select the newly created entity
             setSaveEntityId(entityId);
@@ -8897,12 +8901,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     <div className="pt-3 border-t border-[var(--border-light)]">
                                         <button
                                             onClick={() => openFeedbackPopup('action', 'Rename Columns')}
-                                            className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
-                                        >
-                                            <MessageSquare size={12} weight="light" />
-                                            What would you like this node to do?
-                                        </button>
-                                    </div>
+                                                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
+                                            >
+                                                <MessageSquare size={12} weight="light" />
+                                                What would you like this node to do?
+                                            </button>
+                                        </div>
                                 </NodeConfigSidePanel>
                             );
                         })()}

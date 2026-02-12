@@ -1587,10 +1587,10 @@ function AuthenticatedApp() {
                         />
                     } />
                     <Route path="/workflows" element={
-                        <Workflows entities={entities} onViewChange={handleNavigate} />
+                        <Workflows entities={entities} onViewChange={handleNavigate} onEntityCreated={fetchEntities} />
                     } />
                     <Route path="/workflow/:workflowId" element={
-                        <Workflows entities={entities} onViewChange={handleNavigate} />
+                        <Workflows entities={entities} onViewChange={handleNavigate} onEntityCreated={fetchEntities} />
                     } />
                     {/* New modular workflow editor (v2) */}
                     <Route path="/workflows-v2" element={
