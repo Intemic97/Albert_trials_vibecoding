@@ -24,6 +24,7 @@ export { SaveRecordsConfigModal } from './SaveRecordsConfigModal';
 // AI/Code modals
 export { LLMConfigModal } from './LLMConfigModal';
 export { PythonConfigModal } from './PythonConfigModal';
+export { SpecializedAgentConfigModal } from './SpecializedAgentConfigModal';
 
 // Communication/Notification modals
 export { SlackConfigModal } from './SlackConfigModal';

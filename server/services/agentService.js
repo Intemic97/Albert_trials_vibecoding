@@ -51,27 +51,30 @@ async function get(db, id, orgId) {
 async function create(db, orgId, payload) {
   const id = payload.id || generateId();
   const now = new Date().toISOString();
-  await db.run(
-    `INSERT INTO copilot_agents (id, organizationId, name, description, icon, instructions, allowedEntities, folderIds, orchestratorPrompt, analystPrompt, specialistPrompt, synthesisPrompt, sortOrder, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      id,
-      orgId,
-      payload.name || 'Nuevo Agente',
-      payload.description || null,
-      payload.icon || '🤖',
-      payload.instructions || null,
-      payload.allowedEntities ? JSON.stringify(payload.allowedEntities) : null,
-      payload.folderIds ? JSON.stringify(payload.folderIds) : null,
-      payload.orchestratorPrompt || null,
-      payload.analystPrompt || null,
-      payload.specialistPrompt || null,
-      payload.synthesisPrompt || null,
-      payload.sortOrder ?? 0,
-      now,
-      now
-    ]
-  );
+  const roleVal = 'agent';
+  const baseCols = 'id, organizationId, name, description, icon, instructions, allowedEntities, folderIds, orchestratorPrompt, analystPrompt, specialistPrompt, synthesisPrompt, sortOrder, createdAt, updatedAt, createdBy, createdByName';
+  const baseValues = [
+    id, orgId, payload.name || 'Nuevo Agente', payload.description ?? null, payload.icon || '🤖',
+    payload.instructions ?? null, payload.allowedEntities ? JSON.stringify(payload.allowedEntities) : null,
+    payload.folderIds ? JSON.stringify(payload.folderIds) : null, payload.orchestratorPrompt ?? null,
+    payload.analystPrompt ?? null, payload.specialistPrompt ?? null, payload.synthesisPrompt ?? null,
+    payload.sortOrder ?? 0, now, now, payload.createdBy ?? null, payload.createdByName ?? null
+  ];
+  try {
+    await db.run(
+      `INSERT INTO copilot_agents (${baseCols}, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [...baseValues, roleVal]
+    );
+  } catch (err) {
+    if (err.message && err.message.includes('no such column')) {
+      // Fallback: try without createdBy/createdByName/role
+      const fallbackCols = 'id, organizationId, name, description, icon, instructions, allowedEntities, folderIds, orchestratorPrompt, analystPrompt, specialistPrompt, synthesisPrompt, sortOrder, createdAt, updatedAt';
+      const fallbackValues = baseValues.slice(0, 15);
+      await db.run(`INSERT INTO copilot_agents (${fallbackCols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, fallbackValues);
+    } else {
+      throw err;
+    }
+  }
   return get(db, id, orgId);
 }
 
@@ -127,11 +130,54 @@ async function seedDefaults(db, orgId) {
   }
 }
 
+// ==================== AGENT MEMORY ====================
+
+/**
+ * Add a memory entry for an agent
+ * @param {string} source - 'chat' | 'workflow' | 'system'
+ */
+async function addMemory(db, agentId, orgId, role, content, source = 'chat', metadata = null) {
+  const id = `mem_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+  await db.run(
+    `INSERT INTO agent_memory (id, agentId, organizationId, role, content, source, metadata, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, agentId, orgId, role, content, source, metadata ? JSON.stringify(metadata) : null, new Date().toISOString()]
+  );
+  return id;
+}
+
+/**
+ * Get recent memory for an agent (across all chats/executions)
+ * @param {number} limit - max messages to return (default 20)
+ */
+async function getMemory(db, agentId, limit = 20) {
+  const rows = await db.all(
+    'SELECT role, content, source, metadata, createdAt FROM agent_memory WHERE agentId = ? ORDER BY createdAt DESC LIMIT ?',
+    [agentId, limit]
+  );
+  return rows.reverse().map(r => ({
+    role: r.role,
+    content: r.content,
+    source: r.source,
+    metadata: r.metadata ? safeParse(r.metadata, null) : null,
+    createdAt: r.createdAt
+  }));
+}
+
+/**
+ * Clear all memory for an agent
+ */
+async function clearMemory(db, agentId) {
+  await db.run('DELETE FROM agent_memory WHERE agentId = ?', [agentId]);
+}
+
 module.exports = {
   list,
   get,
   create,
   update,
   remove,
-  seedDefaults
+  seedDefaults,
+  addMemory,
+  getMemory,
+  clearMemory
 };

@@ -35,6 +35,7 @@ async function initDb() {
       name TEXT,
       profilePhoto TEXT,
       companyRole TEXT,
+      locale TEXT DEFAULT 'en',
       createdAt TEXT
     );
 
@@ -477,6 +478,11 @@ async function initDb() {
   } catch (e) {
     // Column already exists, ignore
   }
+  try {
+    await db.exec(`ALTER TABLE users ADD COLUMN locale TEXT DEFAULT 'en'`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
 
   // Migration: Add createdBy and createdByName columns to workflows table
   try {
@@ -847,6 +853,24 @@ async function initDb() {
   try {
     await db.exec(`ALTER TABLE copilot_agents ADD COLUMN synthesisPrompt TEXT`);
   } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN instructions TEXT`);
+  } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN allowedEntities TEXT`);
+  } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN folderIds TEXT`);
+  } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN sortOrder INTEGER DEFAULT 0`);
+  } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN createdAt TEXT`);
+  } catch (e) {}
+  try {
+    await db.exec(`ALTER TABLE copilot_agents ADD COLUMN updatedAt TEXT`);
+  } catch (e) {}
 
   // Multi-agent: copilot_agents table (refactored: agents are now top-level containers)
   await db.exec(`
@@ -866,9 +890,46 @@ async function initDb() {
       sortOrder INTEGER DEFAULT 0,
       createdAt TEXT,
       updatedAt TEXT,
+      role TEXT DEFAULT 'agent',
+      createdBy TEXT,
+      createdByName TEXT,
       FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
     )
   `);
+
+  // Ensure all columns exist (fixes DBs created with older schema)
+  const agentColumns = await db.all('PRAGMA table_info(copilot_agents)');
+  const has = (name) => agentColumns.some((c) => c.name === name);
+  const addCol = async (sql) => { try { await db.exec(sql); } catch (e) { /* already exists or invalid */ } };
+  if (!has('instructions')) await addCol('ALTER TABLE copilot_agents ADD COLUMN instructions TEXT');
+  if (!has('allowedEntities')) await addCol('ALTER TABLE copilot_agents ADD COLUMN allowedEntities TEXT');
+  if (!has('folderIds')) await addCol('ALTER TABLE copilot_agents ADD COLUMN folderIds TEXT');
+  if (!has('sortOrder')) await addCol('ALTER TABLE copilot_agents ADD COLUMN sortOrder INTEGER DEFAULT 0');
+  if (!has('createdAt')) await addCol('ALTER TABLE copilot_agents ADD COLUMN createdAt TEXT');
+  if (!has('updatedAt')) await addCol('ALTER TABLE copilot_agents ADD COLUMN updatedAt TEXT');
+  if (!has('role')) {
+    try { await db.exec(`ALTER TABLE copilot_agents ADD COLUMN role TEXT DEFAULT 'agent'`); } catch (e) {}
+  }
+  if (!has('createdBy')) await addCol('ALTER TABLE copilot_agents ADD COLUMN createdBy TEXT');
+  if (!has('createdByName')) await addCol('ALTER TABLE copilot_agents ADD COLUMN createdByName TEXT');
+
+  // Agent memory: persistent memory per agent across all chats/executions
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_memory (
+      id TEXT PRIMARY KEY,
+      agentId TEXT NOT NULL,
+      organizationId TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      source TEXT DEFAULT 'chat',
+      metadata TEXT,
+      createdAt TEXT,
+      FOREIGN KEY(agentId) REFERENCES copilot_agents(id) ON DELETE CASCADE
+    )
+  `);
+  try {
+    await db.exec('CREATE INDEX IF NOT EXISTS idx_agent_memory_agent ON agent_memory(agentId, createdAt)');
+  } catch (e) {}
 
   // Multi-agent: agent_conversations (inter-agent messages per turn)
   await db.exec(`
@@ -972,6 +1033,38 @@ async function initDb() {
   } catch (e) {
     // Indexes might already exist
   }
+
+  // Create ai_audit_logs table for AI-specific audit trail (compliance)
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS ai_audit_logs (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT NOT NULL,
+      userId TEXT,
+      userEmail TEXT,
+      chatId TEXT,
+      agentId TEXT,
+      agentRole TEXT NOT NULL,
+      model TEXT NOT NULL,
+      tokensInput INTEGER DEFAULT 0,
+      tokensOutput INTEGER DEFAULT 0,
+      tokensTotal INTEGER DEFAULT 0,
+      durationMs INTEGER,
+      promptLength INTEGER,
+      responseLength INTEGER,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+    )
+  `);
+  try {
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_audit_org ON ai_audit_logs(organizationId)`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_audit_created ON ai_audit_logs(createdAt)`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_audit_chat ON ai_audit_logs(chatId)`);
+  } catch (e) { /* indexes exist */ }
+
+  // Migration: aiAuditMode for organizations (modo auditoría)
+  try {
+    await db.exec(`ALTER TABLE organizations ADD COLUMN aiAuditMode INTEGER DEFAULT 0`);
+  } catch (e) { /* column exists */ }
 
   // Create ot_alerts table for OT/Industrial alerts
   await db.exec(`

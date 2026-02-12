@@ -28,7 +28,6 @@ interface TutorialStep {
     allowInteraction?: boolean;
     fullPage?: boolean;
     icon?: React.ElementType;
-    emoji?: string;
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
@@ -38,7 +37,6 @@ const TUTORIAL_STEPS: TutorialStep[] = [
         description: 'Your platform for building automated data workflows and analytics. Let\'s take a quick tour of the three main areas: Build, Analyze, and Reports.',
         position: 'center',
         icon: RocketLaunch,
-        emoji: '👋'
     },
     {
         id: 'sidebar',
@@ -59,7 +57,6 @@ const TUTORIAL_STEPS: TutorialStep[] = [
         position: 'right',
         action: 'click',
         icon: TreeStructure,
-        emoji: '⚡'
     },
     {
         id: 'workflows-list',
@@ -93,7 +90,6 @@ const TUTORIAL_STEPS: TutorialStep[] = [
         allowInteraction: true,
         fullPage: true,
         icon: Hand,
-        emoji: '🎯'
     },
     {
         id: 'database-nav',
@@ -134,7 +130,6 @@ const TUTORIAL_STEPS: TutorialStep[] = [
         position: 'right',
         action: 'click',
         icon: ChartLineUp,
-        emoji: '📊'
     },
     {
         id: 'dashboards-content',
@@ -155,7 +150,6 @@ const TUTORIAL_STEPS: TutorialStep[] = [
         position: 'right',
         action: 'click',
         icon: Sparkle,
-        emoji: '✨'
     },
     // REPORTS SECTION
     {
@@ -167,7 +161,6 @@ const TUTORIAL_STEPS: TutorialStep[] = [
         position: 'right',
         action: 'click',
         icon: FileText,
-        emoji: '📄'
     },
     {
         id: 'reports-content',
@@ -205,7 +198,6 @@ const TUTORIAL_STEPS: TutorialStep[] = [
         description: 'Start exploring and building. You can restart this tour anytime from Settings → General.',
         position: 'center',
         icon: RocketLaunch,
-        emoji: '🎉'
     },
 ];
 
@@ -455,7 +447,7 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                 {/* Progress bar */}
                 <div className="h-1 bg-[var(--bg-tertiary)]">
                     <div 
-                        className="h-full bg-gradient-to-r from-[var(--accent-primary)] to-emerald-400 transition-all duration-500"
+                        className="h-full bg-[var(--accent-primary)] transition-all duration-500"
                         style={{ width: `${progress}%` }}
                     />
                 </div>
@@ -465,12 +457,8 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                     {/* Header */}
                     <div className="flex items-start justify-between mb-5">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-[var(--accent-primary)]/10 flex items-center justify-center">
-                                {step.emoji ? (
-                                    <span className="text-xl">{step.emoji}</span>
-                                ) : (
-                                    <Icon size={20} className="text-[var(--accent-primary)]" weight="duotone" />
-                                )}
+                            <div className="w-10 h-10 rounded-xl bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/20 flex items-center justify-center">
+                                <Icon size={20} className="text-[var(--accent-primary)]" weight="duotone" />
                             </div>
                             <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-tertiary)]">
                                 <Sparkle size={12} className="text-[var(--accent-primary)]" weight="fill" />
@@ -548,7 +536,7 @@ export function InteractiveTutorial({ onComplete, onSkip }: InteractiveTutorialP
                             onClick={handleNext}
                             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                                 isLastStep
-                                    ? 'bg-gradient-to-r from-[var(--accent-primary)] to-emerald-500 text-white shadow-lg shadow-[var(--accent-primary)]/20'
+                                    ? 'bg-[var(--accent-primary)] text-white shadow-lg shadow-[var(--accent-primary)]/20 hover:bg-[var(--accent-primary-hover)]'
                                     : 'bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary-hover)]'
                             }`}
                         >

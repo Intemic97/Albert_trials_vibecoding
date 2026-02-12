@@ -34,7 +34,8 @@ import {
   Cpu,
   WifiHigh,
   Pi,
-  Atom
+  Atom,
+  Brain
 } from '@phosphor-icons/react';
 import { DraggableItem, NodeType } from './types';
 
@@ -71,6 +72,7 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   { type: 'join', label: 'Join', icon: GitMerge, description: 'Combine data from two sources', category: 'Logic' },
   { type: 'splitColumns', label: 'Split by Columns', icon: Columns, description: 'Split dataset by columns into two outputs', category: 'Logic' },
   { type: 'agent', label: 'AI Agent', icon: Robot, description: 'Autonomous AI agent that can execute workflows and make decisions', category: 'Logic' },
+  { type: 'specializedAgent', label: 'Specialized Agent', icon: Brain, description: 'Run a task using one of your configured agents with memory and context', category: 'Logic' },
   { type: 'llm', label: 'AI Generation', icon: Sparkle, description: 'Generate text using AI', category: 'Logic' },
   { type: 'python', label: 'Python Code', icon: Code, description: 'Run Python script', category: 'Logic' },
   { type: 'statisticalAnalysis', label: 'Statistical Analysis', icon: TrendUp, description: 'Perform PCA, SPC, or compare with golden batch', category: 'Logic' },
@@ -141,6 +143,7 @@ export const NODE_ICONS: Record<NodeType, React.ElementType> = {
   mqtt: WifiHigh,
   modbus: Cpu,
   agent: Robot,
+  specializedAgent: Brain,
   limsFetch: Flask,
   statisticalAnalysis: TrendUp,
   alertAgent: Bell,

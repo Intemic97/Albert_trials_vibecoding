@@ -282,6 +282,7 @@ class WorkflowExecutor {
             dataHistorian: () => this.handleDataHistorian(node, inputData),
             timeSeriesAggregator: () => this.handleTimeSeriesAggregator(node, inputData),
             jsCode: () => this.handleJsCode(node, inputData),
+            specializedAgent: () => this.handleSpecializedAgent(node, inputData),
         };
 
         const handler = handlers[node.type];
@@ -814,6 +815,133 @@ class WorkflowExecutor {
             };
         } catch (error) {
             throw new Error(`LLM request failed: ${error.message}`);
+        }
+    }
+
+    async handleSpecializedAgent(node, inputData) {
+        const config = node.config || {};
+        const { agentId, task, includeInput, memoryEnabled, maxMemoryMessages, model, language, contextEntities } = config;
+
+        if (!agentId) {
+            throw new Error('No agent selected for Specialized Agent node');
+        }
+        if (!task) {
+            throw new Error('No task configured for Specialized Agent node');
+        }
+
+        const apiKey = process.env.OPENAI_API_KEY;
+        if (!apiKey) {
+            throw new Error('OpenAI API key not configured');
+        }
+
+        try {
+            const OpenAI = require('openai');
+            const openai = new OpenAI({ apiKey });
+
+            // Fetch agent config from DB
+            let agentConfig = null;
+            if (this.db) {
+                agentConfig = await this.db.get('SELECT * FROM copilot_agents WHERE id = ?', [agentId]);
+            }
+
+            // Build system prompt from agent instructions
+            const agentName = agentConfig?.name || 'Specialized Agent';
+            const agentInstructions = agentConfig?.instructions || '';
+            const languageInstruction = language === 'en'
+                ? 'Always answer in English unless explicitly asked otherwise.'
+                : language === 'es'
+                    ? 'Responde siempre en español salvo instrucción explícita en otro idioma.'
+                    : 'Answer in the same language as the task unless explicitly asked otherwise.';
+            const systemPrompt = [
+                `You are "${agentName}", a specialized AI agent.`,
+                agentInstructions ? `\nYour instructions:\n${agentInstructions}` : '',
+                '\nYou must complete the task given to you precisely and return a clear, structured response.',
+                '\nIf provided with input data, use it as context for your task.',
+                `\n${languageInstruction}`,
+            ].join('');
+
+            // Build context
+            let contextParts = [];
+
+            // Input data context
+            if (includeInput && inputData) {
+                contextParts.push(`\n\nInput data:\n${JSON.stringify(inputData, null, 2)}`);
+            }
+
+            // Entity context (knowledge base)
+            if (contextEntities?.length > 0 && this.db) {
+                try {
+                    const placeholders = contextEntities.map(() => '?').join(',');
+                    const entities = await this.db.all(`SELECT id, name FROM entities WHERE id IN (${placeholders})`, contextEntities);
+                    for (const entity of entities) {
+                        const records = await this.db.all(
+                            `SELECT rv.value, p.name as propertyName FROM record_values rv 
+                             JOIN records r ON rv.recordId = r.id
+                             JOIN properties p ON rv.propertyId = p.id 
+                             WHERE r.entityId = ? LIMIT 100`, [entity.id]
+                        );
+                        if (records.length > 0) {
+                            contextParts.push(`\n\nEntity "${entity.name}" data:\n${JSON.stringify(records.slice(0, 50), null, 2)}`);
+                        }
+                    }
+                } catch (err) {
+                    console.warn('[SpecializedAgent] Error loading entity context:', err.message);
+                }
+            }
+
+            // Memory: load agent's persistent memory (across all chats/workflows)
+            let memoryMessages = [];
+            if (memoryEnabled && this.db) {
+                try {
+                    const agentServiceMod = require('./services/agentService');
+                    const limit = maxMemoryMessages || 10;
+                    const memEntries = await agentServiceMod.getMemory(this.db, agentId, limit);
+                    memoryMessages = memEntries.map(m => ({ role: m.role, content: m.content }));
+                } catch (_) {
+                    // Memory table may not exist, continue without it
+                }
+            }
+
+            // Resolve task template
+            let resolvedTask = task;
+            if (inputData) {
+                resolvedTask = resolvedTask.replace(/\{\{input\}\}/g, JSON.stringify(inputData));
+            }
+
+            const context = contextParts.join('');
+            const messages = [
+                { role: 'system', content: systemPrompt },
+                ...memoryMessages,
+                { role: 'user', content: resolvedTask + context }
+            ];
+
+            const completion = await openai.chat.completions.create({
+                model: model || 'gpt-4o-mini',
+                messages,
+                temperature: 0.3,
+            });
+
+            const response = completion.choices[0]?.message?.content || '';
+
+            // Persist to agent's memory
+            if (memoryEnabled && this.db) {
+                try {
+                    const agentServiceMod = require('./services/agentService');
+                    const orgRow = await this.db.get('SELECT organizationId FROM copilot_agents WHERE id = ?', [agentId]);
+                    const memOrgId = orgRow?.organizationId || '';
+                    await agentServiceMod.addMemory(this.db, agentId, memOrgId, 'user', resolvedTask, 'workflow', { workflowId: this.workflowId, nodeId: node.id });
+                    await agentServiceMod.addMemory(this.db, agentId, memOrgId, 'assistant', response, 'workflow', { workflowId: this.workflowId, nodeId: node.id });
+                } catch (_) {}
+            }
+
+            return {
+                success: true,
+                message: `Agent "${agentName}" completed the task`,
+                outputData: { response, agentName, agentId, inputData },
+                llmResponse: response
+            };
+        } catch (error) {
+            throw new Error(`Specialized Agent failed: ${error.message}`);
         }
     }
 

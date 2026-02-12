@@ -33,7 +33,7 @@ import {
   ConfigSelect,
   ConfigButton,
 } from '../NodeConfigSidePanel';
-import { LLMConfigModal, PythonConfigModal, ConditionConfigModal, SaveRecordsConfigModal } from './modals';
+import { LLMConfigModal, PythonConfigModal, ConditionConfigModal, SaveRecordsConfigModal, SpecializedAgentConfigModal } from './modals';
 
 // ============================================================================
 // TYPES
@@ -97,6 +97,20 @@ export const NodeConfigPanels: React.FC<NodeConfigPanelsProps> = ({
         <LLMConfigModalAdapter
           node={node}
           entities={entities}
+          onSave={(config) => {
+            updateNode(node.id, { config });
+            closeConfig();
+          }}
+          onClose={closeConfig}
+        />
+      );
+    
+    case 'specializedAgent':
+      return (
+        <SpecializedAgentConfigModal
+          isOpen={true}
+          config={node.config || {}}
+          entities={entities.map((e: any) => ({ id: e.id, name: e.name, type: e.type || 'entity' }))}
           onSave={(config) => {
             updateNode(node.id, { config });
             closeConfig();

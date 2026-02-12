@@ -3,7 +3,7 @@ import {
     MagnifyingGlass, Funnel, Export, CaretDown, User, Clock,
     FlowArrow, Database, FileText, SquaresFour, Gear, SpinnerGap,
     ArrowClockwise, Shield, Users, Lightning, Sparkle, Flask,
-    ChartLineUp, CalendarBlank, X, CaretLeft, CaretRight, Eye, EyeSlash
+    ChartLineUp, CalendarBlank, X, CaretLeft, CaretRight, Eye, EyeSlash, Cpu
 } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
@@ -108,7 +108,29 @@ const RESOURCE_ICONS: Record<string, React.ElementType> = {
     'template': FileText,
 };
 
+interface AIAuditLog {
+    id: string;
+    userEmail: string;
+    chatId: string;
+    agentId: string;
+    agentRole: string;
+    model: string;
+    tokensInput: number;
+    tokensOutput: number;
+    tokensTotal: number;
+    durationMs: number;
+    createdAt: string;
+}
+
+interface AIAuditStats {
+    total: number;
+    totalTokens: number;
+    byRole: { agentRole: string; count: number; totalTokens: number }[];
+    daily: { date: string; count: number; tokens: number }[];
+}
+
 export const ActivityLog: React.FC = () => {
+    const [activeTab, setActiveTab] = useState<'general' | 'ai'>('general');
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [stats, setStats] = useState<AuditStats | null>(null);
     const [filters, setFilters] = useState<Filters>({ actions: [], resourceTypes: [], users: [] });
@@ -123,12 +145,25 @@ export const ActivityLog: React.FC = () => {
     const [showPII, setShowPII] = useState(false); // PII masking toggle
     const pageSize = 50;
 
+    const [aiLogs, setAiLogs] = useState<AIAuditLog[]>([]);
+    const [aiStats, setAiStats] = useState<AIAuditStats | null>(null);
+    const [aiLoading, setAiLoading] = useState(false);
+
     // Fetch data
     useEffect(() => {
-        fetchLogs();
-        fetchStats();
-        fetchFilters();
-    }, [selectedAction, selectedResourceType, selectedUser, page]);
+        if (activeTab === 'general') {
+            fetchLogs();
+            fetchStats();
+            fetchFilters();
+        }
+    }, [activeTab, selectedAction, selectedResourceType, selectedUser, page]);
+
+    useEffect(() => {
+        if (activeTab === 'ai') {
+            fetchAILogs();
+            fetchAIStats();
+        }
+    }, [activeTab]);
 
     const fetchLogs = async () => {
         setIsLoading(true);
@@ -152,6 +187,33 @@ export const ActivityLog: React.FC = () => {
             console.error('Error fetching audit logs:', error);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const fetchAILogs = async () => {
+        setAiLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/ai-audit-logs?limit=50&offset=0`, { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                setAiLogs(data);
+            }
+        } catch (error) {
+            console.error('Error fetching AI audit logs:', error);
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    const fetchAIStats = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/ai-audit-logs/stats?days=30`, { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                setAiStats(data);
+            }
+        } catch (error) {
+            console.error('Error fetching AI stats:', error);
         }
     };
 
@@ -247,17 +309,36 @@ export const ActivityLog: React.FC = () => {
                         Track all actions and changes in your workspace
                     </p>
                 </div>
-                <button
-                    onClick={handleExport}
-                    className="flex items-center gap-2 px-4 py-2 border border-[var(--border-light)] hover:border-[var(--accent-primary)] rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"
-                >
-                    <Export size={16} />
-                    Export CSV
-                </button>
+                <div className="flex items-center gap-2">
+                    <div className="flex rounded-lg border border-[var(--border-light)] p-1">
+                        <button
+                            onClick={() => setActiveTab('general')}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'general' ? 'bg-[var(--accent-primary)] text-white' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                        >
+                            Actividad
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('ai')}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 transition-colors ${activeTab === 'ai' ? 'bg-[var(--accent-primary)] text-white' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                        >
+                            <Cpu size={14} />
+                            IA
+                        </button>
+                    </div>
+                    {activeTab === 'general' && (
+                        <button
+                            onClick={handleExport}
+                            className="flex items-center gap-2 px-4 py-2 border border-[var(--border-light)] hover:border-[var(--accent-primary)] rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"
+                        >
+                            <Export size={16} />
+                            Export CSV
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Stats Cards */}
-            {stats && (
+            {activeTab === 'general' && stats && (
                 <div className="grid grid-cols-4 gap-4">
                     <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
                         <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-1">
@@ -310,7 +391,58 @@ export const ActivityLog: React.FC = () => {
                 </div>
             )}
 
-            {/* Search and Filters */}
+            {/* AI Tab: PII toggle row */}
+            {activeTab === 'ai' && (
+                <div className="flex justify-end">
+                    <button
+                        onClick={() => setShowPII(!showPII)}
+                        className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm ${
+                            showPII ? 'border-amber-500/50 bg-amber-500/10 text-amber-500' : 'border-[var(--border-light)] text-[var(--text-secondary)]'
+                        }`}
+                    >
+                        {showPII ? <Eye size={16} /> : <EyeSlash size={16} />}
+                        {showPII ? 'PII Visible' : 'PII Masked'}
+                    </button>
+                </div>
+            )}
+
+            {/* AI Stats (when AI tab active) */}
+            {activeTab === 'ai' && aiStats && (
+                <div className="grid grid-cols-4 gap-4">
+                    <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
+                        <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Llamadas IA (30d)</p>
+                        <p className="text-2xl font-semibold text-[var(--text-primary)]">{aiStats.total.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
+                        <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Tokens totales</p>
+                        <p className="text-2xl font-semibold text-[var(--text-primary)]">{aiStats.totalTokens?.toLocaleString() || '0'}</p>
+                    </div>
+                    <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
+                        <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Rol más usado</p>
+                        <p className="text-2xl font-semibold text-[var(--text-primary)]">{aiStats.byRole?.[0]?.agentRole || '—'}</p>
+                    </div>
+                    <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
+                        <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">Tendencia</p>
+                        {aiStats.daily?.length > 0 && (
+                            <ResponsiveContainer width="100%" height={40} minWidth={100} minHeight={40}>
+                                <AreaChart data={aiStats.daily}>
+                                    <defs>
+                                        <linearGradient id="aiGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.3} />
+                                            <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <Area type="monotone" dataKey="count" stroke="#8B5CF6" strokeWidth={2} fill="url(#aiGradient)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Search and Filters (General tab only) */}
+            {activeTab === 'general' && (
+            <>
             <div className="flex items-center gap-3">
                 <div className="relative flex-1 max-w-md">
                     <MagnifyingGlass 
@@ -412,10 +544,42 @@ export const ActivityLog: React.FC = () => {
                     </div>
                 </div>
             )}
+            </>
+            )}
 
             {/* Activity List */}
             <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl overflow-hidden">
-                {isLoading ? (
+                {activeTab === 'ai' ? (
+                    aiLoading ? (
+                        <div className="flex items-center justify-center py-20">
+                            <SpinnerGap size={32} className="animate-spin text-[var(--text-tertiary)]" />
+                        </div>
+                    ) : aiLogs.length === 0 ? (
+                        <div className="text-center py-20">
+                            <Cpu size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
+                            <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2">Sin llamadas a IA</h3>
+                            <p className="text-sm text-[var(--text-tertiary)]">Las llamadas a agentes aparecerán aquí</p>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-[var(--border-light)]">
+                            {aiLogs.map((log) => (
+                                <div key={log.id} className="flex items-center gap-4 p-4 hover:bg-[var(--bg-tertiary)]">
+                                    <div className="w-9 h-9 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                                        <Cpu size={18} className="text-violet-600" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-[var(--text-primary)]">{log.agentRole}</p>
+                                        <p className="text-xs text-[var(--text-tertiary)]">{log.model} · {log.tokensTotal} tokens · {log.durationMs}ms</p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <p className="text-xs text-[var(--text-tertiary)]">{log.userEmail ? (showPII ? log.userEmail : maskEmail(log.userEmail)) : '—'}</p>
+                                        <p className="text-xs text-[var(--text-tertiary)]">{formatDate(log.createdAt)}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                ) : isLoading ? (
                     <div className="flex items-center justify-center py-20">
                         <SpinnerGap size={32} className="animate-spin text-[var(--text-tertiary)]" />
                     </div>

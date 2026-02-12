@@ -50,6 +50,7 @@ const Dashboard = lazyWithRetry(() => import('./components/Dashboard').then(m =>
 const Overview = lazyWithRetry(() => import('./components/Overview').then(m => ({ default: m.Overview as any })));
 const Reporting = lazyWithRetry(() => import('./components/Reporting').then(m => ({ default: m.Reporting as any })));
 const Copilots = lazyWithRetry(() => import('./components/Copilots').then(m => ({ default: m.Copilots as any })));
+const InteligenciaAgentsPage = lazyWithRetry(() => import('./components/copilots/InteligenciaAgentsPage').then(m => ({ default: m.InteligenciaAgentsPage as any })));
 const KnowledgeBase = lazyWithRetry(() => import('./components/KnowledgeBase').then(m => ({ default: m.KnowledgeBase as any })));
 const Lab = lazyWithRetry(() => import('./components/Lab').then(m => ({ default: m.Lab as any })));
 const Settings = lazyWithRetry(() => import('./components/Settings').then(m => ({ default: m.Settings as any })));
@@ -1616,6 +1617,9 @@ function AuthenticatedApp() {
                     } />
                     <Route path="/inteligencia" element={
                         <Copilots />
+                    } />
+                    <Route path="/inteligencia/agentes" element={
+                        <Suspense fallback={<PageLoader />}><InteligenciaAgentsPage /></Suspense>
                     } />
                     {/* Redirect old copilots URL */}
                     <Route path="/copilots" element={

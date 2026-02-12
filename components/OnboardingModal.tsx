@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-    Sparkle, 
     Briefcase, 
     Buildings, 
     Target, 
@@ -10,53 +9,75 @@ import {
     SpinnerGap,
     RocketLaunch,
     CheckCircle,
-    User
+    User,
+    Desktop,
+    ChartBar,
+    Gear,
+    ClipboardText,
+    DotsThreeCircle,
+    ForkKnife,
+    Pill,
+    Flask,
+    Drop,
+    Factory,
+    Lightning,
+    TrendUp,
+    Database,
+    Microscope,
+    ShieldCheck,
+    MagnifyingGlass,
+    LinkedinLogo,
+    Users,
+    PresentationChart,
+    EnvelopeSimple
 } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 interface OnboardingModalProps {
     onComplete: () => void;
 }
 
 const ROLES = [
-    { id: 'it-manager', label: 'IT Manager', icon: '💻' },
-    { id: 'data-analyst', label: 'Data Analyst', icon: '📊' },
-    { id: 'process-engineer', label: 'Process Engineer', icon: '⚙️' },
-    { id: 'operations-manager', label: 'Operations Manager', icon: '📋' },
-    { id: 'executive', label: 'Executive / C-Level', icon: '👔' },
-    { id: 'other', label: 'Other', icon: '✨' },
+    { id: 'it-manager', label: 'IT Manager', icon: Desktop },
+    { id: 'data-analyst', label: 'Data Analyst', icon: ChartBar },
+    { id: 'process-engineer', label: 'Process Engineer', icon: Gear },
+    { id: 'operations-manager', label: 'Operations Manager', icon: ClipboardText },
+    { id: 'executive', label: 'Executive / C-Level', icon: Briefcase },
+    { id: 'other', label: 'Other', icon: DotsThreeCircle },
 ];
 
 const INDUSTRIES = [
-    { id: 'food-beverage', label: 'Food & Beverage', icon: '🍕' },
-    { id: 'pharma', label: 'Pharmaceutical', icon: '💊' },
-    { id: 'chemical', label: 'Chemical', icon: '🧪' },
-    { id: 'water-treatment', label: 'Water Treatment', icon: '💧' },
-    { id: 'manufacturing', label: 'Manufacturing', icon: '🏭' },
-    { id: 'energy', label: 'Energy', icon: '⚡' },
-    { id: 'other', label: 'Other', icon: '🔧' },
+    { id: 'food-beverage', label: 'Food & Beverage', icon: ForkKnife },
+    { id: 'pharma', label: 'Pharmaceutical', icon: Pill },
+    { id: 'chemical', label: 'Chemical', icon: Flask },
+    { id: 'water-treatment', label: 'Water Treatment', icon: Drop },
+    { id: 'manufacturing', label: 'Manufacturing', icon: Factory },
+    { id: 'energy', label: 'Energy', icon: Lightning },
+    { id: 'other', label: 'Other', icon: DotsThreeCircle },
 ];
 
 const USE_CASES = [
-    { id: 'automated-reporting', label: 'Automated Reporting', icon: '📈' },
-    { id: 'process-optimization', label: 'Process Optimization', icon: '🎯' },
-    { id: 'data-warehouse', label: 'Data Warehouse & BI', icon: '🗄️' },
-    { id: 'doe', label: 'Design of Experiments', icon: '🔬' },
-    { id: 'compliance', label: 'Regulatory Compliance', icon: '✅' },
-    { id: 'exploring', label: 'Just Exploring', icon: '🔍' },
+    { id: 'automated-reporting', label: 'Automated Reporting', icon: TrendUp },
+    { id: 'process-optimization', label: 'Process Optimization', icon: Target },
+    { id: 'data-warehouse', label: 'Data Warehouse & BI', icon: Database },
+    { id: 'doe', label: 'Design of Experiments', icon: Microscope },
+    { id: 'compliance', label: 'Regulatory Compliance', icon: ShieldCheck },
+    { id: 'exploring', label: 'Just Exploring', icon: MagnifyingGlass },
 ];
 
 const SOURCES = [
-    { id: 'linkedin', label: 'LinkedIn', icon: '💼' },
-    { id: 'google', label: 'Google Search', icon: '🔎' },
-    { id: 'referral', label: 'From a Friend', icon: '👥' },
-    { id: 'event', label: 'Event / Congress', icon: '🎤' },
-    { id: 'email', label: 'Email', icon: '📧' },
-    { id: 'other', label: 'Other', icon: '💫' },
+    { id: 'linkedin', label: 'LinkedIn', icon: LinkedinLogo },
+    { id: 'google', label: 'Google Search', icon: MagnifyingGlass },
+    { id: 'referral', label: 'From a Friend', icon: Users },
+    { id: 'event', label: 'Event / Congress', icon: PresentationChart },
+    { id: 'email', label: 'Email', icon: EnvelopeSimple },
+    { id: 'other', label: 'Other', icon: DotsThreeCircle },
 ];
 
 export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) => {
     const { user, completeOnboarding } = useAuth();
+    const { t } = useTranslation();
     const [step, setStep] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
@@ -70,29 +91,29 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
         {
             key: 'role',
             icon: Briefcase,
-            title: "What's your role?",
-            subtitle: 'Help us personalize your experience',
+            title: t('onboarding.roleTitle'),
+            subtitle: t('onboarding.roleSubtitle'),
             options: ROLES,
         },
         {
             key: 'industry',
             icon: Buildings,
-            title: 'Which industry?',
-            subtitle: 'We\'ll show relevant templates and workflows',
+            title: t('onboarding.industryTitle'),
+            subtitle: t('onboarding.industrySubtitle'),
             options: INDUSTRIES,
         },
         {
             key: 'useCase',
             icon: Target,
-            title: 'Primary use case?',
-            subtitle: 'What brings you to Intemic today',
+            title: t('onboarding.useCaseTitle'),
+            subtitle: t('onboarding.useCaseSubtitle'),
             options: USE_CASES,
         },
         {
             key: 'source',
             icon: Megaphone,
-            title: 'How did you find us?',
-            subtitle: 'Help us reach more people like you',
+            title: t('onboarding.sourceTitle'),
+            subtitle: t('onboarding.sourceSubtitle'),
             options: SOURCES,
         },
     ];
@@ -139,15 +160,15 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                     
                     {/* Welcome message */}
                     <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--accent-primary)] to-emerald-500 flex items-center justify-center text-white">
+                        <div className="w-10 h-10 rounded-full bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/20 flex items-center justify-center text-[var(--accent-primary)]">
                             {user?.name?.[0]?.toUpperCase() || <User size={20} />}
                         </div>
                         <div>
                             <h1 className="text-lg font-semibold text-[var(--text-primary)]">
-                                Welcome, {user?.name?.split(' ')[0] || 'there'}!
+                                {t('onboarding.welcome')}, {user?.name?.split(' ')[0] || 'there'}!
                             </h1>
                             <p className="text-sm text-[var(--text-tertiary)]">
-                                Let's set up your workspace
+                                {t('onboarding.setupWorkspace')}
                             </p>
                         </div>
                     </div>
@@ -184,7 +205,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                                 <Icon size={18} className="text-[var(--accent-primary)]" weight="duotone" />
                             </div>
                             <span className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">
-                                Step {step + 1} of {steps.length}
+                                {t('onboarding.stepOf', { current: step + 1, total: steps.length })}
                             </span>
                         </div>
                         <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-1">
@@ -199,6 +220,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                     <div className="grid grid-cols-2 gap-3 mb-6">
                         {currentStep.options.map((option) => {
                             const isSelected = formData[currentStep.key as keyof typeof formData] === option.id;
+                            const OptionIcon = option.icon;
                             return (
                                 <button
                                     key={option.id}
@@ -209,7 +231,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                                             : 'border-[var(--border-light)] hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)]'
                                     }`}
                                 >
-                                    <span className="text-2xl">{option.icon}</span>
+                                    <span className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                                        isSelected ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
+                                    }`}>
+                                        <OptionIcon size={18} weight="duotone" />
+                                    </span>
                                     <span className={`text-sm font-medium ${
                                         isSelected ? 'text-[var(--accent-primary)]' : 'text-[var(--text-primary)]'
                                     }`}>
@@ -240,7 +266,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                         }`}
                     >
                         <ArrowLeft size={16} weight="bold" />
-                        Back
+                        {t('common.back')}
                     </button>
 
                     <button
@@ -251,16 +277,16 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
                         {isSubmitting ? (
                             <>
                                 <SpinnerGap size={18} className="animate-spin" />
-                                <span>Setting up...</span>
+                                <span>{t('onboarding.settingUp')}</span>
                             </>
                         ) : isLastStep ? (
                             <>
-                                <span>Get Started</span>
+                                <span>{t('onboarding.getStarted')}</span>
                                 <RocketLaunch size={18} weight="fill" />
                             </>
                         ) : (
                             <>
-                                <span>Continue</span>
+                                <span>{t('common.continue')}</span>
                                 <ArrowRight size={18} weight="bold" />
                             </>
                         )}

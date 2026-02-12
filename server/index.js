@@ -52,7 +52,7 @@ const STRIPE_PRICES = {
     business: process.env.STRIPE_PRICE_BUSINESS || 'price_business_45_eur'  // 45€/month
 };
 const cookieParser = require('cookie-parser');
-const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding, verifyEmail, resendVerification, validateInvitation, registerWithInvitation, forgotPassword, validateResetToken, resetPassword } = require('./auth');
+const { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, requireOrgAdmin, completeOnboarding, verifyEmail, resendVerification, validateInvitation, registerWithInvitation, forgotPassword, validateResetToken, resetPassword } = require('./auth');
 
 const app = express();
 const server = http.createServer(app);
@@ -61,6 +61,30 @@ const PORT = process.env.PORT || 3001;
 // Helper to generate unique IDs
 function generateId() {
     return Math.random().toString(36).substr(2, 9);
+}
+
+// Rate limiter for AI/copilot endpoints (per user per minute)
+const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT_PER_MIN || '30', 10);
+const aiRateLimitMap = new Map();
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, data] of aiRateLimitMap.entries()) {
+        if (now - data.windowStart > 60000) aiRateLimitMap.delete(key);
+    }
+}, 60000);
+function aiRateLimit(req, res, next) {
+    const key = `${req.user?.sub || req.ip}-${req.user?.orgId || 'anon'}`;
+    const now = Date.now();
+    let data = aiRateLimitMap.get(key);
+    if (!data || now - data.windowStart > 60000) {
+        data = { count: 0, windowStart: now };
+        aiRateLimitMap.set(key, data);
+    }
+    data.count++;
+    if (data.count > AI_RATE_LIMIT) {
+        return res.status(429).json({ error: `Límite de ${AI_RATE_LIMIT} preguntas por minuto alcanzado. Espera unos segundos.` });
+    }
+    next();
 }
 
 // ==================== WEBSOCKET SETUP ====================
@@ -1447,6 +1471,48 @@ app.get('/api/audit-logs/export', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Export audit logs error:', error);
         res.status(500).json({ error: 'Failed to export audit logs' });
+    }
+});
+
+// AI Audit Logs - Trazabilidad específica de IA (compliance)
+app.get('/api/ai-audit-logs', authenticateToken, async (req, res) => {
+    try {
+        const { limit = 50, offset = 0, agentRole, chatId, startDate, endDate } = req.query;
+        let query = `SELECT * FROM ai_audit_logs WHERE organizationId = ?`;
+        const params = [req.user.orgId];
+        if (agentRole) { query += ' AND agentRole = ?'; params.push(agentRole); }
+        if (chatId) { query += ' AND chatId = ?'; params.push(chatId); }
+        if (startDate) { query += ' AND createdAt >= ?'; params.push(startDate); }
+        if (endDate) { query += ' AND createdAt <= ?'; params.push(endDate); }
+        query += ' ORDER BY createdAt DESC LIMIT ? OFFSET ?';
+        params.push(parseInt(limit), parseInt(offset));
+        const logs = await db.all(query, params);
+        res.json(logs);
+    } catch (error) {
+        console.error('Get AI audit logs error:', error);
+        res.status(500).json({ error: 'Failed to fetch AI audit logs' });
+    }
+});
+
+app.get('/api/ai-audit-logs/stats', authenticateToken, async (req, res) => {
+    try {
+        const { days = 30 } = req.query;
+        const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+        const byRole = await db.all(`
+            SELECT agentRole, COUNT(*) as count, SUM(tokensTotal) as totalTokens
+            FROM ai_audit_logs WHERE organizationId = ? AND createdAt >= ?
+            GROUP BY agentRole
+        `, [req.user.orgId, startDate]);
+        const total = await db.get(`SELECT COUNT(*) as c, COALESCE(SUM(tokensTotal),0) as tokens FROM ai_audit_logs WHERE organizationId = ? AND createdAt >= ?`, [req.user.orgId, startDate]);
+        const daily = await db.all(`
+            SELECT DATE(createdAt) as date, COUNT(*) as count, SUM(tokensTotal) as tokens
+            FROM ai_audit_logs WHERE organizationId = ? AND createdAt >= ?
+            GROUP BY DATE(createdAt) ORDER BY date ASC
+        `, [req.user.orgId, startDate]);
+        res.json({ total: total?.c || 0, totalTokens: total?.tokens || 0, byRole, daily });
+    } catch (error) {
+        console.error('AI audit stats error:', error);
+        res.status(500).json({ error: 'Failed to fetch AI audit stats' });
     }
 });
 
@@ -2841,16 +2907,17 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
         const userId = req.user.sub;
         const orgId = req.user.orgId;
         const { chatId } = req.params;
-        const { title, messages, updatedAt, createdAt } = req.body;
+        const { title, messages, updatedAt, createdAt, instructions, allowedEntities, isFavorite, tags, agentId } = req.body;
 
-        // Check if chat exists in the organization (any member can update)
+        const safeTitle = title != null ? String(title) : 'Nuevo Chat';
+        const safeMessages = Array.isArray(messages) ? messages : [];
+        const safeUpdatedAt = updatedAt || new Date().toISOString();
+
         const chat = await db.get(
             'SELECT * FROM copilot_chats WHERE id = ? AND organizationId = ?',
             [chatId, orgId]
         );
 
-        const { instructions, allowedEntities, isFavorite, tags } = req.body;
-        
         if (!chat) {
             // Chat doesn't exist, create it (upsert behavior)
             console.log('[Copilot] Chat not found, creating new chat:', chatId);
@@ -2861,15 +2928,15 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
                     chatId,
                     userId,
                     orgId,
-                    title,
-                    JSON.stringify(messages),
+                    safeTitle,
+                    JSON.stringify(safeMessages),
                     instructions || null,
                     allowedEntities ? JSON.stringify(allowedEntities) : null,
                     agentId || null,
                     isFavorite ? 1 : 0,
                     tags ? JSON.stringify(tags) : null,
-                    createdAt || updatedAt || new Date().toISOString(),
-                    updatedAt || new Date().toISOString()
+                    createdAt || safeUpdatedAt,
+                    safeUpdatedAt
                 ]
             );
         } else {
@@ -2877,14 +2944,14 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
             await db.run(
                 `UPDATE copilot_chats SET title = ?, messages = ?, instructions = ?, allowedEntities = ?, agentId = ?, isFavorite = ?, tags = ?, updatedAt = ? WHERE id = ?`,
                 [
-                    title, 
-                    JSON.stringify(messages), 
+                    safeTitle,
+                    JSON.stringify(safeMessages),
                     instructions || null,
                     allowedEntities ? JSON.stringify(allowedEntities) : null,
                     agentId || null,
                     isFavorite ? 1 : 0,
                     tags ? JSON.stringify(tags) : null,
-                    updatedAt, 
+                    safeUpdatedAt,
                     chatId
                 ]
             );
@@ -2957,6 +3024,9 @@ app.post('/api/copilot/agents/generate-instructions', authenticateToken, async (
         if (!userDescription) {
             return res.status(400).json({ error: 'userDescription is required' });
         }
+        if (!process.env.OPENAI_API_KEY) {
+            return res.status(503).json({ error: 'OPENAI_API_KEY no configurada. Configura la variable de entorno en el servidor para usar Generar con IA.' });
+        }
 
         const systemPrompt = `Eres un experto en diseñar agentes de IA especializados para empresas. 
 Tu tarea es generar instrucciones claras y profesionales para un agente basándote en la descripción del usuario.
@@ -3009,9 +3079,10 @@ Genera las instrucciones del agente:`;
 });
 
 // Create agent
-app.post('/api/copilot/agents', authenticateToken, async (req, res) => {
+app.post('/api/copilot/agents', authenticateToken, requireOrgAdmin, async (req, res) => {
     try {
-        const agent = await agentService.create(db, req.user.orgId, req.body);
+        const payload = { ...req.body, createdBy: req.user.sub, createdByName: req.user.email || req.user.name || 'Unknown' };
+        const agent = await agentService.create(db, req.user.orgId, payload);
         res.status(201).json(agent);
     } catch (error) {
         console.error('[Copilot Agents] Error create:', error);
@@ -3019,8 +3090,30 @@ app.post('/api/copilot/agents', authenticateToken, async (req, res) => {
     }
 });
 
+// Agent memory endpoints
+app.get('/api/copilot/agents/:id/memory', authenticateToken, async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 20;
+        const memory = await agentService.getMemory(db, req.params.id, limit);
+        res.json({ memory });
+    } catch (error) {
+        console.error('[Agent Memory] Error get:', error);
+        res.status(500).json({ error: 'Failed to get agent memory' });
+    }
+});
+
+app.delete('/api/copilot/agents/:id/memory', authenticateToken, requireOrgAdmin, async (req, res) => {
+    try {
+        await agentService.clearMemory(db, req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[Agent Memory] Error clear:', error);
+        res.status(500).json({ error: 'Failed to clear agent memory' });
+    }
+});
+
 // Update agent
-app.put('/api/copilot/agents/:id', authenticateToken, async (req, res) => {
+app.put('/api/copilot/agents/:id', authenticateToken, requireOrgAdmin, async (req, res) => {
     try {
         const agent = await agentService.update(db, req.params.id, req.user.orgId, req.body);
         if (!agent) return res.status(404).json({ error: 'Agent not found' });
@@ -3035,7 +3128,7 @@ app.put('/api/copilot/agents/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete agent
-app.delete('/api/copilot/agents/:id', authenticateToken, async (req, res) => {
+app.delete('/api/copilot/agents/:id', authenticateToken, requireOrgAdmin, async (req, res) => {
     try {
         await agentService.remove(db, req.params.id, req.user.orgId);
         res.json({ success: true });
@@ -3057,7 +3150,7 @@ function mergeEntitiesForAsk(allowed, mentioned) {
 }
 
 // Multi-agent ask (orchestrator + analyst + specialist + synthesis)
-app.post('/api/copilot/ask', authenticateToken, async (req, res) => {
+app.post('/api/copilot/ask', authenticateToken, aiRateLimit, async (req, res) => {
     console.log('[Copilot Ask] Request received');
     try {
         const { question, conversationHistory, chatId, instructions, allowedEntities, mentionedEntities, useMultiAgent = true } = req.body;
@@ -3085,6 +3178,8 @@ app.post('/api/copilot/ask', authenticateToken, async (req, res) => {
 
         if (useMultiAgent) {
             try {
+                const userRow = await db.get('SELECT locale FROM users WHERE id = ?', [req.user.sub]);
+                const userLocale = userRow?.locale || 'es';
                 let agentId = req.body.agentId;
                 if (!agentId && chatId) {
                     const chat = await db.get('SELECT agentId FROM copilot_chats WHERE id = ? AND organizationId = ?', [chatId, orgId]);
@@ -3105,7 +3200,10 @@ app.post('/api/copilot/ask', authenticateToken, async (req, res) => {
                     conversationHistory: conversationHistory || [],
                     instructions: chatInstructions,
                     allowedEntities: chatAllowedEntities,
-                    mentionedEntities: mentionedEntities || []
+                    mentionedEntities: mentionedEntities || [],
+                    userId: req.user.sub,
+                    userEmail: req.user.email,
+                    locale: userLocale
                 });
                 return res.json({
                     answer: result.answer,
@@ -3126,11 +3224,17 @@ app.post('/api/copilot/ask', authenticateToken, async (req, res) => {
         const customInstructions = chatInstructions
             ? `\n\nCUSTOM INSTRUCTIONS:\n${chatInstructions}\n\n`
             : '';
+        const userRow = await db.get('SELECT locale FROM users WHERE id = ?', [req.user.sub]);
+        const userLocale = userRow?.locale || 'es';
+        const languageInstruction = userLocale === 'en'
+            ? 'Always answer in English unless the user explicitly asks for another language.'
+            : 'Responde siempre en español salvo que el usuario pida explícitamente otro idioma.';
         const systemPrompt = `You are a helpful database assistant. You have access to the user's database.
 
 DATABASE SCHEMA AND DATA:
 ${JSON.stringify(databaseContext, null, 2)}
 ${customInstructions}
+${languageInstruction}
 
 Respond in valid JSON: { "answer": "...", "explanation": "...", "entitiesUsed": [...] }`;
         const OpenAI = require('openai');

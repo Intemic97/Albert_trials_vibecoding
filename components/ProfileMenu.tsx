@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 import { User, SignOut, CaretRight, Camera, X, SpinnerGap, ShieldCheck, Plus, CaretUpDown, Cube } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
+import { useTranslation } from 'react-i18next';
+
 
 interface ProfileMenuProps {
     onNavigate?: (view: string) => void;
@@ -79,6 +81,7 @@ export const OrganizationLogo: React.FC<{
 
 export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerContent, triggerClassName = '', menuPlacement = 'bottom-right', initialView = 'main' }) => {
     const { user, logout, organizations, switchOrganization, updateProfile, refreshOrganizations } = useAuth();
+    const { t } = useTranslation();
     // console.log('[ProfileMenu] user.isAdmin:', user?.isAdmin);
     const [isOpen, setIsOpen] = useState(false);
     const [view, setView] = useState<'main' | 'organizations'>(initialView);
@@ -175,6 +178,8 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
             setIsCreatingOrg(false);
         }
     };
+
+
 
     // Close on click outside
     useEffect(() => {
@@ -289,13 +294,12 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     <div className="flex items-center">
                                         <OrganizationLogo name={currentOrg?.name} logo={(currentOrg as any)?.logo} size="sm" className="mr-3" />
                                         <div className="text-left">
-                                            <span className="text-sm">Change workspace</span>
-                                            <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{currentOrg?.name || 'Select'}</p>
+                                            <span className="text-sm">{t('profile.changeWorkspace')}</span>
+                                            <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{currentOrg?.name || t('profile.select')}</p>
                                         </div>
                                     </div>
                                     <CaretRight size={16} weight="light" className="text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)] transition-colors duration-200 ease-in-out" />
                                 </button>
-                                
                                 {/* Admin Panel - Only visible for admins */}
                                 {user?.isAdmin && (
                                     <button
@@ -306,7 +310,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                         className="w-full flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left group text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
                                     >
                                         <ShieldCheck size={16} weight="light" className="mr-3 transition-colors duration-200 ease-in-out text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]" />
-                                        <span className="transition-colors duration-200 ease-in-out">Admin Panel</span>
+                                        <span className="transition-colors duration-200 ease-in-out">{t('profile.adminPanel')}</span>
                                     </button>
                                 )}
                             </div>
@@ -319,7 +323,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     className="w-full flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left group text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
                                 >
                                     <SignOut size={16} weight="light" className="mr-3 transition-colors duration-200 ease-in-out text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]" />
-                                    <span className="transition-colors duration-200 ease-in-out">Log Out</span>
+                                    <span className="transition-colors duration-200 ease-in-out">{t('profile.logout')}</span>
                                 </button>
                             </div>
                         </>
@@ -333,7 +337,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                 >
                                     <CaretRight className="rotate-180" size={16} weight="light" />
                                 </button>
-                                <h3 className="font-normal text-[var(--sidebar-text)] text-sm">Workspace</h3>
+                                <h3 className="font-normal text-[var(--sidebar-text)] text-sm">{t('profile.workspace')}</h3>
                             </div>
 
                             <div className="px-3 py-2 space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">

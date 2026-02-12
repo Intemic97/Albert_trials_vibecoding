@@ -6,6 +6,7 @@ import { API_BASE } from '../config';
 import { useTheme } from '../context/ThemeContext';
 import { ActivityLog } from './ActivityLog';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 // Slack icon component
 const SlackIcon = () => (
@@ -55,7 +56,8 @@ interface OrgUser {
 
 export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial }) => {
     const { mode, setMode, isDark } = useTheme();
-    const { organizations, refreshOrganizations, user } = useAuth();
+    const { organizations, refreshOrganizations, user, updateProfile } = useAuth();
+    const { t, i18n } = useTranslation();
     const [activeTab, setActiveTab] = useState<'general' | 'team' | 'integrations' | 'activity'>('general');
     const [users, setUsers] = useState<OrgUser[]>([]);
     const [pendingInvitations, setPendingInvitations] = useState<{ id: string; email: string; invitedByName: string; createdAt: string }[]>([]);
@@ -863,6 +865,44 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             }`} />
                                         </div>
                                     </button>
+                                </div>
+                                
+                                {/* Language Setting */}
+                                <div className="p-5 flex items-center justify-between">
+                                    <div className="flex-1">
+                                        <h3 className="text-sm font-medium text-[var(--text-primary)] mb-0.5">{t('common.language')}</h3>
+                                        <p className="text-xs text-[var(--text-secondary)] font-light">
+                                            {i18n.language.startsWith('es') ? 'La plataforma se muestra en español' : 'Platform is displayed in English'}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-1 rounded-lg bg-[var(--bg-tertiary)] p-1 border border-[var(--border-light)]">
+                                        <button
+                                            onClick={async () => {
+                                                await i18n.changeLanguage('es');
+                                                try { await updateProfile({ locale: 'es' }); } catch (_) {}
+                                            }}
+                                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                                                i18n.language.startsWith('es')
+                                                    ? 'bg-[var(--accent-primary)] text-white'
+                                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                                            }`}
+                                        >
+                                            Español
+                                        </button>
+                                        <button
+                                            onClick={async () => {
+                                                await i18n.changeLanguage('en');
+                                                try { await updateProfile({ locale: 'en' }); } catch (_) {}
+                                            }}
+                                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                                                i18n.language.startsWith('en')
+                                                    ? 'bg-[var(--accent-primary)] text-white'
+                                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                                            }`}
+                                        >
+                                            English
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 

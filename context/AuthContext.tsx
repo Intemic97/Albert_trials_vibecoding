@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { API_BASE } from '../config';
+import i18n from '../src/i18n';
 
 interface User {
     id: string;
@@ -8,6 +9,7 @@ interface User {
     orgId: string;
     profilePhoto?: string;
     companyRole?: string;
+    locale?: 'es' | 'en';
     isAdmin?: boolean;
     onboardingCompleted?: boolean;
 }
@@ -26,7 +28,7 @@ interface AuthContextType {
     login: (user: User) => void;
     logout: () => void;
     switchOrganization: (orgId: string) => Promise<void>;
-    updateProfile: (updates: { name?: string; companyRole?: string; profilePhoto?: string }) => Promise<boolean>;
+    updateProfile: (updates: { name?: string; companyRole?: string; profilePhoto?: string; locale?: 'es' | 'en' }) => Promise<boolean>;
     completeOnboarding: (data: { role: string; industry: string; useCase: string; source: string }) => Promise<boolean>;
     refreshOrganizations: () => Promise<void>;
 }
@@ -41,6 +43,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         checkAuth();
     }, []);
+
+    useEffect(() => {
+        if (user?.locale && i18n.language !== user.locale) {
+            i18n.changeLanguage(user.locale);
+        }
+    }, [user?.locale]);
 
     const checkAuth = async () => {
         try {
@@ -121,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const updateProfile = async (updates: { name?: string; companyRole?: string; profilePhoto?: string }): Promise<boolean> => {
+    const updateProfile = async (updates: { name?: string; companyRole?: string; profilePhoto?: string; locale?: 'es' | 'en' }): Promise<boolean> => {
         try {
             const res = await fetch(`${API_BASE}/profile`, {
                 method: 'PUT',

@@ -61,6 +61,7 @@ export const getNodeIconColor = (type: NodeType): string => {
       return 'text-[#256A65]';
     case 'llm':
     case 'agent':
+    case 'specializedAgent':
       return 'text-[#256A65]';
     case 'python':
       return 'text-[#84C4D1]';

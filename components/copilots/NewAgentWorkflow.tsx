@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { X, Robot, ArrowRight, ArrowLeft, Check, Database, Folder, Sparkle, SpinnerGap, Info, Factory, Wine, CurrencyDollar, ChartBar, Gear, Flask, Truck, Lightning, ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Barcode, FileText, Buildings, Atom, Cpu, ChartLine } from '@phosphor-icons/react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Robot, ArrowRight, ArrowLeft, Check, Database, Folder, SpinnerGap, Info, Factory, Wine, CurrencyDollar, ChartBar, Gear, Flask, Truck, Lightning, ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, Barcode, FileText, Buildings, Atom, Cpu, ChartLine } from '@phosphor-icons/react';
 import { API_BASE } from '../../config';
 import { Entity } from '../../types';
+import { AGENT_TEMPLATES, type AgentTemplate } from './agentTemplates';
 
 interface KnowledgeFolder {
   id: string;
@@ -12,6 +13,7 @@ interface KnowledgeFolder {
 interface NewAgentWorkflowProps {
   onClose: () => void;
   onComplete: () => void;
+  initialTemplate?: AgentTemplate;
 }
 
 const AGENT_ICONS = [
@@ -41,7 +43,17 @@ const AGENT_ICONS = [
   { icon: ChartLine, name: 'ChartLine', label: 'Forecasting' }
 ];
 
-const AGENT_TEMPLATES = [
+const WIZARD_SECTORS: { id: string; label: string; category: string; icon: string }[] = [
+  { id: 'pharma', label: 'Pharma / Salud', category: 'documentación', icon: 'Flask' },
+  { id: 'food', label: 'Alimentación', category: 'procesos', icon: 'Wine' },
+  { id: 'industrial', label: 'Industrial / Producción', category: 'producción', icon: 'Factory' },
+  { id: 'compliance', label: 'Compliance / Calidad', category: 'procesos', icon: 'Scales' },
+  { id: 'datos', label: 'Datos y Analytics', category: 'datos', icon: 'ChartBar' },
+  { id: 'mantenimiento', label: 'Mantenimiento', category: 'mantenimiento', icon: 'Wrench' },
+  { id: 'otro', label: 'Otro', category: 'general', icon: 'Robot' }
+];
+
+const LEGACY_AGENT_TEMPLATES = [
   {
     name: 'Asistente Industrial',
     icon: 'Factory',
@@ -99,12 +111,13 @@ Mantén un tono profesional y considera aspectos de confidencialidad.`
   }
 ];
 
-export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onComplete }) => {
-  const [step, setStep] = useState(1);
-  const [name, setName] = useState('');
-  const [icon, setIcon] = useState('Robot');
-  const [description, setDescription] = useState('');
-  const [instructions, setInstructions] = useState('');
+export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onComplete, initialTemplate }) => {
+  const hasGuidedStart = !initialTemplate;
+  const [step, setStep] = useState(hasGuidedStart ? 0 : 1);
+  const [name, setName] = useState(initialTemplate?.name ?? '');
+  const [icon, setIcon] = useState(initialTemplate?.icon ?? 'Robot');
+  const [description, setDescription] = useState(initialTemplate?.description ?? '');
+  const [instructions, setInstructions] = useState(initialTemplate?.instructions ?? '');
   const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
   const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
   const [entities, setEntities] = useState<Entity[]>([]);
@@ -115,6 +128,14 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
   const [generatingInstructions, setGeneratingInstructions] = useState(false);
   const [userPrompt, setUserPrompt] = useState('');
   const [showTemplates, setShowTemplates] = useState(false);
+  const [selectedSector, setSelectedSector] = useState<string | null>(null);
+
+  const sectorTemplates = useMemo(() => {
+    if (!selectedSector) return [];
+    const sector = WIZARD_SECTORS.find(s => s.id === selectedSector);
+    if (!sector) return AGENT_TEMPLATES.slice(0, 3);
+    return AGENT_TEMPLATES.filter(t => t.category === sector.category).slice(0, 4);
+  }, [selectedSector]);
 
   const getIconComponent = (iconName: string) => {
     const iconData = AGENT_ICONS.find(i => i.name === iconName);
@@ -152,14 +173,16 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
       });
       
       if (!res.ok) {
-        throw new Error('Error al generar instrucciones');
+        const errBody = await res.json().catch(() => ({}));
+        const msg = errBody?.error || (res.status === 503 ? 'Servicio de IA no configurado en el servidor.' : 'Error al generar instrucciones.');
+        throw new Error(msg);
       }
       
       const data = await res.json();
       setInstructions(data.instructions || '');
     } catch (err) {
       console.error('Error generando instrucciones:', err);
-      setError('No se pudieron generar las instrucciones. Intenta de nuevo.');
+      setError(err instanceof Error ? err.message : 'No se pudieron generar las instrucciones. Intenta de nuevo.');
     } finally {
       setGeneratingInstructions(false);
     }
@@ -217,7 +240,8 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
     return true;
   };
 
-  const totalSteps = 4;
+  const totalSteps = hasGuidedStart ? 5 : 4;
+  const displayStep = hasGuidedStart ? step + 1 : step;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -230,7 +254,7 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
             </div>
             <div>
               <h3 className="text-lg font-medium text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Crear Nuevo Agente</h3>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Paso {step} de {totalSteps}</p>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Paso {displayStep} de {totalSteps}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
@@ -240,11 +264,77 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
 
         {/* Progress bar */}
         <div className="h-1.5 bg-[var(--bg-tertiary)]">
-          <div className="h-full bg-[var(--bg-selected)] transition-all duration-300 ease-out" style={{ width: `${(step / totalSteps) * 100}%` }}></div>
+          <div className="h-full bg-[var(--bg-selected)] transition-all duration-300 ease-out" style={{ width: `${((hasGuidedStart ? step + 1 : step) / totalSteps) * 100}%` }}></div>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
+          {step === 0 && (
+            <div className="space-y-6">
+              <div className="text-center mb-6">
+                <h4 className="text-lg font-medium text-[var(--text-primary)] mb-2" style={{ fontFamily: "'Berkeley Mono', monospace" }}>¿Qué tipo de agente necesitas?</h4>
+                <p className="text-sm text-[var(--text-secondary)]">Elige un sector y te sugerimos plantillas, o empieza desde cero</p>
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {WIZARD_SECTORS.map(s => {
+                  const IconC = AGENT_ICONS.find(i => i.name === s.icon)?.icon || Robot;
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => setSelectedSector(selectedSector === s.id ? null : s.id)}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${
+                        selectedSector === s.id
+                          ? 'border-[var(--bg-selected)] bg-[var(--bg-selected)]/10 text-[var(--text-primary)]'
+                          : 'border-[var(--border-light)] hover:border-[var(--border-medium)] text-[var(--text-secondary)]'
+                      }`}
+                    >
+                      <IconC size={18} weight="light" />
+                      {s.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedSector && sectorTemplates.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Plantillas sugeridas</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {sectorTemplates.map(t => {
+                      const TIcon = AGENT_ICONS.find(i => i.name === t.icon)?.icon || Robot;
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() => {
+                            setName(t.name);
+                            setIcon(t.icon);
+                            setDescription(t.description);
+                            setInstructions(t.instructions);
+                            setStep(1);
+                          }}
+                          className="flex items-start gap-3 p-4 bg-[var(--bg-tertiary)]/30 border border-[var(--border-light)] hover:border-[var(--border-medium)] rounded-xl text-left transition-all"
+                        >
+                          <div className="w-10 h-10 rounded-lg bg-[var(--bg-selected)] flex items-center justify-center shrink-0">
+                            <TIcon size={20} className="text-white" weight="light" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-[var(--text-primary)]">{t.name}</p>
+                            <p className="text-xs text-[var(--text-secondary)] line-clamp-2 mt-0.5">{t.description}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-center pt-4">
+                <button
+                  onClick={() => setStep(1)}
+                  className="px-4 py-2 border border-[var(--border-medium)] hover:bg-[var(--bg-hover)] rounded-lg text-sm font-medium text-[var(--text-secondary)]"
+                >
+                  Empezar desde cero
+                </button>
+              </div>
+            </div>
+          )}
           {step === 1 && (
             <div className="space-y-6">
               <div className="text-center mb-6">
@@ -324,32 +414,14 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
                 <p className="text-sm text-[var(--text-secondary)]">Define cómo debe comportarse y responder este agente</p>
               </div>
               
-              {/* Templates y Generación IA */}
-              <div className="flex gap-2 mb-4">
+              {/* Templates */}
+              <div className="mb-4">
                 <button
                   onClick={() => setShowTemplates(!showTemplates)}
-                  className="flex-1 px-4 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2"
+                  className="w-full px-4 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2"
                 >
                   <Lightbulb size={16} weight="light" />
                   Templates
-                </button>
-                <button
-                  onClick={() => {
-                    if (!userPrompt.trim()) {
-                      setError('Describe qué quieres que haga el agente');
-                      return;
-                    }
-                    handleGenerateInstructions();
-                  }}
-                  disabled={generatingInstructions}
-                  className="flex-1 px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {generatingInstructions ? (
-                    <SpinnerGap size={16} className="animate-spin" weight="light" />
-                  ) : (
-                    <Sparkle size={16} weight="light" />
-                  )}
-                  Generar con IA
                 </button>
               </div>
 
@@ -359,7 +431,7 @@ export const NewAgentWorkflow: React.FC<NewAgentWorkflowProps> = ({ onClose, onC
                   <p className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-3">Selecciona un template</p>
                   {AGENT_TEMPLATES.map(template => (
                     <button
-                      key={template.name}
+                      key={template.id}
                       onClick={() => {
                         setName(name || template.name);
                         setIcon(template.icon);
@@ -541,11 +613,11 @@ O escríbelas manualmente si prefieres.`}
           )}
           <div className="flex items-center justify-between">
           <button
-            onClick={() => step > 1 ? setStep(step - 1) : onClose()}
+            onClick={() => { if (step === 1 && hasGuidedStart) setStep(0); else if (step > 1) setStep(step - 1); else onClose(); }}
             className="flex items-center gap-2 px-4 py-2 border border-[var(--border-light)] hover:bg-[var(--bg-hover)] rounded-lg text-sm transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           >
             <ArrowLeft size={14} weight="light" />
-            {step === 1 ? 'Cancelar' : 'Atrás'}
+            {step === 0 ? 'Cancelar' : (step === 1 && !hasGuidedStart) ? 'Cancelar' : 'Atrás'}
           </button>
           
           <div className="flex items-center gap-2">
@@ -553,7 +625,7 @@ O escríbelas manualmente si prefieres.`}
               <div
                 key={i}
                 className={`w-2 h-2 rounded-full transition-all ${
-                  i + 1 === step ? 'bg-[var(--bg-selected)] w-6' : i + 1 < step ? 'bg-[var(--bg-selected)]/50' : 'bg-[var(--border-medium)]'
+                  (hasGuidedStart ? i : i + 1) === step ? 'bg-[var(--bg-selected)] w-6' : (hasGuidedStart ? i : i + 1) < step ? 'bg-[var(--bg-selected)]/50' : 'bg-[var(--border-medium)]'
                 }`}
               />
             ))}
@@ -561,16 +633,15 @@ O escríbelas manualmente si prefieres.`}
 
           <button
             onClick={() => {
-              if (step < totalSteps) {
-                setStep(step + 1);
-              } else {
-                handleCreate();
-              }
+              const lastStep = hasGuidedStart ? totalSteps - 1 : totalSteps;
+              if (step >= lastStep) handleCreate();
+              else setStep(step + 1);
             }}
-            disabled={!canAdvance() || loading}
+            disabled={(step > 0 && !canAdvance()) || loading}
+            style={{ visibility: step === 0 ? 'hidden' : 'visible' }}
             className="flex items-center gap-2 px-6 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none active:scale-95"
           >
-            {step === totalSteps ? (
+            {step === (hasGuidedStart ? totalSteps - 1 : totalSteps) ? (
               <>
                 {loading ? <SpinnerGap size={16} className="animate-spin" weight="light" /> : <Check size={16} weight="bold" />}
                 Crear Agente

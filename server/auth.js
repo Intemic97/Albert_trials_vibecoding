@@ -196,7 +196,7 @@ async function login(req, res) {
             console.error('Error logging login:', logErr);
         }
 
-        res.json({ message: 'Logged in', user: { id: user.id, name: user.name, email: user.email, orgId: userOrg.organizationId, profilePhoto: user.profilePhoto, companyRole: user.companyRole, isAdmin: !!user.isAdmin, onboardingCompleted: !!user.onboardingCompleted } });
+        res.json({ message: 'Logged in', user: { id: user.id, name: user.name, email: user.email, orgId: userOrg.organizationId, profilePhoto: user.profilePhoto, companyRole: user.companyRole, locale: user.locale || 'es', isAdmin: !!user.isAdmin, onboardingCompleted: !!user.onboardingCompleted } });
 
     } catch (error) {
         console.error('Login error:', error);
@@ -234,7 +234,7 @@ async function getMe(req, res) {
     // req.user is populated by authenticateToken
     const db = await openDb();
     try {
-        const user = await db.get('SELECT id, name, email, profilePhoto, companyRole, isAdmin, onboardingCompleted FROM users WHERE id = ?', [req.user.sub]);
+        const user = await db.get('SELECT id, name, email, profilePhoto, companyRole, locale, isAdmin, onboardingCompleted FROM users WHERE id = ?', [req.user.sub]);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
         res.json({ user: { ...user, orgId: req.user.orgId, isAdmin: !!user.isAdmin, onboardingCompleted: !!user.onboardingCompleted } });
@@ -493,7 +493,7 @@ async function inviteUser(req, res) {
 }
 
 async function updateProfile(req, res) {
-    const { name, companyRole, profilePhoto } = req.body;
+    const { name, companyRole, profilePhoto, locale } = req.body;
     const userId = req.user.sub;
 
     const db = await openDb();
@@ -515,6 +515,11 @@ async function updateProfile(req, res) {
             updates.push('profilePhoto = ?');
             params.push(profilePhoto);
         }
+        if (locale !== undefined) {
+            const normalizedLocale = String(locale).toLowerCase().startsWith('en') ? 'en' : 'es';
+            updates.push('locale = ?');
+            params.push(normalizedLocale);
+        }
 
         if (updates.length === 0) {
             return res.status(400).json({ error: 'No fields to update' });
@@ -524,7 +529,7 @@ async function updateProfile(req, res) {
         await db.run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
 
         // Return updated user with all necessary fields
-        const user = await db.get('SELECT id, name, email, profilePhoto, companyRole, isAdmin, onboardingCompleted FROM users WHERE id = ?', [userId]);
+        const user = await db.get('SELECT id, name, email, profilePhoto, companyRole, locale, isAdmin, onboardingCompleted FROM users WHERE id = ?', [userId]);
         res.json({ user: { ...user, orgId: req.user.orgId, isAdmin: !!user.isAdmin, onboardingCompleted: !!user.onboardingCompleted } });
 
     } catch (error) {
@@ -539,6 +544,22 @@ function requireAdmin(req, res, next) {
         return res.status(403).json({ error: 'Admin access required' });
     }
     next();
+}
+
+// Middleware to verify user is org admin (for agent management, etc.)
+function requireOrgAdmin(req, res, next) {
+    if (!req.user || !req.user.orgId) return res.status(401).json({ error: 'Authentication required' });
+    openDb().then(db => db.get('SELECT role FROM user_organizations WHERE userId = ? AND organizationId = ?', [req.user.sub, req.user.orgId]))
+        .then(row => {
+            if (!row || row.role !== 'admin') {
+                return res.status(403).json({ error: 'Se requieren permisos de administrador de la organización' });
+            }
+            next();
+        })
+        .catch(err => {
+            console.error('[requireOrgAdmin]', err);
+            res.status(500).json({ error: 'Error verificando permisos' });
+        });
 }
 
 async function completeOnboarding(req, res) {
@@ -1140,4 +1161,4 @@ async function googleCallback(req, res) {
     }
 }
 
-module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, completeOnboarding, verifyEmail, resendVerification, validateInvitation, registerWithInvitation, forgotPassword, validateResetToken, resetPassword, googleAuth, googleCallback };
+module.exports = { register, login, logout, authenticateToken, getMe, getOrganizations, switchOrganization, getOrganizationUsers, inviteUser, updateProfile, requireAdmin, requireOrgAdmin, completeOnboarding, verifyEmail, resendVerification, validateInvitation, registerWithInvitation, forgotPassword, validateResetToken, resetPassword, googleAuth, googleCallback };

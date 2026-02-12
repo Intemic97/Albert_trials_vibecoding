@@ -38,6 +38,7 @@ export type NodeType =
   | 'dataHistorian'
   | 'timeSeriesAggregator'
   | 'agent' 
+  | 'specializedAgent'
   | 'limsFetch' 
   | 'statisticalAnalysis' 
   | 'alertAgent' 
