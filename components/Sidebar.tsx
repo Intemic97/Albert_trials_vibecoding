@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { ProfileMenu, UserAvatar, OrganizationLogo } from './ProfileMenu';
@@ -59,6 +60,7 @@ const viewToRoute: Record<string, string> = {
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShowTutorial }) => {
+  const { t } = useTranslation();
   const { organizations, user } = useAuth();
   const navigate = useNavigate();
   const notificationCenter = useNotificationCenter();
@@ -401,7 +403,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
                 // Small delay to allow click events on results
                 setTimeout(() => setShowResults(false), 200);
               }}
-              placeholder="Search"
+              placeholder={t('sidebar.searchPlaceholder')}
               className="w-full pl-9 pr-8 py-1.5 text-xs bg-[var(--bg-input)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] focus:border-[var(--border-focus)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] transition-all duration-200"
             />
             {searchQuery && (
@@ -419,12 +421,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
           {showResults && (
             <div className="absolute left-0 right-0 mt-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-lg text-sm z-20 overflow-hidden">
               <div className="px-3 py-2 text-xs font-medium text-[var(--text-secondary)] border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
-                {isSearching ? 'Searching...' : 'Results'}
+                {isSearching ? t('sidebar.searching') : t('sidebar.results')}
               </div>
               <div className="max-h-64 overflow-y-auto">
                 {searchResults.workflows.length > 0 && (
                   <div className="py-1.5">
-                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-normal">Workflows</div>
+                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-normal">{t('nav.workflows')}</div>
                     {searchResults.workflows.map(item => (
                       <button
                         key={item.id}
@@ -443,7 +445,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
 
                 {searchResults.chats.length > 0 && (
                   <div className="py-1.5 border-t border-[var(--border-light)]">
-                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-normal">Chats</div>
+                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-normal">{t('sidebar.chats')}</div>
                     {searchResults.chats.map(item => (
                       <button
                         key={item.id}
@@ -462,7 +464,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
 
                 {searchResults.entities.length > 0 && (
                   <div className="py-1.5 border-t border-[var(--border-light)]">
-                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-normal">Knowledge Base</div>
+                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-normal">{t('nav.knowledgeBase')}</div>
                     {searchResults.entities.map(item => (
                       <button
                         key={item.id}
@@ -480,7 +482,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
                 )}
 
                 {searchResults.workflows.length === 0 && searchResults.chats.length === 0 && searchResults.entities.length === 0 && !isSearching && (
-                  <div className="px-3 py-4 text-xs text-[var(--text-tertiary)] text-center">No results found</div>
+                  <div className="px-3 py-4 text-xs text-[var(--text-tertiary)] text-center">{t('sidebar.noResults')}</div>
                 )}
               </div>
             </div>
@@ -490,7 +492,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
           <button
             onClick={() => setIsCollapsed(false)}
             className="w-full flex items-center justify-center p-2 rounded-lg text-[var(--sidebar-icon)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)] transition-colors"
-            title="Search (⌘K)"
+            title={t('sidebar.searchCmd')}
           >
             <MagnifyingGlass size={18} weight="light" />
           </button>
@@ -502,27 +504,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
         <nav className="px-3 py-2">
           {/* Overview - standalone */}
           <div className="space-y-0.5 mb-1">
-            <NavItem icon={House} label="Overview" view="overview" active={activeView === 'overview'} />
+            <NavItem icon={House} label={t('nav.overview')} view="overview" active={activeView === 'overview'} />
           </div>
 
           <SectionLabel label="Build" />
           <div className="space-y-0.5">
-            <NavItem icon={FlowArrow} label="Workflows" view="workflows" active={activeView === 'workflows'} />
-            <NavItem icon={Database} label="Knowledge Base" view="database" active={activeView === 'database'} />
-            <NavItem icon={Plug} label="Connections" view="connections" active={activeView === 'connections'} />
+            <NavItem icon={FlowArrow} label={t('nav.workflows')} view="workflows" active={activeView === 'workflows'} />
+            <NavItem icon={Database} label={t('nav.knowledgeBase')} view="database" active={activeView === 'database'} />
+            <NavItem icon={Plug} label={t('nav.connections')} view="connections" active={activeView === 'connections'} />
           </div>
 
-          <SectionLabel label="Analyze" />
+          <SectionLabel label={t('nav.analyze')} />
           <div className="space-y-0.5">
-            <NavItem icon={SquaresFour} label="Dashboards" view="dashboard" active={activeView === 'dashboard'} />
-            <NavItem icon={Sparkle} label="Inteligencia" view="inteligencia" active={activeView === 'inteligencia'} />
-            <NavItem icon={Flask} label="Lab" view="lab" active={activeView === 'lab'} betaTag />
+            <NavItem icon={SquaresFour} label={t('nav.dashboards')} view="dashboard" active={activeView === 'dashboard'} />
+            <NavItem icon={Sparkle} label={t('nav.inteligencia')} view="inteligencia" active={activeView === 'inteligencia'} />
+            <NavItem icon={Flask} label={t('nav.lab')} view="lab" active={activeView === 'lab'} betaTag />
           </div>
 
-          <SectionLabel label="Reports" />
+          <SectionLabel label={t('nav.reports')} />
           <div className="space-y-0.5">
-            <NavItem icon={FileText} label="Templates" view="templates" active={activeView === 'templates'} />
-            <NavItem icon={Checks} label="Documents" view="documents" active={activeView === 'documents'} />
+            <NavItem icon={FileText} label={t('nav.templates')} view="templates" active={activeView === 'templates'} />
+            <NavItem icon={Checks} label={t('nav.documents')} view="documents" active={activeView === 'documents'} />
           </div>
 
         </nav>
@@ -539,7 +541,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
             >
               <div className="flex items-center">
                 <Question size={16} weight="light" className="mr-3 text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)] transition-colors duration-200 ease-in-out" />
-                <span className="transition-colors duration-200 ease-in-out">Help</span>
+                <span className="transition-colors duration-200 ease-in-out">{t('nav.help')}</span>
               </div>
               {showHelpDropdown ? (
                 <CaretUp size={16} weight="light" className="text-[var(--sidebar-icon)]" />
@@ -551,7 +553,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
               <div className="ml-4 mt-1 space-y-0.5 border-l border-[var(--sidebar-border)] pl-3">
                 <NavItem 
                   icon={Question} 
-                  label="Quickstart" 
+                  label={t('nav.quickstart')} 
                   onClick={() => {
                     setShowHelpDropdown(false);
                     if (onShowTutorial) {
@@ -564,7 +566,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
                 <div onClick={() => setShowHelpDropdown(false)}>
                   <NavItem 
                     icon={BookOpen} 
-                    label="Documentation" 
+                    label={t('nav.documentation')} 
                     view="documentation"
                     active={activeView === 'documentation'}
                   />
@@ -572,14 +574,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
                 <div onClick={() => setShowHelpDropdown(false)}>
                   <NavItem
                     icon={ClipboardText}
-                    label="Import Package"
+                    label={t('nav.importPackage')}
                     view="import-use-case"
                     active={activeView === 'import-use-case'}
                   />
                 </div>
                 <NavItem 
                   icon={Bug} 
-                  label="Report a Bug" 
+                  label={t('nav.reportBug')} 
                   onClick={() => {
                     setShowHelpDropdown(false);
                     window.dispatchEvent(new CustomEvent('showReportBug'));
@@ -590,12 +592,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onShow
           </div>
         ) : (
           <div className="mb-2">
-            <NavItem icon={Question} label="Help" view="documentation" active={activeView === 'documentation'} />
+            <NavItem icon={Question} label={t('nav.help')} view="documentation" active={activeView === 'documentation'} />
           </div>
         )}
         
         <div className="mb-2">
-          <NavItem icon={GearSix} label="Settings" view="settings" active={activeView === 'settings'} />
+          <NavItem icon={GearSix} label={t('nav.settings')} view="settings" active={activeView === 'settings'} />
         </div>
         
         {/* Organization Switcher */}

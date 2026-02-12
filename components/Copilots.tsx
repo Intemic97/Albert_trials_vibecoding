@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PaperPlaneTilt, SpinnerGap, Info, Robot, User, Plus, Trash, ChatCircle, ArrowLeft, List, X, Sparkle, Database, Check, XCircle, CaretDoubleLeft, MagnifyingGlass, GearSix, Hash, ArrowCircleLeft, Folder, Star, Export, Tag, FileText, CaretLeft, CaretDown, CaretRight, Factory, Wine, CurrencyDollar, ChartBar, Gear, Flask, Truck, Lightning, ShieldCheck, TrendUp, Users, Scales, Target, Wrench, Package, Globe, Lightbulb, FlowArrow } from '@phosphor-icons/react';
 import { AgentLibrary } from './copilots/AgentLibrary';
 import { AgentConfigModal } from './copilots/AgentConfigModal';
@@ -19,7 +20,7 @@ interface KnowledgeFolder {
 }
 
 // Generate clean, concise chat title from user input
-const generateChatTitle = (input: string): string => {
+const generateChatTitle = (input: string, defaultTitle: string = 'New Chat'): string => {
     let title = input.trim();
     
     // Remove folder contents: "#Folder (contains: @entity1, @entity2)" -> "#Folder"
@@ -55,7 +56,7 @@ const generateChatTitle = (input: string): string => {
         return cleanTitle + '...';
     }
     
-    return cleanTitle || 'New Chat';
+    return cleanTitle || defaultTitle;
 };
 
 // Intemic Logo Icon Component
@@ -154,6 +155,7 @@ const TAG_COLORS: Record<string, string> = {
 };
 
 export const Copilots: React.FC = () => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
     const { notifications, removeNotification, error: showError, warning } = useNotifications(3000);
@@ -324,7 +326,7 @@ export const Copilots: React.FC = () => {
                 if (chat.messages.length > 0 || chat.instructions || (chat.allowedEntities && chat.allowedEntities.length > 0)) {
                     const payload = {
                         id: chat.id,
-                        title: chat.title || 'Nuevo Chat',
+                        title: chat.title || t('copilots.newChat'),
                         messages: chat.messages.map(m => ({
                             id: m.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                             role: m.role,
@@ -364,7 +366,7 @@ export const Copilots: React.FC = () => {
                 }
             });
         };
-    }, [chats]);
+    }, [chats, t]);
 
     useEffect(() => {
         if (isEditingTitle) {
@@ -385,7 +387,7 @@ export const Copilots: React.FC = () => {
                         // Server already parses messages and allowedEntities
                         return {
                             id: chat.id,
-                            title: chat.title || 'Nuevo Chat',
+                            title: chat.title || t('copilots.newChat'),
                             createdAt: chat.createdAt ? new Date(chat.createdAt) : new Date(),
                             updatedAt: chat.updatedAt ? new Date(chat.updatedAt) : new Date(),
                             instructions: chat.instructions || undefined,
@@ -424,7 +426,7 @@ export const Copilots: React.FC = () => {
         
         try {
             const payload = {
-                title: chat.title || 'New Copilot',
+                title: chat.title || t('copilots.newCopilot'),
                 messages: chat.messages.map(m => ({
                     id: m.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                     role: m.role,
@@ -470,12 +472,12 @@ export const Copilots: React.FC = () => {
         const chatAgentId = agentIdOverride || selectedAgentForChat;
         const defaultInstructions = instructions || "You are a helpful database assistant. Help users navigate through your entities, find records, and answer questions about relationships between tables.";
         const welcomeMessage = instructions 
-            ? `Hello! I'm ${name || 'your Copilot'}. ${instructions}\n\nWhat would you like to know?`
+            ? `${t('copilots.hello', { name: name || t('copilots.yourCopilot') })}\n\n${instructions}`
             : "Good afternoon! I'm your Database Copilot. I can help you navigate through your entities, find records, and answer questions about relationships between your tables. What would you like to know?";
 
         const newChat: Chat = {
             id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            title: name || 'New Copilot',
+            title: name || t('copilots.newCopilot'),
             messages: [{
                 id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 role: 'assistant',
@@ -524,7 +526,7 @@ export const Copilots: React.FC = () => {
 
     const handleSaveCopilot = async () => {
         if (!copilotName.trim()) {
-            warning('Missing name', 'Please enter a name for your copilot');
+            warning(t('copilots.missingName'), t('copilots.enterName'));
             return;
         }
         
@@ -572,7 +574,7 @@ export const Copilots: React.FC = () => {
             setCopilotInstructions('');
             setSelectedEntities([]);
         } catch (error) {
-            showError('Failed to create copilot', 'Please try again');
+            showError(t('copilots.createErrorTitle'), t('copilots.createError'));
         }
     };
 
@@ -663,7 +665,7 @@ export const Copilots: React.FC = () => {
             content = `# ${chat.title}\n\n`;
             content += `*Exported: ${new Date().toLocaleString()}*\n\n---\n\n`;
             chat.messages.forEach(msg => {
-                const role = msg.role === 'user' ? '**You**' : '**Copilot**';
+                const role = msg.role === 'user' ? `**${t('copilots.you')}**` : `**${t('copilots.copilot')}**`;
                 content += `### ${role}\n\n${msg.content}\n\n---\n\n`;
             });
             filename += '.md';
@@ -672,7 +674,7 @@ export const Copilots: React.FC = () => {
             content = `${chat.title}\n${'='.repeat(chat.title.length)}\n\n`;
             content += `Exported: ${new Date().toLocaleString()}\n\n`;
             chat.messages.forEach(msg => {
-                const role = msg.role === 'user' ? 'You' : 'Copilot';
+                const role = msg.role === 'user' ? t('copilots.you') : t('copilots.copilot');
                 content += `[${role}]\n${msg.content}\n\n`;
             });
             filename += '.txt';
@@ -745,7 +747,7 @@ export const Copilots: React.FC = () => {
             messages: [...currentChat.messages, userMessage],
             updatedAt: new Date(),
             // Auto-generate title from first user message (clean & concise)
-            title: currentChat.messages.length === 1 ? generateChatTitle(input) : currentChat.title
+            title: currentChat.messages.length === 1 ? generateChatTitle(input, t('copilots.newChat')) : currentChat.title
         };
 
         // Use currentChat.id instead of activeChat to ensure we update the correct chat
@@ -1218,7 +1220,7 @@ export const Copilots: React.FC = () => {
                         className="flex items-center gap-2 px-2 py-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors text-sm"
                     >
                         <ArrowLeft size={14} weight="light" />
-                        <span className="font-medium">Back</span>
+                        <span className="font-medium">{t('common.back')}</span>
                     </button>
                     <div className="h-6 w-px bg-[var(--bg-selected)]"></div>
                     {currentAgent && (
@@ -1263,15 +1265,15 @@ export const Copilots: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        setEditingTitle(currentChat.title || 'New Chat');
+                                        setEditingTitle(currentChat.title || t('copilots.newChat'));
                                         setIsEditingTitle(true);
                                     }}
                                     className="text-sm font-normal text-[var(--text-primary)] hover:text-[var(--text-primary)] active:text-[var(--text-primary)] focus:outline-none transition-colors bg-transparent active:bg-transparent appearance-none"
                                 >
-                                    {currentChat.title || 'Nuevo Chat'}
+                                    {currentChat.title || t('copilots.newChat')}
                                 </button>
                             ) : (
-                                <span className="text-sm font-normal text-[var(--text-primary)]">Asistente de Inteligencia</span>
+                                <span className="text-sm font-normal text-[var(--text-primary)]">{t('copilots.intelligenceAssistant')}</span>
                             )
                         )}
                     </div>
@@ -1281,20 +1283,20 @@ export const Copilots: React.FC = () => {
                     <button
                         onClick={() => navigate('/inteligencia/agentes')}
                         className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]/30 rounded-lg transition-colors"
-                        title="Librería de agentes"
+                            title={t('copilots.agentLibrary')}
                     >
                         <Robot size={14} />
-                        <span className="hidden sm:inline">Agentes</span>
+                        <span className="hidden sm:inline">{t('copilots.agents')}</span>
                     </button>
                     {currentChat && (
                     <>
                         <button
                             onClick={() => setShowExportModal(true)}
                             className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]/30 rounded-lg transition-colors"
-                            title="Export conversation"
+                            title={t('copilots.exportConversation')}
                         >
                             <Export size={14} />
-                            <span className="hidden sm:inline">Export</span>
+                            <span className="hidden sm:inline">{t('copilots.exportChat')}</span>
                         </button>
                         <button
                             onClick={() => toggleFavorite(currentChat.id)}
@@ -1303,17 +1305,17 @@ export const Copilots: React.FC = () => {
                                     ? 'text-amber-500' 
                                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]/30'
                             }`}
-                            title={currentChat.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                            title={currentChat.isFavorite ? t('copilots.removeFromFavorites') : t('copilots.addToFavorites')}
                         >
                             <Star size={14} weight={currentChat.isFavorite ? "fill" : "regular"} />
                         </button>
                         <button
                             onClick={() => openEditModal(currentChat.id)}
                             className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]/30 rounded-lg transition-colors"
-                            title="Configurar chat"
+                            title={t('copilots.configureChat')}
                         >
                             <GearSix size={14} />
-                            <span className="hidden sm:inline">Configurar</span>
+                            <span className="hidden sm:inline">{t('copilots.configure')}</span>
                         </button>
                     </>
                     )}
@@ -1331,7 +1333,7 @@ export const Copilots: React.FC = () => {
                     {/* Sidebar Header */}
                     <div className="p-4 border-b border-[var(--border-light)] shrink-0 bg-[var(--bg-card)]">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xs font-light text-[var(--text-tertiary)] uppercase tracking-wider" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Conversaciones</h2>
+                            <h2 className="text-xs font-light text-[var(--text-tertiary)] uppercase tracking-wider" style={{ fontFamily: "'Berkeley Mono', monospace" }}>{t('copilots.conversations')}</h2>
                             <button
                                 onClick={() => setIsSidebarOpen(false)}
                                 className="p-1.5 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
@@ -1346,7 +1348,7 @@ export const Copilots: React.FC = () => {
                                 type="text"
                                 value={chatSearchQuery}
                                 onChange={(e) => setChatSearchQuery(e.target.value)}
-                                placeholder="Search chats..."
+                                placeholder={t('copilots.searchChats')}
                                 className="w-full pl-9 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                             />
                         </div>
@@ -1359,7 +1361,7 @@ export const Copilots: React.FC = () => {
                                     className="w-full mb-3 px-4 py-2.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2"
                                 >
                                     <Plus size={16} weight="bold" />
-                                    Nuevo Chat
+                                    {t('copilots.newChat')}
                                 </button>
 
                                 {/* Filter Pills */}
@@ -1443,10 +1445,10 @@ export const Copilots: React.FC = () => {
                                                             const AgentIcon = getIcon(chatAgent.icon);
                                                             return <AgentIcon size={12} weight="duotone" />;
                                                         })()}
-                                                        <span className="truncate">Agente: {chatAgent.name}</span>
+                                                        <span className="truncate">{t('copilots.agentPrefix')} {chatAgent.name}</span>
                                                     </>
                                                 ) : (
-                                                    <span className="truncate">Agente: Asistente General</span>
+                                                    <span className="truncate">{t('copilots.agentPrefix')} {t('copilots.generalAssistant')}</span>
                                                 )}
                                             </div>
                                         </div>
@@ -1457,7 +1459,7 @@ export const Copilots: React.FC = () => {
                                                     toggleFavorite(chat.id);
                                                 }}
                                                 className={`p-1 rounded transition-all ${chat.isFavorite ? 'text-amber-500' : 'hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)]'}`}
-                                                title={chat.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                                                title={chat.isFavorite ? t('copilots.removeFromFavorites') : t('copilots.addToFavorites')}
                                             >
                                                 <Star size={12} weight={chat.isFavorite ? "fill" : "regular"} />
                                             </button>
@@ -1468,7 +1470,7 @@ export const Copilots: React.FC = () => {
                                                         setShowTagMenu(showTagMenu === chat.id ? null : chat.id);
                                                     }}
                                                     className="p-1 hover:bg-[var(--bg-hover)] rounded transition-all"
-                                                    title="Add tag"
+                                                    title={t('copilots.addTag')}
                                                 >
                                                     <Tag size={12} className="text-[var(--text-tertiary)]" />
                                                 </button>
@@ -1485,7 +1487,7 @@ export const Copilots: React.FC = () => {
                                                                         addTagToChat(chat.id, newTagInput);
                                                                     }
                                                                 }}
-                                                                placeholder="New tag..."
+                                                                placeholder={t('copilots.newTag')}
                                                                 className="w-full px-2 py-1 text-xs bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mb-2"
                                                                 autoFocus
                                                                 onClick={(e) => e.stopPropagation()}
@@ -1507,7 +1509,7 @@ export const Copilots: React.FC = () => {
                                                             {chat.tags && chat.tags.length > 0 && (
                                                                 <>
                                                                     <div className="border-t border-[var(--border-light)] my-1" />
-                                                                    <p className="text-[10px] text-[var(--text-tertiary)] px-2 mb-1">Remove:</p>
+                                                                    <p className="text-[10px] text-[var(--text-tertiary)] px-2 mb-1">{t('copilots.removeTag')}</p>
                                                                     {chat.tags.map((tag, tagIdx) => (
                                                                         <button
                                                                             key={(tag != null && tag !== '') ? tag : `rm-${tagIdx}`}
@@ -1533,7 +1535,7 @@ export const Copilots: React.FC = () => {
                                                     openEditModal(chat.id);
                                                 }}
                                                 className="p-1 hover:bg-[var(--bg-hover)] rounded transition-all"
-                                                title="Edit configuration"
+                                                title={t('copilots.editConfiguration')}
                                             >
                                                 <GearSix size={12} className="text-[var(--text-tertiary)]" />
                                             </button>
@@ -1575,7 +1577,7 @@ export const Copilots: React.FC = () => {
                                     {/* Greeting */}
                                     <div className="text-center">
                                         <h2 className="text-lg font-medium text-[var(--text-secondary)] tracking-wider uppercase" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
-                                            Ask me anything about your data
+                                            {t('copilots.askAboutData')}
                                         </h2>
                                     </div>
                                     
@@ -1588,7 +1590,7 @@ export const Copilots: React.FC = () => {
                                                     value={input}
                                                     onChange={handleInputChange}
                                                     onKeyDown={handleKeyDown}
-                                                    placeholder="Ask about your data..."
+                                                    placeholder={t('copilots.askAboutDataPlaceholder')}
                                                     rows={1}
                                                     className="w-full px-5 py-4 pr-16 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl text-[15px] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)] resize-none transition-all"
                                                     style={{ 
@@ -1610,7 +1612,7 @@ export const Copilots: React.FC = () => {
                                                         }}
                                                     >
                                                         <div className="bg-[var(--bg-tertiary)] px-3 py-2 border-b border-[var(--border-light)] text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">
-                                                            {mention.type === 'entity' ? 'Entities' : mention.type === 'folder' ? 'Folders' : `Properties of ${mention.entityContext?.name}`}
+                                                            {mention.type === 'entity' ? t('copilots.entities') : mention.type === 'folder' ? t('copilots.folders') : t('copilots.propertiesOf', { name: mention.entityContext?.name })}
                                                         </div>
                                                         <div className="max-h-48 overflow-y-auto">
                                                             {mentionSuggestions.map((item, index) => (
@@ -1633,7 +1635,7 @@ export const Copilots: React.FC = () => {
                                                                     <span className={item._type === 'folder' ? 'font-medium' : ''}>{item.name}</span>
                                                                     {item._type === 'folder' && (
                                                                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 ml-auto">
-                                                                            {(item as KnowledgeFolder).entityIds.length} entities
+                                                                            {t('copilots.entitiesCount', { count: (item as KnowledgeFolder).entityIds.length })}
                                                                         </span>
                                                                     )}
                                                                 </button>
@@ -1659,15 +1661,15 @@ export const Copilots: React.FC = () => {
                                             <div className="flex items-center space-x-4 text-xs text-[var(--text-tertiary)] mt-2">
                                                 <span className="flex items-center">
                                                     <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans text-[var(--text-secondary)]">@</kbd>
-                                                    entities
+                                                    {t('copilots.entities')}
                                                 </span>
                                                 <span className="flex items-center">
                                                     <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans text-[var(--text-secondary)]">#</kbd>
-                                                    folders
+                                                    {t('copilots.folders')}
                                                 </span>
                                                 <span className="flex items-center">
                                                     <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans text-[var(--text-secondary)]">.</kbd>
-                                                    attributes
+                                                    {t('copilots.attributes')}
                                                 </span>
                                             </div>
                                         </form>
@@ -1675,7 +1677,7 @@ export const Copilots: React.FC = () => {
 
                                     {/* Example Prompts */}
                                     <div className="space-y-4">
-                                        <p className="text-sm text-[var(--text-secondary)] text-center font-normal">Try asking:</p>
+                                        <p className="text-sm text-[var(--text-secondary)] text-center font-normal">{t('copilots.tryAsking')}</p>
                                         <div className="flex flex-wrap gap-3 justify-center">
                                             {examplePrompts.slice(0, 5).map((prompt, idx) => (
                                                 <button
@@ -1728,7 +1730,7 @@ export const Copilots: React.FC = () => {
                                                 {message.data && Array.isArray(message.data) && message.data.length > 0 && (
                                                     <div className="mt-4 pt-4 border-t border-[var(--border-light)]">
                                                         <p className="text-xs font-normal text-[var(--text-secondary)] mb-3 uppercase tracking-wide">
-                                                            Found {message.data.length} result{message.data.length > 1 ? 's' : ''}
+                                                            {t('copilots.foundResults', { count: message.data.length })}
                                                         </p>
                                                         <div className="space-y-2 max-h-80 overflow-y-auto">
                                                             {message.data.slice(0, 10).map((item: any, idx: number) => (
@@ -1745,7 +1747,7 @@ export const Copilots: React.FC = () => {
                                                             ))}
                                                             {message.data.length > 10 && (
                                                                 <p className="text-sm text-[var(--text-tertiary)] text-center py-2">
-                                                                    + {message.data.length - 10} more results
+                                                                    {t('copilots.moreResults', { count: message.data.length - 10 })}
                                                                 </p>
                                                             )}
                                                         </div>
@@ -1760,7 +1762,7 @@ export const Copilots: React.FC = () => {
                                                             className="flex items-center gap-2 text-sm text-teal-600 hover:text-teal-700 font-medium transition-colors"
                                                         >
                                                             <Info size={14} weight="light" />
-                                                            How did I prepare this?
+                                                            {t('copilots.howDidIPrepare')}
                                                         </button>
 
                                                         {expandedExplanations.has(message.id) && (
@@ -1768,7 +1770,7 @@ export const Copilots: React.FC = () => {
                                                                 <p className="whitespace-pre-wrap">{message.explanation}</p>
                                                                 {message.entitiesUsed && message.entitiesUsed.length > 0 && (
                                                                     <div className="mt-3 pt-3 border-t border-teal-200">
-                                                                        <span className="text-[var(--text-secondary)] font-medium">Entities analyzed: </span>
+                                                                        <span className="text-[var(--text-secondary)] font-medium">{t('copilots.entitiesAnalyzed')} </span>
                                                                         {message.entitiesUsed.map((entity, idx) => (
                                                                             <span key={entity ?? `eu-${idx}`}>
                                                                                 <span className="text-teal-700 font-normal">@{entity}</span>
@@ -1795,7 +1797,7 @@ export const Copilots: React.FC = () => {
                                                             className="flex items-center gap-2 text-sm text-violet-600 hover:text-violet-700 font-medium transition-colors"
                                                         >
                                                             <FlowArrow size={14} weight="light" />
-                                                            Ver razonamiento ({message.agentConversation.length} mensajes entre agentes)
+                                                            {t('copilots.viewReasoning')} ({t('copilots.messagesBetweenAgents', { count: message.agentConversation.length })})
                                                         </button>
                                                         {expandedAgentConversations.has(message.id) && (
                                                             <div className="mt-3 space-y-4">
@@ -1855,7 +1857,7 @@ export const Copilots: React.FC = () => {
                                         <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-2xl px-6 py-4 shadow-sm">
                                             <div className="flex items-center gap-3">
                                                 <SpinnerGap size={18} className="animate-spin text-teal-600" weight="light" />
-                                                <span className="text-[15px] text-[var(--text-secondary)]">Analyzing your data...</span>
+                                                <span className="text-[15px] text-[var(--text-secondary)]">{t('copilots.analyzingData')}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1878,7 +1880,7 @@ export const Copilots: React.FC = () => {
                                         value={input}
                                         onChange={handleInputChange}
                                         onKeyDown={handleKeyDown}
-                                        placeholder="Ask about your data... (Press Enter to send, Shift+Enter for new line)"
+                                        placeholder={t('copilots.askAboutDataPlaceholderLong')}
                                         rows={1}
                                         className="w-full px-5 py-4 pr-16 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent placeholder:text-[var(--text-tertiary)] resize-none transition-all"
                                         style={{ minHeight: '56px', maxHeight: '200px' }}
@@ -1894,7 +1896,7 @@ export const Copilots: React.FC = () => {
                                             }}
                                         >
                                             <div className="bg-[var(--bg-tertiary)] px-3 py-2 border-b border-[var(--border-light)] text-xs font-normal text-[var(--text-secondary)] uppercase tracking-wider">
-                                                {mention.type === 'entity' ? 'Entities' : mention.type === 'folder' ? 'Folders' : `Properties of ${mention.entityContext?.name}`}
+                                                {mention.type === 'entity' ? t('copilots.entities') : mention.type === 'folder' ? t('copilots.folders') : t('copilots.propertiesOf', { name: mention.entityContext?.name })}
                                             </div>
                                             <div className="max-h-48 overflow-y-auto">
                                                 {mentionSuggestions.map((item, index) => (
@@ -1917,7 +1919,7 @@ export const Copilots: React.FC = () => {
                                                         <span className={item._type === 'folder' ? 'font-medium' : ''}>{item.name}</span>
                                                         {item._type === 'folder' && (
                                                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 ml-auto">
-                                                                {(item as KnowledgeFolder).entityIds.length} entities
+                                                                {t('copilots.entitiesCount', { count: (item as KnowledgeFolder).entityIds.length })}
                                                             </span>
                                                         )}
                                                     </button>
@@ -1943,20 +1945,20 @@ export const Copilots: React.FC = () => {
                                 <div className="flex items-center space-x-4 text-xs text-[var(--text-tertiary)] mt-2">
                                     <span className="flex items-center">
                                         <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans text-[var(--text-secondary)]">@</kbd>
-                                        entities
-                                    </span>
-                                    <span className="flex items-center">
-                                        <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans text-[var(--text-secondary)]">#</kbd>
-                                        folders
-                                    </span>
-                                    <span className="flex items-center">
-                                        <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans text-[var(--text-secondary)]">.</kbd>
-                                        attributes
-                                    </span>
-                                </div>
+                                                    {t('copilots.entities')}
+                                                </span>
+                                                <span className="flex items-center">
+                                                    <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans text-[var(--text-secondary)]">#</kbd>
+                                                    {t('copilots.folders')}
+                                                </span>
+                                                <span className="flex items-center">
+                                                    <kbd className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded mr-1.5 font-sans text-[var(--text-secondary)]">.</kbd>
+                                                    {t('copilots.attributes')}
+                                                </span>
+                                            </div>
                             </form>
                             <div className="mt-2 flex items-center justify-center gap-4 text-xs text-[var(--text-tertiary)]">
-                                <span>Prueba: "¿Cuál es la tasa de defectos?"</span>
+                                <span>{t('copilots.tryAsking')} &quot;¿Cuál es la tasa de defectos?&quot;</span>
                                 <span>•</span>
                                 <span>"Muéstrame lotes fuera de especificación"</span>
                             </div>
@@ -1983,8 +1985,8 @@ export const Copilots: React.FC = () => {
                                     <Sparkle size={18} className="text-white" weight="light" />
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Crear Nuevo Chat</h3>
-                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Selecciona un agente especializado o crea uno nuevo con contexto específico</p>
+                                    <h3 className="text-base font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>{t('copilots.createNewChat')}</h3>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">{t('copilots.selectAgentDescription')}</p>
                                 </div>
                             </div>
                         </div>
@@ -1993,14 +1995,14 @@ export const Copilots: React.FC = () => {
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
                             {/* Name */}
                             <div>
-                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
-                                    Nombre del Chat <span className="text-red-500">*</span>
+                                    <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                    {t('copilots.chatName')} <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
                                     value={copilotName}
                                     onChange={(e) => setCopilotName(e.target.value)}
-                                    placeholder="ej., Análisis Q1, Revisión Calidad..."
+                                    placeholder={t('copilots.chatNamePlaceholder')}
                                     className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)] transition-all"
                                     autoFocus
                                 />
@@ -2009,10 +2011,10 @@ export const Copilots: React.FC = () => {
                             {/* Agente: opcional. Sin agente = chat genérico con toda la knowledge base */}
                             <div className="space-y-2.5">
                                 <label className="block text-sm font-medium text-[var(--text-primary)]">
-                                    Agente especializado <span className="text-xs font-normal text-[var(--text-tertiary)]">(opcional)</span>
+                                    {t('copilots.specializedAgent')} <span className="text-xs font-normal text-[var(--text-tertiary)]">{t('copilots.specializedAgentOptional')}</span>
                                 </label>
                                 <p className="text-xs text-[var(--text-secondary)]">
-                                    Si no eliges un agente, el chat será <strong>genérico</strong> y tendrá acceso a toda la knowledge base y a todos los datasets. Opcionalmente puedes restringir abajo a datasets concretos.
+                                    {t('copilots.withoutAgentDescription')}
                                 </p>
                                 <div className="flex gap-2">
                                     {selectedAgentForChat ? (
@@ -2032,7 +2034,7 @@ export const Copilots: React.FC = () => {
                                                 })()}
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-medium text-[var(--text-primary)]">
-                                                        {agents.find(a => a.id === selectedAgentForChat)?.name || 'Agente'}
+                                                        {agents.find(a => a.id === selectedAgentForChat)?.name || t('copilots.agent')}
                                                     </p>
                                                     <p className="text-xs text-[var(--text-secondary)] line-clamp-1">
                                                         {agents.find(a => a.id === selectedAgentForChat)?.description || ''}
@@ -2041,7 +2043,7 @@ export const Copilots: React.FC = () => {
                                                 <button
                                                     onClick={() => setSelectedAgentForChat(null)}
                                                     className="p-1.5 hover:bg-red-100 rounded-lg text-red-600 transition-colors"
-                                                    title="Quitar agente (chat genérico)"
+                                                    title={t('copilots.removeAgentGeneric')}
                                                 >
                                                     <X size={16} />
                                                 </button>
@@ -2053,13 +2055,13 @@ export const Copilots: React.FC = () => {
                                             className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-[var(--border-medium)] hover:border-[var(--bg-selected)] hover:bg-[var(--bg-selected)]/5 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                                         >
                                             <Robot size={18} weight="light" />
-                                            Elegir agente de la librería (opcional)
+                                            {t('copilots.chooseAgentFromLibrary')}
                                         </button>
                                     )}
                                 </div>
                                 {selectedAgentForChat && (
                                     <p className="text-xs text-[var(--text-tertiary)] mt-2">
-                                        Este chat usará la configuración, entidades y knowledge base del agente. No podrás elegir datasets aquí; vienen del agente.
+                                        {t('copilots.thisChatUsesAgent')}
                                     </p>
                                 )}
                             </div>
@@ -2068,10 +2070,10 @@ export const Copilots: React.FC = () => {
                             {!selectedAgentForChat && (
                             <div>
                                 <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
-                                    Restringir a datasets concretos <span className="text-[var(--text-tertiary)] font-normal">(opcional)</span>
+                                    {t('copilots.restrictToDatasets')} <span className="text-[var(--text-tertiary)] font-normal">{t('copilots.specializedAgentOptional')}</span>
                                 </label>
                                 <p className="text-xs text-[var(--text-secondary)] mb-3">
-                                    Por defecto el chat genérico tiene acceso a toda la knowledge base. Selecciona entidades solo si quieres limitar a ciertos datasets.
+                                    {t('copilots.defaultGenericAccess')}
                                 </p>
                                 
                                 {isLoadingEntities ? (
@@ -2080,7 +2082,7 @@ export const Copilots: React.FC = () => {
                                     </div>
                                 ) : availableEntities.length === 0 ? (
                                     <div className="p-4 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-secondary)] text-center">
-                                        No hay entidades. Crea entidades en Base de Datos primero.
+                                        {t('copilots.noEntitiesCreateFirst')}
                                     </div>
                                 ) : (
                                     <div className="space-y-1.5 max-h-64 overflow-y-auto border border-[var(--border-light)] rounded-lg p-3 bg-[var(--bg-tertiary)]">
@@ -2119,7 +2121,7 @@ export const Copilots: React.FC = () => {
                                                     )}
                                                 </div>
                                                 <span className="text-xs text-[var(--text-tertiary)] flex-shrink-0">
-                                                    {entity.properties?.length || 0} fields
+                                                    {entity.properties?.length || 0} {t('copilots.fields')}
                                                 </span>
                                             </button>
                                         ))}
@@ -2157,7 +2159,7 @@ export const Copilots: React.FC = () => {
                                 onClick={() => setShowCopilotModal(false)}
                                 className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium transition-colors duration-200 ease-in-out"
                             >
-                                Cancelar
+                                {t('common.cancel')}
                             </button>
                             <button
                                 onClick={handleSaveCopilot}
@@ -2165,7 +2167,7 @@ export const Copilots: React.FC = () => {
                                 className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Sparkle size={14} weight="light" />
-                                Crear Chat
+                                {t('copilots.createChat')}
                             </button>
                         </div>
                     </div>
@@ -2193,8 +2195,8 @@ export const Copilots: React.FC = () => {
                                     <GearSix size={18} className="text-white" weight="light" />
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Configurar Chat</h3>
-                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Cambia el agente o ajusta configuraciones específicas</p>
+                                    <h3 className="text-base font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>{t('copilots.configureChat')}</h3>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">{t('copilots.changeAgentDescriptionDetail')}</p>
                                 </div>
                             </div>
                         </div>
@@ -2206,8 +2208,8 @@ export const Copilots: React.FC = () => {
                                 <div className="flex items-start gap-3">
                                     <Info size={18} className="text-blue-600 mt-0.5 shrink-0" weight="light" />
                                     <div className="text-xs text-blue-800">
-                                        <p className="font-medium mb-1">Cambia el agente del chat</p>
-                                        <p>Para usar diferentes instrucciones o contexto, selecciona otro agente de la librería o crea uno nuevo.</p>
+                                        <p className="font-medium mb-1">{t('copilots.changeAgentDescription')}</p>
+                                        <p>{t('copilots.changeAgentDescriptionDetail')}</p>
                                     </div>
                                 </div>
                             </div>
@@ -2215,10 +2217,10 @@ export const Copilots: React.FC = () => {
                             {/* Agente: opcional. Sin agente = chat genérico con toda la knowledge base */}
                             <div className="space-y-2.5">
                                 <label className="block text-sm font-medium text-[var(--text-primary)]">
-                                    Agente especializado <span className="text-xs font-normal text-[var(--text-tertiary)]">(opcional)</span>
+                                    {t('copilots.specializedAgent')} <span className="text-xs font-normal text-[var(--text-tertiary)]">{t('copilots.specializedAgentOptional')}</span>
                                 </label>
                                 <p className="text-xs text-[var(--text-secondary)]">
-                                    Sin agente, el chat es genérico y tiene acceso a toda la knowledge base. Con agente, usa su configuración y datasets.
+                                    {t('copilots.noAgentGenericDesc')}
                                 </p>
                                 <div className="flex gap-2">
                                     {selectedAgentForChat ? (
@@ -2238,7 +2240,7 @@ export const Copilots: React.FC = () => {
                                                 })()}
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-medium text-[var(--text-primary)]">
-                                                        {agents.find(a => a.id === selectedAgentForChat)?.name || 'Agente'}
+                                                        {agents.find(a => a.id === selectedAgentForChat)?.name || t('copilots.agent')}
                                                     </p>
                                                     <p className="text-xs text-[var(--text-secondary)] line-clamp-1">
                                                         {agents.find(a => a.id === selectedAgentForChat)?.description || ''}
@@ -2247,7 +2249,7 @@ export const Copilots: React.FC = () => {
                                                 <button
                                                     onClick={() => setSelectedAgentForChat(null)}
                                                     className="p-1.5 hover:bg-red-100 rounded-lg text-red-600 transition-colors"
-                                                    title="Quitar agente (chat genérico)"
+                                                    title={t('copilots.removeAgentGeneric')}
                                                 >
                                                     <X size={16} />
                                                 </button>
@@ -2259,13 +2261,13 @@ export const Copilots: React.FC = () => {
                                             className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-[var(--border-medium)] hover:border-[var(--bg-selected)] hover:bg-[var(--bg-selected)]/5 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                                         >
                                             <Robot size={18} weight="light" />
-                                            Elegir agente (opcional)
+                                            {t('copilots.chooseAgentOptional')}
                                         </button>
                                     )}
                                 </div>
                                 {selectedAgentForChat && (
                                     <p className="text-xs text-[var(--text-tertiary)] mt-2">
-                                        Contexto y datasets vienen del agente.
+                                        {t('copilots.contextFromAgent')}
                                     </p>
                                 )}
                             </div>
@@ -2274,10 +2276,10 @@ export const Copilots: React.FC = () => {
                             {!selectedAgentForChat && (
                             <div>
                                 <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
-                                    Restringir a datasets <span className="text-[var(--text-tertiary)] font-normal">(opcional)</span>
+                                    {t('copilots.restrictToDatasetsOptional')}
                                 </label>
                                 <p className="text-xs text-[var(--text-secondary)] mb-3">
-                                    Vacío = acceso a toda la knowledge base.
+                                    {t('copilots.emptyGenericAccess')}
                                 </p>
                                 
                                 {isLoadingEntities ? (
@@ -2286,7 +2288,7 @@ export const Copilots: React.FC = () => {
                                     </div>
                                 ) : availableEntities.length === 0 ? (
                                     <div className="p-4 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-secondary)] text-center">
-                                        No hay entidades disponibles.
+                                        {t('copilots.noEntitiesAvailable')}
                                     </div>
                                 ) : (
                                     <div className="space-y-1.5 max-h-64 overflow-y-auto border border-[var(--border-light)] rounded-lg p-3 bg-[var(--bg-tertiary)]">
@@ -2325,7 +2327,7 @@ export const Copilots: React.FC = () => {
                                                     )}
                                                 </div>
                                                 <span className="text-xs text-[var(--text-tertiary)] flex-shrink-0">
-                                                    {entity.properties?.length || 0} fields
+                                                    {entity.properties?.length || 0} {t('copilots.fields')}
                                                 </span>
                                             </button>
                                         ))}
@@ -2367,14 +2369,14 @@ export const Copilots: React.FC = () => {
                                 }}
                                 className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium transition-colors duration-200 ease-in-out"
                             >
-                                Cancelar
+                                {t('common.cancel')}
                             </button>
                             <button
                                 onClick={handleSaveEdit}
                                 className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
                             >
                                 <Check size={14} weight="light" />
-                                Guardar cambios
+                                {t('common.saveChanges')}
                             </button>
                         </div>
                     </div>
@@ -2391,8 +2393,8 @@ export const Copilots: React.FC = () => {
                                     <Export size={20} className="text-[var(--accent-primary)]" />
                                 </div>
                                 <div>
-                                    <h2 className="text-base font-medium text-[var(--text-primary)]">Export Conversation</h2>
-                                    <p className="text-xs text-[var(--text-tertiary)]">{currentChat.messages.length} messages</p>
+                                    <h2 className="text-base font-medium text-[var(--text-primary)]">{t('copilots.exportConversationTitle')}</h2>
+                                    <p className="text-xs text-[var(--text-tertiary)]">{currentChat.messages.length} {t('copilots.messages')}</p>
                                 </div>
                             </div>
                             <button
@@ -2411,8 +2413,8 @@ export const Copilots: React.FC = () => {
                                     <FileText size={18} className="text-purple-500" />
                                 </div>
                                 <div>
-                                    <p className="font-medium text-sm">Markdown</p>
-                                    <p className="text-xs text-[var(--text-tertiary)] group-hover:text-white/70">Formatted for docs & notes</p>
+                                    <p className="font-medium text-sm">{t('copilots.markdownExport')}</p>
+                                    <p className="text-xs text-[var(--text-tertiary)] group-hover:text-white/70">{t('copilots.markdownExportDesc')}</p>
                                 </div>
                             </button>
                             <button
@@ -2423,8 +2425,8 @@ export const Copilots: React.FC = () => {
                                     <FileText size={18} className="text-blue-500" />
                                 </div>
                                 <div>
-                                    <p className="font-medium text-sm">Plain Text</p>
-                                    <p className="text-xs text-[var(--text-tertiary)] group-hover:text-white/70">Simple readable format</p>
+                                    <p className="font-medium text-sm">{t('copilots.plainText')}</p>
+                                    <p className="text-xs text-[var(--text-tertiary)] group-hover:text-white/70">{t('copilots.plainTextDesc')}</p>
                                 </div>
                             </button>
                             <button
@@ -2435,8 +2437,8 @@ export const Copilots: React.FC = () => {
                                     <Database size={18} className="text-emerald-500" />
                                 </div>
                                 <div>
-                                    <p className="font-medium text-sm">JSON</p>
-                                    <p className="text-xs text-[var(--text-tertiary)] group-hover:text-white/70">Structured data export</p>
+                                    <p className="font-medium text-sm">{t('copilots.jsonExport')}</p>
+                                    <p className="text-xs text-[var(--text-tertiary)] group-hover:text-white/70">{t('copilots.jsonExportDesc')}</p>
                                 </div>
                             </button>
                         </div>

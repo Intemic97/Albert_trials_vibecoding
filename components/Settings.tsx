@@ -455,9 +455,9 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                 credentials: 'include'
             });
             if (res.ok) {
-                setFeedback({ type: 'success', message: 'Company information saved successfully!' });
+                setFeedback({ type: 'success', message: t('settings.companyInfoSaved') });
             } else {
-                setFeedback({ type: 'error', message: 'Failed to save company information' });
+                setFeedback({ type: 'error', message: t('settings.companyInfoError') });
             }
         } catch (error) {
             console.error('Error saving company info:', error);
@@ -555,7 +555,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
 
             if (res.ok) {
                 setPendingInvitations(prev => prev.filter(inv => inv.id !== invitationId));
-                setFeedback({ type: 'success', message: 'Invitation cancelled' });
+                setFeedback({ type: 'success', message: t('settings.invitationCancelled') });
             } else {
                 const data = await res.json();
                 setFeedback({ type: 'error', message: data.error || 'Failed to cancel invitation' });
@@ -607,7 +607,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
     const copyInviteLink = () => {
         if (inviteLink) {
             navigator.clipboard.writeText(inviteLink);
-            setFeedback({ type: 'success', message: 'Link copied to clipboard!' });
+            setFeedback({ type: 'success', message: t('settings.linkCopied') });
             setTimeout(() => setFeedback(null), 2000);
         }
     };
@@ -615,16 +615,16 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
     return (
         <div className="flex flex-col h-full bg-[var(--bg-primary)]" data-tutorial="settings-content">
             {/* Header */}
-            <PageHeader title="Settings" subtitle="Manage workspace and preferences" />
+            <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
 
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 <div className="max-w-5xl mx-auto">
                     <div className="flex gap-0.5 bg-[var(--bg-tertiary)] p-0.5 rounded-lg w-fit mb-6 border border-[var(--border-light)]">
                         {[
-                            { id: 'general', label: 'General' },
-                            { id: 'team', label: 'Team' },
-                            { id: 'integrations', label: 'Integrations' },
-                            { id: 'activity', label: 'Activity Log', icon: Shield }
+                            { id: 'general', label: t('settings.general') },
+                            { id: 'team', label: t('settings.team') },
+                            { id: 'integrations', label: t('settings.integrations') },
+                            { id: 'activity', label: t('settings.activityLog'), icon: Shield }
                         ].map((tab) => (
                             <button
                                 key={tab.id}
@@ -644,7 +644,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                         <div className="space-y-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-lg font-normal text-slate-800">Team Members</h2>
+                                    <h2 className="text-lg font-normal text-slate-800">{t('settings.teamMembers')}</h2>
                                     <p className="text-[var(--text-secondary)] text-sm">Manage who has access to this workspace.</p>
                                 </div>
                                 {currentOrg?.role === 'admin' && (
@@ -653,7 +653,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                         className="flex items-center px-4 py-2 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
                                     >
                                         <Plus size={16} weight="light" className="mr-2" />
-                                        Invite Member
+                                        {t('settings.addMember')}
                                     </button>
                                 )}
                             </div>
@@ -759,7 +759,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                                     onClick={() => cancelInvitation(inv.id)}
                                                                     className="text-xs text-red-500 hover:text-red-700 transition-colors"
                                                                 >
-                                                                    Cancel
+                                                                    {t('common.cancel')}
                                                                 </button>
                                                             </td>
                                                         )}
@@ -776,7 +776,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                     {activeTab === 'general' && (
                         <div className="space-y-6">
                             <div className="mb-5">
-                                <h2 className="text-base font-normal text-[var(--text-primary)] tracking-tight mb-0.5">Preferences</h2>
+                                <h2 className="text-base font-normal text-[var(--text-primary)] tracking-tight mb-0.5">{t('settings.preferences')}</h2>
                                 <p className="text-xs text-[var(--text-secondary)] font-light">Customize your experience.</p>
                             </div>
 
@@ -784,9 +784,9 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                 {/* Theme Setting */}
                                 <div className="p-5 flex items-center justify-between border-b border-[var(--border-light)]">
                                     <div className="flex-1">
-                                        <h3 className="text-sm font-medium text-[var(--text-primary)] mb-0.5">Appearance</h3>
+                                        <h3 className="text-sm font-medium text-[var(--text-primary)] mb-0.5">{t('settings.appearance')}</h3>
                                         <p className="text-xs text-[var(--text-secondary)] font-light">
-                                            Choose your preferred color theme
+                                            {t('settings.appearanceDesc')}
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-1 p-1 bg-[var(--bg-tertiary)] rounded-lg">
@@ -797,10 +797,10 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                     ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
                                                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                             }`}
-                                            title="Light mode"
+                                            title={t('settings.lightMode')}
                                         >
                                             <Sun size={14} weight="light" />
-                                            Light
+                                            {t('settings.lightMode')}
                                         </button>
                                         <button
                                             onClick={() => setMode('dark')}
@@ -809,10 +809,10 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                     ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
                                                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                             }`}
-                                            title="Dark mode"
+                                            title={t('settings.darkMode')}
                                         >
                                             <Moon size={14} weight="light" />
-                                            Dark
+                                            {t('settings.darkMode')}
                                         </button>
                                         <button
                                             onClick={() => setMode('system')}
@@ -821,10 +821,10 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                     ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
                                                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                             }`}
-                                            title="System preference"
+                                            title={t('settings.systemPreference')}
                                         >
                                             <Monitor size={14} weight="light" />
-                                            System
+                                            {t('settings.systemPreference')}
                                         </button>
                                     </div>
                                 </div>
@@ -832,11 +832,11 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                 {/* Tutorial Setting */}
                                 <div className="p-5 flex items-center justify-between border-b border-[var(--border-light)] last:border-b-0">
                                     <div className="flex-1">
-                                        <h3 className="text-sm font-medium text-[var(--text-primary)] mb-0.5">Product Tutorial</h3>
+                                        <h3 className="text-sm font-medium text-[var(--text-primary)] mb-0.5">{t('settings.productTutorial')}</h3>
                                         <p className="text-xs text-[var(--text-secondary)] font-light">
                                                 {tutorialEnabled 
-                                                    ? 'Tutorial will show on next page refresh'
-                                                    : 'Enable to see the guided tour again'
+                                                    ? t('settings.tutorialEnabled')
+                                                    : t('settings.tutorialDisabled')
                                                 }
                                         </p>
                                     </div>
@@ -908,8 +908,8 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
 
                             {/* Workspace Branding Section */}
                             <div className="mt-8 mb-5">
-                                <h2 className="text-base font-normal text-[var(--text-primary)] tracking-tight mb-0.5">Workspace</h2>
-                                <p className="text-xs text-[var(--text-secondary)] font-light">Manage your workspace's branding and identity.</p>
+                                <h2 className="text-base font-normal text-[var(--text-primary)] tracking-tight mb-0.5">{t('settings.workspaceBranding')}</h2>
+                                <p className="text-xs text-[var(--text-secondary)] font-light">{t('settings.workspaceBrandingDesc')}</p>
                             </div>
 
                             <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-6 mb-6">
@@ -951,7 +951,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                     <div className="flex-1">
                                         <h3 className="font-medium text-[var(--text-primary)] mb-1">{currentOrg?.name || 'Workspace'}</h3>
                                         <p className="text-sm text-[var(--text-secondary)] mb-3">
-                                            Upload your workspace logo. It will appear in the sidebar and other places.
+                                            {t('settings.uploadLogo')}
                                         </p>
                                         <button
                                             onClick={() => logoInputRef.current?.click()}
@@ -961,12 +961,12 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                             {isUploadingLogo ? (
                                                 <>
                                                     <SpinnerGap size={14} weight="light" className="animate-spin" />
-                                                    Uploading...
+                                                    {t('common.loading')}
                                                 </>
                                             ) : (
                                                 <>
                                                     <Camera size={14} weight="light" />
-                                                    Change logo
+                                                    {t('settings.changeLogo')}
                                                 </>
                                             )}
                                         </button>
@@ -976,8 +976,8 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
 
                             {/* Company Information Section */}
                             <div className="mb-5">
-                                <h2 className="text-base font-normal text-[var(--text-primary)] tracking-tight mb-0.5">Company Information</h2>
-                                <p className="text-xs text-[var(--text-secondary)] font-light">Manage your company's core information.</p>
+                                <h2 className="text-base font-normal text-[var(--text-primary)] tracking-tight mb-0.5">{t('settings.companyInfo')}</h2>
+                                <p className="text-xs text-[var(--text-secondary)] font-light">{t('settings.companyInfoDesc')}</p>
                             </div>
 
                             {feedback && (
@@ -1004,14 +1004,14 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                 Saving...
                                             </>
                                         ) : (
-                                            'Save Changes'
+                                            t('common.saveChanges')
                                         )}
                                     </button>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="md:col-span-2">
-                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Company Name</label>
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">{t('settings.companyName')}</label>
                                         <input
                                             type="text"
                                             value={companyInfo.name}
@@ -1047,7 +1047,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Website</label>
+                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">{t('settings.website')}</label>
                                         <input
                                             type="url"
                                             value={companyInfo.website}
@@ -1563,7 +1563,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                         onClick={() => { setIsInviting(false); setInviteLink(null); }}
                                         className="px-4 py-2 text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded-lg text-sm font-medium transition-colors"
                                     >
-                                        {inviteLink ? 'Done' : 'Cancel'}
+                                        {inviteLink ? 'Done' : t('common.cancel')}
                                     </button>
                                     {!inviteLink && (
                                         <button

@@ -6,6 +6,7 @@ import {
     ChartLineUp, CalendarBlank, X, CaretLeft, CaretRight, Eye, EyeSlash, Cpu
 } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
+import { useTranslation } from 'react-i18next';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 
 // PII Masking utilities
@@ -95,6 +96,11 @@ const ACTION_CONFIG: Record<string, { icon: React.ElementType; color: string; la
     'export': { icon: Export, color: '#F97316', label: 'Exported' },
 };
 
+const ACTION_I18N_KEYS: Record<string, string> = {
+    create: 'created', update: 'updated', delete: 'deleted', login: 'login', logout: 'logoutAction',
+    view: 'viewed', execute: 'executed', share: 'shared', unshare: 'unshared', invite: 'invited', export: 'exported',
+};
+
 const RESOURCE_ICONS: Record<string, React.ElementType> = {
     'workflow': FlowArrow,
     'entity': Database,
@@ -130,6 +136,7 @@ interface AIAuditStats {
 }
 
 export const ActivityLog: React.FC = () => {
+    const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState<'general' | 'ai'>('general');
     const [logs, setLogs] = useState<AuditLog[]>([]);
     const [stats, setStats] = useState<AuditStats | null>(null);
@@ -315,14 +322,14 @@ export const ActivityLog: React.FC = () => {
                             onClick={() => setActiveTab('general')}
                             className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'general' ? 'bg-[var(--accent-primary)] text-white' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                         >
-                            Actividad
+                            {t('activity.tabActivity')}
                         </button>
                         <button
                             onClick={() => setActiveTab('ai')}
                             className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 transition-colors ${activeTab === 'ai' ? 'bg-[var(--accent-primary)] text-white' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
                         >
                             <Cpu size={14} />
-                            IA
+                            {t('activity.tabAI')}
                         </button>
                     </div>
                     {activeTab === 'general' && (
@@ -331,7 +338,7 @@ export const ActivityLog: React.FC = () => {
                             className="flex items-center gap-2 px-4 py-2 border border-[var(--border-light)] hover:border-[var(--accent-primary)] rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"
                         >
                             <Export size={16} />
-                            Export CSV
+                            {t('activity.exportCsv')}
                         </button>
                     )}
                 </div>
@@ -342,7 +349,7 @@ export const ActivityLog: React.FC = () => {
                 <div className="grid grid-cols-4 gap-4">
                     <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
                         <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-1">
-                            Total Events (30d)
+                            {t('activity.totalEvents')}
                         </p>
                         <p className="text-2xl font-semibold text-[var(--text-primary)]">
                             {stats.total.toLocaleString()}
@@ -350,7 +357,7 @@ export const ActivityLog: React.FC = () => {
                     </div>
                     <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
                         <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-1">
-                            Most Common Action
+                            {t('activity.mostCommonAction')}
                         </p>
                         <p className="text-2xl font-semibold text-[var(--text-primary)]">
                             {stats.actionCounts[0]?.action || '—'}
@@ -358,7 +365,7 @@ export const ActivityLog: React.FC = () => {
                     </div>
                     <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
                         <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-1">
-                            Most Active User
+                            {t('activity.mostActiveUser')}
                         </p>
                         <p className="text-2xl font-semibold text-[var(--text-primary)] truncate">
                             {stats.activeUsers[0]?.userName || '—'}
@@ -366,7 +373,7 @@ export const ActivityLog: React.FC = () => {
                     </div>
                     <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
                         <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-                            Activity Trend
+                            {t('activity.activityTrend')}
                         </p>
                         {stats.dailyActivity.length > 0 && (
                             <ResponsiveContainer width="100%" height={40} minWidth={100} minHeight={40}>
@@ -401,7 +408,7 @@ export const ActivityLog: React.FC = () => {
                         }`}
                     >
                         {showPII ? <Eye size={16} /> : <EyeSlash size={16} />}
-                        {showPII ? 'PII Visible' : 'PII Masked'}
+                        {showPII ? t('activity.piiVisible') : t('activity.piiMasked')}
                     </button>
                 </div>
             )}
@@ -410,19 +417,19 @@ export const ActivityLog: React.FC = () => {
             {activeTab === 'ai' && aiStats && (
                 <div className="grid grid-cols-4 gap-4">
                     <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
-                        <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Llamadas IA (30d)</p>
+                        <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-1">{t('activity.aiCalls')}</p>
                         <p className="text-2xl font-semibold text-[var(--text-primary)]">{aiStats.total.toLocaleString()}</p>
                     </div>
                     <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
-                        <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Tokens totales</p>
+                        <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-1">{t('activity.totalTokens')}</p>
                         <p className="text-2xl font-semibold text-[var(--text-primary)]">{aiStats.totalTokens?.toLocaleString() || '0'}</p>
                     </div>
                     <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
-                        <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Rol más usado</p>
+                        <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-1">{t('activity.mostUsedRole')}</p>
                         <p className="text-2xl font-semibold text-[var(--text-primary)]">{aiStats.byRole?.[0]?.agentRole || '—'}</p>
                     </div>
                     <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
-                        <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">Tendencia</p>
+                        <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">{t('activity.trend')}</p>
                         {aiStats.daily?.length > 0 && (
                             <ResponsiveContainer width="100%" height={40} minWidth={100} minHeight={40}>
                                 <AreaChart data={aiStats.daily}>
@@ -454,7 +461,7 @@ export const ActivityLog: React.FC = () => {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                        placeholder="Search by user, action, or resource..."
+                        placeholder={t('activity.searchPlaceholder')}
                         className="w-full pl-10 pr-4 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                     />
                 </div>
@@ -468,7 +475,7 @@ export const ActivityLog: React.FC = () => {
                     }`}
                 >
                     <Funnel size={16} />
-                    Filters
+                    {t('common.filters')}
                     {hasActiveFilters && (
                         <span className="w-5 h-5 bg-[var(--accent-primary)] text-white text-xs rounded-full flex items-center justify-center">
                             {[selectedAction, selectedResourceType, selectedUser].filter(Boolean).length}
@@ -481,7 +488,7 @@ export const ActivityLog: React.FC = () => {
                         onClick={clearFilters}
                         className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                     >
-                        Clear all
+                        {t('common.clearAll')}
                     </button>
                 )}
 
@@ -496,7 +503,7 @@ export const ActivityLog: React.FC = () => {
                     title={showPII ? 'PII visible - Click to mask sensitive data' : 'PII masked - Click to reveal sensitive data'}
                 >
                     {showPII ? <Eye size={16} /> : <EyeSlash size={16} />}
-                    <span className="hidden sm:inline">{showPII ? 'PII Visible' : 'PII Masked'}</span>
+                    <span className="hidden sm:inline">{showPII ? t('activity.piiVisible') : t('activity.piiMasked')}</span>
                 </button>
             </div>
 
@@ -504,39 +511,39 @@ export const ActivityLog: React.FC = () => {
             {showFilters && (
                 <div className="flex items-center gap-4 p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl">
                     <div className="flex-1">
-                        <label className="block text-xs text-[var(--text-tertiary)] mb-1.5">Action</label>
+                        <label className="block text-xs text-[var(--text-tertiary)] mb-1.5">{t('activity.action')}</label>
                         <select
                             value={selectedAction}
                             onChange={(e) => { setSelectedAction(e.target.value); setPage(0); }}
                             className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                         >
-                            <option value="">All actions</option>
+                            <option value="">{t('activity.allActions')}</option>
                             {filters.actions.map(action => (
                                 <option key={action} value={action}>{action}</option>
                             ))}
                         </select>
                     </div>
                     <div className="flex-1">
-                        <label className="block text-xs text-[var(--text-tertiary)] mb-1.5">Resource Type</label>
+                        <label className="block text-xs text-[var(--text-tertiary)] mb-1.5">{t('activity.resourceType')}</label>
                         <select
                             value={selectedResourceType}
                             onChange={(e) => { setSelectedResourceType(e.target.value); setPage(0); }}
                             className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                         >
-                            <option value="">All resources</option>
+                            <option value="">{t('activity.allResources')}</option>
                             {filters.resourceTypes.map(type => (
                                 <option key={type} value={type}>{type}</option>
                             ))}
                         </select>
                     </div>
                     <div className="flex-1">
-                        <label className="block text-xs text-[var(--text-tertiary)] mb-1.5">User</label>
+                        <label className="block text-xs text-[var(--text-tertiary)] mb-1.5">{t('common.user')}</label>
                         <select
                             value={selectedUser}
                             onChange={(e) => { setSelectedUser(e.target.value); setPage(0); }}
                             className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                         >
-                            <option value="">All users</option>
+                            <option value="">{t('activity.allUsers')}</option>
                             {filters.users.map(user => (
                                 <option key={user.id} value={user.id}>{user.name}</option>
                             ))}
@@ -557,8 +564,8 @@ export const ActivityLog: React.FC = () => {
                     ) : aiLogs.length === 0 ? (
                         <div className="text-center py-20">
                             <Cpu size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
-                            <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2">Sin llamadas a IA</h3>
-                            <p className="text-sm text-[var(--text-tertiary)]">Las llamadas a agentes aparecerán aquí</p>
+                            <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2">{t('activity.noAiCalls')}</h3>
+                            <p className="text-sm text-[var(--text-tertiary)]">{t('activity.aiCallsWillAppear')}</p>
                         </div>
                     ) : (
                         <div className="divide-y divide-[var(--border-light)]">
@@ -587,12 +594,12 @@ export const ActivityLog: React.FC = () => {
                     <div className="text-center py-20">
                         <Shield size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
                         <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2">
-                            No activity found
+                            {t('activity.noActivity')}
                         </h3>
                         <p className="text-sm text-[var(--text-tertiary)]">
                             {hasActiveFilters 
-                                ? 'Try adjusting your filters' 
-                                : 'Activity will appear here as users interact with the workspace'
+                                ? t('activity.adjustFilters') 
+                                : t('activity.activityWillAppear')
                             }
                         </p>
                     </div>
@@ -620,7 +627,7 @@ export const ActivityLog: React.FC = () => {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <span className="font-medium text-[var(--text-primary)]">
-                                                {log.userName || 'System'}
+                                                {log.userName || t('common.system')}
                                             </span>
                                             <span 
                                                 className="text-xs px-2 py-0.5 rounded-full font-medium"
@@ -629,11 +636,11 @@ export const ActivityLog: React.FC = () => {
                                                     color: actionConfig.color
                                                 }}
                                             >
-                                                {actionConfig.label}
+                                                {ACTION_I18N_KEYS[log.action.toLowerCase()] ? t(`activity.${ACTION_I18N_KEYS[log.action.toLowerCase()]}`) : actionConfig.label}
                                             </span>
                                             {log.resourceName && (
                                                 <>
-                                                    <span className="text-[var(--text-tertiary)]">on</span>
+                                                    <span className="text-[var(--text-tertiary)]">{t('common.on')}</span>
                                                     <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
                                                         <ResourceIcon size={14} />
                                                         {log.resourceName}
@@ -659,12 +666,12 @@ export const ActivityLog: React.FC = () => {
                                                 {formatDate(log.createdAt)}
                                             </span>
                                             {log.ipAddress && (
-                                                <span className="font-mono" title={showPII ? log.ipAddress : 'IP address masked'}>
+                                                <span className="font-mono" title={showPII ? log.ipAddress : t('activity.ipMasked')}>
                                                     IP: {showPII ? log.ipAddress : maskIP(log.ipAddress)}
                                                 </span>
                                             )}
                                             {log.userEmail && (
-                                                <span title={showPII ? log.userEmail : 'Email masked'}>
+                                                <span title={showPII ? log.userEmail : t('activity.emailMasked')}>
                                                     {showPII ? log.userEmail : maskEmail(log.userEmail)}
                                                 </span>
                                             )}

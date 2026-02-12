@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { 
   ArrowLeft, 
   Play, 
@@ -54,6 +55,7 @@ export const WorkflowToolbar: React.FC<WorkflowToolbarProps> = ({
   onTogglePublicAccess,
   isPublic = false,
 }) => {
+  const { t } = useTranslation();
   const [editingName, setEditingName] = useState(false);
   const [tempName, setTempName] = useState(workflowName);
 
@@ -84,7 +86,7 @@ export const WorkflowToolbar: React.FC<WorkflowToolbarProps> = ({
           className="flex items-center gap-2 px-2 py-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors text-sm active:scale-95"
         >
           <ArrowLeft size={14} weight="light" />
-          <span className="font-medium">Back</span>
+          <span className="font-medium">{t('workflows.backToList')}</span>
         </button>
 
         <div className="w-px h-5 bg-[var(--border-light)]" />
@@ -123,7 +125,7 @@ export const WorkflowToolbar: React.FC<WorkflowToolbarProps> = ({
             onClick={() => setEditingName(true)}
             className="text-lg font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] px-2 py-1 rounded-md transition-colors truncate max-w-[300px]"
             style={{ fontFamily: "'Berkeley Mono', monospace" }}
-            title="Click to rename"
+            title={t('workflows.clickToRename')}
           >
             {workflowName}
             {hasUnsavedChanges && (
@@ -159,7 +161,7 @@ export const WorkflowToolbar: React.FC<WorkflowToolbarProps> = ({
           <button
             onClick={onOpenTags}
             className="p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
-            title="Manage Tags"
+            title={t('workflows.manageTags')}
           >
             <Tag size={18} weight="light" />
           </button>
@@ -170,7 +172,7 @@ export const WorkflowToolbar: React.FC<WorkflowToolbarProps> = ({
           <button
             onClick={onOpenHistory}
             className="p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
-            title="Execution History"
+            title={t('workflows.executionHistory')}
           >
             <ClockCounterClockwise size={18} weight="light" />
           </button>
@@ -181,7 +183,7 @@ export const WorkflowToolbar: React.FC<WorkflowToolbarProps> = ({
           onClick={onSave}
           disabled={isSaving}
           className="p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors disabled:opacity-50"
-          title="Save Workflow"
+          title={t('workflows.saveWorkflow')}
         >
           {isSaving ? (
             <SpinnerGap size={18} className="animate-spin" weight="light" />
@@ -201,12 +203,12 @@ export const WorkflowToolbar: React.FC<WorkflowToolbarProps> = ({
           {isRunning ? (
             <>
               <SpinnerGap size={16} className="animate-spin" weight="light" />
-              <span>Running...</span>
+              <span>{t('workflows.running')}</span>
             </>
           ) : (
             <>
               <Play size={16} weight="light" />
-              <span>Run</span>
+              <span>{t('workflows.runWorkflow')}</span>
             </>
           )}
         </button>
@@ -217,7 +219,7 @@ export const WorkflowToolbar: React.FC<WorkflowToolbarProps> = ({
           className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-lg text-sm font-medium transition-colors"
         >
           <Share size={16} weight="light" />
-          <span>Export</span>
+          <span>{t('common.export')}</span>
         </button>
       </div>
     </div>

@@ -379,7 +379,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     className="w-full flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left group text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
                                 >
                                     <Plus size={16} weight="light" className="mr-3 transition-colors duration-200 ease-in-out text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]" />
-                                    <span className="transition-colors duration-200 ease-in-out">Create Workspace</span>
+                                    <span className="transition-colors duration-200 ease-in-out">{t('profile.createWorkspace')}</span>
                                 </button>
                             </div>
                         </>
@@ -395,7 +395,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                 <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl w-[420px] max-w-full mx-4" onClick={e => e.stopPropagation()}>
                     {/* Header */}
                     <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
-                        <h2 className="text-sm font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>My Profile</h2>
+                        <h2 className="text-sm font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>{t('profile.myProfile')}</h2>
                         <button 
                             onClick={() => setShowProfileModal(false)}
                             className="p-1 hover:bg-[var(--bg-hover)] rounded-md transition-colors"
@@ -434,40 +434,40 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     )}
                                 </button>
                             </div>
-                            <p className="text-xs text-[var(--text-tertiary)] mt-2">Click to change photo</p>
+                            <p className="text-xs text-[var(--text-tertiary)] mt-2">{t('profile.changePhoto')}</p>
                         </div>
 
                         {/* Form Fields */}
                         <div className="space-y-3">
                             <div>
                                 <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                                    Name
+                                    {t('common.name')}
                                 </label>
                                 <input
                                     type="text"
                                     value={editName}
                                     onChange={(e) => setEditName(e.target.value)}
                                     className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] placeholder:text-[var(--text-tertiary)]"
-                                    placeholder="Your name"
+                                    placeholder={t('profile.yourName')}
                                 />
                             </div>
 
                             <div>
                                 <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                                    Company Role
+                                    {t('profile.companyRole')}
                                 </label>
                                 <input
                                     type="text"
                                     value={editRole}
                                     onChange={(e) => setEditRole(e.target.value)}
                                     className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] placeholder:text-[var(--text-tertiary)]"
-                                    placeholder="e.g. Product Manager, Developer, Designer"
+                                    placeholder={t('profile.companyRolePlaceholder')}
                                 />
                             </div>
 
                             <div>
                                 <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                                    Email
+                                    {t('common.email')}
                                 </label>
                                 <input
                                     type="email"
@@ -475,7 +475,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     disabled
                                     className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] cursor-not-allowed"
                                 />
-                                <p className="text-[11px] text-[var(--text-tertiary)] mt-1">Email cannot be changed</p>
+                                <p className="text-[11px] text-[var(--text-tertiary)] mt-1">{t('profile.emailCannotChange')}</p>
                             </div>
                         </div>
                     </div>
@@ -486,7 +486,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                             onClick={() => setShowProfileModal(false)}
                             className="px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
                         >
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button
                             onClick={handleSaveProfile}
@@ -494,7 +494,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                             className="px-3 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-sm text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
                             {isSaving && <SpinnerGap size={16} weight="bold" className="animate-spin" />}
-                            Save Changes
+                            {t('common.saveChanges')}
                         </button>
                     </div>
                 </div>
@@ -507,7 +507,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                 <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-lg w-[400px] max-w-full mx-4" onClick={e => e.stopPropagation()}>
                     {/* Header */}
                     <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
-                        <h2 className="text-sm font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Create Workspace</h2>
+                        <h2 className="text-sm font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>{t('profile.createWorkspace')}</h2>
                         <button 
                             onClick={() => setShowCreateOrgModal(false)}
                             className="p-1 hover:bg-[var(--bg-hover)] rounded-md transition-colors"
@@ -519,19 +519,19 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                     {/* Content */}
                     <div className="p-5">
                         <p className="text-xs text-[var(--text-secondary)] mb-4">
-                            Create a new workspace and become its admin. You can invite team members after creation.
+                            {t('profile.createWorkspaceDesc')}
                         </p>
                         
                         <div>
                             <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                                Workspace Name
+                                {t('profile.workspaceName')}
                             </label>
                             <input
                                 type="text"
                                 value={newOrgName}
                                 onChange={(e) => setNewOrgName(e.target.value)}
                                 className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] placeholder:text-[var(--text-tertiary)]"
-                                placeholder="e.g. Acme Inc."
+                                placeholder={t('profile.workspaceNamePlaceholder')}
                                 autoFocus
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && newOrgName.trim()) {
@@ -548,7 +548,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                             onClick={() => setShowCreateOrgModal(false)}
                             className="px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
                         >
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button
                             onClick={handleCreateOrganization}
@@ -556,7 +556,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                             className="px-3 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-sm text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
                             {isCreatingOrg && <SpinnerGap size={16} weight="bold" className="animate-spin" />}
-                            Create Workspace
+                            {t('profile.createWorkspace')}
                         </button>
                     </div>
                 </div>

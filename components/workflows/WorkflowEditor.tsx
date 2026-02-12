@@ -11,6 +11,7 @@
 
 import React, { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { 
   FloppyDisk as Save, 
   Play, 
@@ -60,6 +61,7 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
   entities = [],
   onViewChange,
 }) => {
+  const { t } = useTranslation();
   const { workflowId: urlWorkflowId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -256,8 +258,8 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
         : `${API_BASE}/workflows/${workflow.id}`;
       
       const apiPayload = isNew
-        ? { name: workflow.name, data: { nodes, connections }, tags: workflow.tags || [], createdByName: user?.name || user?.email?.split('@')[0] || 'Unknown' }
-        : { name: workflow.name, data: { nodes, connections }, tags: workflow.tags || [], lastEditedByName: user?.name || user?.email?.split('@')[0] || 'Unknown' };
+        ? { name: workflow.name, data: { nodes, connections }, tags: workflow.tags || [], createdByName: user?.name || user?.email?.split('@')[0] || t('common.unknown') }
+        : { name: workflow.name, data: { nodes, connections }, tags: workflow.tags || [], lastEditedByName: user?.name || user?.email?.split('@')[0] || t('common.unknown') };
       
       const response = await fetch(url, {
         method: isNew ? 'POST' : 'PUT',
@@ -331,7 +333,7 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
     });
     if (!response.ok) {
       const err = await response.json();
-      throw new Error(err.error || 'Execution failed');
+      throw new Error(err.error || t('workflows.executionFailed'));
     }
     const data = await response.json();
     if (data.executionId) {
@@ -349,7 +351,7 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
   
   const handleBack = () => {
     if (hasUnsavedChanges) {
-      if (!window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
+      if (!window.confirm(t('workflows.unsavedChanges'))) {
         return;
       }
     }
@@ -390,20 +392,20 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
           const output = data.output ?? data.result;
           updateNode(nodeId, {
             status: 'completed',
-            executionResult: output ? (typeof output === 'string' ? output : JSON.stringify(output).slice(0, 200)) : 'Success',
+            executionResult: output ? (typeof output === 'string' ? output : JSON.stringify(output).slice(0, 200)) : t('workflows.success'),
             data: Array.isArray(output) ? output : output?.data ?? (output ? [output] : undefined),
           });
         } else {
           updateNode(nodeId, {
             status: 'error',
-            executionResult: data.error || 'Execution failed',
+            executionResult: data.error || t('workflows.executionFailed'),
           });
         }
       } catch (error) {
         console.error('Node execution error:', error);
         updateNode(nodeId, {
           status: 'error',
-          executionResult: error instanceof Error ? error.message : 'Execution failed',
+          executionResult: error instanceof Error ? error.message : t('workflows.executionFailed'),
         });
       }
     } else {
@@ -411,7 +413,7 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
       setTimeout(() => {
         updateNode(nodeId, {
           status: 'completed',
-          executionResult: 'Success',
+          executionResult: t('workflows.success'),
           data: [{ id: 1, name: 'Sample', value: 100 }, { id: 2, name: 'Data', value: 200 }],
         });
       }, 1000);
@@ -456,11 +458,11 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({
+        body: JSON.stringify({
         name: workflow.name,
         data: { nodes, connections },
         tags: newTags,
-        lastEditedByName: user?.name || user?.email?.split('@')[0] || 'Unknown',
+        lastEditedByName: user?.name || user?.email?.split('@')[0] || t('common.unknown'),
       }),
     });
     if (res.ok) {

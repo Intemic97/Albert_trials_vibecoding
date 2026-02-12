@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MagnifyingGlass, CaretDown, CaretRight, CaretDoubleLeft, CaretDoubleRight } from '@phosphor-icons/react';
 import { DraggableItem, NodeType } from './types';
 import { DRAGGABLE_ITEMS } from './constants';
@@ -11,17 +12,17 @@ interface NodePaletteProps {
   onDragEnd: () => void;
 }
 
-const CATEGORIES = [
-  { id: 'Triggers', label: 'Triggers', defaultOpen: false },
-  { id: 'Data', label: 'Data Sources', defaultOpen: false },
-  { id: 'Logic', label: 'Data Operations', defaultOpen: false },
-  { id: 'Actions', label: 'Control Flow', defaultOpen: false },
-  { id: 'Other', label: 'Models', defaultOpen: false },
-  { id: 'Agents', label: 'Agents', defaultOpen: false },
-  { id: 'Code', label: 'Code', defaultOpen: false },
-  { id: 'OutputLogging', label: 'Output & Logging', defaultOpen: false },
-  { id: 'Notifications', label: 'Notifications', defaultOpen: false },
-  { id: 'Advanced', label: 'Advanced', defaultOpen: false },
+const CATEGORY_IDS = [
+  { id: 'Triggers', labelKey: 'catTriggers', defaultOpen: false },
+  { id: 'Data', labelKey: 'catDataSources', defaultOpen: false },
+  { id: 'Logic', labelKey: 'catDataOps', defaultOpen: false },
+  { id: 'Actions', labelKey: 'catControlFlow', defaultOpen: false },
+  { id: 'Other', labelKey: 'catModels', defaultOpen: false },
+  { id: 'Agents', labelKey: 'catAgents', defaultOpen: false },
+  { id: 'Code', labelKey: 'catCode', defaultOpen: false },
+  { id: 'OutputLogging', labelKey: 'catOutput', defaultOpen: false },
+  { id: 'Notifications', labelKey: 'catNotifications', defaultOpen: false },
+  { id: 'Advanced', labelKey: 'catAdvanced', defaultOpen: false },
 ];
 
 export const NodePalette: React.FC<NodePaletteProps> = ({
@@ -31,9 +32,10 @@ export const NodePalette: React.FC<NodePaletteProps> = ({
   onDragStart,
   onDragEnd,
 }) => {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>(
-    CATEGORIES.reduce((acc, cat) => ({ ...acc, [cat.id]: cat.defaultOpen }), {})
+    CATEGORY_IDS.reduce((acc, cat) => ({ ...acc, [cat.id]: cat.defaultOpen }), {})
   );
 
   // Filter items based on search
@@ -50,7 +52,7 @@ export const NodePalette: React.FC<NodePaletteProps> = ({
   // Group items by category
   const groupedItems = useMemo(() => {
     const groups: Record<string, DraggableItem[]> = {};
-    CATEGORIES.forEach(cat => {
+    CATEGORY_IDS.forEach(cat => {
       groups[cat.id] = [];
     });
     
@@ -76,7 +78,7 @@ export const NodePalette: React.FC<NodePaletteProps> = ({
         <button
           onClick={onToggleCollapse}
           className="p-3 hover:bg-[var(--bg-hover)] transition-colors border-b border-[var(--border-light)]"
-          title="Expand panel"
+          title={t('workflows.expandPanel')}
         >
           <CaretDoubleRight size={18} className="text-[var(--text-secondary)]" weight="light" />
         </button>
@@ -89,11 +91,11 @@ export const NodePalette: React.FC<NodePaletteProps> = ({
       {/* Header */}
       <div className="p-4 border-b border-[var(--border-light)] bg-[var(--bg-card)]">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-[var(--text-primary)]">Components</span>
+          <span className="text-sm font-medium text-[var(--text-primary)]">{t('workflows.components')}</span>
           <button
             onClick={onToggleCollapse}
             className="p-1.5 hover:bg-[var(--bg-hover)] rounded-md transition-colors"
-            title="Collapse panel"
+            title={t('workflows.collapsePanel')}
           >
             <CaretDoubleLeft size={16} className="text-[var(--text-secondary)]" weight="light" />
           </button>
@@ -104,7 +106,7 @@ export const NodePalette: React.FC<NodePaletteProps> = ({
           <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" weight="light" />
           <input
             type="text"
-            placeholder="Search"
+            placeholder={t('workflows.searchComponents')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
@@ -114,7 +116,7 @@ export const NodePalette: React.FC<NodePaletteProps> = ({
 
       {/* Categories */}
       <div className="flex-1 overflow-y-auto bg-[var(--bg-card)] custom-scrollbar">
-        {CATEGORIES.map((category) => {
+        {CATEGORY_IDS.map((category) => {
           const items = groupedItems[category.id] || [];
           if (items.length === 0 && !searchQuery) return null;
 
@@ -125,7 +127,7 @@ export const NodePalette: React.FC<NodePaletteProps> = ({
                 className="w-full flex items-center justify-between px-4 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] transition-colors text-left"
               >
                 <span className="text-xs font-medium text-[var(--text-secondary)]">
-                  {category.label}
+                  {t(`workflows.${category.labelKey}`)}
                 </span>
                 {expandedCategories[category.id] ? (
                   <CaretDown size={14} className="text-[var(--text-tertiary)]" weight="light" />
