@@ -52,7 +52,7 @@ const en = {
     knowledgeBase: 'Knowledge Base',
     connections: 'Connections',
     dashboards: 'Dashboards',
-    inteligencia: 'Inteligencia',
+    inteligencia: 'Intelligence',
     lab: 'Lab',
     reports: 'Reports',
     templates: 'Templates',
