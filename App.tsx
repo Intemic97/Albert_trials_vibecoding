@@ -1447,7 +1447,7 @@ function AuthenticatedApp() {
                                 return (
                                     <button
                                         key={id}
-                                        onClick={() => rec && handleRecordClick(rec, relatedInfo.entity)}
+                                        onClick={(e) => { e.stopPropagation(); rec && handleRecordClick(rec, relatedInfo.entity); }}
                                         className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-800 hover:bg-teal-200 transition-colors"
                                     >
                                         {rec ? getRecordDisplayName(rec, relatedInfo.entity) : 'Unknown'}
@@ -2262,12 +2262,15 @@ function AuthenticatedApp() {
                                                                 {sourceEntity.name}
                                                             </th>
                                                         ))}
+                                                        <th className="px-4 py-2.5 text-[10px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider bg-[var(--bg-tertiary)] text-right w-24">
+                                                            Actions
+                                                        </th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-[var(--border-light)]">
                                                     {paged.length === 0 ? (
                                                         <tr>
-                                                            <td colSpan={Math.max(activeEntity.properties.length, 1) + Object.keys(incomingData).length} className="p-8 text-center text-[var(--text-tertiary)] text-sm">
+                                                            <td colSpan={Math.max(activeEntity.properties.length, 1) + Object.keys(incomingData).length + 1} className="p-8 text-center text-[var(--text-tertiary)] text-sm">
                                                                 {records.length === 0 
                                                                     ? (activeEntity.properties.length === 0 
                                                                         ? 'Add properties to define your data structure first.'
@@ -2277,7 +2280,7 @@ function AuthenticatedApp() {
                                                         </tr>
                                                     ) : (
                                                         paged.map(record => (
-                                                            <tr key={record.id} className="hover:bg-[var(--bg-tertiary)] transition-colors group">
+                                                            <tr key={record.id} onClick={() => handleRecordClick(record, activeEntity)} className="hover:bg-[var(--bg-tertiary)] transition-colors group cursor-pointer">
                                                                 {activeEntity.properties.map((prop, pIdx) => {
                                                                     const isEditing = inlineEditCell?.recordId === record.id && inlineEditCell?.propId === prop.id;
                                                                     const isCalculated = !!prop.formula;
@@ -2332,7 +2335,7 @@ function AuthenticatedApp() {
                                                                                 {linkedRecords.length > 0 ? linkedRecords.map(lr => (
                                                                                     <button
                                                                                         key={lr.id}
-                                                                                        onClick={() => handleRecordClick(lr, sourceEntity)}
+                                                                                        onClick={(e) => { e.stopPropagation(); handleRecordClick(lr, sourceEntity); }}
                                                                                         className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-[#419CAF]/10 text-[#419CAF] hover:bg-[#419CAF]/20 transition-colors"
                                                                                     >
                                                                                         {getRecordDisplayName(lr, sourceEntity)}
@@ -2342,6 +2345,27 @@ function AuthenticatedApp() {
                                                                         </td>
                                                                     );
                                                                 })}
+                                                                <td className="px-4 py-3 text-right">
+                                                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleEditRecord(record, activeEntity); }}
+                                                                            className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 rounded transition-colors"
+                                                                            title="Edit record"
+                                                                        >
+                                                                            <PencilSimple size={14} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                if (confirm('Delete this record?')) deleteRecord(record.id);
+                                                                            }}
+                                                                            className="p-1.5 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                                                                            title="Delete record"
+                                                                        >
+                                                                            <Trash size={14} />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
                                                             </tr>
                                                         ))
                                                     )}
@@ -2403,8 +2427,21 @@ function AuthenticatedApp() {
                                                 setSelectedRecord(null);
                                             }}
                                             className="p-2 text-[var(--text-tertiary)] hover:text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 rounded-full transition-colors"
+                                            title="Edit record"
                                         >
                                             <PencilSimple size={20} />
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                if (confirm('Delete this record?')) {
+                                                    deleteRecord(selectedRecord.id);
+                                                    setSelectedRecord(null);
+                                                }
+                                            }}
+                                            className="p-2 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-500/10 rounded-full transition-colors"
+                                            title="Delete record"
+                                        >
+                                            <Trash size={20} />
                                         </button>
                                         <button
                                             onClick={() => setSelectedRecord(null)}
