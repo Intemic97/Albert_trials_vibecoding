@@ -92,7 +92,9 @@ export const getNodeIconColor = (type: string): string => {
         'webhook': 'text-cyan-600',
         'agent': 'text-purple-600',
         'opcua': 'text-indigo-600',
-        'mqtt': 'text-cyan-600'
+        'mqtt': 'text-cyan-600',
+        'conveyor': 'text-amber-600',
+        'franmit': 'text-teal-600'
     };
     return colorMap[type] || 'text-[var(--text-secondary)]';
 };
@@ -153,7 +155,9 @@ export const isNodeConfigured = (node: WorkflowNode): boolean => {
         'output': () => true,
         'agent': () => true,
         'opcua': () => true,
-        'mqtt': () => true
+        'mqtt': () => true,
+        'franmit': () => true,
+        'conveyor': (n) => !!(n.config?.conveyorSpeed && n.config?.conveyorLength)
     };
 
     const check = configChecks[node.type];

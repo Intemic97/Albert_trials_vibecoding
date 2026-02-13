@@ -384,6 +384,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
     const [franmitCatalystScaleFactor, setFranmitCatalystScaleFactor] = useState<string>('');
     const [showFranmitApiSecret, setShowFranmitApiSecret] = useState<boolean>(false);
 
+    // Conveyor Node State
+    const [configuringConveyorNodeId, setConfiguringConveyorNodeId] = useState<string | null>(null);
+    const [conveyorSpeed, setConveyorSpeed] = useState<string>('');
+    const [conveyorLength, setConveyorLength] = useState<string>('');
+    const [conveyorWidth, setConveyorWidth] = useState<string>('');
+    const [conveyorInclination, setConveyorInclination] = useState<string>('');
+    const [conveyorLoadCapacity, setConveyorLoadCapacity] = useState<string>('');
+    const [conveyorBeltType, setConveyorBeltType] = useState<string>('flat');
+    const [conveyorMotorPower, setConveyorMotorPower] = useState<string>('');
+    const [conveyorFrictionCoeff, setConveyorFrictionCoeff] = useState<string>('');
+
     // Unsaved Changes Confirmation
     const [showExitConfirmation, setShowExitConfirmation] = useState<boolean>(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
@@ -1051,6 +1062,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         setConfiguringMqttNodeId(null);
         setConfiguringOsiPiNodeId(null);
         setConfiguringFranmitNodeId(null);
+        setConfiguringConveyorNodeId(null);
         setConfiguringEsiosNodeId(null);
         setConfiguringClimatiqNodeId(null);
         setConfiguringHumanApprovalNodeId(null);
@@ -2165,6 +2177,48 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                 : n
         ));
         setConfiguringFranmitNodeId(null);
+    };
+
+    // Conveyor Node Functions
+    const openConveyorConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'conveyor') {
+            setConfiguringConveyorNodeId(nodeId);
+            setConveyorSpeed(node.config?.conveyorSpeed || '');
+            setConveyorLength(node.config?.conveyorLength || '');
+            setConveyorWidth(node.config?.conveyorWidth || '');
+            setConveyorInclination(node.config?.conveyorInclination || '');
+            setConveyorLoadCapacity(node.config?.conveyorLoadCapacity || '');
+            setConveyorBeltType(node.config?.conveyorBeltType || 'flat');
+            setConveyorMotorPower(node.config?.conveyorMotorPower || '');
+            setConveyorFrictionCoeff(node.config?.conveyorFrictionCoeff || '');
+        }
+    };
+
+    const saveConveyorConfig = () => {
+        if (!configuringConveyorNodeId) return;
+        if (!conveyorSpeed.trim() || !conveyorLength.trim()) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringConveyorNodeId
+                ? {
+                    ...n,
+                    label: `Conveyor: ${conveyorLength}m @ ${conveyorSpeed} m/s`,
+                    config: {
+                        ...n.config,
+                        conveyorSpeed,
+                        conveyorLength,
+                        conveyorWidth,
+                        conveyorInclination,
+                        conveyorLoadCapacity,
+                        conveyorBeltType,
+                        conveyorMotorPower,
+                        conveyorFrictionCoeff,
+                    }
+                }
+                : n
+        ));
+        setConfiguringConveyorNodeId(null);
     };
 
     const openEmailConfig = (nodeId: string) => {
@@ -3399,6 +3453,68 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                             status: 'error' as const, 
                             executionResult: result,
                             outputData: [{ error: errorMessage }]
+                        });
+                        return;
+                    }
+                    break;
+                case 'conveyor':
+                    try {
+                        const speed = parseFloat(node.config?.conveyorSpeed || '0');
+                        const length = parseFloat(node.config?.conveyorLength || '0');
+                        const width = parseFloat(node.config?.conveyorWidth || '0') || 0.8;
+                        const inclination = parseFloat(node.config?.conveyorInclination || '0');
+                        const loadCapacity = parseFloat(node.config?.conveyorLoadCapacity || '0') || 50;
+                        const motorPower = parseFloat(node.config?.conveyorMotorPower || '0') || 0;
+                        const frictionCoeff = parseFloat(node.config?.conveyorFrictionCoeff || '0') || 0.025;
+                        const beltType = node.config?.conveyorBeltType || 'flat';
+
+                        if (!speed || !length) {
+                            throw new Error('Speed and Length are required parameters');
+                        }
+
+                        const g = 9.81;
+                        const inclinationRad = (inclination * Math.PI) / 180;
+                        const transportTime = length / speed;
+                        const throughput = loadCapacity * speed * 3.6; // t/h
+                        const horizontalComponent = frictionCoeff * loadCapacity * length * g * Math.cos(inclinationRad);
+                        const verticalComponent = loadCapacity * length * g * Math.sin(inclinationRad);
+                        const beltTension = horizontalComponent + verticalComponent;
+                        const requiredPower = (beltTension * speed) / 1000; // kW
+                        const efficiency = motorPower > 0 ? Math.min((requiredPower / motorPower) * 100, 100) : 0;
+
+                        const conveyorOutput = {
+                            belt_speed_m_s: speed,
+                            belt_length_m: length,
+                            belt_width_m: width,
+                            belt_type: beltType,
+                            inclination_deg: inclination,
+                            load_capacity_kg_m: loadCapacity,
+                            friction_coefficient: frictionCoeff,
+                            transport_time_s: Math.round(transportTime * 100) / 100,
+                            throughput_t_h: Math.round(throughput * 100) / 100,
+                            belt_tension_N: Math.round(beltTension * 100) / 100,
+                            required_power_kW: Math.round(requiredPower * 100) / 100,
+                            motor_power_kW: motorPower || 'N/A',
+                            motor_efficiency_pct: motorPower > 0 ? Math.round(efficiency * 100) / 100 : 'N/A',
+                        };
+
+                        // If there's input data (rows), merge the conveyor output with each input row
+                        if (Array.isArray(inputData) && inputData.length > 0) {
+                            nodeData = inputData.map((row: any) => ({
+                                ...row,
+                                ...conveyorOutput,
+                            }));
+                        } else {
+                            nodeData = [conveyorOutput];
+                        }
+                        result = `Conveyor model calculated: transport ${transportTime.toFixed(1)}s, throughput ${throughput.toFixed(1)} t/h, power ${requiredPower.toFixed(2)} kW`;
+                    } catch (error: any) {
+                        console.error('Conveyor execution error:', error);
+                        result = `Error: ${error.message || 'Conveyor calculation failed'}`;
+                        updateNodeAndBroadcast(nodeId, {
+                            status: 'error' as const,
+                            executionResult: result,
+                            outputData: [{ error: error.message }]
                         });
                         return;
                     }
@@ -5213,6 +5329,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                 // Franmit está configurado si tiene al menos un parámetro configurado
                 // (no requiere API Secret ID para ejecución local)
                 return true; // Siempre permitir ejecución, validación se hace en el backend
+            case 'conveyor':
+                return !!(node.config?.conveyorSpeed && node.config?.conveyorLength);
             default:
                 return false;
         }
@@ -5301,6 +5419,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
             case 'opcua': return 'text-indigo-600';
             case 'mqtt': return 'text-cyan-600';
             case 'franmit': return 'text-teal-600';
+            case 'conveyor': return 'text-amber-600';
             default: return 'text-[var(--text-secondary)]';
         }
     };
@@ -5656,7 +5775,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                             'Data Sources': { icon: Database, items: DRAGGABLE_ITEMS.filter(i => ['fetchData', 'excelInput', 'pdfInput', 'http', 'mysql', 'sapFetch', 'limsFetch', 'opcua', 'mqtt', 'osiPi', 'esios', 'climatiq', 'manualInput'].includes(i.type)) },
                                             'Data Operations': { icon: GitMerge, items: DRAGGABLE_ITEMS.filter(i => ['join', 'splitColumns', 'addField', 'action'].includes(i.type)) },
                                             'Control Flow': { icon: AlertCircle, items: DRAGGABLE_ITEMS.filter(i => ['condition', 'humanApproval', 'alertAgent', 'dataVisualization'].includes(i.type)) },
-                                            'Models': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['llm', 'statisticalAnalysis', 'franmit'].includes(i.type)) },
+                                            'Models': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['llm', 'statisticalAnalysis', 'franmit', 'conveyor'].includes(i.type)) },
                                             'Code': { icon: Code, items: DRAGGABLE_ITEMS.filter(i => ['python'].includes(i.type)) },
                                             'Output & Logging': { icon: LogOut, items: DRAGGABLE_ITEMS.filter(i => ['output', 'saveRecords'].includes(i.type)) },
                                             'Notifications': { icon: Mail, items: DRAGGABLE_ITEMS.filter(i => ['sendEmail', 'sendSMS', 'sendWhatsApp', 'pdfReport'].includes(i.type)) },
@@ -6302,6 +6421,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                 openOsiPiConfig(node.id);
                                             } else if (node.type === 'franmit') {
                                                 openFranmitConfig(node.id);
+                                            } else if (node.type === 'conveyor') {
+                                                openConveyorConfig(node.id);
                                             } else if (node.type === 'trigger' && (node.label === 'Schedule' || node.label.startsWith('Schedule:') || node.config?.scheduleInterval)) {
                                                 openScheduleConfig(node.id);
                                             }
@@ -7946,6 +8067,219 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                     <div className="pt-3 border-t border-[var(--border-light)]">
                                         <button
                                             onClick={() => openFeedbackPopup('franmit', 'FranMIT')}
+                                            className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
+                                        >
+                                            <MessageSquare size={12} />
+                                            What would you like this node to do?
+                                        </button>
+                                    </div>
+                                </div>
+                            </NodeConfigSidePanel>
+                        )}
+
+                        {/* Conveyor Belt Configuration Panel */}
+                        {configuringConveyorNodeId && (
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringConveyorNodeId}
+                                onClose={() => setConfiguringConveyorNodeId(null)}
+                                title="Conveyor Belt"
+                                description="Industrial conveyor belt model"
+                                icon={Workflow}
+                                width="w-[500px]"
+                                footer={
+                                    <>
+                                        <button
+                                            onClick={() => setConfiguringConveyorNodeId(null)}
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveConveyorConfig}
+                                            disabled={!conveyorSpeed.trim() || !conveyorLength.trim()}
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save
+                                        </button>
+                                    </>
+                                }
+                            >
+                                <div className="space-y-5">
+                                    {/* Required Inputs Info */}
+                                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                                        <h4 className="text-xs font-semibold text-amber-800 dark:text-amber-300 mb-1.5 flex items-center gap-1.5">
+                                            <AlertCircle size={14} />
+                                            Required Inputs
+                                        </h4>
+                                        <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-relaxed">
+                                            This node requires <strong>Speed</strong> and <strong>Length</strong> to calculate transport dynamics. 
+                                            Connect an upstream node providing input data, or configure the parameters below.
+                                        </p>
+                                    </div>
+
+                                    {/* Required Parameters Section */}
+                                    <div className="border-t border-[var(--border-light)] pt-4">
+                                        <h4 className="text-xs font-medium text-[var(--text-secondary)] mb-3 text-center">Required Parameters</h4>
+
+                                        {/* Speed */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Belt Speed (m/s) <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={conveyorSpeed}
+                                                onChange={(e) => setConveyorSpeed(e.target.value)}
+                                                placeholder="e.g. 1.5"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                            <p className="text-[10px] text-[var(--text-tertiary)] mt-1">Linear speed of the conveyor belt surface</p>
+                                        </div>
+
+                                        {/* Length */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Belt Length (m) <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={conveyorLength}
+                                                onChange={(e) => setConveyorLength(e.target.value)}
+                                                placeholder="e.g. 25"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                            <p className="text-[10px] text-[var(--text-tertiary)] mt-1">Total distance from loading to discharge point</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Optional Parameters Section */}
+                                    <div className="border-t border-[var(--border-light)] pt-4">
+                                        <h4 className="text-xs font-medium text-[var(--text-secondary)] mb-3 text-center">Physical Parameters</h4>
+
+                                        {/* Width */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Belt Width (m)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={conveyorWidth}
+                                                onChange={(e) => setConveyorWidth(e.target.value)}
+                                                placeholder="e.g. 0.8"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                        </div>
+
+                                        {/* Inclination */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Inclination Angle (°)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={conveyorInclination}
+                                                onChange={(e) => setConveyorInclination(e.target.value)}
+                                                placeholder="e.g. 15 (0 = horizontal)"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                            <p className="text-[10px] text-[var(--text-tertiary)] mt-1">Angle of incline, 0° for horizontal conveyors</p>
+                                        </div>
+
+                                        {/* Load Capacity */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Max Load Capacity (kg/m)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={conveyorLoadCapacity}
+                                                onChange={(e) => setConveyorLoadCapacity(e.target.value)}
+                                                placeholder="e.g. 50"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                            <p className="text-[10px] text-[var(--text-tertiary)] mt-1">Maximum material load per meter of belt</p>
+                                        </div>
+
+                                        {/* Belt Type */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Belt Type
+                                            </label>
+                                            <select
+                                                value={conveyorBeltType}
+                                                onChange={(e) => setConveyorBeltType(e.target.value)}
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] bg-[var(--bg-card)]"
+                                            >
+                                                <option value="flat">Flat Belt</option>
+                                                <option value="troughed">Troughed Belt</option>
+                                                <option value="cleated">Cleated Belt</option>
+                                                <option value="modular">Modular Belt</option>
+                                                <option value="roller">Roller Conveyor</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Motor & Mechanical Section */}
+                                    <div className="border-t border-[var(--border-light)] pt-4">
+                                        <h4 className="text-xs font-medium text-[var(--text-secondary)] mb-3 text-center">Motor & Mechanical</h4>
+
+                                        {/* Motor Power */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Motor Power (kW)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={conveyorMotorPower}
+                                                onChange={(e) => setConveyorMotorPower(e.target.value)}
+                                                placeholder="e.g. 7.5"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                        </div>
+
+                                        {/* Friction Coefficient */}
+                                        <div>
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Friction Coefficient (μ)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={conveyorFrictionCoeff}
+                                                onChange={(e) => setConveyorFrictionCoeff(e.target.value)}
+                                                placeholder="e.g. 0.025"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                            <p className="text-[10px] text-[var(--text-tertiary)] mt-1">Belt-to-idler friction coefficient (typical: 0.02–0.03)</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Calculated Outputs Info */}
+                                    <div className="border-t border-[var(--border-light)] pt-4">
+                                        <h4 className="text-xs font-medium text-[var(--text-secondary)] mb-2 text-center">Calculated Outputs</h4>
+                                        <div className="bg-[var(--bg-tertiary)] rounded-lg p-3 space-y-1.5">
+                                            <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)]">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                Transport time (s) — Time for material to travel the full belt length
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)]">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                Throughput (t/h) — Material mass flow rate
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)]">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                Required power (kW) — Estimated drive power needed
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)]">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                Belt tension (N) — Effective belt tension force
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Feedback Link */}
+                                    <div className="pt-3 border-t border-[var(--border-light)]">
+                                        <button
+                                            onClick={() => openFeedbackPopup('conveyor', 'Conveyor Belt')}
                                             className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
                                         >
                                             <MessageSquare size={12} />

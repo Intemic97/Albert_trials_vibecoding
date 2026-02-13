@@ -44,7 +44,8 @@ export type NodeType =
   | 'alertAgent' 
   | 'pdfReport'
   | 'osiPi'
-  | 'franmit';
+  | 'franmit'
+  | 'conveyor';
 
 export type NodeStatus = 'idle' | 'running' | 'completed' | 'error' | 'waiting';
 
@@ -212,6 +213,15 @@ export interface NodeConfig {
   osiPiGranularityValue?: string;
   osiPiGranularityUnit?: 'seconds' | 'minutes' | 'hours' | 'days';
   osiPiWebIds?: string[];
+  // For Conveyor nodes:
+  conveyorSpeed?: string;
+  conveyorLength?: string;
+  conveyorWidth?: string;
+  conveyorInclination?: string;
+  conveyorLoadCapacity?: string;
+  conveyorBeltType?: string;
+  conveyorMotorPower?: string;
+  conveyorFrictionCoeff?: string;
   // Alert configuration
   alerts?: {
     enabled: boolean;

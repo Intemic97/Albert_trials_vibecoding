@@ -119,6 +119,12 @@ export const getNodeSummary = (node: WorkflowNode): string | null => {
       return node.config?.smsTo || null;
     case 'sendWhatsApp':
       return node.config?.whatsappTo || null;
+    case 'conveyor':
+      return node.config?.conveyorSpeed && node.config?.conveyorLength 
+        ? `${node.config.conveyorLength}m @ ${node.config.conveyorSpeed} m/s` 
+        : null;
+    case 'franmit':
+      return node.config?.franmitReactorVolume ? `V=${node.config.franmitReactorVolume} m³` : null;
     default:
       return null;
   }

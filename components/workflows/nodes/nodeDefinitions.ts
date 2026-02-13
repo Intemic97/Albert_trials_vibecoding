@@ -37,6 +37,7 @@ import {
   WhatsappLogo,
   GoogleLogo,
   Pi,
+  ArrowRight,
 } from '@phosphor-icons/react';
 import { NodeType, NodeStatus } from '../types';
 
@@ -569,7 +570,23 @@ export const NODE_DEFINITIONS: Record<NodeType, NodeDefinition> = {
       requiredConfig: ['aggregationType', 'interval'],
     },
   },
-};
+
+  // Models
+  conveyor: {
+    type: 'conveyor',
+    label: 'Conveyor Belt',
+    description: 'Industrial conveyor belt model - simulate transport dynamics',
+    category: 'other',
+    icon: ArrowRight,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-200',
+    configFields: ['conveyorSpeed', 'conveyorLength', 'conveyorWidth', 'conveyorLoadCapacity'],
+    validationRules: {
+      requiredConfig: ['conveyorSpeed', 'conveyorLength'],
+    },
+  },
+} as any;
 
 /**
  * Get node definition by type

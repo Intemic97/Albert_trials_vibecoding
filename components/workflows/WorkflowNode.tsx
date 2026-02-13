@@ -80,6 +80,10 @@ export const getNodeIconColor = (type: NodeType): string => {
       return 'text-orange-600';
     case 'alertAgent':
       return 'text-red-600';
+    case 'conveyor':
+      return 'text-amber-600';
+    case 'franmit':
+      return 'text-teal-600';
     default:
       return 'text-[var(--text-secondary)]';
   }
