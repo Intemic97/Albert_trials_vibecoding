@@ -2822,6 +2822,7 @@ app.get('/api/copilot/chats', authenticateToken, async (req, res) => {
                     instructions: chat.instructions || null,
                     allowedEntities: chat.allowedEntities ? JSON.parse(chat.allowedEntities) : null,
                     agentIds: chat.agentIds ? JSON.parse(chat.agentIds) : null,
+                    useChatMemory: chat.useChatMemory === undefined || chat.useChatMemory === 1,
                     isFavorite: chat.isFavorite === 1,
                     tags: chat.tags ? JSON.parse(chat.tags) : [],
                     createdAt: chat.createdAt ? new Date(chat.createdAt) : new Date(),
@@ -2835,6 +2836,7 @@ app.get('/api/copilot/chats', authenticateToken, async (req, res) => {
                     instructions: chat.instructions || null,
                     allowedEntities: null,
                     agentIds: null,
+                    useChatMemory: chat.useChatMemory === undefined || chat.useChatMemory === 1,
                     isFavorite: false,
                     tags: [],
                     createdAt: chat.createdAt ? new Date(chat.createdAt) : new Date(),
@@ -2857,13 +2859,12 @@ app.post('/api/copilot/chats', authenticateToken, async (req, res) => {
         const userId = req.user.sub;
         const orgId = req.user.orgId;
         const { id, title, messages, createdAt, updatedAt } = req.body;
-
-        const { instructions, allowedEntities, isFavorite, tags } = req.body;
+        const { instructions, allowedEntities, isFavorite, tags, agentId, useChatMemory } = req.body;
         
         await db.run(
-            `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, instructions, allowedEntities, isFavorite, tags, createdAt, updatedAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
+            `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, instructions, allowedEntities, agentId, useChatMemory, isFavorite, tags, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
                 id, 
                 userId, 
                 orgId, 
@@ -2872,6 +2873,7 @@ app.post('/api/copilot/chats', authenticateToken, async (req, res) => {
                 instructions || null,
                 allowedEntities ? JSON.stringify(allowedEntities) : null,
                 agentId || null,
+                useChatMemory !== false ? 1 : 0,
                 isFavorite ? 1 : 0,
                 tags ? JSON.stringify(tags) : null,
                 createdAt, 
@@ -2907,11 +2909,12 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
         const userId = req.user.sub;
         const orgId = req.user.orgId;
         const { chatId } = req.params;
-        const { title, messages, updatedAt, createdAt, instructions, allowedEntities, isFavorite, tags, agentId } = req.body;
+        const { title, messages, updatedAt, createdAt, instructions, allowedEntities, isFavorite, tags, agentId, useChatMemory } = req.body;
 
         const safeTitle = title != null ? String(title) : 'Nuevo Chat';
         const safeMessages = Array.isArray(messages) ? messages : [];
         const safeUpdatedAt = updatedAt || new Date().toISOString();
+        const useChatMemoryVal = useChatMemory !== false ? 1 : 0;
 
         const chat = await db.get(
             'SELECT * FROM copilot_chats WHERE id = ? AND organizationId = ?',
@@ -2922,8 +2925,8 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
             // Chat doesn't exist, create it (upsert behavior)
             console.log('[Copilot] Chat not found, creating new chat:', chatId);
             await db.run(
-                `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, instructions, allowedEntities, agentId, isFavorite, tags, createdAt, updatedAt)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO copilot_chats (id, userId, organizationId, title, messages, instructions, allowedEntities, agentId, useChatMemory, isFavorite, tags, createdAt, updatedAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     chatId,
                     userId,
@@ -2933,6 +2936,7 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
                     instructions || null,
                     allowedEntities ? JSON.stringify(allowedEntities) : null,
                     agentId || null,
+                    useChatMemoryVal,
                     isFavorite ? 1 : 0,
                     tags ? JSON.stringify(tags) : null,
                     createdAt || safeUpdatedAt,
@@ -2942,13 +2946,14 @@ app.put('/api/copilot/chats/:chatId', authenticateToken, async (req, res) => {
         } else {
             // Chat exists, update it
             await db.run(
-                `UPDATE copilot_chats SET title = ?, messages = ?, instructions = ?, allowedEntities = ?, agentId = ?, isFavorite = ?, tags = ?, updatedAt = ? WHERE id = ?`,
+                `UPDATE copilot_chats SET title = ?, messages = ?, instructions = ?, allowedEntities = ?, agentId = ?, useChatMemory = ?, isFavorite = ?, tags = ?, updatedAt = ? WHERE id = ?`,
                 [
                     safeTitle,
                     JSON.stringify(safeMessages),
                     instructions || null,
                     allowedEntities ? JSON.stringify(allowedEntities) : null,
                     agentId || null,
+                    useChatMemoryVal,
                     isFavorite ? 1 : 0,
                     tags ? JSON.stringify(tags) : null,
                     safeUpdatedAt,
@@ -3130,6 +3135,10 @@ app.put('/api/copilot/agents/:id', authenticateToken, requireOrgAdmin, async (re
 // Delete agent
 app.delete('/api/copilot/agents/:id', authenticateToken, requireOrgAdmin, async (req, res) => {
     try {
+        // Prevent deleting the default seed agent
+        if (req.params.id.startsWith('agent_default_')) {
+            return res.status(400).json({ error: 'The default agent cannot be deleted' });
+        }
         await agentService.remove(db, req.params.id, req.user.orgId);
         res.json({ success: true });
     } catch (error) {
@@ -3153,7 +3162,7 @@ function mergeEntitiesForAsk(allowed, mentioned) {
 app.post('/api/copilot/ask', authenticateToken, aiRateLimit, async (req, res) => {
     console.log('[Copilot Ask] Request received');
     try {
-        const { question, conversationHistory, chatId, instructions, allowedEntities, mentionedEntities, useMultiAgent = true } = req.body;
+        const { question, conversationHistory, chatId, instructions, allowedEntities, mentionedEntities, useChatMemory, useMultiAgent = true } = req.body;
         const orgId = req.user.orgId;
 
         if (!question) {
@@ -3165,14 +3174,16 @@ app.post('/api/copilot/ask', authenticateToken, aiRateLimit, async (req, res) =>
 
         let chatInstructions = instructions;
         let chatAllowedEntities = allowedEntities;
+        let chatUseChatMemory = useChatMemory;
         if (chatId) {
             const chat = await db.get(
-                'SELECT instructions, allowedEntities FROM copilot_chats WHERE id = ? AND organizationId = ?',
+                'SELECT instructions, allowedEntities, useChatMemory FROM copilot_chats WHERE id = ? AND organizationId = ?',
                 [chatId, orgId]
             );
             if (chat) {
                 chatInstructions = chatInstructions || chat.instructions;
                 chatAllowedEntities = chatAllowedEntities || (chat.allowedEntities ? JSON.parse(chat.allowedEntities) : null);
+                if (chatUseChatMemory === undefined) chatUseChatMemory = chat.useChatMemory === undefined || chat.useChatMemory === 1;
             }
         }
 
@@ -3201,6 +3212,7 @@ app.post('/api/copilot/ask', authenticateToken, aiRateLimit, async (req, res) =>
                     instructions: chatInstructions,
                     allowedEntities: chatAllowedEntities,
                     mentionedEntities: mentionedEntities || [],
+                    useChatMemory: chatUseChatMemory,
                     userId: req.user.sub,
                     userEmail: req.user.email,
                     locale: userLocale

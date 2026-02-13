@@ -2673,9 +2673,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={handleCreateDashboard}
-                                    className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                                 >
-                                    <Plus size={14} weight="light" className="mr-2" />
+                                    <Plus size={14} weight="light" />
                                     Create Dashboard
                                 </button>
                                 <div className="relative" ref={examplesMenuRef}>

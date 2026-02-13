@@ -19,7 +19,7 @@ function generateId() {
  * @returns { answer, explanation, entitiesUsed, agentConversation }
  */
 async function process(db, params) {
-  const { agentId, userMessage, chatId, conversationHistory = [], instructions, allowedEntities, mentionedEntities, userId, userEmail } = params;
+  const { agentId, userMessage, chatId, conversationHistory = [], instructions, allowedEntities, mentionedEntities, useChatMemory, userId, userEmail } = params;
   const orgId = params.orgId;
   const locale = params.locale === 'en' ? 'en' : 'es';
   const languageInstruction = locale === 'en'
@@ -41,11 +41,14 @@ async function process(db, params) {
   const effectiveEntities = mergeEntities(agent.allowedEntities || allowedEntities, mentionedEntities);
   const databaseContext = await buildDatabaseContext(db, orgId, effectiveEntities);
 
-  // Load agent's persistent memory
+  // Load agent's persistent memory (only if agent has memory enabled and chat uses it)
+  const shouldUseMemory = (agent.memoryEnabled !== false) && (useChatMemory !== false);
   let agentMemory = [];
-  try {
-    agentMemory = await agentService.getMemory(db, agentId, 20);
-  } catch (_) {}
+  if (shouldUseMemory) {
+    try {
+      agentMemory = await agentService.getMemory(db, agentId, 20);
+    } catch (_) {}
+  }
 
   // Build orchestrator prompt using agent's config
   const orchAgentConfig = {
@@ -166,11 +169,13 @@ async function process(db, params) {
     await persistAgentConversation(db, chatId, turnIndex, agentConversation);
   }
 
-  // Persist this interaction to agent's memory
-  try {
-    await agentService.addMemory(db, agentId, orgId, 'user', userMessage, 'chat', { chatId });
-    await agentService.addMemory(db, agentId, orgId, 'assistant', finalParsed.answer || synResult, 'chat', { chatId });
-  } catch (_) {}
+  // Persist this interaction to agent's memory (only if agent has memory enabled)
+  if (agent.memoryEnabled !== false) {
+    try {
+      await agentService.addMemory(db, agentId, orgId, 'user', userMessage, 'chat', { chatId });
+      await agentService.addMemory(db, agentId, orgId, 'assistant', finalParsed.answer || synResult, 'chat', { chatId });
+    } catch (_) {}
+  }
 
   return {
     answer: finalParsed.answer || synResult,

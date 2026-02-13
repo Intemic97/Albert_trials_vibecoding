@@ -1746,7 +1746,7 @@ function AuthenticatedApp() {
                                                             placeholder="Search entities..."
                                                             value={entitySearchQuery}
                                                             onChange={(e) => setEntitySearchQuery(e.target.value)}
-                                                            className="pl-8 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] w-60 placeholder:text-[var(--text-tertiary)]"
+                                                            className="pl-8 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] w-60 placeholder:text-[var(--text-tertiary)]"
                                                         />
                                                     </div>
                                                     <button className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors">
@@ -1786,7 +1786,7 @@ function AuthenticatedApp() {
                                                     </div>
                                                     <button
                                                         onClick={() => setIsCreatingEntity(true)}
-                                                        className="flex items-center px-3 py-1.5 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                                        className="flex items-center px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                                     >
                                                         <Plus size={14} className="mr-2" weight="light" />
                                                         Create Entity
@@ -1816,7 +1816,7 @@ function AuthenticatedApp() {
                                                 {/* Empty State / Add New Placeholder */}
                                                 <div
                                                     onClick={() => setIsCreatingEntity(true)}
-                                                    className="border-2 border-dashed border-[var(--border-medium)] rounded-xl flex flex-col items-center justify-center min-h-[200px] text-[var(--text-tertiary)] hover:border-[#256A65] hover:text-[#256A65] hover:bg-[#256A65]/5 transition-all cursor-pointer group"
+                                                    className="border-2 border-dashed border-[var(--border-medium)] rounded-xl flex flex-col items-center justify-center min-h-[200px] text-[var(--text-tertiary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/5 transition-all cursor-pointer group"
                                                 >
                                                     <div className="p-4 bg-[var(--bg-tertiary)] rounded-full mb-3 group-hover:bg-[var(--bg-card)]">
                                                         <Plus size={24} weight="light" />

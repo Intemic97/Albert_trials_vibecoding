@@ -28,7 +28,10 @@ function parseAgent(row) {
     ...row,
     allowedEntities: row.allowedEntities ? safeParse(row.allowedEntities, []) : [],
     folderIds: row.folderIds ? safeParse(row.folderIds, []) : [],
-    icon: row.icon || 'Robot'
+    icon: row.icon || 'Robot',
+    memoryEnabled: row.memoryEnabled === undefined || row.memoryEnabled === 1 || row.memoryEnabled === true,
+    toolsEnabled: row.toolsEnabled ? safeParse(row.toolsEnabled, []) : [],
+    allowedWorkflowIds: row.allowedWorkflowIds ? safeParse(row.allowedWorkflowIds, []) : []
   };
 }
 
@@ -84,12 +87,15 @@ async function update(db, id, orgId, payload) {
   const now = new Date().toISOString();
   const updates = [];
   const params = [];
-  const fields = ['name', 'description', 'icon', 'instructions', 'allowedEntities', 'folderIds', 'orchestratorPrompt', 'analystPrompt', 'specialistPrompt', 'synthesisPrompt', 'sortOrder'];
+  const fields = ['name', 'description', 'icon', 'instructions', 'allowedEntities', 'folderIds', 'orchestratorPrompt', 'analystPrompt', 'specialistPrompt', 'synthesisPrompt', 'sortOrder', 'allowedWorkflowIds', 'toolsEnabled', 'memoryEnabled'];
   for (const f of fields) {
     if (payload[f] !== undefined) {
-      if (f === 'allowedEntities' || f === 'folderIds') {
+      if (f === 'allowedEntities' || f === 'folderIds' || f === 'allowedWorkflowIds' || f === 'toolsEnabled') {
         updates.push(`${f} = ?`);
         params.push(Array.isArray(payload[f]) ? JSON.stringify(payload[f]) : payload[f]);
+      } else if (f === 'memoryEnabled') {
+        updates.push(`${f} = ?`);
+        params.push(payload[f] === true || payload[f] === 1 ? 1 : 0);
       } else {
         updates.push(`${f} = ?`);
         params.push(payload[f]);

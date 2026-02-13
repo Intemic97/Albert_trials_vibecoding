@@ -833,6 +833,11 @@ async function initDb() {
   } catch (e) {
     // Column already exists, ignore
   }
+  try {
+    await db.exec(`ALTER TABLE copilot_chats ADD COLUMN useChatMemory INTEGER DEFAULT 1`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
 
   // Migrate old copilot_agents schema to new (if old columns exist)
   try {
@@ -912,6 +917,9 @@ async function initDb() {
   }
   if (!has('createdBy')) await addCol('ALTER TABLE copilot_agents ADD COLUMN createdBy TEXT');
   if (!has('createdByName')) await addCol('ALTER TABLE copilot_agents ADD COLUMN createdByName TEXT');
+  if (!has('allowedWorkflowIds')) await addCol('ALTER TABLE copilot_agents ADD COLUMN allowedWorkflowIds TEXT');
+  if (!has('toolsEnabled')) await addCol('ALTER TABLE copilot_agents ADD COLUMN toolsEnabled TEXT');
+  if (!has('memoryEnabled')) await addCol('ALTER TABLE copilot_agents ADD COLUMN memoryEnabled INTEGER DEFAULT 1');
 
   // Agent memory: persistent memory per agent across all chats/executions
   await db.exec(`

@@ -227,7 +227,14 @@ export const InteligenciaAgentsPage: React.FC = () => {
                           <AgentIcon size={24} weight="light" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm mb-1 truncate">{agent.name}</h4>
+                          <h4 className="font-medium text-sm mb-1 truncate flex items-center gap-1.5">
+                            {agent.name}
+                            {agent.id.startsWith('agent_default_') && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] font-medium uppercase tracking-wider shrink-0">
+                                default
+                              </span>
+                            )}
+                          </h4>
                           <p className="text-xs text-[var(--text-secondary)] line-clamp-2 min-h-[2rem]">
                             {agent.description || t('agents.specializedAgent')}
                           </p>
@@ -270,13 +277,15 @@ export const InteligenciaAgentsPage: React.FC = () => {
                         <GearSix size={14} />
                         {t('agents.configure')}
                       </button>
-                      <button
-                        onClick={() => handleDelete(agent.id)}
-                        className="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs transition-colors"
-                        title={t('agents.delete')}
-                      >
-                        <Trash size={14} />
-                      </button>
+                      {!agent.id.startsWith('agent_default_') && (
+                        <button
+                          onClick={() => handleDelete(agent.id)}
+                          className="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs transition-colors"
+                          title={t('agents.delete')}
+                        >
+                          <Trash size={14} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

@@ -387,7 +387,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
           {onOpenAIAssistant && (
             <button
               onClick={onOpenAIAssistant}
-              className="flex items-center justify-center gap-2 px-6 py-3.5 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] transition-all font-medium shadow-md hover:shadow-lg"
+              className="flex items-center justify-center gap-2 px-6 py-3.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all font-medium shadow-md hover:shadow-lg"
             >
               <Sparkles size={20} />
               Create with AI Assistant

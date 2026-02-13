@@ -491,7 +491,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                         <button
                             onClick={handleSaveProfile}
                             disabled={isSaving}
-                            className="px-3 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-sm text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                            className="px-3 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-sm text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
                             {isSaving && <SpinnerGap size={16} weight="bold" className="animate-spin" />}
                             {t('common.saveChanges')}
@@ -553,7 +553,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                         <button
                             onClick={handleCreateOrganization}
                             disabled={isCreatingOrg || !newOrgName.trim()}
-                            className="px-3 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-sm text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                            className="px-3 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-sm text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
                             {isCreatingOrg && <SpinnerGap size={16} weight="bold" className="animate-spin" />}
                             {t('profile.createWorkspace')}

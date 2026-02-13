@@ -2625,7 +2625,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                         <div className="flex items-center justify-end gap-2 mb-4" ref={presetsMenuRef}>
                             <button
                                 onClick={() => setShowCreateModal(true)}
-                                className="inline-flex items-center gap-2 px-3 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                             >
                                 <Plus size={14} />
                                 New Experiment
@@ -2634,7 +2634,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                 <button
                                     onClick={() => setShowPresetsMenu(prev => !prev)}
                                     disabled={isCreatingPreset}
-                                    className="inline-flex items-center gap-2 px-3 py-2 border border-[var(--border-light)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-lg text-sm transition-colors disabled:opacity-60"
+                                    className="flex items-center gap-2 px-3 py-1.5 border border-[var(--border-light)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
                                     {isCreatingPreset ? <SpinnerGap size={14} className="animate-spin" /> : <Sparkle size={14} />}
                                     Examples / Presets
@@ -2694,14 +2694,14 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                     <div className="inline-flex items-center gap-2">
                                         <button
                                             onClick={() => setShowCreateModal(true)}
-                                            className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors"
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                                         >
-                                            <Plus size={16} />
+                                            <Plus size={14} />
                                             New Experiment
                                         </button>
                                         <button
                                             onClick={() => setShowPresetsMenu(true)}
-                                            className="inline-flex items-center gap-2 px-4 py-2 border border-[var(--border-light)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-lg text-sm font-medium transition-colors"
+                                            className="flex items-center gap-2 px-3 py-1.5 border border-[var(--border-light)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                                         >
                                             <Sparkle size={14} />
                                             Examples / Presets

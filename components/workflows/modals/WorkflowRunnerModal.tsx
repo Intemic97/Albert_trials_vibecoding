@@ -477,7 +477,7 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
                     <button
                         onClick={handleRun}
                         disabled={isRunning || status === 'success'}
-                        className="flex items-center gap-2 px-4 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {isRunning ? (
                             <>

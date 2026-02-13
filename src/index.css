@@ -51,9 +51,9 @@
   --sidebar-icon-active: #F8F8F8;
   --sidebar-section-label: #707070;
   
-  /* Accents */
-  --accent-primary: #2383E2;
-  --accent-primary-hover: #1a6fc0;
+  /* Accents - Primary teal (Login/CTA buttons) */
+  --accent-primary: #256A65;
+  --accent-primary-hover: #1e5a55;
   --accent-success: #0F766E;
   --accent-warning: #D97706;
   --accent-error: #DC2626;
@@ -111,9 +111,9 @@
   --sidebar-icon-active: #E8E8E8;
   --sidebar-section-label: #6B6B6B;
   
-  /* Accents */
-  --accent-primary: #529CCA;
-  --accent-primary-hover: #6ab0d8;
+  /* Accents - Primary teal (Login/CTA buttons) */
+  --accent-primary: #256A65;
+  --accent-primary-hover: #1e5a55;
   --accent-success: #2DD4BF;
   --accent-warning: #FBBF24;
   --accent-error: #F87171;
@@ -126,6 +126,31 @@
   
   /* Logo */
   --logo-filter: brightness(0) invert(1) opacity(0.8);
+}
+
+/* Primary button - consistent with Login CTA */
+.btn-primary {
+  background-color: var(--accent-primary);
+  color: white;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+}
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--accent-primary-hover);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-primary-sm {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+}
+.btn-primary-lg {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
 }
 
 /* Base styles */
