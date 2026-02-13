@@ -1,0 +1,63 @@
+---
+description: Security standards for enterprise-grade platform
+alwaysApply: true
+---
+
+# Security Standards
+
+Follow these security rules in ALL code changes. The platform must be enterprise-ready (SOC 2, GDPR, ISO 27001).
+
+## Authentication & Secrets
+
+- NEVER hardcode secrets, API keys, or passwords in code
+- NEVER log secret values (use `[REDACTED]` or `configured/missing`)
+- JWT_SECRET must come from env var; server must crash in production if missing
+- Passwords: min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
+- Use `server/security/encryption.js` for sensitive fields (connection credentials, API keys)
+
+## SQL & Data
+
+- ALWAYS use parameterized queries (`?` placeholders), NEVER string concatenation
+- ALWAYS filter by `organizationId` in queries (multi-tenant isolation)
+- Block dangerous SQL patterns (UNION injection, stacked queries, INFORMATION_SCHEMA)
+- Limit query result sizes to prevent data exfiltration
+
+## API Endpoints
+
+- ALL endpoints must use `authenticateToken` middleware
+- Admin endpoints must use `requireOrgAdmin` or `requirePermission()`
+- Use RBAC from `server/security/rbac.js` for granular access control
+- Validate all input; never trust client-side data
+- Return generic error messages to clients (no stack traces, no internal paths)
+
+## CORS & Headers
+
+- CORS origins must be configurable via `CORS_ORIGINS` env var
+- Helmet.js is installed and configured; do not disable it
+- Never add `Access-Control-Allow-Origin: *` in production
+
+## Files & Uploads
+
+- Validate MIME types and file size on upload
+- Files must be access-controlled (check user's org membership)
+- Never serve user-uploaded files without authentication
+
+## GDPR
+
+- User data deletion endpoint exists at `/api/gdpr/deletion-request`
+- Audit all data access and modifications via `audit_logs`
+- Never store PII without consent; use `server/security/gdpr.js` for consent management
+
+## Security Modules
+
+Located in `server/security/`:
+- `validateSecrets.js` - Startup validation
+- `sso.js` - SAML 2.0 + OIDC
+- `encryption.js` - AES-256-GCM field encryption
+- `secretsManager.js` - Secrets provider (env/AWS/Vault)
+- `rbac.js` - Role-based access control
+- `gdpr.js` - GDPR compliance
+
+## Reference
+
+Full roadmap: `docs/SECURITY_ROADMAP.md`
