@@ -1,0 +1,117 @@
+name: Security Checks
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    # Run weekly security scan (Mondays at 6 AM UTC)
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: npm ci
+        working-directory: server
+      
+      - name: Run npm audit
+        run: npm audit --audit-level=high --json > audit-results.json || true
+        working-directory: server
+      
+      - name: Check for critical vulnerabilities
+        run: |
+          CRITICAL=$(npm audit --audit-level=critical 2>&1 | grep -c "critical" || true)
+          if [ "$CRITICAL" -gt "0" ]; then
+            echo "::error::Critical vulnerabilities found! Run 'npm audit' locally for details."
+            exit 1
+          fi
+        working-directory: server
+
+  secret-scanning:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for scanning
+      
+      - name: Check for exposed secrets
+        run: |
+          # Check for common secret patterns in tracked files
+          echo "Scanning for exposed secrets..."
+          FOUND=0
+          
+          # API keys
+          if git log --all --diff-filter=A -p -- '*.env' '*.env.*' | grep -qE '(sk_live_|sk_test_|AKIA[A-Z0-9]{16}|AIzaSy)'; then
+            echo "::warning::Potential API keys found in git history"
+            FOUND=1
+          fi
+          
+          # Private keys
+          if git grep -l 'PRIVATE KEY' -- ':(exclude)*.md' ':(exclude)*.example' 2>/dev/null; then
+            echo "::warning::Private key files found in repository"
+            FOUND=1
+          fi
+          
+          if [ "$FOUND" -eq "1" ]; then
+            echo "::warning::Secrets may be exposed. Review git history and rotate affected keys."
+          else
+            echo "No obvious secrets found in tracked files."
+          fi
+
+  security-headers:
+    name: Verify Security Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check Helmet.js is configured
+        run: |
+          if grep -q "require('helmet')" server/index.js; then
+            echo "Helmet.js is configured"
+          else
+            echo "::error::Helmet.js is not configured in server/index.js"
+            exit 1
+          fi
+      
+      - name: Check JWT secret fallback removed
+        run: |
+          if grep -q "your-secret-key-change-in-production" server/auth.js; then
+            echo "::error::Insecure JWT secret fallback still present in auth.js"
+            exit 1
+          else
+            echo "JWT secret properly configured"
+          fi
+      
+      - name: Check password policy
+        run: |
+          if grep -q "validatePassword" server/auth.js; then
+            echo "Password validation function found"
+          else
+            echo "::error::Password validation function not found in auth.js"
+            exit 1
+          fi
+      
+      - name: Check for email verification bypass
+        run: |
+          if grep -q "m.alcazar@intemic.com" server/auth.js; then
+            echo "::error::Email verification bypass still present"
+            exit 1
+          else
+            echo "No email verification bypass found"
+          fi

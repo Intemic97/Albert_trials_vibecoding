@@ -918,12 +918,36 @@ async def handle_save_records(node: Dict, input_data: Optional[Dict] = None, exe
 async def handle_mysql(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
     """Handle MySQL query node"""
     import mysql.connector
+    import re
     
     config_data = node.get("config", {})
-    query = config_data.get("mysqlQuery")
+    query = config_data.get("mysqlQuery", "").strip()
     
     if not query:
         raise ValueError("No query configured for MySQL node")
+    
+    # Security: Only allow SELECT queries
+    if not query.upper().startswith("SELECT"):
+        raise ValueError("Only SELECT queries are allowed for security reasons")
+    
+    # Security: Block dangerous SQL patterns
+    dangerous_patterns = [
+        r';\s*(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|EXEC|EXECUTE|GRANT|REVOKE)',
+        r'INTO\s+OUTFILE',
+        r'INTO\s+DUMPFILE',
+        r'LOAD_FILE\s*\(',
+        r'BENCHMARK\s*\(',
+        r'SLEEP\s*\(',
+        r'@@\w+',
+        r'INFORMATION_SCHEMA',
+    ]
+    for pattern in dangerous_patterns:
+        if re.search(pattern, query, re.IGNORECASE):
+            raise ValueError("Query contains disallowed SQL patterns")
+    
+    # Security: Limit query length
+    if len(query) > 10000:
+        raise ValueError("Query too long (max 10000 characters)")
     
     try:
         conn = mysql.connector.connect(
@@ -936,17 +960,24 @@ async def handle_mysql(node: Dict, input_data: Optional[Dict] = None, execution_
         )
         
         cursor = conn.cursor(dictionary=True)
+        # Note: mysql.connector does not support parameterized SELECT *
+        # Security relies on validation above + single statement execution
         cursor.execute(query)
         rows = cursor.fetchall()
         
         cursor.close()
         conn.close()
         
+        # Limit result size
+        max_rows = 10000
+        limited_rows = rows[:max_rows]
+        
         return {
             "success": True,
-            "message": f"MySQL query returned {len(rows)} rows",
-            "outputData": rows,
-            "rowCount": len(rows)
+            "message": f"MySQL query returned {len(limited_rows)} rows" + (" (truncated)" if len(rows) > max_rows else ""),
+            "outputData": limited_rows,
+            "rowCount": len(limited_rows),
+            "truncated": len(rows) > max_rows
         }
     except Exception as e:
         raise ValueError(f"MySQL query failed: {str(e)}")

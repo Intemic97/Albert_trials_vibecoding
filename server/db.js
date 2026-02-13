@@ -1103,6 +1103,78 @@ async function initDb() {
     // Indexes might already exist
   }
 
+  // ==================== SECURITY: SSO Configurations ====================
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS sso_configurations (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT NOT NULL UNIQUE,
+      provider TEXT NOT NULL,
+      protocol TEXT NOT NULL CHECK(protocol IN ('saml', 'oidc')),
+      entityId TEXT,
+      ssoUrl TEXT,
+      certificate TEXT,
+      clientId TEXT,
+      clientSecret TEXT,
+      issuerUrl TEXT,
+      enabled INTEGER DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+    )
+  `);
+
+  // SSO provider field on users
+  try {
+    await db.exec(`ALTER TABLE users ADD COLUMN ssoProvider TEXT`);
+  } catch (e) { /* column already exists */ }
+
+  // ==================== SECURITY: RBAC Permissions ====================
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS role_permissions (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT NOT NULL,
+      role TEXT NOT NULL,
+      resource TEXT NOT NULL,
+      action TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+    )
+  `);
+
+  try {
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_role_permissions_org_role ON role_permissions(organizationId, role)`);
+  } catch (e) {}
+
+  // ==================== SECURITY: GDPR - User Data Deletion Requests ====================
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS data_deletion_requests (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      email TEXT NOT NULL,
+      organizationId TEXT,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'processing', 'completed', 'failed')),
+      requestedAt TEXT NOT NULL,
+      completedAt TEXT,
+      processedBy TEXT,
+      deletionLog TEXT,
+      FOREIGN KEY(userId) REFERENCES users(id)
+    )
+  `);
+
+  // ==================== SECURITY: GDPR Consent Management ====================
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS user_consents (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      granted INTEGER DEFAULT 0,
+      grantedAt TEXT,
+      revokedAt TEXT,
+      FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(userId, purpose)
+    )
+  `);
+
   return db;
 }
 

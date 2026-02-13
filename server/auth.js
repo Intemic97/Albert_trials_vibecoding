@@ -4,7 +4,24 @@ const crypto = require('crypto');
 const { Resend } = require('resend');
 const { openDb } = require('./db');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+// Security: In production, JWT_SECRET MUST be set via environment variable.
+// In development, a weak default is allowed but logged as warning.
+const IS_PRODUCTION_AUTH = process.env.NODE_ENV === 'production';
+const JWT_SECRET = (() => {
+    const secret = process.env.JWT_SECRET;
+    if (!secret && IS_PRODUCTION_AUTH) {
+        console.error('[SECURITY] FATAL: JWT_SECRET is not set. Server cannot start in production without it.');
+        process.exit(1);
+    }
+    if (!secret) {
+        console.warn('[SECURITY] WARNING: JWT_SECRET not set - using insecure default. Set JWT_SECRET env var for production.');
+        return 'dev-only-insecure-secret-do-not-use-in-prod';
+    }
+    if (secret.length < 32) {
+        console.warn('[SECURITY] WARNING: JWT_SECRET is shorter than 32 characters. Use a stronger secret.');
+    }
+    return secret;
+})();
 const SALT_ROUNDS = 10;
 
 // Cookie configuration based on environment
@@ -24,11 +41,40 @@ const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 // App URL for verification links
 const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 
+/**
+ * Validate password strength
+ * Requirements: min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
+ */
+function validatePassword(password) {
+    if (!password || password.length < 8) {
+        return { valid: false, error: 'Password must be at least 8 characters long' };
+    }
+    if (!/[A-Z]/.test(password)) {
+        return { valid: false, error: 'Password must contain at least one uppercase letter' };
+    }
+    if (!/[a-z]/.test(password)) {
+        return { valid: false, error: 'Password must contain at least one lowercase letter' };
+    }
+    if (!/[0-9]/.test(password)) {
+        return { valid: false, error: 'Password must contain at least one number' };
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password)) {
+        return { valid: false, error: 'Password must contain at least one special character (!@#$%^&*...)' };
+    }
+    return { valid: true };
+}
+
 async function register(req, res) {
     const { email, password, name, orgName } = req.body;
 
     if (!email || !password || !name || !orgName) {
         return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    // Validate password strength
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+        return res.status(400).json({ error: passwordCheck.error });
     }
 
     const db = await openDb();
@@ -163,8 +209,8 @@ async function login(req, res) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Check if email is verified (allow bypass for specific local user)
-        if (!user.emailVerified && user.email !== 'm.alcazar@intemic.com') {
+        // Check if email is verified
+        if (!user.emailVerified) {
             return res.status(403).json({ 
                 error: 'Please verify your email before logging in. Check your inbox for the verification link.',
                 requiresVerification: true,
@@ -954,8 +1000,9 @@ async function resetPassword(req, res) {
         return res.status(400).json({ error: 'Token and password are required' });
     }
 
-    if (password.length < 6) {
-        return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+        return res.status(400).json({ error: passwordCheck.error });
     }
 
     const db = await openDb();

@@ -1,0 +1,24 @@
+---
+description: Git workflow - feature branch, commit, push
+alwaysApply: true
+---
+
+# Git Workflow
+
+Cuando el usuario pida hacer commit / push / subir cambios, seguir SIEMPRE este flujo:
+
+1. `git checkout main` — Ir a main
+2. `git pull` — Bajar lo último del remoto
+3. `git checkout -b feat/nombre-descriptivo` — Crear rama feature nueva
+4. Hacer los cambios necesarios
+5. `git add .` — Stage de todos los cambios
+6. `git commit -m "descripción clara"` — Commit en la rama local
+7. `git push -u origin feat/nombre-descriptivo` — Push al remoto
+
+## Reglas clave
+
+- **NUNCA** hacer commit directamente en main
+- **NUNCA** hacer merge a main desde aquí — el merge lo hace el usuario vía PR
+- Siempre crear rama feature desde main actualizado
+- Nombres de rama: `feat/`, `fix/`, `refactor/` según el tipo de cambio
+- Mensajes de commit descriptivos en inglés

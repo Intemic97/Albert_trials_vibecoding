@@ -18,29 +18,20 @@ const { extractStructuredFromText } = require('./services/langExtractService');
 const workflowScheduler = require('./services/workflowScheduler');
 const agentOrchestrator = require('./services/agentOrchestrator');
 const agentService = require('./services/agentService');
-// Load environment variables - Try multiple methods to ensure it loads
+// Load environment variables
 const envPath = path.join(__dirname, '.env');
-console.log('[ENV] Attempting to load .env from:', envPath);
-console.log('[ENV] File exists:', require('fs').existsSync(envPath));
-
-// Method 1: Explicit path
-const result1 = require('dotenv').config({ path: envPath });
-if (result1.error) {
-    console.error('[ENV] Error loading .env:', result1.error);
-}
-
-// Method 2: Also try without explicit path (default behavior)
+require('dotenv').config({ path: envPath });
 if (!process.env.OPENAI_API_KEY) {
     require('dotenv').config();
 }
 
-// Debug: Verificar que OPENAI_API_KEY se cargó correctamente
+// Security: Validate all required secrets at startup
+const { validateSecrets } = require('./security/validateSecrets');
+validateSecrets();
+
+// Verify critical API keys (without exposing values in logs)
 const openaiKey = process.env.OPENAI_API_KEY;
-console.log('[ENV] OPENAI_API_KEY cargada:', openaiKey ? `✅ SÍ (length: ${openaiKey.length}, starts with: ${openaiKey.substring(0, 20)}...)` : '❌ NO - VARIABLE NO ENCONTRADA');
-if (!openaiKey) {
-    console.error('[ENV] ERROR: OPENAI_API_KEY no está configurada. Verifica el archivo .env');
-    console.error('[ENV] Variables disponibles:', Object.keys(process.env).filter(k => k.includes('API') || k.includes('KEY')).join(', '));
-}
+console.log('[ENV] OPENAI_API_KEY:', openaiKey ? '✅ configured' : '❌ missing');
 
 // Stripe configuration
 const Stripe = require('stripe');
@@ -645,14 +636,41 @@ const upload = multer({
     }
 });
 
-app.use(cors({
-    origin: [
+// Security headers with Helmet
+const helmet = require('helmet');
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Required for Vite/React dev
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:", "blob:", "https:"],
+            connectSrc: ["'self'", "https://api.openai.com", "wss:", "ws:"],
+            frameSrc: ["'none'"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"],
+        }
+    },
+    crossOriginEmbedderPolicy: false, // Required for loading external resources
+    hsts: {
+        maxAge: 31536000, // 1 year
+        includeSubDomains: true,
+        preload: true
+    }
+}));
+
+// CORS configuration - use env var in production
+const CORS_ORIGINS = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+    : [
         'http://localhost:5173', 
         'http://localhost:5174', 
         'http://localhost:5175',
-        'http://178.128.170.0',
-        'https://178.128.170.0'
-    ],
+    ];
+app.use(cors({
+    origin: CORS_ORIGINS,
     credentials: true
 }));
 // Stripe webhook needs raw body - must be before express.json()
@@ -668,6 +686,30 @@ let db;
 initDb().then(database => {
     db = database;
     console.log('Database initialized');
+
+    // Initialize SSO routes
+    try {
+        const { initSSO } = require('./security/sso');
+        initSSO(app, db);
+    } catch (error) {
+        console.warn('[SSO] Failed to initialize SSO:', error.message);
+    }
+
+    // Initialize RBAC routes
+    try {
+        const { initRBACRoutes } = require('./security/rbac');
+        initRBACRoutes(app, db);
+    } catch (error) {
+        console.warn('[RBAC] Failed to initialize RBAC:', error.message);
+    }
+
+    // Initialize GDPR compliance routes
+    try {
+        const { initGDPRRoutes } = require('./security/gdpr');
+        initGDPRRoutes(app, db);
+    } catch (error) {
+        console.warn('[GDPR] Failed to initialize GDPR routes:', error.message);
+    }
 
     server.listen(PORT, () => {
         console.log(`Server running on http://localhost:${PORT}`);
@@ -8041,10 +8083,36 @@ app.post('/api/mysql/query', authenticateToken, async (req, res) => {
         return res.status(400).json({ error: 'SQL query is required' });
     }
 
-    // Only allow SELECT queries for security
-    const trimmedQuery = query.trim().toUpperCase();
-    if (!trimmedQuery.startsWith('SELECT')) {
+    // Security: Sanitize and validate the query
+    const trimmedQuery = query.trim();
+    const upperQuery = trimmedQuery.toUpperCase();
+
+    // Only allow SELECT queries
+    if (!upperQuery.startsWith('SELECT')) {
         return res.status(400).json({ error: 'Only SELECT queries are allowed for security reasons' });
+    }
+
+    // Block dangerous SQL patterns (UNION injection, subqueries with writes, stacked queries)
+    const dangerousPatterns = [
+        /;\s*(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|EXEC|EXECUTE|GRANT|REVOKE)/i,
+        /INTO\s+OUTFILE/i,
+        /INTO\s+DUMPFILE/i,
+        /LOAD_FILE\s*\(/i,
+        /BENCHMARK\s*\(/i,
+        /SLEEP\s*\(/i,
+        /@@\w+/i,           // System variables access
+        /INFORMATION_SCHEMA/i, // Schema enumeration
+    ];
+
+    for (const pattern of dangerousPatterns) {
+        if (pattern.test(trimmedQuery)) {
+            return res.status(400).json({ error: 'Query contains disallowed SQL patterns' });
+        }
+    }
+
+    // Limit query length to prevent abuse
+    if (trimmedQuery.length > 10000) {
+        return res.status(400).json({ error: 'Query too long (max 10000 characters)' });
     }
 
     try {
@@ -8056,16 +8124,24 @@ app.post('/api/mysql/query', authenticateToken, async (req, res) => {
             database: database,
             user: username,
             password: password,
-            connectTimeout: 10000
+            connectTimeout: 10000,
+            // Security: Disable multiple statements to prevent stacked queries
+            multipleStatements: false
         });
 
-        const [rows] = await connection.execute(query);
+        // Use execute with prepared statements where possible
+        // For dynamic SELECTs, we rely on the validation above + multipleStatements: false
+        const [rows] = await connection.execute(trimmedQuery);
         await connection.end();
 
-        res.json({ results: rows });
+        // Limit result size to prevent data exfiltration
+        const maxRows = 10000;
+        const limitedRows = Array.isArray(rows) ? rows.slice(0, maxRows) : rows;
+
+        res.json({ results: limitedRows, truncated: Array.isArray(rows) && rows.length > maxRows });
     } catch (error) {
-        console.error('MySQL query error:', error);
-        res.status(500).json({ error: error.message || 'Failed to execute MySQL query' });
+        console.error('MySQL query error:', error.message);
+        res.status(500).json({ error: 'Failed to execute MySQL query' });
     }
 });
 
