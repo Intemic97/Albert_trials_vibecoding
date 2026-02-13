@@ -650,7 +650,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                 {currentOrg?.role === 'admin' && (
                                     <button
                                         onClick={() => setIsInviting(true)}
-                                        className="flex items-center px-4 py-2 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                                        className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
                                     >
                                         <Plus size={16} weight="light" className="mr-2" />
                                         {t('settings.addMember')}

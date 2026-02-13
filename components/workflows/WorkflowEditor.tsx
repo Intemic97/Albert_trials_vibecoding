@@ -560,7 +560,7 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
           <button
             onClick={runWorkflow}
             disabled={isRunning || nodes.length === 0}
-            className="flex items-center gap-2 px-4 py-1.5 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
           >
             <Play size={16} weight="fill" />
             {isRunning ? 'Running...' : 'Run'}

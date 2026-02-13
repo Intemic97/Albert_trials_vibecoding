@@ -57,8 +57,9 @@ export const lightTheme = {
   sidebarIconActive: '#F8F8F8',
   sidebarSectionLabel: '#707070',
   
-  // Accents
-  accentPrimary: '#2383E2',
+  // Accents - Primary teal (Login/CTA buttons)
+  accentPrimary: '#256A65',
+  accentPrimaryHover: '#1e5a55',
   accentSuccess: '#0F766E',
   accentWarning: '#D97706',
   accentError: '#DC2626',
@@ -112,8 +113,9 @@ export const darkTheme = {
   sidebarIconActive: '#E8E8E8',
   sidebarSectionLabel: '#6B6B6B',
   
-  // Accents - Slightly muted for dark mode
-  accentPrimary: '#529CCA',
+  // Accents - Primary teal (same as Login)
+  accentPrimary: '#256A65',
+  accentPrimaryHover: '#1e5a55',
   accentSuccess: '#2DD4BF',
   accentWarning: '#FBBF24',
   accentError: '#F87171',
@@ -168,6 +170,7 @@ export const cssVarNames = {
   sidebarSectionLabel: '--sidebar-section-label',
   
   accentPrimary: '--accent-primary',
+  accentPrimaryHover: '--accent-primary-hover',
   accentSuccess: '--accent-success',
   accentWarning: '--accent-warning',
   accentError: '--accent-error',

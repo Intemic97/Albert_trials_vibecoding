@@ -198,7 +198,7 @@ export const WorkflowToolbar: React.FC<WorkflowToolbarProps> = ({
         <button
           onClick={onRun}
           disabled={isRunning}
-          className="flex items-center gap-2 px-4 py-2 bg-[#256A65] hover:bg-[#1e5652] text-white rounded-lg text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 active:scale-95"
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 active:scale-95"
         >
           {isRunning ? (
             <>

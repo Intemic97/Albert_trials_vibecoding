@@ -164,7 +164,7 @@ export function LoginPage() {
                 <div className="flex-1 flex items-center justify-center px-4">
                     <div className="w-full max-w-sm">
                         <div className="flex items-center justify-center mx-auto mb-8">
-                            <div className="w-16 h-16 bg-[#256A65] rounded-full flex items-center justify-center">
+                            <div className="w-16 h-16 bg-[var(--accent-primary)] rounded-full flex items-center justify-center">
                                 <Envelope weight="light" className="w-8 h-8 text-white" />
                             </div>
                         </div>
@@ -266,7 +266,7 @@ export function LoginPage() {
                                     <input
                                         type="text"
                                         required
-                                        className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[#256A65] focus:ring-1 focus:ring-[#256A65] transition-all text-sm"
+                                        className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition-all text-sm"
                                         placeholder="Full name"
                                         value={formData.name}
                                         onChange={e => setFormData({ ...formData, name: e.target.value })}
@@ -279,7 +279,7 @@ export function LoginPage() {
                                     <input
                                         type="text"
                                         required
-                                        className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[#256A65] focus:ring-1 focus:ring-[#256A65] transition-all text-sm"
+                                        className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition-all text-sm"
                                         placeholder="Organization name"
                                         value={formData.orgName}
                                         onChange={e => setFormData({ ...formData, orgName: e.target.value })}
@@ -294,7 +294,7 @@ export function LoginPage() {
                             <input
                                 type="email"
                                 required
-                                className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[#256A65] focus:ring-1 focus:ring-[#256A65] transition-all text-sm"
+                                className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition-all text-sm"
                                 placeholder="Enter your work email address"
                                 value={formData.email}
                                 onChange={e => setFormData({ ...formData, email: e.target.value })}
@@ -306,7 +306,7 @@ export function LoginPage() {
                             <input
                                 type={showPassword ? 'text' : 'password'}
                                 required
-                                className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 px-4 pr-12 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[#256A65] focus:ring-1 focus:ring-[#256A65] transition-all text-sm"
+                                className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 px-4 pr-12 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition-all text-sm"
                                 placeholder="Password"
                                 value={formData.password}
                                 onChange={e => setFormData({ ...formData, password: e.target.value })}
@@ -344,7 +344,7 @@ export function LoginPage() {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full bg-[#256A65] hover:bg-[#1e5a55] text-white font-medium py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                            className="w-full btn-primary btn-primary-lg flex items-center justify-center gap-2"
                         >
                             {isLoading ? (
                                 <>
@@ -368,7 +368,7 @@ export function LoginPage() {
                             <>Don't have an account?{' '}
                                 <button 
                                     onClick={() => setIsLogin(false)} 
-                                    className="text-[#256A65] hover:text-[#2d7a73] transition-colors font-medium"
+                                    className="text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] transition-colors font-medium"
                                 >
                                     Sign up
                                 </button>
@@ -377,7 +377,7 @@ export function LoginPage() {
                             <>Already have an account?{' '}
                                 <button 
                                     onClick={() => setIsLogin(true)} 
-                                    className="text-[#256A65] hover:text-[#2d7a73] transition-colors font-medium"
+                                    className="text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] transition-colors font-medium"
                                 >
                                     Sign in
                                 </button>

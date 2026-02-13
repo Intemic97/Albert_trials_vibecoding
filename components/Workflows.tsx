@@ -6644,7 +6644,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                                         e.stopPropagation();
                                                                         handleApproval(true);
                                                                     }}
-                                                                    className="flex-1 px-4 py-2 bg-[#256A65] hover:bg-[#1e554f] text-white text-xs font-medium rounded-lg transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-1.5"
+                                                                    className="flex-1 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-medium rounded-lg transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-1.5"
                                                                 >
                                                                     <Check size={14} />
                                                                     Accept
@@ -7157,7 +7157,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                             <div className="flex flex-col gap-4">
                                                 <button
                                                     onClick={() => setShowAiAssistant(true)}
-                                                    className="flex items-center justify-center gap-2 px-6 py-3.5 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] transition-all font-medium shadow-md hover:shadow-lg transform hover:scale-[1.02]"
+                                                    className="flex items-center justify-center gap-2 px-6 py-3.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all font-medium shadow-md hover:shadow-lg transform hover:scale-[1.02]"
                                                 >
                                                     <Sparkles size={20} />
                                                     Create with AI Assistant
@@ -7273,7 +7273,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                                 <div className="flex gap-2">
                                                                     <button
                                                                         onClick={handleAcceptWorkflowSuggestion}
-                                                                        className="flex-1 px-3 py-1.5 bg-[#256A65] text-white rounded text-xs font-medium hover:bg-[#1e554f] transition-colors flex items-center justify-center gap-1"
+                                                                        className="flex-1 px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded text-xs font-medium transition-colors flex items-center justify-center gap-1"
                                                                     >
                                                                         <Check size={14} />
                                                                         Accept
@@ -12323,7 +12323,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                         copyTemplateToWorkflows(template);
                                                     }}
                                                     disabled={isCopyingTemplate}
-                                                    className="flex-1 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                                                    className="flex-1 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
                                                 >
                                                     {isCopyingTemplate ? (
                                                         <>
@@ -12799,7 +12799,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                 <span className="text-sm text-[var(--text-primary)]">Schedule is active</span>
                             </label>
                             <div className="flex gap-2 pt-2">
-                                <button onClick={saveScheduleConfig} className="flex-1 px-4 py-2 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium">
+                                <button onClick={saveScheduleConfig} className="flex-1 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium">
                                     Save
                                 </button>
                                 <button onClick={closeScheduleConfig} className="px-4 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] rounded-lg text-sm font-medium">
