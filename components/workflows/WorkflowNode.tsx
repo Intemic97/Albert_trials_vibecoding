@@ -71,6 +71,7 @@ export const getNodeIconColor = (type: NodeType): string => {
       return 'text-[var(--text-secondary)]';
     case 'sendEmail':
     case 'sendSMS':
+    case 'sendWhatsApp':
       return 'text-green-600';
     case 'esios':
       return 'text-yellow-600';
@@ -80,6 +81,10 @@ export const getNodeIconColor = (type: NodeType): string => {
       return 'text-orange-600';
     case 'alertAgent':
       return 'text-red-600';
+    case 'conveyor':
+      return 'text-amber-600';
+    case 'franmit':
+      return 'text-teal-600';
     default:
       return 'text-[var(--text-secondary)]';
   }

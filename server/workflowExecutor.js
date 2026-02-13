@@ -253,6 +253,7 @@ class WorkflowExecutor {
             excelInput: () => this.handleExcelInput(node, inputData),
             pdfInput: () => this.handlePdfInput(node, inputData),
             saveRecords: () => this.handleSaveRecords(node, inputData),
+            action: () => this.handleRenameColumns(node, inputData),
             addField: () => this.handleAddField(node, inputData),
             condition: () => this.handleCondition(node, inputData),
             join: () => this.handleJoin(node, inputData),
@@ -261,6 +262,7 @@ class WorkflowExecutor {
             mysql: () => this.handleMySQL(node, inputData),
             sendEmail: () => this.handleSendEmail(node, inputData),
             sendSMS: () => this.handleSendSMS(node, inputData),
+            sendWhatsApp: () => this.handleSendWhatsApp(node, inputData),
             sendSlack: () => this.handleSendSlack(node, inputData),
             sendDiscord: () => this.handleSendDiscord(node, inputData),
             sendTeams: () => this.handleSendTeams(node, inputData),
@@ -526,7 +528,23 @@ class WorkflowExecutor {
     }
 
     /**
-     * Save records to entity using the entities API structure
+     * Infer property type from a JS value
+     */
+    inferPropertyType(value) {
+        if (value === null || value === undefined) return 'text';
+        if (typeof value === 'number') return 'number';
+        if (typeof value === 'boolean') return 'text';
+        if (typeof value === 'string') {
+            if (/^\d{4}-\d{2}-\d{2}/.test(value)) return 'date';
+            const num = Number(value);
+            if (!isNaN(num) && value.trim() !== '') return 'number';
+        }
+        return 'text';
+    }
+
+    /**
+     * Save records to entity using the entities API structure.
+     * Auto-creates missing properties when data columns don't match existing ones.
      */
     async saveToEntity(entityId, inputData, isTimeSeriesData) {
         try {
@@ -542,24 +560,64 @@ class WorkflowExecutor {
                 });
             }
 
-            // Save each record (in a real implementation, this would call the API)
-            // For now, we'll use the database directly
+            // --- Auto-create missing properties ---
+            // Collect all unique keys from all records
+            const skipKeys = new Set(['id', 'createdAt', 'updatedAt', 'entityId', 'metadata', 'raw', '__index']);
+            const allKeys = new Set();
+            for (const record of normalizedRecords) {
+                if (record && typeof record === 'object') {
+                    for (const key of Object.keys(record)) {
+                        if (!skipKeys.has(key)) allKeys.add(key);
+                    }
+                }
+            }
+
+            // Get existing properties once
+            let properties = await this.db.all(
+                'SELECT id, name, type FROM properties WHERE entityId = ?',
+                [entityId]
+            );
+            const existingNames = new Set(properties.map(p => p.name.toLowerCase()));
+
+            // Create any missing properties
+            let createdProps = 0;
+            for (const key of allKeys) {
+                if (!existingNames.has(key.toLowerCase())) {
+                    // Find a sample value to infer type
+                    let sampleValue = undefined;
+                    for (const rec of normalizedRecords) {
+                        if (rec[key] !== null && rec[key] !== undefined) { sampleValue = rec[key]; break; }
+                    }
+                    const propId = generateId();
+                    const propType = this.inferPropertyType(sampleValue);
+                    await this.db.run(
+                        'INSERT INTO properties (id, entityId, name, type, defaultValue) VALUES (?, ?, ?, ?, ?)',
+                        [propId, entityId, key, propType, '']
+                    );
+                    createdProps++;
+                }
+            }
+
+            // Re-fetch properties if we created new ones
+            if (createdProps > 0) {
+                properties = await this.db.all(
+                    'SELECT id, name, type FROM properties WHERE entityId = ?',
+                    [entityId]
+                );
+                console.log(`[SaveToEntity] Auto-created ${createdProps} new properties for entity ${entityId}`);
+            }
+
+            // Build property name mapping
+            const propertyMap = {};
+            properties.forEach(prop => {
+                propertyMap[prop.name.toLowerCase()] = prop;
+            });
+
+            // Save each record
             let savedCount = 0;
             const savedIds = [];
 
             for (const record of normalizedRecords) {
-                // Get entity properties
-                const properties = await this.db.all(
-                    'SELECT id, name, type FROM properties WHERE entityId = ?',
-                    [entityId]
-                );
-
-                // Create property name mapping
-                const propertyMap = {};
-                properties.forEach(prop => {
-                    propertyMap[prop.name.toLowerCase()] = prop;
-                });
-
                 // Create record
                 const recordId = generateId();
                 const createdAt = record.timestamp || record.createdAt || new Date().toISOString();
@@ -571,7 +629,7 @@ class WorkflowExecutor {
 
                 // Save property values
                 for (const [key, val] of Object.entries(record)) {
-                    if (key === 'id' || key === 'createdAt' || key === 'entityId' || key === 'timestamp') {
+                    if (skipKeys.has(key)) {
                         // Handle timestamp specially if needed
                         if (key === 'timestamp') {
                             const timestampProp = propertyMap['timestamp'] || propertyMap['time'] || propertyMap['createdat'];
@@ -603,16 +661,52 @@ class WorkflowExecutor {
 
             return {
                 success: true,
-                message: `Saved ${savedCount} record(s) to entity '${entityId}'${isTimeSeriesData ? ' (time-series optimized)' : ''}`,
+                message: `Saved ${savedCount} record(s) to entity '${entityId}'${createdProps > 0 ? ` (${createdProps} properties auto-created)` : ''}${isTimeSeriesData ? ' (time-series optimized)' : ''}`,
                 outputData: inputData,
                 savedIds,
                 entityId,
+                createdProperties: createdProps,
                 isTimeSeries: isTimeSeriesData
             };
         } catch (error) {
             console.error('[SaveToEntity] Error:', error);
             throw error;
         }
+    }
+
+    async handleRenameColumns(node, inputData) {
+        const renames = node.config?.columnRenames || [];
+        
+        if (!renames.length) {
+            return {
+                success: true,
+                message: 'No column renames configured',
+                outputData: inputData
+            };
+        }
+
+        if (!inputData || !Array.isArray(inputData)) {
+            return {
+                success: true,
+                message: 'No input data to rename',
+                outputData: inputData || []
+            };
+        }
+
+        const renamedData = inputData.map(row => {
+            const newRow = {};
+            for (const key of Object.keys(row)) {
+                const rename = renames.find(r => r.oldName === key);
+                newRow[rename ? rename.newName : key] = row[key];
+            }
+            return newRow;
+        });
+
+        return {
+            success: true,
+            message: `Renamed ${renames.length} column(s): ${renames.map(r => `${r.oldName} → ${r.newName}`).join(', ')}`,
+            outputData: renamedData
+        };
     }
 
     async handleAddField(node, inputData) {
@@ -1040,6 +1134,36 @@ class WorkflowExecutor {
             };
         } catch (error) {
             throw new Error(`Failed to send SMS: ${error.message}`);
+        }
+    }
+
+    async handleSendWhatsApp(node, inputData) {
+        const config = node.config || {};
+        const { whatsappTo, whatsappBody, whatsappTwilioAccountSid, whatsappTwilioAuthToken, whatsappTwilioFromNumber } = config;
+
+        if (!whatsappTo || !whatsappTwilioAccountSid || !whatsappTwilioAuthToken || !whatsappTwilioFromNumber) {
+            throw new Error('WhatsApp configuration incomplete. Please provide Twilio credentials and phone numbers.');
+        }
+
+        try {
+            const twilio = require('twilio');
+            const client = twilio(whatsappTwilioAccountSid, whatsappTwilioAuthToken);
+
+            const message = await client.messages.create({
+                body: whatsappBody || '',
+                from: `whatsapp:${whatsappTwilioFromNumber}`,
+                to: `whatsapp:${whatsappTo}`
+            });
+
+            return {
+                success: true,
+                message: `WhatsApp sent to ${whatsappTo}`,
+                outputData: inputData,
+                messageSid: message.sid,
+                status: message.status
+            };
+        } catch (error) {
+            throw new Error(`Failed to send WhatsApp: ${error.message}`);
         }
     }
 

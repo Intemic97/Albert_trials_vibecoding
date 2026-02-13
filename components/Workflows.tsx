@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { FlowArrow as Workflow, Lightning as Zap, Play, CheckCircle, WarningCircle as AlertCircle, ArrowRight, ArrowLeft, X, FloppyDisk as Save, FolderOpen, Trash, PlayCircle, Check, XCircle, Database, Wrench, MagnifyingGlass as Search, CaretDoubleLeft as ChevronsLeft, CaretDoubleRight as ChevronsRight, Sparkle as Sparkles, Code, PencilSimple as Edit, SignOut as LogOut, ChatCircle as MessageSquare, Globe, Leaf, Share as Share2, UserCheck, GitMerge, FileXls as FileSpreadsheet, FileText, UploadSimple as Upload, Columns, DotsSixVertical as GripVertical, Users, Envelope as Mail, BookOpen, Copy, Eye, Clock, ClockCounterClockwise as History, ArrowsOut as Maximize2, MagnifyingGlassPlus as ZoomIn, MagnifyingGlassMinus as ZoomOut, Robot as Bot, DeviceMobile as Smartphone, ChartBar as BarChart3, User, Calendar, CaretRight as ChevronRight, CaretDown as ChevronDown, CaretUp as ChevronUp, Plus, Folder, ShieldCheck as Shield, Terminal, Tag, DotsThreeVertical as MoreVertical, WebhooksLogo as Webhook, Flask as FlaskConical, TrendUp, Bell, FilePdf, Bug, Pi } from '@phosphor-icons/react';
+import { FlowArrow as Workflow, Lightning as Zap, Play, CheckCircle, WarningCircle as AlertCircle, ArrowRight, ArrowLeft, X, FloppyDisk as Save, FolderOpen, Trash, PlayCircle, Check, XCircle, Database, Wrench, MagnifyingGlass as Search, CaretDoubleLeft as ChevronsLeft, CaretDoubleRight as ChevronsRight, Sparkle as Sparkles, Code, PencilSimple as Edit, SignOut as LogOut, ChatCircle as MessageSquare, Globe, Leaf, Share as Share2, UserCheck, GitMerge, FileXls as FileSpreadsheet, FileText, UploadSimple as Upload, Columns, DotsSixVertical as GripVertical, Users, Envelope as Mail, BookOpen, Copy, Eye, Clock, ClockCounterClockwise as History, ArrowsOut as Maximize2, MagnifyingGlassPlus as ZoomIn, MagnifyingGlassMinus as ZoomOut, Robot as Bot, DeviceMobile as Smartphone, ChartBar as BarChart3, User, Calendar, CaretRight as ChevronRight, CaretDown as ChevronDown, CaretUp as ChevronUp, Plus, Folder, ShieldCheck as Shield, Terminal, Tag, DotsThreeVertical as MoreVertical, WebhooksLogo as Webhook, Flask as FlaskConical, TrendUp, Bell, FilePdf, Bug, Pi, WhatsappLogo, TextAa } from '@phosphor-icons/react';
 import { NodeConfigSidePanel } from './NodeConfigSidePanel';
 import { DynamicChart, WidgetConfig } from './DynamicChart';
 import { PromptInput } from './PromptInput';
@@ -75,9 +75,10 @@ interface WorkflowSuggestion {
 interface WorkflowsProps {
     entities: any[];
     onViewChange?: (view: string) => void;
+    onEntityCreated?: () => void;
 }
 
-export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) => {
+export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, onEntityCreated }) => {
     const { workflowId: urlWorkflowId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -211,6 +212,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [addFieldValue, setAddFieldValue] = useState<string>('');
     const [configuringSaveNodeId, setConfiguringSaveNodeId] = useState<string | null>(null);
     const [saveEntityId, setSaveEntityId] = useState<string>('');
+    const [isCreatingNewEntity, setIsCreatingNewEntity] = useState(false);
+    const [newEntityName, setNewEntityName] = useState('');
+    const [isCreatingEntity, setIsCreatingEntity] = useState(false);
+    const [localCreatedEntities, setLocalCreatedEntities] = useState<Array<{ id: string; name: string; properties?: any[] }>>([]);
 
     // Sidebar State
     const [searchQuery, setSearchQuery] = useState('');
@@ -311,6 +316,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [twilioFromNumber, setTwilioFromNumber] = useState<string>('');
     const [showSMSTwilioSettings, setShowSMSTwilioSettings] = useState<boolean>(false);
 
+    // Send WhatsApp Node State
+    const [configuringWhatsAppNodeId, setConfiguringWhatsAppNodeId] = useState<string | null>(null);
+    const [whatsappTo, setWhatsappTo] = useState<string>('');
+    const [whatsappBody, setWhatsappBody] = useState<string>('');
+    const [whatsappTwilioAccountSid, setWhatsappTwilioAccountSid] = useState<string>('');
+    const [whatsappTwilioAuthToken, setWhatsappTwilioAuthToken] = useState<string>('');
+    const [whatsappTwilioFromNumber, setWhatsappTwilioFromNumber] = useState<string>('');
+    const [showWhatsAppTwilioSettings, setShowWhatsAppTwilioSettings] = useState<boolean>(false);
+
+    // Rename Columns Node State
+    const [configuringRenameColumnsNodeId, setConfiguringRenameColumnsNodeId] = useState<string | null>(null);
+    const [columnRenames, setColumnRenames] = useState<{ oldName: string; newName: string }[]>([{ oldName: '', newName: '' }]);
+
     // Data Visualization Node State
     const [configuringVisualizationNodeId, setConfiguringVisualizationNodeId] = useState<string | null>(null);
     const [visualizationPrompt, setVisualizationPrompt] = useState<string>('');
@@ -365,6 +383,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const [franmitReactionVolume, setFranmitReactionVolume] = useState<string>('');
     const [franmitCatalystScaleFactor, setFranmitCatalystScaleFactor] = useState<string>('');
     const [showFranmitApiSecret, setShowFranmitApiSecret] = useState<boolean>(false);
+
+    // Conveyor Node State
+    const [configuringConveyorNodeId, setConfiguringConveyorNodeId] = useState<string | null>(null);
+    const [conveyorSpeed, setConveyorSpeed] = useState<string>('');
+    const [conveyorLength, setConveyorLength] = useState<string>('');
+    const [conveyorWidth, setConveyorWidth] = useState<string>('');
+    const [conveyorInclination, setConveyorInclination] = useState<string>('');
+    const [conveyorLoadCapacity, setConveyorLoadCapacity] = useState<string>('');
+    const [conveyorBeltType, setConveyorBeltType] = useState<string>('flat');
+    const [conveyorMotorPower, setConveyorMotorPower] = useState<string>('');
+    const [conveyorFrictionCoeff, setConveyorFrictionCoeff] = useState<string>('');
 
     // Unsaved Changes Confirmation
     const [showExitConfirmation, setShowExitConfirmation] = useState<boolean>(false);
@@ -1006,6 +1035,43 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         // useEffect will handle setting currentView to 'canvas' based on /workflow/new URL
     };
 
+    // Close ALL config panels — prevents overlapping side panels
+    const closeAllConfigs = () => {
+        setConfiguringNodeId(null);
+        setConfiguringConditionNodeId(null);
+        setConfiguringAddFieldNodeId(null);
+        setConfiguringSaveNodeId(null);
+        setConfiguringLLMNodeId(null);
+        setConfiguringPythonNodeId(null);
+        setConfiguringJoinNodeId(null);
+        setConfiguringSplitColumnsNodeId(null);
+        setConfiguringExcelNodeId(null);
+        setConfiguringPdfNodeId(null);
+        setConfiguringManualInputNodeId(null);
+        setConfiguringHttpNodeId(null);
+        setConfiguringWebhookNodeId(null);
+        setConfiguringMySQLNodeId(null);
+        setConfiguringSAPNodeId(null);
+        setConfiguringEmailNodeId(null);
+        setConfiguringSMSNodeId(null);
+        setConfiguringWhatsAppNodeId(null);
+        setConfiguringRenameColumnsNodeId(null);
+        setConfiguringVisualizationNodeId(null);
+        setConfiguringScheduleNodeId(null);
+        setConfiguringOpcuaNodeId(null);
+        setConfiguringMqttNodeId(null);
+        setConfiguringOsiPiNodeId(null);
+        setConfiguringFranmitNodeId(null);
+        setConfiguringConveyorNodeId(null);
+        setConfiguringEsiosNodeId(null);
+        setConfiguringClimatiqNodeId(null);
+        setConfiguringHumanApprovalNodeId(null);
+        setConfiguringLIMSNodeId(null);
+        setConfiguringStatisticalNodeId(null);
+        setConfiguringAlertAgentNodeId(null);
+        setConfiguringPdfReportNodeId(null);
+    };
+
     const openNodeConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
         if (node && node.type === 'fetchData') {
@@ -1512,13 +1578,155 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             setConfiguringSaveNodeId(nodeId);
             setSaveEntityId(node.config?.entityId || '');
             setNodeCustomTitle(node.config?.customName || '');
+            setIsCreatingNewEntity(false);
+            setNewEntityName('');
         }
     };
+
+    /** Infer property type from a JS value */
+    const inferPropertyType = (value: any): string => {
+        if (value === null || value === undefined) return 'text';
+        if (typeof value === 'number') return 'number';
+        if (typeof value === 'boolean') return 'text';
+        if (typeof value === 'string') {
+            if (/^\d{4}-\d{2}-\d{2}/.test(value)) return 'date';
+            const num = Number(value);
+            if (!isNaN(num) && value.trim() !== '') return 'number';
+        }
+        return 'text';
+    };
+
+    /** Get output data from the parent node connected to a given node.
+     *  Falls back to synthesizing from node.config when not yet executed. */
+    const getParentNodeOutputData = (nodeId: string): any[] | null => {
+        const incoming = connections.filter(c => c.toNodeId === nodeId);
+        for (const conn of incoming) {
+            const parent = nodes.find(n => n.id === conn.fromNodeId);
+            if (!parent) continue;
+
+            // 1. Try already-executed output data
+            const executed = parent.outputData || parent.data;
+            if (executed) {
+                const data = parent.type === 'splitColumns'
+                    ? (conn as any).outputType === 'B' ? executed.outputB : executed.outputA
+                    : executed;
+                if (Array.isArray(data) && data.length > 0) return data;
+                if (data && typeof data === 'object' && !Array.isArray(data)) return [data];
+            }
+
+            // 2. Fallback: synthesize from node config for known types
+            if (parent.type === 'manualInput' && parent.config?.inputVarName) {
+                const varName = parent.config.inputVarName;
+                const varValue = parent.config.inputVarValue || '';
+                const parsed = !isNaN(Number(varValue)) && varValue.trim() !== '' ? Number(varValue) : varValue;
+                return [{ [varName]: parsed }];
+            }
+            if (parent.type === 'excelInput' && parent.config?.parsedData && parent.config.parsedData.length > 0) {
+                return parent.config.parsedData;
+            }
+            if (parent.type === 'excelInput' && parent.config?.previewData && parent.config.previewData.length > 0) {
+                return parent.config.previewData;
+            }
+            if (parent.type === 'excelInput' && parent.config?.headers && parent.config.headers.length > 0) {
+                // Build a synthetic row with column names
+                const row: Record<string, string> = {};
+                parent.config.headers.forEach((h: string) => { row[h] = ''; });
+                return [row];
+            }
+        }
+        return null;
+    };
+
+    /** Create a new entity with auto-detected properties from parent node data */
+    const handleCreateNewEntity = async () => {
+        if (!newEntityName.trim() || !configuringSaveNodeId) return;
+        setIsCreatingEntity(true);
+
+        try {
+            const entityId = generateUUID();
+            const now = new Date().toISOString();
+
+            // Detect properties from parent node output
+            const parentData = getParentNodeOutputData(configuringSaveNodeId);
+            const properties: Array<{ id: string; name: string; type: string; defaultValue: string }> = [];
+
+            if (parentData && parentData.length > 0) {
+                // Sample first rows to detect columns & types
+                const sample = parentData.slice(0, Math.min(5, parentData.length));
+                const allKeys = new Set<string>();
+                sample.forEach(row => {
+                    if (row && typeof row === 'object') {
+                        Object.keys(row).forEach(k => allKeys.add(k));
+                    }
+                });
+
+                // Skip internal/meta keys
+                const skipKeys = new Set(['id', 'createdAt', 'updatedAt', 'entityId', 'metadata', 'raw', '__index']);
+                allKeys.forEach(key => {
+                    if (skipKeys.has(key)) return;
+                    // Find first non-null value to infer type
+                    let sampleValue: any = undefined;
+                    for (const row of sample) {
+                        if (row[key] !== null && row[key] !== undefined) {
+                            sampleValue = row[key];
+                            break;
+                        }
+                    }
+                    properties.push({
+                        id: generateUUID(),
+                        name: key,
+                        type: inferPropertyType(sampleValue),
+                        defaultValue: ''
+                    });
+                });
+            }
+
+            // Call API to create entity
+            const res = await fetch(`${API_BASE}/entities`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    id: entityId,
+                    name: newEntityName.trim(),
+                    description: `Created from workflow`,
+                    author: 'Workflow',
+                    lastEdited: now,
+                    entityType: 'generic',
+                    properties
+                })
+            });
+
+            if (!res.ok) throw new Error('Failed to create entity');
+
+            // Add to local cache so the dropdown shows it immediately
+            setLocalCreatedEntities(prev => [...prev, { id: entityId, name: newEntityName.trim(), properties }]);
+
+            // Notify parent (App.tsx) to refresh global entities list
+            onEntityCreated?.();
+
+            // Select the newly created entity
+            setSaveEntityId(entityId);
+            setIsCreatingNewEntity(false);
+            setNewEntityName('');
+        } catch (error) {
+            console.error('Error creating entity:', error);
+        } finally {
+            setIsCreatingEntity(false);
+        }
+    };
+
+    /** Merged entities list: props + locally created ones */
+    const allEntities = React.useMemo(() => {
+        const ids = new Set(entities.map(e => e.id));
+        const extra = localCreatedEntities.filter(e => !ids.has(e.id));
+        return [...entities, ...extra];
+    }, [entities, localCreatedEntities]);
 
     const saveSaveRecordsConfig = () => {
         if (!configuringSaveNodeId || !saveEntityId) return;
 
-        const entity = entities.find(e => e.id === saveEntityId);
+        const entity = allEntities.find(e => e.id === saveEntityId);
         const defaultLabel = `Save to ${entity?.name || 'Database'}`;
         const finalLabel = nodeCustomTitle.trim() || defaultLabel;
         
@@ -1971,6 +2179,48 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
         setConfiguringFranmitNodeId(null);
     };
 
+    // Conveyor Node Functions
+    const openConveyorConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'conveyor') {
+            setConfiguringConveyorNodeId(nodeId);
+            setConveyorSpeed(node.config?.conveyorSpeed || '');
+            setConveyorLength(node.config?.conveyorLength || '');
+            setConveyorWidth(node.config?.conveyorWidth || '');
+            setConveyorInclination(node.config?.conveyorInclination || '');
+            setConveyorLoadCapacity(node.config?.conveyorLoadCapacity || '');
+            setConveyorBeltType(node.config?.conveyorBeltType || 'flat');
+            setConveyorMotorPower(node.config?.conveyorMotorPower || '');
+            setConveyorFrictionCoeff(node.config?.conveyorFrictionCoeff || '');
+        }
+    };
+
+    const saveConveyorConfig = () => {
+        if (!configuringConveyorNodeId) return;
+        if (!conveyorSpeed.trim() || !conveyorLength.trim()) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringConveyorNodeId
+                ? {
+                    ...n,
+                    label: `Conveyor: ${conveyorLength}m @ ${conveyorSpeed} m/s`,
+                    config: {
+                        ...n.config,
+                        conveyorSpeed,
+                        conveyorLength,
+                        conveyorWidth,
+                        conveyorInclination,
+                        conveyorLoadCapacity,
+                        conveyorBeltType,
+                        conveyorMotorPower,
+                        conveyorFrictionCoeff,
+                    }
+                }
+                : n
+        ));
+        setConfiguringConveyorNodeId(null);
+    };
+
     const openEmailConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
         if (node && node.type === 'sendEmail') {
@@ -2042,6 +2292,74 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 : n
         ));
         setConfiguringSMSNodeId(null);
+    };
+
+    const openWhatsAppConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'sendWhatsApp') {
+            setConfiguringWhatsAppNodeId(nodeId);
+            setWhatsappTo(node.config?.whatsappTo || '');
+            setWhatsappBody(node.config?.whatsappBody || '');
+            setWhatsappTwilioAccountSid(node.config?.whatsappTwilioAccountSid || '');
+            setWhatsappTwilioAuthToken(node.config?.whatsappTwilioAuthToken || '');
+            setWhatsappTwilioFromNumber(node.config?.whatsappTwilioFromNumber || '');
+        }
+    };
+
+    const saveWhatsAppConfig = () => {
+        if (!configuringWhatsAppNodeId) return;
+
+        setNodes(prev => prev.map(n =>
+            n.id === configuringWhatsAppNodeId
+                ? {
+                    ...n,
+                    label: whatsappTo ? `WhatsApp to: ${whatsappTo.slice(-4)}...` : 'Send WhatsApp',
+                    config: {
+                        ...n.config,
+                        whatsappTo,
+                        whatsappBody,
+                        whatsappTwilioAccountSid: whatsappTwilioAccountSid || undefined,
+                        whatsappTwilioAuthToken: whatsappTwilioAuthToken || undefined,
+                        whatsappTwilioFromNumber: whatsappTwilioFromNumber || undefined,
+                    }
+                }
+                : n
+        ));
+        setConfiguringWhatsAppNodeId(null);
+    };
+
+    const openRenameColumnsConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'action') {
+            setConfiguringRenameColumnsNodeId(nodeId);
+            const existing = node.config?.columnRenames;
+            if (existing && existing.length > 0) {
+                setColumnRenames(existing);
+            } else {
+                setColumnRenames([{ oldName: '', newName: '' }]);
+            }
+        }
+    };
+
+    const saveRenameColumnsConfig = () => {
+        if (!configuringRenameColumnsNodeId) return;
+
+        const validRenames = columnRenames.filter(r => r.oldName.trim() && r.newName.trim());
+        setNodes(prev => prev.map(n =>
+            n.id === configuringRenameColumnsNodeId
+                ? {
+                    ...n,
+                    label: validRenames.length > 0
+                        ? `Rename: ${validRenames.map(r => `${r.oldName} → ${r.newName}`).slice(0, 2).join(', ')}${validRenames.length > 2 ? '...' : ''}`
+                        : 'Rename Columns',
+                    config: {
+                        ...n.config,
+                        columnRenames: validRenames,
+                    }
+                }
+                : n
+        ));
+        setConfiguringRenameColumnsNodeId(null);
     };
 
     const openVisualizationConfig = (nodeId: string) => {
@@ -2814,7 +3132,22 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                     result = 'Triggered!';
                     break;
                 case 'action':
-                    result = 'Action executed!';
+                    // Rename Columns logic
+                    if (node.config?.columnRenames && node.config.columnRenames.length > 0 && inputData && Array.isArray(inputData)) {
+                        const renames = node.config.columnRenames as { oldName: string; newName: string }[];
+                        nodeData = inputData.map((row: any) => {
+                            const newRow: any = {};
+                            for (const key of Object.keys(row)) {
+                                const rename = renames.find(r => r.oldName === key);
+                                newRow[rename ? rename.newName : key] = row[key];
+                            }
+                            return newRow;
+                        });
+                        result = `Renamed ${renames.length} column(s): ${renames.map(r => `${r.oldName} → ${r.newName}`).join(', ')}`;
+                    } else {
+                        nodeData = inputData;
+                        result = 'No column renames configured';
+                    }
                     break;
                 case 'condition':
                     // Evaluate condition (supports multiple conditions with AND/OR)
@@ -3120,6 +3453,68 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             status: 'error' as const, 
                             executionResult: result,
                             outputData: [{ error: errorMessage }]
+                        });
+                        return;
+                    }
+                    break;
+                case 'conveyor':
+                    try {
+                        const speed = parseFloat(node.config?.conveyorSpeed || '0');
+                        const length = parseFloat(node.config?.conveyorLength || '0');
+                        const width = parseFloat(node.config?.conveyorWidth || '0') || 0.8;
+                        const inclination = parseFloat(node.config?.conveyorInclination || '0');
+                        const loadCapacity = parseFloat(node.config?.conveyorLoadCapacity || '0') || 50;
+                        const motorPower = parseFloat(node.config?.conveyorMotorPower || '0') || 0;
+                        const frictionCoeff = parseFloat(node.config?.conveyorFrictionCoeff || '0') || 0.025;
+                        const beltType = node.config?.conveyorBeltType || 'flat';
+
+                        if (!speed || !length) {
+                            throw new Error('Speed and Length are required parameters');
+                        }
+
+                        const g = 9.81;
+                        const inclinationRad = (inclination * Math.PI) / 180;
+                        const transportTime = length / speed;
+                        const throughput = loadCapacity * speed * 3.6; // t/h
+                        const horizontalComponent = frictionCoeff * loadCapacity * length * g * Math.cos(inclinationRad);
+                        const verticalComponent = loadCapacity * length * g * Math.sin(inclinationRad);
+                        const beltTension = horizontalComponent + verticalComponent;
+                        const requiredPower = (beltTension * speed) / 1000; // kW
+                        const efficiency = motorPower > 0 ? Math.min((requiredPower / motorPower) * 100, 100) : 0;
+
+                        const conveyorOutput = {
+                            belt_speed_m_s: speed,
+                            belt_length_m: length,
+                            belt_width_m: width,
+                            belt_type: beltType,
+                            inclination_deg: inclination,
+                            load_capacity_kg_m: loadCapacity,
+                            friction_coefficient: frictionCoeff,
+                            transport_time_s: Math.round(transportTime * 100) / 100,
+                            throughput_t_h: Math.round(throughput * 100) / 100,
+                            belt_tension_N: Math.round(beltTension * 100) / 100,
+                            required_power_kW: Math.round(requiredPower * 100) / 100,
+                            motor_power_kW: motorPower || 'N/A',
+                            motor_efficiency_pct: motorPower > 0 ? Math.round(efficiency * 100) / 100 : 'N/A',
+                        };
+
+                        // If there's input data (rows), merge the conveyor output with each input row
+                        if (Array.isArray(inputData) && inputData.length > 0) {
+                            nodeData = inputData.map((row: any) => ({
+                                ...row,
+                                ...conveyorOutput,
+                            }));
+                        } else {
+                            nodeData = [conveyorOutput];
+                        }
+                        result = `Conveyor model calculated: transport ${transportTime.toFixed(1)}s, throughput ${throughput.toFixed(1)} t/h, power ${requiredPower.toFixed(2)} kW`;
+                    } catch (error: any) {
+                        console.error('Conveyor execution error:', error);
+                        result = `Error: ${error.message || 'Conveyor calculation failed'}`;
+                        updateNodeAndBroadcast(nodeId, {
+                            status: 'error' as const,
+                            executionResult: result,
+                            outputData: [{ error: error.message }]
                         });
                         return;
                     }
@@ -3596,6 +3991,54 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         }
                     } else {
                         result = 'Phone number not configured';
+                    }
+                    break;
+                case 'sendWhatsApp':
+                    if (node.config?.whatsappTo) {
+                        try {
+                            const replaceVariablesWA = (text: string, data: any) => {
+                                if (!text || !data) return text;
+                                let result = text;
+                                const record = Array.isArray(data) ? data[0] : data;
+                                if (record && typeof record === 'object') {
+                                    Object.keys(record).forEach(key => {
+                                        const regex = new RegExp(`\\{${key}\\}`, 'g');
+                                        result = result.replace(regex, String(record[key] ?? ''));
+                                    });
+                                }
+                                return result;
+                            };
+
+                            const waData = {
+                                to: replaceVariablesWA(node.config.whatsappTo, inputData),
+                                body: replaceVariablesWA(node.config.whatsappBody || '', inputData),
+                                accountSid: node.config.whatsappTwilioAccountSid,
+                                authToken: node.config.whatsappTwilioAuthToken,
+                                fromNumber: node.config.whatsappTwilioFromNumber
+                            };
+
+                            const response = await fetch(`${API_BASE}/whatsapp/send`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(waData),
+                                credentials: 'include'
+                            });
+
+                            if (response.ok) {
+                                const data = await response.json();
+                                nodeData = inputData || [{ whatsappSent: true, to: waData.to }];
+                                result = `WhatsApp sent to ${waData.to}`;
+                            } else {
+                                const errorData = await response.json();
+                                throw new Error(errorData.error || 'Failed to send WhatsApp');
+                            }
+                        } catch (error) {
+                            console.error('WhatsApp send error:', error);
+                            result = `Error: ${error.message || 'Failed to send WhatsApp'}`;
+                            nodeData = [{ error: error.message }];
+                        }
+                    } else {
+                        result = 'WhatsApp number not configured';
                     }
                     break;
                 case 'dataVisualization':
@@ -4862,6 +5305,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 return !!node.config?.emailTo;
             case 'sendSMS':
                 return !!node.config?.smsTo;
+            case 'sendWhatsApp':
+                return !!node.config?.whatsappTo;
             case 'dataVisualization':
                 return !!node.config?.generatedWidget;
             case 'esios':
@@ -4872,8 +5317,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 return !!node.config?.assignedUserId;
             case 'comment':
                 return !!node.config?.commentText;
-            case 'trigger':
             case 'action':
+                return (node.config?.columnRenames?.length || 0) > 0;
+            case 'trigger':
             case 'output':
             case 'agent':
             case 'opcua':
@@ -4883,6 +5329,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                 // Franmit está configurado si tiene al menos un parámetro configurado
                 // (no requiere API Secret ID para ejecución local)
                 return true; // Siempre permitir ejecución, validación se hace en el backend
+            case 'conveyor':
+                return !!(node.config?.conveyorSpeed && node.config?.conveyorLength);
             default:
                 return false;
         }
@@ -4939,7 +5387,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
     const getNodeIconColor = (type: string): string => {
         switch (type) {
             case 'trigger': return 'text-cyan-600';
-            case 'action': return 'text-blue-600';
+            case 'action': return 'text-amber-600';
             case 'condition': return 'text-[var(--text-secondary)]';
             case 'fetchData': return 'text-indigo-600';
             case 'humanApproval': return 'text-sky-600';
@@ -4964,12 +5412,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
             case 'pdfInput': return 'text-indigo-600';
             case 'sendEmail': return 'text-blue-600';
             case 'sendSMS': return 'text-blue-600';
+            case 'sendWhatsApp': return 'text-green-600';
             case 'dataVisualization': return 'text-indigo-600';
             case 'webhook': return 'text-cyan-600';
             case 'agent': return 'text-purple-600';
             case 'opcua': return 'text-indigo-600';
             case 'mqtt': return 'text-cyan-600';
             case 'franmit': return 'text-teal-600';
+            case 'conveyor': return 'text-amber-600';
             default: return 'text-[var(--text-secondary)]';
         }
     };
@@ -5042,6 +5492,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         placeholder="Search workflows..."
                                         value={workflowSearchQuery}
                                         onChange={(e) => setWorkflowSearchQuery(e.target.value)}
+                                        autoComplete="off"
+                                        name="workflow-search-nofill"
                                         className="pl-8 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] w-60 placeholder:text-[var(--text-tertiary)]"
                                     />
                                 </div>
@@ -5310,6 +5762,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             placeholder="Search"
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
+                                            autoComplete="off"
+                                            name="component-search-nofill"
                                             className="w-full pl-9 pr-4 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-[var(--text-tertiary)]"
                                         />
                                     </div>
@@ -5325,10 +5779,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             'Data Sources': { icon: Database, items: DRAGGABLE_ITEMS.filter(i => ['fetchData', 'excelInput', 'pdfInput', 'http', 'mysql', 'sapFetch', 'limsFetch', 'opcua', 'mqtt', 'osiPi', 'esios', 'climatiq', 'manualInput'].includes(i.type)) },
                                             'Data Operations': { icon: GitMerge, items: DRAGGABLE_ITEMS.filter(i => ['join', 'splitColumns', 'addField', 'action'].includes(i.type)) },
                                             'Control Flow': { icon: AlertCircle, items: DRAGGABLE_ITEMS.filter(i => ['condition', 'humanApproval', 'alertAgent', 'dataVisualization'].includes(i.type)) },
-                                            'Models': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['llm', 'statisticalAnalysis', 'franmit'].includes(i.type)) },
+                                            'Models': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['llm', 'statisticalAnalysis', 'franmit', 'conveyor'].includes(i.type)) },
                                             'Code': { icon: Code, items: DRAGGABLE_ITEMS.filter(i => ['python'].includes(i.type)) },
                                             'Output & Logging': { icon: LogOut, items: DRAGGABLE_ITEMS.filter(i => ['output', 'saveRecords'].includes(i.type)) },
-                                            'Notifications': { icon: Mail, items: DRAGGABLE_ITEMS.filter(i => ['sendEmail', 'sendSMS', 'pdfReport'].includes(i.type)) },
+                                            'Notifications': { icon: Mail, items: DRAGGABLE_ITEMS.filter(i => ['sendEmail', 'sendSMS', 'sendWhatsApp', 'pdfReport'].includes(i.type)) },
                                             'Utils': { icon: Wrench, items: DRAGGABLE_ITEMS.filter(i => ['comment'].includes(i.type)) },
                                         };
 
@@ -5907,6 +6361,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                             // Don't open modal if node was dragged
                                             if (nodeDragged) return;
 
+                                            // Close any open config panel before opening a new one
+                                            closeAllConfigs();
+
                                             // Open config for configurable nodes
                                             if (node.type === 'fetchData') {
                                                 openNodeConfig(node.id);
@@ -5914,6 +6371,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openConditionConfig(node.id);
                                             } else if (node.type === 'addField') {
                                                 openAddFieldConfig(node.id);
+                                            } else if (node.type === 'action') {
+                                                openRenameColumnsConfig(node.id);
                                             } else if (node.type === 'saveRecords') {
                                                 openSaveRecordsConfig(node.id);
                                             } else if (node.type === 'agent') {
@@ -5944,6 +6403,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openEmailConfig(node.id);
                                             } else if (node.type === 'sendSMS') {
                                                 openSMSConfig(node.id);
+                                            } else if (node.type === 'sendWhatsApp') {
+                                                openWhatsAppConfig(node.id);
                                             } else if (node.type === 'dataVisualization') {
                                                 openVisualizationConfig(node.id);
                                             } else if (node.type === 'esios') {
@@ -5964,6 +6425,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                 openOsiPiConfig(node.id);
                                             } else if (node.type === 'franmit') {
                                                 openFranmitConfig(node.id);
+                                            } else if (node.type === 'conveyor') {
+                                                openConveyorConfig(node.id);
                                             } else if (node.type === 'trigger' && (node.label === 'Schedule' || node.label.startsWith('Schedule:') || node.config?.scheduleInterval)) {
                                                 openScheduleConfig(node.id);
                                             }
@@ -6107,6 +6570,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     openConditionConfig(node.id);
                                                                 } else if (node.type === 'addField') {
                                                                     openAddFieldConfig(node.id);
+                                                                } else if (node.type === 'action') {
+                                                                    openRenameColumnsConfig(node.id);
                                                                 } else if (node.type === 'saveRecords') {
                                                                     openSaveConfig(node.id);
                                                                 } else if (node.type === 'llm') {
@@ -6143,6 +6608,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                                                     openEmailConfig(node.id);
                                                                 } else if (node.type === 'sendSMS') {
                                                                     openSMSConfig(node.id);
+                                                                } else if (node.type === 'sendWhatsApp') {
+                                                                    openWhatsAppConfig(node.id);
                                                                 } else if (node.type === 'dataVisualization') {
                                                                     openVisualizationConfig(node.id);
                                                                 } else if (node.type === 'esios') {
@@ -7614,6 +8081,219 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                             </NodeConfigSidePanel>
                         )}
 
+                        {/* Conveyor Belt Configuration Panel */}
+                        {configuringConveyorNodeId && (
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringConveyorNodeId}
+                                onClose={() => setConfiguringConveyorNodeId(null)}
+                                title="Conveyor Belt"
+                                description="Industrial conveyor belt model"
+                                icon={Workflow}
+                                width="w-[500px]"
+                                footer={
+                                    <>
+                                        <button
+                                            onClick={() => setConfiguringConveyorNodeId(null)}
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={saveConveyorConfig}
+                                            disabled={!conveyorSpeed.trim() || !conveyorLength.trim()}
+                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Save
+                                        </button>
+                                    </>
+                                }
+                            >
+                                <div className="space-y-5">
+                                    {/* Required Inputs Info */}
+                                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                                        <h4 className="text-xs font-semibold text-amber-800 dark:text-amber-300 mb-1.5 flex items-center gap-1.5">
+                                            <AlertCircle size={14} />
+                                            Required Inputs
+                                        </h4>
+                                        <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-relaxed">
+                                            This node requires <strong>Speed</strong> and <strong>Length</strong> to calculate transport dynamics. 
+                                            Connect an upstream node providing input data, or configure the parameters below.
+                                        </p>
+                                    </div>
+
+                                    {/* Required Parameters Section */}
+                                    <div className="border-t border-[var(--border-light)] pt-4">
+                                        <h4 className="text-xs font-medium text-[var(--text-secondary)] mb-3 text-center">Required Parameters</h4>
+
+                                        {/* Speed */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Belt Speed (m/s) <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={conveyorSpeed}
+                                                onChange={(e) => setConveyorSpeed(e.target.value)}
+                                                placeholder="e.g. 1.5"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                            <p className="text-[10px] text-[var(--text-tertiary)] mt-1">Linear speed of the conveyor belt surface</p>
+                                        </div>
+
+                                        {/* Length */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Belt Length (m) <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={conveyorLength}
+                                                onChange={(e) => setConveyorLength(e.target.value)}
+                                                placeholder="e.g. 25"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                            <p className="text-[10px] text-[var(--text-tertiary)] mt-1">Total distance from loading to discharge point</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Optional Parameters Section */}
+                                    <div className="border-t border-[var(--border-light)] pt-4">
+                                        <h4 className="text-xs font-medium text-[var(--text-secondary)] mb-3 text-center">Physical Parameters</h4>
+
+                                        {/* Width */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Belt Width (m)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={conveyorWidth}
+                                                onChange={(e) => setConveyorWidth(e.target.value)}
+                                                placeholder="e.g. 0.8"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                        </div>
+
+                                        {/* Inclination */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Inclination Angle (°)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={conveyorInclination}
+                                                onChange={(e) => setConveyorInclination(e.target.value)}
+                                                placeholder="e.g. 15 (0 = horizontal)"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                            <p className="text-[10px] text-[var(--text-tertiary)] mt-1">Angle of incline, 0° for horizontal conveyors</p>
+                                        </div>
+
+                                        {/* Load Capacity */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Max Load Capacity (kg/m)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={conveyorLoadCapacity}
+                                                onChange={(e) => setConveyorLoadCapacity(e.target.value)}
+                                                placeholder="e.g. 50"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                            <p className="text-[10px] text-[var(--text-tertiary)] mt-1">Maximum material load per meter of belt</p>
+                                        </div>
+
+                                        {/* Belt Type */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Belt Type
+                                            </label>
+                                            <select
+                                                value={conveyorBeltType}
+                                                onChange={(e) => setConveyorBeltType(e.target.value)}
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] bg-[var(--bg-card)]"
+                                            >
+                                                <option value="flat">Flat Belt</option>
+                                                <option value="troughed">Troughed Belt</option>
+                                                <option value="cleated">Cleated Belt</option>
+                                                <option value="modular">Modular Belt</option>
+                                                <option value="roller">Roller Conveyor</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Motor & Mechanical Section */}
+                                    <div className="border-t border-[var(--border-light)] pt-4">
+                                        <h4 className="text-xs font-medium text-[var(--text-secondary)] mb-3 text-center">Motor & Mechanical</h4>
+
+                                        {/* Motor Power */}
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Motor Power (kW)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={conveyorMotorPower}
+                                                onChange={(e) => setConveyorMotorPower(e.target.value)}
+                                                placeholder="e.g. 7.5"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                        </div>
+
+                                        {/* Friction Coefficient */}
+                                        <div>
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Friction Coefficient (μ)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={conveyorFrictionCoeff}
+                                                onChange={(e) => setConveyorFrictionCoeff(e.target.value)}
+                                                placeholder="e.g. 0.025"
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                                            />
+                                            <p className="text-[10px] text-[var(--text-tertiary)] mt-1">Belt-to-idler friction coefficient (typical: 0.02–0.03)</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Calculated Outputs Info */}
+                                    <div className="border-t border-[var(--border-light)] pt-4">
+                                        <h4 className="text-xs font-medium text-[var(--text-secondary)] mb-2 text-center">Calculated Outputs</h4>
+                                        <div className="bg-[var(--bg-tertiary)] rounded-lg p-3 space-y-1.5">
+                                            <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)]">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                Transport time (s) — Time for material to travel the full belt length
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)]">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                Throughput (t/h) — Material mass flow rate
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)]">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                Required power (kW) — Estimated drive power needed
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)]">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                Belt tension (N) — Effective belt tension force
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Feedback Link */}
+                                    <div className="pt-3 border-t border-[var(--border-light)]">
+                                        <button
+                                            onClick={() => openFeedbackPopup('conveyor', 'Conveyor Belt')}
+                                            className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
+                                        >
+                                            <MessageSquare size={12} />
+                                            What would you like this node to do?
+                                        </button>
+                                    </div>
+                                </div>
+                            </NodeConfigSidePanel>
+                        )}
+
                         {/* LIMS Connector Modal */}
                         {configuringLIMSNodeId && (
                             <NodeConfigSidePanel
@@ -8266,6 +8946,338 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                         <div className="pt-3 border-t border-[var(--border-light)]">
                                             <button
                                                 onClick={() => openFeedbackPopup('sendSMS', 'Send SMS')}
+                                                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
+                                            >
+                                                <MessageSquare size={12} weight="light" />
+                                                What would you like this node to do?
+                                            </button>
+                                        </div>
+                                </NodeConfigSidePanel>
+                            );
+                        })()}
+
+                        {/* Send WhatsApp Configuration Modal */}
+                        {configuringWhatsAppNodeId && (() => {
+                            // Get input data from parent node for @ mentions
+                            const parentConnectionWA = connections.find(c => c.toNodeId === configuringWhatsAppNodeId);
+                            const parentNodeWA = parentConnectionWA ? nodes.find(n => n.id === parentConnectionWA.fromNodeId) : null;
+                            let inputDataForWA: any[] = [];
+                            
+                            if (parentNodeWA) {
+                                if (parentNodeWA.type === 'splitColumns' && parentNodeWA.outputData) {
+                                    inputDataForWA = parentConnectionWA.outputType === 'B' 
+                                        ? parentNodeWA.outputData.outputB || []
+                                        : parentNodeWA.outputData.outputA || [];
+                                } else {
+                                    inputDataForWA = parentNodeWA.outputData || parentNodeWA.config?.parsedData || [];
+                                }
+                            }
+
+                            return (
+                                <NodeConfigSidePanel
+                                    isOpen={!!configuringWhatsAppNodeId}
+                                    onClose={() => setConfiguringWhatsAppNodeId(null)}
+                                    title="Send WhatsApp"
+                                    icon={WhatsappLogo}
+                                    width="w-[550px]"
+                                    footer={
+                                        <>
+                                            <button
+                                                onClick={() => setConfiguringWhatsAppNodeId(null)}
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveWhatsAppConfig}
+                                                disabled={!whatsappTo.trim()}
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Save
+                                            </button>
+                                        </>
+                                    }
+                                >
+                                        <div className="space-y-5">
+                                            <div>
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                    To (phone number with country code)
+                                                </label>
+                                                <div className="h-16">
+                                                    <PromptInput
+                                                        entities={entities}
+                                                        onGenerate={() => {}}
+                                                        isGenerating={false}
+                                                        initialValue={whatsappTo}
+                                                        placeholder="+34612345678 — Use @ to mention Input Data"
+                                                        hideButton={true}
+                                                        onChange={(val) => setWhatsappTo(val)}
+                                                        className="h-full [&_textarea]:!h-10 [&_textarea]:!min-h-0 [&_textarea]:!p-2 [&_textarea]:!text-sm"
+                                                        inputData={inputDataForWA}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                    Message Body
+                                                </label>
+                                                <div className="h-32">
+                                                    <PromptInput
+                                                        entities={entities}
+                                                        onGenerate={() => {}}
+                                                        isGenerating={false}
+                                                        initialValue={whatsappBody}
+                                                        placeholder="Write your WhatsApp message here...&#10;&#10;Use @ to mention Input Data or entities."
+                                                        hideButton={true}
+                                                        onChange={(val) => setWhatsappBody(val)}
+                                                        className="h-full"
+                                                        inputData={inputDataForWA}
+                                                    />
+                                                </div>
+                                                <p className="text-[10px] text-[var(--text-secondary)] mt-1">
+                                                    WhatsApp messages support rich text formatting and up to 4096 characters
+                                                </p>
+                                            </div>
+
+                                            {/* Twilio Settings (collapsible) */}
+                                            <div className="border border-[var(--border-light)] rounded-lg">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowWhatsAppTwilioSettings(!showWhatsAppTwilioSettings)}
+                                                    className="w-full px-4 py-2 flex items-center justify-between text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                                >
+                                                    <span>⚙️ Twilio Settings</span>
+                                                    <span>{showWhatsAppTwilioSettings ? '▲' : '▼'}</span>
+                                                </button>
+                                                
+                                                {showWhatsAppTwilioSettings && (
+                                                    <div className="p-4 border-t border-[var(--border-light)] space-y-3">
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                                                                Account SID
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={whatsappTwilioAccountSid}
+                                                                onChange={(e) => setWhatsappTwilioAccountSid(e.target.value)}
+                                                                placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                                                className="w-full px-2 py-1.5 text-sm border border-[var(--border-medium)] rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                                                                Auth Token
+                                                            </label>
+                                                            <input
+                                                                type="password"
+                                                                value={whatsappTwilioAuthToken}
+                                                                onChange={(e) => setWhatsappTwilioAuthToken(e.target.value)}
+                                                                placeholder="••••••••••••"
+                                                                className="w-full px-2 py-1.5 text-sm border border-[var(--border-medium)] rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                                                                From Number (WhatsApp-enabled Twilio number)
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={whatsappTwilioFromNumber}
+                                                                onChange={(e) => setWhatsappTwilioFromNumber(e.target.value)}
+                                                                placeholder="+14155238886"
+                                                                className="w-full px-2 py-1.5 text-sm border border-[var(--border-medium)] rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                                                            />
+                                                            <p className="text-[10px] text-[var(--text-secondary)] mt-1">
+                                                                Use your Twilio WhatsApp Sandbox number or a registered WhatsApp Business number. Get it from twilio.com/console
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Feedback Link */}
+                                        <div className="pt-3 border-t border-[var(--border-light)]">
+                                            <button
+                                                onClick={() => openFeedbackPopup('sendWhatsApp', 'Send WhatsApp')}
+                                                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
+                                            >
+                                                <MessageSquare size={12} weight="light" />
+                                                What would you like this node to do?
+                                            </button>
+                                        </div>
+                                </NodeConfigSidePanel>
+                            );
+                        })()}
+
+                        {/* Rename Columns Configuration Modal */}
+                        {configuringRenameColumnsNodeId && (() => {
+                            // Get input data columns from parent node
+                            const parentConnRC = connections.find(c => c.toNodeId === configuringRenameColumnsNodeId);
+                            const parentNodeRC = parentConnRC ? nodes.find(n => n.id === parentConnRC.fromNodeId) : null;
+                            let inputColumnsRC: string[] = [];
+                            
+                            if (parentNodeRC) {
+                                let parentData: any[] = [];
+                                if (parentNodeRC.type === 'splitColumns' && parentNodeRC.outputData) {
+                                    parentData = parentConnRC.outputType === 'B'
+                                        ? parentNodeRC.outputData.outputB || []
+                                        : parentNodeRC.outputData.outputA || [];
+                                } else {
+                                    parentData = parentNodeRC.outputData || parentNodeRC.config?.parsedData || [];
+                                }
+                                if (Array.isArray(parentData) && parentData.length > 0) {
+                                    inputColumnsRC = Object.keys(parentData[0]).filter(
+                                        k => !['id', 'createdAt', 'updatedAt', 'entityId', 'metadata', 'raw', '__index'].includes(k)
+                                    );
+                                }
+                            }
+
+                            return (
+                                <NodeConfigSidePanel
+                                    isOpen={!!configuringRenameColumnsNodeId}
+                                    onClose={() => setConfiguringRenameColumnsNodeId(null)}
+                                    title="Rename Columns"
+                                    icon={TextAa}
+                                    width="w-[550px]"
+                                    footer={
+                                        <>
+                                            <button
+                                                onClick={() => setConfiguringRenameColumnsNodeId(null)}
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={saveRenameColumnsConfig}
+                                                disabled={!columnRenames.some(r => r.oldName.trim() && r.newName.trim())}
+                                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Save
+                                            </button>
+                                        </>
+                                    }
+                                >
+                                    <div className="space-y-4">
+                                        {inputColumnsRC.length === 0 && (
+                                            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                                                <p className="text-xs text-amber-700 dark:text-amber-300">
+                                                    ⚠️ No input data detected. Run the parent node first to auto-detect available columns, or type column names manually.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <div className="space-y-3">
+                                            {columnRenames.map((rename, idx) => (
+                                                <div key={idx} className="flex items-center gap-2">
+                                                    <div className="flex-1">
+                                                        {idx === 0 && (
+                                                            <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1 uppercase tracking-wider">
+                                                                Original Column
+                                                            </label>
+                                                        )}
+                                                        {inputColumnsRC.length > 0 ? (
+                                                            <select
+                                                                value={rename.oldName}
+                                                                onChange={(e) => {
+                                                                    const updated = [...columnRenames];
+                                                                    updated[idx] = { ...updated[idx], oldName: e.target.value };
+                                                                    setColumnRenames(updated);
+                                                                }}
+                                                                className="w-full px-2.5 py-2 text-sm bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 text-[var(--text-primary)]"
+                                                            >
+                                                                <option value="">Select column...</option>
+                                                                {inputColumnsRC.map(col => (
+                                                                    <option key={col} value={col} disabled={columnRenames.some((r, i) => i !== idx && r.oldName === col)}>
+                                                                        {col}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        ) : (
+                                                            <input
+                                                                type="text"
+                                                                value={rename.oldName}
+                                                                onChange={(e) => {
+                                                                    const updated = [...columnRenames];
+                                                                    updated[idx] = { ...updated[idx], oldName: e.target.value };
+                                                                    setColumnRenames(updated);
+                                                                }}
+                                                                placeholder="Column name"
+                                                                className="w-full px-2.5 py-2 text-sm bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 text-[var(--text-primary)]"
+                                                            />
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex items-center pt-4">
+                                                        <ArrowRight size={14} className="text-[var(--text-tertiary)]" />
+                                                    </div>
+
+                                                    <div className="flex-1">
+                                                        {idx === 0 && (
+                                                            <label className="block text-[10px] font-medium text-[var(--text-secondary)] mb-1 uppercase tracking-wider">
+                                                                New Name
+                                                            </label>
+                                                        )}
+                                                        <input
+                                                            type="text"
+                                                            value={rename.newName}
+                                                            onChange={(e) => {
+                                                                const updated = [...columnRenames];
+                                                                updated[idx] = { ...updated[idx], newName: e.target.value };
+                                                                setColumnRenames(updated);
+                                                            }}
+                                                            placeholder="New column name"
+                                                            className="w-full px-2.5 py-2 text-sm bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 text-[var(--text-primary)]"
+                                                        />
+                                                    </div>
+
+                                                    {columnRenames.length > 1 && (
+                                                        <button
+                                                            onClick={() => {
+                                                                const updated = columnRenames.filter((_, i) => i !== idx);
+                                                                setColumnRenames(updated);
+                                                            }}
+                                                            className="flex items-center justify-center w-7 h-7 mt-4 text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                                                        >
+                                                            <Trash size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <button
+                                            onClick={() => setColumnRenames(prev => [...prev, { oldName: '', newName: '' }])}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-dashed border-[var(--border-medium)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors w-full justify-center"
+                                        >
+                                            <Plus size={12} />
+                                            Add another column to rename
+                                        </button>
+
+                                        {/* Preview of configured renames */}
+                                        {columnRenames.some(r => r.oldName.trim() && r.newName.trim()) && (
+                                            <div className="p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
+                                                <p className="text-[10px] font-medium text-[var(--text-secondary)] mb-2 uppercase tracking-wider">Preview</p>
+                                                <div className="space-y-1">
+                                                    {columnRenames
+                                                        .filter(r => r.oldName.trim() && r.newName.trim())
+                                                        .map((r, i) => (
+                                                            <div key={i} className="flex items-center gap-2 text-xs">
+                                                                <span className="font-mono text-[var(--text-primary)] bg-[var(--bg-primary)] px-1.5 py-0.5 rounded">{r.oldName}</span>
+                                                                <ArrowRight size={10} className="text-[var(--text-tertiary)]" />
+                                                                <span className="font-mono text-amber-600 dark:text-amber-400 bg-[var(--bg-primary)] px-1.5 py-0.5 rounded">{r.newName}</span>
+                                                            </div>
+                                                        ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Feedback Link */}
+                                    <div className="pt-3 border-t border-[var(--border-light)]">
+                                        <button
+                                            onClick={() => openFeedbackPopup('action', 'Rename Columns')}
                                                 className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
                                             >
                                                 <MessageSquare size={12} weight="light" />
@@ -10112,13 +11124,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                         {configuringSaveNodeId && (
                             <NodeConfigSidePanel
                                     isOpen={!!configuringSaveNodeId}
-                                onClose={() => setConfiguringSaveNodeId(null)}
+                                onClose={() => { setConfiguringSaveNodeId(null); setIsCreatingNewEntity(false); setNewEntityName(''); }}
                                 title="Save to Database"
                                 icon={Database}
                                 footer={
                                     <>
                                         <button
-                                            onClick={() => setConfiguringSaveNodeId(null)}
+                                            onClick={() => { setConfiguringSaveNodeId(null); setIsCreatingNewEntity(false); setNewEntityName(''); }}
                                             className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                         >
                                             Cancel
@@ -10133,22 +11145,119 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange }) 
                                     </>
                                 }
                             >
-                                <div className="space-y-6">
+                                <div className="space-y-4">
                                     <div>
                                         <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                                             Select Entity
                                         </label>
                                         <select
                                             value={saveEntityId}
-                                            onChange={(e) => setSaveEntityId(e.target.value)}
+                                            onChange={(e) => { setSaveEntityId(e.target.value); setIsCreatingNewEntity(false); }}
                                             className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
                                         >
                                             <option value="">Choose entity...</option>
-                                            {entities.map(entity => (
+                                            {allEntities.map(entity => (
                                                 <option key={entity.id} value={entity.id}>{entity.name}</option>
                                             ))}
                                         </select>
                                     </div>
+
+                                    {/* + New Database */}
+                                    {!isCreatingNewEntity ? (
+                                        <button
+                                            onClick={() => { setIsCreatingNewEntity(true); setSaveEntityId(''); }}
+                                            className="flex items-center gap-1.5 text-xs text-[var(--accent-primary)] hover:text-[var(--accent-secondary)] font-medium transition-colors"
+                                        >
+                                            <Plus size={14} weight="bold" />
+                                            New database
+                                        </button>
+                                    ) : (
+                                        <div className="border border-[var(--border-light)] rounded-lg p-3 space-y-3 bg-[var(--bg-tertiary)]">
+                                            <label className="block text-xs font-medium text-[var(--text-primary)]">
+                                                New Database Name
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={newEntityName}
+                                                onChange={(e) => setNewEntityName(e.target.value)}
+                                                placeholder="e.g. Viticultors Output"
+                                                autoFocus
+                                                className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] bg-[var(--bg-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+                                                onKeyDown={(e) => { if (e.key === 'Enter' && newEntityName.trim()) handleCreateNewEntity(); }}
+                                            />
+
+                                            {/* Preview detected columns */}
+                                            {(() => {
+                                                const parentData = configuringSaveNodeId ? getParentNodeOutputData(configuringSaveNodeId) : null;
+                                                if (!parentData || parentData.length === 0) return null;
+                                                const sample = parentData[0];
+                                                const keys = Object.keys(sample).filter(k => !['id', 'createdAt', 'updatedAt', 'entityId', 'metadata', 'raw', '__index'].includes(k));
+                                                if (keys.length === 0) return null;
+                                                return (
+                                                    <div>
+                                                        <p className="text-[10px] text-[var(--text-tertiary)] mb-1.5">
+                                                            {keys.length} properties detected from upstream data:
+                                                        </p>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {keys.slice(0, 20).map(k => (
+                                                                <span key={k} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-[var(--bg-primary)] border border-[var(--border-light)] text-[var(--text-secondary)] font-mono">
+                                                                    {k}
+                                                                </span>
+                                                            ))}
+                                                            {keys.length > 20 && (
+                                                                <span className="text-[10px] text-[var(--text-tertiary)]">+{keys.length - 20} more</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => { setIsCreatingNewEntity(false); setNewEntityName(''); }}
+                                                    className="px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    onClick={handleCreateNewEntity}
+                                                    disabled={!newEntityName.trim() || isCreatingEntity}
+                                                    className="flex items-center gap-1.5 px-3 py-1 bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {isCreatingEntity ? (
+                                                        <>
+                                                            <span className="animate-spin inline-block w-3 h-3 border border-white border-t-transparent rounded-full" />
+                                                            Creating...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Plus size={12} weight="bold" />
+                                                            Create
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Show selected entity info */}
+                                    {saveEntityId && !isCreatingNewEntity && (() => {
+                                        const selectedEntity = allEntities.find(e => e.id === saveEntityId);
+                                        if (!selectedEntity) return null;
+                                        const propCount = selectedEntity.properties?.length || 0;
+                                        return (
+                                            <div className="p-2.5 border border-[var(--border-light)] rounded-lg bg-[var(--bg-tertiary)]">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <Database size={12} className="text-[var(--text-secondary)]" />
+                                                    <span className="text-xs font-medium text-[var(--text-primary)]">{selectedEntity.name}</span>
+                                                </div>
+                                                <p className="text-[10px] text-[var(--text-tertiary)]">
+                                                    {propCount} {propCount === 1 ? 'property' : 'properties'}
+                                                    {selectedEntity.description ? ` · ${selectedEntity.description}` : ''}
+                                                </p>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </NodeConfigSidePanel>
                         )}

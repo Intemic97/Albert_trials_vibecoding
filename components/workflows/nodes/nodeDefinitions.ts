@@ -34,8 +34,10 @@ import {
   DiscordLogo,
   MicrosoftTeamsLogo,
   TelegramLogo,
+  WhatsappLogo,
   GoogleLogo,
   Pi,
+  ArrowRight,
 } from '@phosphor-icons/react';
 import { NodeType, NodeStatus } from '../types';
 
@@ -342,6 +344,16 @@ export const NODE_DEFINITIONS: Record<NodeType, NodeDefinition> = {
     bgColor: 'bg-green-50',
     borderColor: 'border-green-200',
   },
+  sendWhatsApp: {
+    type: 'sendWhatsApp',
+    label: 'Send WhatsApp',
+    description: 'Send a WhatsApp message via Twilio',
+    category: 'actions',
+    icon: WhatsappLogo,
+    color: 'text-green-600',
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-200',
+  },
   sendSlack: {
     type: 'sendSlack',
     label: 'Send Slack',
@@ -414,13 +426,13 @@ export const NODE_DEFINITIONS: Record<NodeType, NodeDefinition> = {
   },
   action: {
     type: 'action',
-    label: 'Update Record',
-    description: 'Modify existing records',
-    category: 'actions',
+    label: 'Rename Columns',
+    description: 'Rename columns in a dataset',
+    category: 'logic',
     icon: CheckCircle,
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-50',
-    borderColor: 'border-emerald-200',
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-200',
   },
   output: {
     type: 'output',
@@ -558,7 +570,23 @@ export const NODE_DEFINITIONS: Record<NodeType, NodeDefinition> = {
       requiredConfig: ['aggregationType', 'interval'],
     },
   },
-};
+
+  // Models
+  conveyor: {
+    type: 'conveyor',
+    label: 'Conveyor Belt',
+    description: 'Industrial conveyor belt model - simulate transport dynamics',
+    category: 'other',
+    icon: ArrowRight,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-200',
+    configFields: ['conveyorSpeed', 'conveyorLength', 'conveyorWidth', 'conveyorLoadCapacity'],
+    validationRules: {
+      requiredConfig: ['conveyorSpeed', 'conveyorLength'],
+    },
+  },
+} as any;
 
 /**
  * Get node definition by type

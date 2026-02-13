@@ -29,13 +29,16 @@ import {
   DiscordLogo,
   MicrosoftTeamsLogo,
   TelegramLogo,
+  WhatsappLogo,
   GoogleLogo,
   Factory,
   Cpu,
   WifiHigh,
   Pi,
   Atom,
-  Brain
+  Brain,
+  TextAa,
+  ArrowRight,
 } from '@phosphor-icons/react';
 import { DraggableItem, NodeType } from './types';
 
@@ -77,6 +80,7 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   { type: 'python', label: 'Python Code', icon: Code, description: 'Run Python script', category: 'Logic' },
   { type: 'statisticalAnalysis', label: 'Statistical Analysis', icon: TrendUp, description: 'Perform PCA, SPC, or compare with golden batch', category: 'Logic' },
   { type: 'franmit', label: 'FranMIT Reactor', icon: Atom, description: 'Chemical reactor model - calculate outputs from inputs', category: 'Other' },
+  { type: 'conveyor', label: 'Conveyor Belt', icon: ArrowRight, description: 'Industrial conveyor belt model - simulate transport dynamics', category: 'Other' },
   { type: 'alertAgent', label: 'Alert Agent', icon: Bell, description: 'Configure deterministic alerts with conditions and actions', category: 'Logic' },
   { type: 'addField', label: 'Add Field', icon: CheckCircle, description: 'Add a new field to data', category: 'Logic' },
   { type: 'humanApproval', label: 'Human in the Loop', icon: UserCheck, description: 'Wait for user approval to continue', category: 'Logic' },
@@ -84,6 +88,7 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   // Actions
   { type: 'sendEmail', label: 'Send Email', icon: Envelope, description: 'Send an email notification', category: 'Actions' },
   { type: 'sendSMS', label: 'Send SMS', icon: DeviceMobile, description: 'Send an SMS text message via Twilio', category: 'Actions' },
+  { type: 'sendWhatsApp', label: 'Send WhatsApp', icon: WhatsappLogo, description: 'Send a WhatsApp message via Twilio', category: 'Actions' },
   { type: 'sendSlack', label: 'Send Slack', icon: SlackLogo, description: 'Send a message to Slack channel', category: 'Actions' },
   { type: 'sendDiscord', label: 'Send Discord', icon: DiscordLogo, description: 'Send a message to Discord channel', category: 'Actions' },
   { type: 'sendTeams', label: 'Send Teams', icon: MicrosoftTeamsLogo, description: 'Send a message to Microsoft Teams', category: 'Actions' },
@@ -91,7 +96,7 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   { type: 'googleSheets', label: 'Google Sheets', icon: GoogleLogo, description: 'Read/write data from Google Sheets', category: 'Data' },
   { type: 'dataVisualization', label: 'Data Visualization', icon: ChartBar, description: 'Generate charts from data using AI', category: 'Actions' },
   { type: 'pdfReport', label: 'PDF Report Generator', icon: FilePdf, description: 'Generate structured PDF reports from data', category: 'Actions' },
-  { type: 'action', label: 'Update Record', icon: CheckCircle, description: 'Modify existing records', category: 'Actions' },
+  { type: 'action', label: 'Rename Columns', icon: TextAa, description: 'Rename columns in a dataset', category: 'Logic' },
   { type: 'output', label: 'Workflow Output', icon: CheckCircle, description: 'Set the final output', category: 'Actions' },
   
   // Other
@@ -115,7 +120,7 @@ export const NODE_CATEGORIES = [
  */
 export const NODE_ICONS: Record<NodeType, React.ElementType> = {
   trigger: Play,
-  action: CheckCircle,
+  action: TextAa,
   condition: WarningCircle,
   fetchData: Database,
   addField: CheckCircle,
@@ -136,6 +141,7 @@ export const NODE_ICONS: Record<NodeType, React.ElementType> = {
   mysql: Database,
   sendEmail: Envelope,
   sendSMS: DeviceMobile,
+  sendWhatsApp: WhatsappLogo,
   dataVisualization: ChartBar,
   webhook: Globe,
   sapFetch: Database,
@@ -150,6 +156,11 @@ export const NODE_ICONS: Record<NodeType, React.ElementType> = {
   pdfReport: FilePdf,
   osiPi: Pi,
   franmit: Atom,
+  conveyor: ArrowRight,
+  scada: Factory,
+  mes: Factory,
+  dataHistorian: Database,
+  timeSeriesAggregator: TrendUp,
 };
 
 /**

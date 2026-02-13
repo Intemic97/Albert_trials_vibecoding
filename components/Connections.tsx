@@ -861,7 +861,7 @@ export const Connections: React.FC = () => {
                                     Connect to {selectedConnection.name}
                                 </h3>
                                 <p className="text-xs text-[var(--text-secondary)] mt-1">
-                                    Configure your connection settings
+                                    Upgrade to Pro to connect to your tools
                                 </p>
                             </div>
                             <button
@@ -1601,12 +1601,14 @@ export const Connections: React.FC = () => {
 
                             <div className="flex gap-2 justify-end pt-4 border-t border-[var(--border-light)]">
                                 <button
+                                    type="button"
                                     onClick={() => setShowContactInfo(true)}
                                     className="px-6 py-2.5 bg-[#2D3748] hover:bg-[#1A202C] text-white rounded-lg text-sm font-medium transition-all shadow-md hover:shadow-lg"
                                 >
-                                    Contact Sales
+                                    Upgrade Plan
                                 </button>
                                 <button
+                                    type="button"
                                     onClick={() => { setShowConfigModal(false); setShowContactInfo(false); }}
                                     className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                                 >
@@ -1618,7 +1620,7 @@ export const Connections: React.FC = () => {
                             {showContactInfo && (
                                 <div className="mt-4 p-4 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-left">
                                     <p className="text-sm text-[var(--text-secondary)]">
-                                        Write us at <a href="mailto:info@intemic.com" className="text-[#419CAF] hover:underline font-medium">info@intemic.com</a> about your requirements and we will provide a personalized proposal.
+                                        Write us at <a href="mailto:info@intemic.com" className="text-[#419CAF] hover:underline font-medium">info@intemic.com</a> to upgrade your plan and unlock all integrations.
                                     </p>
                                 </div>
                             )}

@@ -421,22 +421,8 @@ const GridWidgetCard: React.FC<{
                 </div>
                 {/* Chart container - takes all remaining space */}
                 <div className="flex-1 flex flex-col min-h-0" style={{ overflow: 'hidden' }}>
+                    {(widget.dataConfig?.xAxisColumn || widget.dataConfig?.yAxisColumn) && (
                     <div className="px-3 pt-2 flex items-center gap-2 flex-wrap">
-                        <span
-                            onClick={(e) => {
-                                if (!onSourceClick || !widget.dataConfig?.entityId) return;
-                                e.stopPropagation();
-                                e.preventDefault();
-                                onSourceClick(widget);
-                            }}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] ${widget.dataConfig?.entityId && onSourceClick ? 'cursor-pointer hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] transition-colors' : ''}`}
-                        >
-                            {sourceLabel}
-                        </span>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border border-[var(--border-light)] ${analyticalConfidence.bg} ${analyticalConfidence.color}`}>
-                            {analyticalConfidence.label}
-                        </span>
                         {widget.dataConfig?.xAxisColumn && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] border border-[var(--border-light)]">
                                 X: {widget.xAxisKey || 'n/a'}
@@ -448,6 +434,7 @@ const GridWidgetCard: React.FC<{
                             </span>
                         )}
                     </div>
+                    )}
                     {widget.description && (
                         <div className="px-3 pt-2 pb-1 flex-shrink-0">
                             <p className="text-xs text-[var(--text-secondary)]">{widget.description}</p>
@@ -2063,7 +2050,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                     }
                 } else {
                     setSelectedDashboardId(null);
-                    await handleCreateProcessExampleDashboard('hdpe_transition_monitoring', true);
                 }
             }
         } catch (error) {
@@ -2286,25 +2272,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
         }
     };
 
-    const handleDeleteDashboard = async () => {
-        if (!selectedDashboardId) return;
+    const handleDeleteDashboard = async (dashboardId?: string) => {
+        const targetId = dashboardId || selectedDashboardId;
+        if (!targetId) return;
         if (!confirm('Are you sure you want to delete this dashboard and all its widgets?')) return;
         
         try {
-            const res = await fetch(`${API_BASE}/dashboards/${selectedDashboardId}`, {
+            const res = await fetch(`${API_BASE}/dashboards/${targetId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
 
             if (res.ok) {
-                const remaining = dashboards.filter(d => d.id !== selectedDashboardId);
+                const remaining = dashboards.filter(d => d.id !== targetId);
                 setDashboards(remaining);
-                if (remaining.length > 0) {
-                    selectDashboard(remaining[0].id);
-                } else {
-                    setSelectedDashboardId(null);
-                    navigate('/dashboard', { replace: true });
+                if (targetId === selectedDashboardId) {
+                    if (remaining.length > 0) {
+                        selectDashboard(remaining[0].id);
+                    } else {
+                        setSelectedDashboardId(null);
+                        navigate('/dashboard', { replace: true });
+                    }
                 }
+                success('Dashboard deleted');
             }
         } catch (error) {
             console.error('Error deleting dashboard:', error);

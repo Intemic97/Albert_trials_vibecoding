@@ -62,7 +62,7 @@ export const getNodeColor = (type: string, status?: string): string => {
 export const getNodeIconColor = (type: string): string => {
     const colorMap: { [key: string]: string } = {
         'trigger': 'text-cyan-600',
-        'action': 'text-blue-600',
+        'action': 'text-amber-600',
         'condition': 'text-[var(--text-secondary)]',
         'fetchData': 'text-indigo-600',
         'humanApproval': 'text-sky-600',
@@ -87,11 +87,14 @@ export const getNodeIconColor = (type: string): string => {
         'pdfInput': 'text-indigo-600',
         'sendEmail': 'text-blue-600',
         'sendSMS': 'text-blue-600',
+        'sendWhatsApp': 'text-green-600',
         'dataVisualization': 'text-indigo-600',
         'webhook': 'text-cyan-600',
         'agent': 'text-purple-600',
         'opcua': 'text-indigo-600',
-        'mqtt': 'text-cyan-600'
+        'mqtt': 'text-cyan-600',
+        'conveyor': 'text-amber-600',
+        'franmit': 'text-teal-600'
     };
     return colorMap[type] || 'text-[var(--text-secondary)]';
 };
@@ -141,17 +144,20 @@ export const isNodeConfigured = (node: WorkflowNode): boolean => {
         'pdfReport': (n) => !!n.config?.pdfTemplate,
         'sendEmail': (n) => !!n.config?.emailTo,
         'sendSMS': (n) => !!n.config?.smsTo,
+        'sendWhatsApp': (n) => !!n.config?.whatsappTo,
         'dataVisualization': (n) => !!n.config?.generatedWidget,
         'esios': (n) => !!n.config?.esiosArchiveId,
         'climatiq': (n) => !!n.config?.climatiqFactor,
         'humanApproval': (n) => !!n.config?.assignedUserId,
         'comment': (n) => !!n.config?.commentText,
         'trigger': () => true,
-        'action': () => true,
+        'action': (n) => (n.config?.columnRenames?.length || 0) > 0,
         'output': () => true,
         'agent': () => true,
         'opcua': () => true,
-        'mqtt': () => true
+        'mqtt': () => true,
+        'franmit': () => true,
+        'conveyor': (n) => !!(n.config?.conveyorSpeed && n.config?.conveyorLength)
     };
 
     const check = configChecks[node.type];

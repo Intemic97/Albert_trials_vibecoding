@@ -450,7 +450,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                 // Single color for bars - more elegant
                 const barColor = colors[0] || '#419CAF';
                 return (
-                    <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} barCategoryGap="20%">
+                    <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barCategoryGap="20%">
                         <defs>
                             <linearGradient id="barGradientMain" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor={barColor} stopOpacity={0.9} />
@@ -498,7 +498,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
             case 'line':
                 const lineColor = colors[0] || '#419CAF';
                 return (
-                    <LineChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <defs>
                             {colors.map((color, i) => (
                                 <linearGradient key={i} id={`lineGradient-${i}`} x1="0" y1="0" x2="0" y2="1">
@@ -510,7 +510,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                         <CartesianGrid strokeDasharray="4 4" stroke={gridColor} vertical={false} strokeOpacity={0.5} />
                         <XAxis dataKey={xAxisKey} {...axisProps} tickMargin={8} />
                         <YAxis {...axisProps} tickMargin={8} allowDecimals={false} />
-                        <Tooltip content={<CustomTooltip isDarkMode={isDarkMode} />} />
+                        <Tooltip content={<CustomTooltip isDarkMode={isDarkMode} />} cursor={{ stroke: isDarkMode ? '#555' : '#ccc', strokeDasharray: '3 3' }} />
                         {Array.isArray(dataKey) && dataKey.length > 1 && (
                             <Legend content={<CustomLegend isDarkMode={isDarkMode} />} />
                         )}
@@ -524,7 +524,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                                     strokeWidth={2}
                                     dot={false}
                                     activeDot={{ r: 5, fill: colors[index % colors.length], strokeWidth: 2, stroke: isDarkMode ? '#1a1a1a' : '#ffffff' }}
-                                    animationDuration={1000}
+                                    isAnimationActive={false}
                                 />
                             ))
                         ) : (
@@ -535,7 +535,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                                 strokeWidth={2}
                                 dot={false}
                                 activeDot={{ r: 5, fill: lineColor, strokeWidth: 2, stroke: isDarkMode ? '#1a1a1a' : '#ffffff' }}
-                                animationDuration={1000}
+                                isAnimationActive={false}
                             />
                         )}
                     </LineChart>
@@ -544,7 +544,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
             case 'area':
                 const areaColor = colors[0] || '#419CAF';
                 return (
-                    <AreaChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <defs>
                             <linearGradient id="areaGradientMain" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor={areaColor} stopOpacity={0.3} />
@@ -560,7 +560,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                         <CartesianGrid strokeDasharray="4 4" stroke={gridColor} vertical={false} strokeOpacity={0.5} />
                         <XAxis dataKey={xAxisKey} {...axisProps} tickMargin={8} />
                         <YAxis {...axisProps} tickMargin={8} allowDecimals={false} />
-                        <Tooltip content={<CustomTooltip isDarkMode={isDarkMode} />} />
+                        <Tooltip content={<CustomTooltip isDarkMode={isDarkMode} />} cursor={{ stroke: isDarkMode ? '#555' : '#ccc', strokeDasharray: '3 3' }} />
                         {Array.isArray(dataKey) && dataKey.length > 1 && (
                             <Legend content={<CustomLegend isDarkMode={isDarkMode} />} />
                         )}
@@ -574,7 +574,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                                     stroke={colors[index % colors.length]} 
                                     strokeWidth={2}
                                     fill={`url(#areaGradient-${index % colors.length})`}
-                                    animationDuration={1000}
+                                    isAnimationActive={false}
                                 />
                             ))
                         ) : (
@@ -584,7 +584,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                                 stroke={areaColor} 
                                 strokeWidth={2}
                                 fill="url(#areaGradientMain)"
-                                animationDuration={1000}
+                                isAnimationActive={false}
                             />
                         )}
                     </AreaChart>

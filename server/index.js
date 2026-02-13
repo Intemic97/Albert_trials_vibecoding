@@ -8136,6 +8136,42 @@ app.post('/api/sms/send', authenticateToken, async (req, res) => {
     }
 });
 
+// Send WhatsApp Endpoint (using Twilio)
+app.post('/api/whatsapp/send', authenticateToken, async (req, res) => {
+    const { to, body, accountSid, authToken, fromNumber } = req.body;
+
+    if (!to) {
+        return res.status(400).json({ error: 'Recipient phone number is required' });
+    }
+
+    if (!accountSid || !authToken || !fromNumber) {
+        return res.status(400).json({ error: 'Twilio credentials are required (Account SID, Auth Token, and From Number)' });
+    }
+
+    try {
+        const twilio = require('twilio');
+        const client = twilio(accountSid, authToken);
+
+        const message = await client.messages.create({
+            body: body || '',
+            from: `whatsapp:${fromNumber}`,
+            to: `whatsapp:${to}`
+        });
+
+        console.log('WhatsApp sent:', message.sid);
+        res.json({ 
+            success: true, 
+            messageSid: message.sid,
+            status: message.status,
+            to: message.to,
+            from: message.from
+        });
+    } catch (error) {
+        console.error('WhatsApp send error:', error);
+        res.status(500).json({ error: error.message || 'Failed to send WhatsApp message' });
+    }
+});
+
 // Node Feedback Endpoints
 app.post('/api/node-feedback', authenticateToken, async (req, res) => {
     try {
