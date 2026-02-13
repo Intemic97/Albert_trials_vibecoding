@@ -5492,6 +5492,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                         placeholder="Search workflows..."
                                         value={workflowSearchQuery}
                                         onChange={(e) => setWorkflowSearchQuery(e.target.value)}
+                                        autoComplete="off"
+                                        name="workflow-search-nofill"
                                         className="pl-8 pr-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] w-60 placeholder:text-[var(--text-tertiary)]"
                                     />
                                 </div>
@@ -5760,6 +5762,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                             placeholder="Search"
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
+                                            autoComplete="off"
+                                            name="component-search-nofill"
                                             className="w-full pl-9 pr-4 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-[var(--text-tertiary)]"
                                         />
                                     </div>
