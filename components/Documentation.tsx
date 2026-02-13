@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     CaretRight, 
@@ -17,7 +17,12 @@ import {
     Gear,
     Info,
     Lightbulb,
-    ChartLine
+    ChartLine,
+    Shield,
+    Lock,
+    Key,
+    UserCircle,
+    ShieldCheck
 } from '@phosphor-icons/react';
 
 // ============================================================================
@@ -42,8 +47,6 @@ const DOC_SECTIONS: DocSection[] = [
         icon: Lightning,
         subsections: [
             { id: 'what-is-intemic', title: 'What is Intemic?' },
-            { id: 'architecture', title: 'Architecture' },
-            { id: 'installation', title: 'Installation' },
             { id: 'first-workflow', title: 'Your First Workflow' }
         ]
     },
@@ -72,11 +75,12 @@ const DOC_SECTIONS: DocSection[] = [
         ]
     },
     {
-        id: 'copilots',
-        title: 'Copilots',
+        id: 'inteligencia',
+        title: 'Inteligencia',
         icon: Sparkle,
         subsections: [
-            { id: 'create-copilot', title: 'Creating Copilots' },
+            { id: 'agents', title: 'Agents' },
+            { id: 'chat', title: 'Chat' },
             { id: 'data-access', title: 'Data Access Control' },
             { id: 'mentions', title: 'Using Mentions' },
             { id: 'reports', title: 'AI Reports' }
@@ -115,16 +119,6 @@ const DOC_SECTIONS: DocSection[] = [
         ]
     },
     {
-        id: 'api',
-        title: 'API Reference',
-        icon: Code,
-        subsections: [
-            { id: 'authentication', title: 'Authentication' },
-            { id: 'endpoints', title: 'Endpoints' },
-            { id: 'errors', title: 'Error Codes' }
-        ]
-    },
-    {
         id: 'settings',
         title: 'Settings & Admin',
         icon: Gear,
@@ -132,6 +126,18 @@ const DOC_SECTIONS: DocSection[] = [
             { id: 'users', title: 'User Management' },
             { id: 'organizations', title: 'Organizations' },
             { id: 'notifications', title: 'Notifications' }
+        ]
+    },
+    {
+        id: 'security',
+        title: 'Security',
+        icon: Shield,
+        subsections: [
+            { id: 'overview', title: 'Overview' },
+            { id: 'authentication', title: 'Authentication & SSO' },
+            { id: 'authorization', title: 'Roles & Permissions' },
+            { id: 'data-protection', title: 'Data Protection' },
+            { id: 'compliance', title: 'Privacy & Compliance' }
         ]
     },
     {
@@ -206,19 +212,6 @@ const Table: React.FC<{ headers: string[]; rows: string[][] }> = ({ headers, row
     </div>
 );
 
-const Badge: React.FC<{ type: 'get' | 'post' | 'put' | 'delete'; children: React.ReactNode }> = ({ type, children }) => {
-    const colors = {
-        get: 'bg-emerald-500/20 text-emerald-400',
-        post: 'bg-blue-500/20 text-blue-400',
-        put: 'bg-amber-500/20 text-amber-400',
-        delete: 'bg-red-500/20 text-red-400'
-    };
-    return (
-        <span className={`px-2 py-0.5 rounded text-xs font-mono font-medium ${colors[type]}`}>
-            {children}
-        </span>
-    );
-};
 
 // ============================================================================
 // MAIN COMPONENT
@@ -226,49 +219,87 @@ const Badge: React.FC<{ type: 'get' | 'post' | 'put' | 'delete'; children: React
 
 export const Documentation: React.FC = () => {
     const navigate = useNavigate();
+    const mainContentRef = useRef<HTMLElement>(null);
     const [activeSection, setActiveSection] = useState<string>('getting-started');
     const [activeSubsection, setActiveSubsection] = useState<string | null>(null);
+    const [pendingSubsection, setPendingSubsection] = useState<string | null>(null);
 
     useEffect(() => {
         const hash = window.location.hash.slice(1);
         if (hash) {
-            const parts = hash.split('-');
-            if (parts.length >= 2) {
-                const section = DOC_SECTIONS.find(s => hash.startsWith(s.id));
-                if (section) {
-                    setActiveSection(section.id);
+            const section = DOC_SECTIONS.find(s => hash.startsWith(s.id));
+            if (section) {
+                setActiveSection(section.id);
+                if (hash !== section.id) {
                     setActiveSubsection(hash);
+                    setPendingSubsection(hash);
                 }
             }
         }
     }, []);
 
-    const scrollToSection = (sectionId: string) => {
-        const element = document.getElementById(sectionId);
-        if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            window.history.pushState(null, '', `#${sectionId}`);
-            
-            const section = DOC_SECTIONS.find(s => sectionId.startsWith(s.id));
-            if (section) {
-                setActiveSection(section.id);
-                setActiveSubsection(sectionId);
+    // After section renders, scroll to pending subsection if any
+    useEffect(() => {
+        if (pendingSubsection) {
+            requestAnimationFrame(() => {
+                const el = document.getElementById(pendingSubsection);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                setPendingSubsection(null);
+            });
+        }
+    }, [pendingSubsection, activeSection]);
+
+    const navigateToSection = useCallback((sectionId: string) => {
+        // Find parent section
+        const parentSection = DOC_SECTIONS.find(s => sectionId === s.id || sectionId.startsWith(s.id + '-'));
+        if (!parentSection) return;
+
+        const isSubsection = sectionId !== parentSection.id;
+        const isNewSection = parentSection.id !== activeSection;
+
+        window.history.pushState(null, '', `#${sectionId}`);
+        setActiveSubsection(isSubsection ? sectionId : null);
+
+        if (isNewSection) {
+            setActiveSection(parentSection.id);
+            // Scroll to top of main content
+            if (mainContentRef.current) {
+                mainContentRef.current.scrollTop = 0;
+            }
+            // If navigating to a subsection in a new section, defer scroll
+            if (isSubsection) {
+                setPendingSubsection(sectionId);
+            }
+        } else if (isSubsection) {
+            // Same section, just scroll to subsection
+            const el = document.getElementById(sectionId);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        } else {
+            // Same section header clicked, scroll to top
+            if (mainContentRef.current) {
+                mainContentRef.current.scrollTop = 0;
             }
         }
-    };
+    }, [activeSection]);
 
     const getCurrentSectionIndex = () => DOC_SECTIONS.findIndex(s => s.id === activeSection);
-    const getPreviousSection = () => {
-        const idx = getCurrentSectionIndex();
-        return idx > 0 ? DOC_SECTIONS[idx - 1] : null;
-    };
-    const getNextSection = () => {
-        const idx = getCurrentSectionIndex();
-        return idx < DOC_SECTIONS.length - 1 ? DOC_SECTIONS[idx + 1] : null;
-    };
 
-    const previousSection = getPreviousSection();
-    const nextSection = getNextSection();
+    const goToSection = useCallback((section: DocSection) => {
+        setActiveSection(section.id);
+        setActiveSubsection(null);
+        window.history.pushState(null, '', `#${section.id}`);
+        if (mainContentRef.current) {
+            mainContentRef.current.scrollTop = 0;
+        }
+    }, []);
+
+    const previousSection = getCurrentSectionIndex() > 0 ? DOC_SECTIONS[getCurrentSectionIndex() - 1] : null;
+    const nextSection = getCurrentSectionIndex() < DOC_SECTIONS.length - 1 ? DOC_SECTIONS[getCurrentSectionIndex() + 1] : null;
+    const currentSectionData = DOC_SECTIONS[getCurrentSectionIndex()];
 
     return (
         <div className="flex flex-col h-full bg-[var(--bg-primary)]">
@@ -276,7 +307,7 @@ export const Documentation: React.FC = () => {
             <header className="h-16 bg-[var(--bg-primary)] border-b border-[var(--border-light)] flex items-center justify-between px-8 z-10 shrink-0 sticky top-0">
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={() => navigate(-1)}
+                        onClick={() => navigate('/overview')}
                         className="p-2 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     >
                         <ArrowLeft size={18} weight="light" />
@@ -302,7 +333,7 @@ export const Documentation: React.FC = () => {
                                     return (
                                         <li key={section.id}>
                                             <button
-                                                onClick={() => scrollToSection(section.id)}
+                                                onClick={() => navigateToSection(section.id)}
                                                 className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                                                     isActive
                                                         ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border-light)]'
@@ -320,7 +351,7 @@ export const Documentation: React.FC = () => {
                                                         return (
                                                             <li key={sub.id}>
                                                                 <button
-                                                                    onClick={() => scrollToSection(subId)}
+                                                                    onClick={() => navigateToSection(subId)}
                                                                     className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
                                                                         isSubActive
                                                                             ? 'text-[#256A65] font-medium'
@@ -342,13 +373,13 @@ export const Documentation: React.FC = () => {
                     </aside>
 
                     {/* Main Content */}
-                    <main className="flex-1 overflow-y-auto">
+                    <main ref={mainContentRef} className="flex-1 overflow-y-auto">
                         <div className="max-w-4xl mx-auto px-8 py-12">
 
                             {/* ================================================================== */}
                             {/* GETTING STARTED */}
                             {/* ================================================================== */}
-                            <section id="getting-started" className="mb-20">
+                            {activeSection === 'getting-started' && <section id="getting-started" className="mb-8">
                                 <div className="mb-8">
                                     <h1 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-3">Getting Started</h1>
                                     <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
@@ -368,7 +399,7 @@ export const Documentation: React.FC = () => {
                                     <ul className="list-disc pl-6 space-y-2 text-[var(--text-primary)] mb-6">
                                         <li><strong>Data Silos</strong> — Centralize data from multiple sources into a unified knowledge base</li>
                                         <li><strong>Manual Processes</strong> — Automate repetitive tasks with visual workflows</li>
-                                        <li><strong>Limited Insights</strong> — Create dashboards and AI copilots to unlock data value</li>
+                                        <li><strong>Limited Insights</strong> — Create dashboards and AI agents to unlock data value</li>
                                         <li><strong>Integration Complexity</strong> — Connect to SAP, Oracle, databases, and cloud services easily</li>
                                     </ul>
 
@@ -393,7 +424,7 @@ export const Documentation: React.FC = () => {
                                         rows={[
                                             ['Dashboards', 'Create interactive visualizations with charts and KPIs'],
                                             ['Lab', 'Run simulations and scenario analysis using workflows'],
-                                            ['Copilots', 'AI assistants that understand your data and answer questions']
+                                            ['Inteligencia', 'AI agents that understand your data and answer questions']
                                         ]}
                                     />
                                     
@@ -405,94 +436,6 @@ export const Documentation: React.FC = () => {
                                             ['Documents', 'Generate professional reports from your data']
                                         ]}
                                     />
-                                </div>
-
-                                {/* Architecture */}
-                                <div id="getting-started-architecture" className="mb-12">
-                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Architecture</h2>
-                                    <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
-                                        Intemic follows a modern client-server architecture:
-                                    </p>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
-                                        <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
-                                            <h4 className="font-medium text-[var(--text-primary)] mb-2">Frontend</h4>
-                                            <ul className="text-sm text-[var(--text-secondary)] space-y-1">
-                                                <li>React 19 + TypeScript</li>
-                                                <li>Tailwind CSS</li>
-                                                <li>Vite (bundler)</li>
-                                                <li>Recharts (visualizations)</li>
-                                            </ul>
-                                        </div>
-                                        <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
-                                            <h4 className="font-medium text-[var(--text-primary)] mb-2">Backend</h4>
-                                            <ul className="text-sm text-[var(--text-secondary)] space-y-1">
-                                                <li>Node.js + Express</li>
-                                                <li>SQLite (default DB)</li>
-                                                <li>JWT Authentication</li>
-                                                <li>OpenAI API (AI features)</li>
-                                            </ul>
-                                        </div>
-                                        <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
-                                            <h4 className="font-medium text-[var(--text-primary)] mb-2">Optional</h4>
-                                            <ul className="text-sm text-[var(--text-secondary)] space-y-1">
-                                                <li>PostgreSQL / MySQL</li>
-                                                <li>Prefect (workflow engine)</li>
-                                                <li>Redis (caching)</li>
-                                                <li>AWS Lambda (serverless)</li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Installation */}
-                                <div id="getting-started-installation" className="mb-12">
-                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Installation</h2>
-                                    <p className="text-[var(--text-primary)] mb-4">Get up and running in under 5 minutes.</p>
-
-                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Prerequisites</h3>
-                                    <ul className="list-disc pl-6 space-y-2 text-[var(--text-primary)] mb-4">
-                                        <li>Node.js 18+ and npm</li>
-                                        <li>Git</li>
-                                        <li>OpenAI API key (optional, for AI features)</li>
-                                    </ul>
-
-                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Quick Setup</h3>
-                                    <CodeBlock 
-                                        code={`# 1. Clone the repository
-git clone https://github.com/your-org/intemic-platform.git
-cd intemic-platform
-
-# 2. Install dependencies
-npm install
-
-# 3. Configure environment
-cp ENV_TEMPLATE.txt server/.env
-# Edit server/.env with your settings
-
-# 4. Start the backend (terminal 1)
-npm run server
-
-# 5. Start the frontend (terminal 2)
-npm run dev
-
-# 6. Open http://localhost:5175 in your browser`}
-                                    />
-
-                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Environment Variables</h3>
-                                    <Table 
-                                        headers={['Variable', 'Description', 'Required']}
-                                        rows={[
-                                            ['PORT', 'Backend server port (default: 3001)', 'No'],
-                                            ['JWT_SECRET', 'Secret key for JWT tokens', 'Yes'],
-                                            ['OPENAI_API_KEY', 'OpenAI API key for Copilots', 'For AI'],
-                                            ['DATABASE_URL', 'Database connection string', 'No']
-                                        ]}
-                                    />
-
-                                    <Tip>
-                                        For production deployments, see the <strong>Deployment Guide</strong> in the repository.
-                                    </Tip>
                                 </div>
 
                                 {/* First Workflow */}
@@ -528,12 +471,12 @@ npm run dev
                                         Use <strong>Templates</strong> to get started faster! Intemic includes pre-built workflows for common use cases like data imports, scheduled reports, and API integrations.
                                     </Tip>
                                 </div>
-                            </section>
+                            </section>}
 
                             {/* ================================================================== */}
                             {/* KNOWLEDGE BASE */}
                             {/* ================================================================== */}
-                            <section id="knowledge-base" className="mb-20">
+                            {activeSection === 'knowledge-base' && <section id="knowledge-base" className="mb-8">
                                 <div className="mb-8">
                                     <h1 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-3">Knowledge Base</h1>
                                     <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
@@ -687,12 +630,12 @@ Order (Entity)
                                         </div>
                                     </div>
                                 </div>
-                            </section>
+                            </section>}
 
                             {/* ================================================================== */}
                             {/* WORKFLOWS */}
                             {/* ================================================================== */}
-                            <section id="workflows" className="mb-20">
+                            {activeSection === 'workflows' && <section id="workflows" className="mb-8">
                                 <div className="mb-8">
                                     <h1 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-3">Workflows</h1>
                                     <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
@@ -858,125 +801,139 @@ Order (Entity)
                                         </div>
                                     </div>
                                 </div>
-                            </section>
+                            </section>}
 
                             {/* ================================================================== */}
-                            {/* COPILOTS */}
+                            {/* INTELIGENCIA */}
                             {/* ================================================================== */}
-                            <section id="copilots" className="mb-20">
+                            {activeSection === 'inteligencia' && <section id="inteligencia" className="mb-8">
                                 <div className="mb-8">
-                                    <h1 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-3">Copilots</h1>
+                                    <h1 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-3">Inteligencia</h1>
                                     <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
-                                        Create AI assistants with custom instructions and controlled data access.
+                                        AI-powered agents that understand your data, answer questions, and generate insights.
                                     </p>
                                 </div>
 
-                                {/* Creating Copilots */}
-                                <div id="copilots-create-copilot" className="mb-12">
-                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Creating Copilots</h2>
+                                {/* Agents */}
+                                <div id="inteligencia-agents" className="mb-12">
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Agents</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
-                                        Copilots are AI assistants that understand your data and can answer questions, generate reports, and provide insights.
+                                        Agents are AI assistants with specific instructions, data access, and capabilities. Every workspace comes with a default agent (<strong>Asistente General</strong>) that you can start chatting with immediately.
                                     </p>
 
+                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Creating a new agent</h3>
                                     <ol className="list-decimal pl-6 space-y-2 text-[var(--text-primary)] mb-4">
-                                        <li>Navigate to <strong>Copilots</strong> in the sidebar</li>
-                                        <li>Click <strong>New Copilot</strong></li>
-                                        <li>Enter a name and description</li>
-                                        <li>Write custom instructions (system prompt)</li>
-                                        <li>Select which entities the copilot can access</li>
-                                        <li>Click <strong>Create</strong></li>
+                                        <li>Go to <strong>Inteligencia</strong> in the sidebar</li>
+                                        <li>Click <strong>Agents</strong> in the top navigation</li>
+                                        <li>Click <strong>New Agent</strong></li>
+                                        <li>Give it a name, description, and custom instructions</li>
+                                        <li>Configure which entities the agent can access</li>
+                                        <li>Enable or disable memory (whether the agent remembers previous conversations)</li>
                                     </ol>
 
-                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Writing Good Instructions</h3>
-                                    <p className="text-[var(--text-primary)] mb-3">Custom instructions define your copilot's personality and behavior:</p>
-                                    <CodeBlock 
-                                        language="plaintext"
-                                        code={`You are a sales analysis assistant for Acme Corp.
-
-Your role:
-- Answer questions about sales data, customers, and products
-- Generate weekly sales summaries when asked
-- Identify trends and anomalies in the data
-
-Guidelines:
-- Always cite specific data when making claims
-- Use tables for comparisons
-- Be concise but thorough`}
+                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Agent configuration</h3>
+                                    <Table
+                                        headers={['Setting', 'Description']}
+                                        rows={[
+                                            ['Name & Description', 'Identifies the agent in the selector and agents page'],
+                                            ['Instructions', 'Custom prompt that defines the agent\'s behavior and expertise'],
+                                            ['Data Access', 'Which Knowledge Base entities the agent can query'],
+                                            ['Workflow Access', 'Which workflows the agent can trigger'],
+                                            ['Memory', 'Whether the agent retains context across different chats'],
+                                        ]}
                                     />
+
+                                    <Tip>
+                                        Write clear, specific instructions. For example: "You are a production analyst at a food company. Focus on quality metrics and batch traceability. Always reference specific lot numbers."
+                                    </Tip>
+                                </div>
+
+                                {/* Chat */}
+                                <div id="inteligencia-chat" className="mb-12">
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Chat</h2>
+                                    <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
+                                        The chat is where you interact with agents. Select an agent from the dropdown at the top and start a conversation.
+                                    </p>
+
+                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">How to start</h3>
+                                    <ol className="list-decimal pl-6 space-y-2 text-[var(--text-primary)] mb-4">
+                                        <li>Select an agent from the dropdown at the top of the chat</li>
+                                        <li>Click <strong>New Chat</strong> or start typing</li>
+                                        <li>Ask questions about your data, request analysis, or generate reports</li>
+                                    </ol>
+
+                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Chat options</h3>
+                                    <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
+                                        When you have an active chat, you can toggle <strong>Memory</strong> on or off. When memory is enabled, the agent will use context from previous messages in the conversation to give more relevant answers.
+                                    </p>
                                 </div>
 
                                 {/* Data Access Control */}
-                                <div id="copilots-data-access" className="mb-12">
+                                <div id="inteligencia-data-access" className="mb-12">
                                     <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Data Access Control</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
-                                        Control which Knowledge Base entities each copilot can access. This ensures data security and prevents unauthorized access.
+                                        Each agent can be configured to access specific entities from your Knowledge Base. This ensures data security and separation.
                                     </p>
 
-                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Access Modes</h3>
                                     <Table 
                                         headers={['Mode', 'Description']}
                                         rows={[
-                                            ['All entities', 'Copilot can access all entities in the Knowledge Base'],
-                                            ['Selected entities', 'Copilot can only access explicitly selected entities'],
-                                            ['None', 'Copilot has no data access (general-purpose assistant)']
+                                            ['All entities', 'Agent can query all entities in your Knowledge Base'],
+                                            ['Selected entities', 'Agent can only access the entities you choose'],
+                                            ['None', 'Agent has no data access (general-purpose assistant)']
                                         ]}
                                     />
 
                                     <WarningBox>
-                                        Data access is enforced server-side. The copilot cannot access entities it hasn't been granted permission to, even if mentioned in a prompt.
+                                        Data access is enforced on the server. An agent cannot access entities it hasn't been granted permission to, even if referenced in a conversation.
                                     </WarningBox>
                                 </div>
 
                                 {/* Using Mentions */}
-                                <div id="copilots-mentions" className="mb-12">
+                                <div id="inteligencia-mentions" className="mb-12">
                                     <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Using Mentions</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
-                                        Use the <code className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] rounded text-sm">@</code> symbol to reference entities in your prompts. 
-                                        This automatically includes relevant data context.
+                                        Use the <code className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] rounded text-sm">@</code> symbol in the chat to reference specific entities. This automatically provides the agent with relevant data context.
                                     </p>
 
                                     <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Examples</h3>
                                     <CodeBlock 
                                         language="plaintext"
-                                        code={`// Reference an entity
-"Show me all @Customers from California"
+                                        code={`"Show me all @Customers from Barcelona"
 
-// Multiple entities
 "Compare @Products sales with @Orders this month"
 
-// Specific analysis
-"Analyze revenue trends for @Customers with high-value @Orders"`}
+"Analyze trends for @Customers with high-value @Orders"`}
                                     />
 
                                     <Tip>
-                                        Type <code className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] rounded text-sm">@</code> in the chat to see a dropdown of available entities.
+                                        Type <code className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] rounded text-sm">@</code> in the chat input to see a dropdown of all entities your agent can access.
                                     </Tip>
                                 </div>
 
                                 {/* AI Reports */}
-                                <div id="copilots-reports" className="mb-12">
+                                <div id="inteligencia-reports" className="mb-12">
                                     <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">AI Reports</h2>
                                     <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
-                                        Generate comprehensive reports using natural language prompts.
+                                        Ask your agent to generate reports from your data using natural language.
                                     </p>
 
-                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Report Types</h3>
+                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Report types</h3>
                                     <ul className="list-disc pl-6 space-y-2 text-[var(--text-primary)] mb-4">
-                                        <li><strong>Summary Reports</strong> — High-level overview of entity data</li>
+                                        <li><strong>Summaries</strong> — High-level overview of entity data</li>
                                         <li><strong>Trend Analysis</strong> — Changes over time with visualizations</li>
-                                        <li><strong>Comparison Reports</strong> — Side-by-side entity comparisons</li>
+                                        <li><strong>Comparisons</strong> — Side-by-side analysis across entities</li>
                                         <li><strong>Anomaly Detection</strong> — Identify outliers and unusual patterns</li>
                                     </ul>
 
-                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Export Options</h3>
                                     <p className="text-[var(--text-primary)]">Reports can be exported as PDF, Markdown, or copied to clipboard.</p>
                                 </div>
-                            </section>
+                            </section>}
 
                             {/* ================================================================== */}
                             {/* DASHBOARDS */}
                             {/* ================================================================== */}
-                            <section id="dashboards" className="mb-20">
+                            {activeSection === 'dashboards' && <section id="dashboards" className="mb-8">
                                 <div className="mb-8">
                                     <h1 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-3">Dashboards</h1>
                                     <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
@@ -1051,12 +1008,12 @@ Guidelines:
                                         <li><strong>Embed</strong> — Embed in external websites via iframe</li>
                                     </ul>
                                 </div>
-                            </section>
+                            </section>}
 
                             {/* ================================================================== */}
                             {/* CONNECTIONS */}
                             {/* ================================================================== */}
-                            <section id="connections" className="mb-20">
+                            {activeSection === 'connections' && <section id="connections" className="mb-8">
                                 <div className="mb-8">
                                     <h1 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-3">Connections</h1>
                                     <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
@@ -1107,12 +1064,12 @@ Guidelines:
                                         After configuration, click <strong>Test Connection</strong> to verify connectivity before saving.
                                     </p>
                                 </div>
-                            </section>
+                            </section>}
 
                             {/* ================================================================== */}
                             {/* LAB */}
                             {/* ================================================================== */}
-                            <section id="lab" className="mb-20">
+                            {activeSection === 'lab' && <section id="lab" className="mb-8">
                                 <div className="mb-8">
                                     <h1 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-3">Lab</h1>
                                     <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
@@ -1178,125 +1135,12 @@ Guidelines:
                                         <li><strong>Conservative</strong> — Worst-case scenario assumptions</li>
                                     </ul>
                                 </div>
-                            </section>
-
-                            {/* ================================================================== */}
-                            {/* API REFERENCE */}
-                            {/* ================================================================== */}
-                            <section id="api" className="mb-20">
-                                <div className="mb-8">
-                                    <h1 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-3">API Reference</h1>
-                                    <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
-                                        RESTful API for programmatic access to Intemic Platform.
-                                    </p>
-                                </div>
-
-                                {/* Authentication */}
-                                <div id="api-authentication" className="mb-12">
-                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Authentication</h2>
-                                    <p className="text-[var(--text-primary)] mb-4">API requests require authentication via session cookies or JWT tokens.</p>
-
-                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Cookie Authentication</h3>
-                                    <p className="text-[var(--text-primary)] mb-3">Used automatically when logged in via the web interface:</p>
-                                    <CodeBlock 
-                                        language="javascript"
-                                        code={`fetch('/api/entities', {
-  credentials: 'include'
-})`}
-                                    />
-
-                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">JWT Authentication</h3>
-                                    <p className="text-[var(--text-primary)] mb-3">For external integrations:</p>
-                                    <CodeBlock 
-                                        language="bash"
-                                        code={`curl -X GET https://your-domain.com/api/entities \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"`}
-                                    />
-                                </div>
-
-                                {/* Endpoints */}
-                                <div id="api-endpoints" className="mb-12">
-                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Endpoints</h2>
-
-                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Entities</h3>
-                                    <div className="space-y-3 mb-6">
-                                        <div className="flex items-center gap-3 p-3 bg-[var(--bg-tertiary)] rounded-lg">
-                                            <Badge type="get">GET</Badge>
-                                            <code className="text-sm text-[var(--text-primary)]">/api/entities</code>
-                                            <span className="text-xs text-[var(--text-tertiary)] ml-auto">List all entities</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 p-3 bg-[var(--bg-tertiary)] rounded-lg">
-                                            <Badge type="post">POST</Badge>
-                                            <code className="text-sm text-[var(--text-primary)]">/api/entities</code>
-                                            <span className="text-xs text-[var(--text-tertiary)] ml-auto">Create entity</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 p-3 bg-[var(--bg-tertiary)] rounded-lg">
-                                            <Badge type="get">GET</Badge>
-                                            <code className="text-sm text-[var(--text-primary)]">/api/entities/:id</code>
-                                            <span className="text-xs text-[var(--text-tertiary)] ml-auto">Get entity</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 p-3 bg-[var(--bg-tertiary)] rounded-lg">
-                                            <Badge type="put">PUT</Badge>
-                                            <code className="text-sm text-[var(--text-primary)]">/api/entities/:id</code>
-                                            <span className="text-xs text-[var(--text-tertiary)] ml-auto">Update entity</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 p-3 bg-[var(--bg-tertiary)] rounded-lg">
-                                            <Badge type="delete">DELETE</Badge>
-                                            <code className="text-sm text-[var(--text-primary)]">/api/entities/:id</code>
-                                            <span className="text-xs text-[var(--text-tertiary)] ml-auto">Delete entity</span>
-                                        </div>
-                                    </div>
-
-                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Workflows</h3>
-                                    <div className="space-y-3 mb-6">
-                                        <div className="flex items-center gap-3 p-3 bg-[var(--bg-tertiary)] rounded-lg">
-                                            <Badge type="get">GET</Badge>
-                                            <code className="text-sm text-[var(--text-primary)]">/api/workflows</code>
-                                            <span className="text-xs text-[var(--text-tertiary)] ml-auto">List workflows</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 p-3 bg-[var(--bg-tertiary)] rounded-lg">
-                                            <Badge type="post">POST</Badge>
-                                            <code className="text-sm text-[var(--text-primary)]">/api/workflows/:id/execute</code>
-                                            <span className="text-xs text-[var(--text-tertiary)] ml-auto">Execute workflow</span>
-                                        </div>
-                                    </div>
-
-                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mt-6 mb-3">Records</h3>
-                                    <div className="space-y-3">
-                                        <div className="flex items-center gap-3 p-3 bg-[var(--bg-tertiary)] rounded-lg">
-                                            <Badge type="get">GET</Badge>
-                                            <code className="text-sm text-[var(--text-primary)]">/api/entities/:id/records</code>
-                                            <span className="text-xs text-[var(--text-tertiary)] ml-auto">List records</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 p-3 bg-[var(--bg-tertiary)] rounded-lg">
-                                            <Badge type="post">POST</Badge>
-                                            <code className="text-sm text-[var(--text-primary)]">/api/entities/:id/records</code>
-                                            <span className="text-xs text-[var(--text-tertiary)] ml-auto">Create record</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Error Codes */}
-                                <div id="api-errors" className="mb-12">
-                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Error Codes</h2>
-                                    <Table 
-                                        headers={['Code', 'Description']}
-                                        rows={[
-                                            ['400', 'Bad Request — Invalid parameters'],
-                                            ['401', 'Unauthorized — Missing or invalid authentication'],
-                                            ['403', 'Forbidden — Insufficient permissions'],
-                                            ['404', 'Not Found — Resource does not exist'],
-                                            ['429', 'Too Many Requests — Rate limit exceeded'],
-                                            ['500', 'Internal Server Error — Server-side error']
-                                        ]}
-                                    />
-                                </div>
-                            </section>
+                            </section>}
 
                             {/* ================================================================== */}
                             {/* SETTINGS & ADMIN */}
                             {/* ================================================================== */}
-                            <section id="settings" className="mb-20">
+                            {activeSection === 'settings' && <section id="settings" className="mb-8">
                                 <div className="mb-8">
                                     <h1 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-3">Settings & Admin</h1>
                                     <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
@@ -1353,12 +1197,208 @@ Guidelines:
                                         <li>Slack (requires connection)</li>
                                     </ul>
                                 </div>
-                            </section>
+                            </section>}
+
+                            {/* ================================================================== */}
+                            {/* SECURITY */}
+                            {/* ================================================================== */}
+                            {activeSection === 'security' && <section id="security" className="mb-8">
+                                <div className="mb-8">
+                                    <h1 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-3">Security</h1>
+                                    <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
+                                        How Intemic protects your data, controls access, and meets compliance requirements.
+                                    </p>
+                                </div>
+
+                                {/* Overview */}
+                                <div id="security-overview" className="mb-12">
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Overview</h2>
+                                    <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
+                                        Intemic Platform is built with enterprise security in mind. Your data is protected at every level — from how you log in, to what you can access, to how sensitive information is stored.
+                                    </p>
+
+                                    <div className="grid grid-cols-2 gap-4 my-6">
+                                        <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Lock size={16} weight="light" className="text-[var(--accent-primary)]" />
+                                                <h4 className="text-sm font-medium text-[var(--text-primary)]">Secure Login</h4>
+                                            </div>
+                                            <p className="text-xs text-[var(--text-secondary)]">Strong passwords, Single Sign-On (SSO) with your company identity provider, and secure session management.</p>
+                                        </div>
+                                        <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <UserCircle size={16} weight="light" className="text-[var(--accent-primary)]" />
+                                                <h4 className="text-sm font-medium text-[var(--text-primary)]">Access Control</h4>
+                                            </div>
+                                            <p className="text-xs text-[var(--text-secondary)]">Role-based permissions ensure each team member only sees and edits what they need.</p>
+                                        </div>
+                                        <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Key size={16} weight="light" className="text-[var(--accent-primary)]" />
+                                                <h4 className="text-sm font-medium text-[var(--text-primary)]">Data Encryption</h4>
+                                            </div>
+                                            <p className="text-xs text-[var(--text-secondary)]">Sensitive data is encrypted at rest using AES-256 encryption. All connections use HTTPS.</p>
+                                        </div>
+                                        <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <ShieldCheck size={16} weight="light" className="text-[var(--accent-primary)]" />
+                                                <h4 className="text-sm font-medium text-[var(--text-primary)]">Compliance</h4>
+                                            </div>
+                                            <p className="text-xs text-[var(--text-secondary)]">GDPR-ready with data export, deletion requests, and consent management built in.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Authentication & SSO */}
+                                <div id="security-authentication" className="mb-12">
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Authentication & SSO</h2>
+                                    
+                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">Password Requirements</h3>
+                                    <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
+                                        When creating an account or changing your password, you must meet these requirements:
+                                    </p>
+                                    <ul className="list-disc pl-5 space-y-1 text-sm text-[var(--text-primary)] mb-6">
+                                        <li>At least 8 characters long</li>
+                                        <li>Include uppercase and lowercase letters</li>
+                                        <li>Include at least one number</li>
+                                        <li>Include at least one special character (!@#$...)</li>
+                                    </ul>
+
+                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3 mt-6">Single Sign-On (SSO)</h3>
+                                    <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
+                                        If your organization uses an identity provider (like Okta, Azure AD, or Google Workspace), your admin can enable SSO. Once configured, you can log in with your company credentials — no separate Intemic password needed.
+                                    </p>
+                                    <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
+                                        Intemic supports both <strong>SAML 2.0</strong> and <strong>OpenID Connect</strong> protocols, compatible with most enterprise identity providers.
+                                    </p>
+
+                                    <Tip>
+                                        If your organization has SSO enabled, you'll see a <strong>"Sign in with SSO"</strong> button on the login page. Your account is automatically created on first login.
+                                    </Tip>
+                                </div>
+
+                                {/* Roles & Permissions */}
+                                <div id="security-authorization" className="mb-12">
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Roles & Permissions</h2>
+                                    <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
+                                        Every user in a workspace has a role that determines what they can see and do. Your admin assigns roles from <strong>Settings &gt; Team</strong>.
+                                    </p>
+
+                                    <Table
+                                        headers={['Role', 'What you can do']}
+                                        rows={[
+                                            ['Admin', 'Everything — manage users, settings, billing, and all content'],
+                                            ['Editor', 'Create and edit entities, workflows, dashboards, and agents'],
+                                            ['Viewer', 'View all content but cannot make changes'],
+                                            ['Auditor', 'View content plus access to activity logs and security reports'],
+                                        ]}
+                                    />
+
+                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3 mt-6">What each role can access</h3>
+                                    <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
+                                        Permissions are applied per area of the platform:
+                                    </p>
+                                    <Table
+                                        headers={['Area', 'Admin', 'Editor', 'Viewer', 'Auditor']}
+                                        rows={[
+                                            ['Knowledge Base', 'Full', 'Create / Edit', 'View', 'View'],
+                                            ['Workflows', 'Full', 'Create / Edit / Run', 'View', 'View'],
+                                            ['Dashboards', 'Full', 'Create / Edit', 'View', 'View'],
+                                            ['Inteligencia', 'Full', 'Create / Edit / Chat', 'Chat only', 'Chat only'],
+                                            ['Connections', 'Full', 'Configure', 'View', 'View'],
+                                            ['Settings & Team', 'Full', 'No access', 'No access', 'No access'],
+                                            ['Activity Log', 'Full', 'No access', 'No access', 'Full'],
+                                        ]}
+                                    />
+                                </div>
+
+                                {/* Data Protection */}
+                                <div id="security-data-protection" className="mb-12">
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Data Protection</h2>
+                                    <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
+                                        Intemic takes multiple measures to keep your data safe:
+                                    </p>
+
+                                    <div className="space-y-4 mb-6">
+                                        <div className="flex gap-3 items-start">
+                                            <div className="w-6 h-6 rounded-md bg-[var(--accent-primary)]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                <Lock size={13} weight="light" className="text-[var(--accent-primary)]" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-medium text-[var(--text-primary)]">Encryption at rest</h4>
+                                                <p className="text-xs text-[var(--text-secondary)] mt-0.5">Sensitive fields like credentials and personal data are encrypted using AES-256 before being stored.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3 items-start">
+                                            <div className="w-6 h-6 rounded-md bg-[var(--accent-primary)]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                <Shield size={13} weight="light" className="text-[var(--accent-primary)]" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-medium text-[var(--text-primary)]">Encryption in transit</h4>
+                                                <p className="text-xs text-[var(--text-secondary)] mt-0.5">All data transmitted between your browser and the server is encrypted via HTTPS/TLS.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3 items-start">
+                                            <div className="w-6 h-6 rounded-md bg-[var(--accent-primary)]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                <ShieldCheck size={13} weight="light" className="text-[var(--accent-primary)]" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-medium text-[var(--text-primary)]">Audit trail</h4>
+                                                <p className="text-xs text-[var(--text-secondary)] mt-0.5">Every action in the platform is logged. Admins and auditors can review the full activity history in Settings &gt; Activity Log.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3 items-start">
+                                            <div className="w-6 h-6 rounded-md bg-[var(--accent-primary)]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                <Key size={13} weight="light" className="text-[var(--accent-primary)]" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-medium text-[var(--text-primary)]">Secure sessions</h4>
+                                                <p className="text-xs text-[var(--text-secondary)] mt-0.5">Sessions are stored in HTTP-only cookies that cannot be accessed by scripts, protecting against XSS attacks.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Privacy & Compliance */}
+                                <div id="security-compliance" className="mb-12">
+                                    <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4 uppercase tracking-wide">Privacy & Compliance</h2>
+                                    <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
+                                        Intemic is built to meet European data protection requirements. As a user, you have full control over your personal data.
+                                    </p>
+
+                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">Your Rights</h3>
+                                    <Table
+                                        headers={['Right', 'What it means', 'How to use it']}
+                                        rows={[
+                                            ['Data deletion', 'Request removal of all your personal data', 'Settings > Privacy > Request Data Deletion'],
+                                            ['Data export', 'Download a copy of all your data', 'Settings > Privacy > Export My Data'],
+                                            ['Consent management', 'Control how your data is processed', 'Settings > Privacy > Manage Consent'],
+                                        ]}
+                                    />
+
+                                    <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3 mt-6">Compliance Standards</h3>
+                                    <p className="text-[var(--text-primary)] mb-4 leading-relaxed">
+                                        Intemic is working towards the following certifications to meet enterprise requirements:
+                                    </p>
+                                    <Table
+                                        headers={['Standard', 'Status']}
+                                        rows={[
+                                            ['GDPR / LOPD (EU data protection)', 'Compliant'],
+                                            ['SOC 2 Type II (security controls)', 'In progress'],
+                                            ['ISO 27001 (information security)', 'Planned'],
+                                        ]}
+                                    />
+
+                                    <Tip>
+                                        If you need a Data Processing Agreement (DPA) or have specific compliance questions, contact your account manager or reach out to our security team.
+                                    </Tip>
+                                </div>
+                            </section>}
 
                             {/* ================================================================== */}
                             {/* TROUBLESHOOTING */}
                             {/* ================================================================== */}
-                            <section id="troubleshooting" className="mb-20">
+                            {activeSection === 'troubleshooting' && <section id="troubleshooting" className="mb-8">
                                 <div className="mb-8">
                                     <h1 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-3">Troubleshooting</h1>
                                     <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
@@ -1372,27 +1412,33 @@ Guidelines:
 
                                     <div className="space-y-6">
                                         <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
-                                            <h4 className="font-medium text-[var(--text-primary)] mb-2">Port already in use</h4>
-                                            <p className="text-sm text-[var(--text-secondary)] mb-2">Error: EADDRINUSE: address already in use :::3001</p>
-                                            <p className="text-sm text-[var(--text-primary)]"><strong>Solution:</strong> Stop other processes using port 3001, or change the PORT in .env file.</p>
+                                            <h4 className="font-medium text-[var(--text-primary)] mb-2">Page not loading or showing errors</h4>
+                                            <p className="text-sm text-[var(--text-secondary)] mb-2">The page shows an error message or blank screen.</p>
+                                            <p className="text-sm text-[var(--text-primary)]"><strong>Solution:</strong> Try refreshing the page (Ctrl+R / Cmd+R). If the issue persists, clear your browser cache or try a different browser.</p>
                                         </div>
 
                                         <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
-                                            <h4 className="font-medium text-[var(--text-primary)] mb-2">Database locked</h4>
-                                            <p className="text-sm text-[var(--text-secondary)] mb-2">SQLITE_BUSY: database is locked</p>
-                                            <p className="text-sm text-[var(--text-primary)]"><strong>Solution:</strong> Stop all running server instances before running migrations or seed scripts.</p>
-                                        </div>
-
-                                        <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
-                                            <h4 className="font-medium text-[var(--text-primary)] mb-2">OpenAI API errors</h4>
-                                            <p className="text-sm text-[var(--text-secondary)] mb-2">401 Unauthorized or rate limit exceeded</p>
-                                            <p className="text-sm text-[var(--text-primary)]"><strong>Solution:</strong> Verify your API key in .env file. Check OpenAI dashboard for usage limits.</p>
+                                            <h4 className="font-medium text-[var(--text-primary)] mb-2">AI Agent not responding</h4>
+                                            <p className="text-sm text-[var(--text-secondary)] mb-2">The agent seems stuck or returns an error.</p>
+                                            <p className="text-sm text-[var(--text-primary)]"><strong>Solution:</strong> Wait a few seconds and try again. If the issue continues, the AI service may be temporarily unavailable — check back shortly.</p>
                                         </div>
 
                                         <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
                                             <h4 className="font-medium text-[var(--text-primary)] mb-2">Workflow execution timeout</h4>
-                                            <p className="text-sm text-[var(--text-secondary)] mb-2">Workflow stuck or taking too long</p>
-                                            <p className="text-sm text-[var(--text-primary)]"><strong>Solution:</strong> Check for infinite loops in conditions. Add timeout settings to HTTP nodes.</p>
+                                            <p className="text-sm text-[var(--text-secondary)] mb-2">Workflow stuck or taking too long to complete.</p>
+                                            <p className="text-sm text-[var(--text-primary)]"><strong>Solution:</strong> Check for infinite loops in conditions. If using external connections, verify that the target system is reachable.</p>
+                                        </div>
+
+                                        <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
+                                            <h4 className="font-medium text-[var(--text-primary)] mb-2">Cannot access a feature</h4>
+                                            <p className="text-sm text-[var(--text-secondary)] mb-2">A button or section is greyed out or shows "No access".</p>
+                                            <p className="text-sm text-[var(--text-primary)]"><strong>Solution:</strong> Your role may not have permission for that feature. Contact your workspace admin to request access. See <strong>Security &gt; Roles & Permissions</strong> for details.</p>
+                                        </div>
+
+                                        <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
+                                            <h4 className="font-medium text-[var(--text-primary)] mb-2">Data not showing in dashboard</h4>
+                                            <p className="text-sm text-[var(--text-secondary)] mb-2">Dashboard widgets show empty or "No data" messages.</p>
+                                            <p className="text-sm text-[var(--text-primary)]"><strong>Solution:</strong> Check that the data source entity has records. Verify the widget's data mapping in the configuration panel.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1414,7 +1460,7 @@ Guidelines:
 
                                         <div>
                                             <h3 className="text-base font-medium text-[var(--text-primary)] mb-2">How do I export my data?</h3>
-                                            <p className="text-sm text-[var(--text-secondary)]">Use the Export function in each entity's toolbar, or access data via the API for bulk exports.</p>
+                                            <p className="text-sm text-[var(--text-secondary)]">Use the Export function in each entity's toolbar. You can also download all your personal data from Settings &gt; Privacy.</p>
                                         </div>
 
                                         <div>
@@ -1428,12 +1474,12 @@ Guidelines:
                                         </div>
                                     </div>
                                 </div>
-                            </section>
+                            </section>}
 
                             {/* ================================================================== */}
                             {/* CHANGELOG */}
                             {/* ================================================================== */}
-                            <section id="changelog" className="mb-20">
+                            {activeSection === 'changelog' && <section id="changelog" className="mb-8">
                                 <div className="mb-8">
                                     <h1 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-3">Changelog</h1>
                                     <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
@@ -1452,7 +1498,7 @@ Guidelines:
                                             <li>Initial public release</li>
                                             <li>Knowledge Base with entities, properties, and relationships</li>
                                             <li>Visual workflow builder with 20+ node types</li>
-                                            <li>AI Copilots with custom instructions</li>
+                                            <li>AI agents with custom instructions</li>
                                             <li>Grafana-style dashboard builder</li>
                                             <li>External connections (SAP, Oracle, PostgreSQL, etc.)</li>
                                             <li>Simulation and scenario analysis</li>
@@ -1473,29 +1519,43 @@ Guidelines:
                                         </ul>
                                     </div>
                                 </div>
-                            </section>
+                            </section>}
 
-                            {/* Pagination */}
-                            <div className="flex items-center justify-between pt-8 mt-16 border-t border-[var(--border-light)]">
+                            {/* Section Pagination */}
+                            <div className="flex items-center justify-between pt-6 mt-8 border-t border-[var(--border-light)]">
                                 {previousSection ? (
                                     <button
-                                        onClick={() => scrollToSection(previousSection.id)}
-                                        className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                                        onClick={() => goToSection(previousSection)}
+                                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors group"
                                     >
-                                        <CaretLeft size={16} weight="light" />
-                                        <span>{previousSection.title}</span>
+                                        <CaretLeft size={14} weight="light" className="group-hover:-translate-x-0.5 transition-transform" />
+                                        <div className="text-left">
+                                            <span className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] block">Previous</span>
+                                            <span className="font-medium">{previousSection.title}</span>
+                                        </div>
                                     </button>
                                 ) : (
-                                    <div></div>
+                                    <div />
                                 )}
-                                {nextSection && (
+
+                                {/* Page indicator */}
+                                <span className="text-[11px] text-[var(--text-tertiary)]">
+                                    {getCurrentSectionIndex() + 1} / {DOC_SECTIONS.length}
+                                </span>
+
+                                {nextSection ? (
                                     <button
-                                        onClick={() => scrollToSection(nextSection.id)}
-                                        className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors ml-auto"
+                                        onClick={() => goToSection(nextSection)}
+                                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors group"
                                     >
-                                        <span>{nextSection.title}</span>
-                                        <CaretRight size={16} weight="light" />
+                                        <div className="text-right">
+                                            <span className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] block">Next</span>
+                                            <span className="font-medium">{nextSection.title}</span>
+                                        </div>
+                                        <CaretRight size={14} weight="light" className="group-hover:translate-x-0.5 transition-transform" />
                                     </button>
+                                ) : (
+                                    <div />
                                 )}
                             </div>
                         </div>
