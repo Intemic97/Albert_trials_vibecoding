@@ -1833,7 +1833,7 @@ app.post('/api/parse-spreadsheet', authenticateToken, upload.single('file'), (re
     }
 });
 
-// Parse PDF file endpoint
+// Parse PDF file endpoint (with optional GCS upload for large PDFs)
 app.post('/api/parse-pdf', authenticateToken, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
@@ -1857,8 +1857,53 @@ app.post('/api/parse-pdf', authenticateToken, upload.single('file'), async (req,
         // Clean up uploaded file after parsing
         fs.unlinkSync(filePath);
 
+        const { workflowId, nodeId } = req.body;
+        const pdfTextLength = (pdfData.text || '').length;
+
+        // If workflowId/nodeId provided and text is large, try GCS upload
+        if (workflowId && nodeId && pdfTextLength > 5000) {
+            const gcsAvailable = await gcsService.init();
+
+            if (gcsAvailable) {
+                const uploadResult = await gcsService.uploadWorkflowData(
+                    workflowId,
+                    nodeId,
+                    {
+                        text: pdfData.text,
+                        pages: pdfData.numpages,
+                        info: pdfData.info,
+                        metadata: pdfData.metadata,
+                        fileName: req.file.originalname
+                    },
+                    req.file.originalname.replace('.pdf', '_pdf_text')
+                );
+
+                if (uploadResult.success) {
+                    const previewText = pdfData.text.substring(0, 500) + (pdfTextLength > 500 ? '...' : '');
+                    console.log(`[PDF] Uploaded to GCS: ${uploadResult.gcsPath} (${(pdfTextLength / 1024).toFixed(1)} KB text)`);
+                    
+                    res.json({
+                        success: true,
+                        useGCS: true,
+                        gcsPath: uploadResult.gcsPath,
+                        pdfTextPreview: previewText,
+                        textLength: pdfTextLength,
+                        pages: pdfData.numpages,
+                        info: pdfData.info,
+                        metadata: pdfData.metadata,
+                        fileName: req.file.originalname
+                    });
+                    return;
+                } else {
+                    console.warn('[PDF] GCS upload failed, falling back to inline:', uploadResult.error);
+                }
+            }
+        }
+
+        // Fallback: return full text inline (small files or GCS unavailable)
         res.json({
             success: true,
+            useGCS: false,
             text: pdfData.text,
             pages: pdfData.numpages,
             info: pdfData.info,

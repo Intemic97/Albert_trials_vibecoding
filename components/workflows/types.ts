@@ -109,6 +109,8 @@ export interface NodeConfig {
   useGCS?: boolean;
   // For PDF input nodes:
   pdfText?: string;
+  pdfTextPreview?: string;
+  pdfGcsPath?: string;
   pages?: number;
   info?: any;
   metadata?: any;

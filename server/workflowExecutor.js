@@ -409,15 +409,46 @@ class WorkflowExecutor {
     async handlePdfInput(node, inputData) {
         const config = node.config || {};
         
-        if (config.parsedText) {
+        // Check if PDF text is stored in GCS
+        if (config.gcsPath && config.useGCS) {
+            console.log(`[PdfInput] Loading PDF data from GCS: ${config.gcsPath}`);
+            
+            const gcsAvailable = await gcsService.init();
+            if (!gcsAvailable) {
+                throw new Error('Cloud storage not available');
+            }
+
+            const result = await gcsService.downloadWorkflowData(config.gcsPath);
+            
+            if (!result.success) {
+                throw new Error(`Failed to load PDF from cloud: ${result.error}`);
+            }
+
+            const pdfData = result.data;
+            return {
+                success: true,
+                message: `Loaded PDF: ${pdfData.fileName || config.fileName || 'file'} (${pdfData.pages || '?'} pages) from cloud`,
+                outputData: {
+                    text: pdfData.text,
+                    fileName: pdfData.fileName || config.fileName,
+                    pages: pdfData.pages
+                },
+                source: 'gcs'
+            };
+        }
+
+        // Fallback: use inline text (pdfText or parsedText)
+        const pdfText = config.pdfText || config.parsedText;
+        if (pdfText) {
             return {
                 success: true,
                 message: `Loaded PDF: ${config.fileName || 'file'} (${config.pages || '?'} pages)`,
                 outputData: {
-                    text: config.parsedText,
+                    text: pdfText,
                     fileName: config.fileName,
                     pages: config.pages
-                }
+                },
+                source: 'inline'
             };
         }
 

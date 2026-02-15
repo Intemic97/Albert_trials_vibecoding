@@ -1496,8 +1496,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         const node = nodes.find(n => n.id === nodeId);
         if (node && node.type === 'pdfInput') {
             setConfiguringPdfNodeId(nodeId);
-            // If the node already has parsed data, show preview
-            if (node.config?.pdfText) {
+            // If the node already has data (GCS or inline), show preview
+            if (node.config?.useGCS && node.config?.pdfTextPreview) {
+                // GCS data - show preview text
+                setPdfPreviewData({
+                    text: node.config.pdfTextPreview,
+                    pages: node.config.pages || 0,
+                    fileName: node.config.fileName || ''
+                });
+            } else if (node.config?.pdfText) {
+                // Inline data
                 setPdfPreviewData({
                     text: node.config.pdfText,
                     pages: node.config.pages || 0,
@@ -1521,6 +1529,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
             const formData = new FormData();
             formData.append('file', file);
 
+            // Send workflowId and nodeId so backend can upload to GCS for large PDFs
+            if (currentWorkflowId && configuringPdfNodeId) {
+                formData.append('workflowId', currentWorkflowId);
+                formData.append('nodeId', configuringPdfNodeId);
+            }
+
             const res = await fetch(`${API_BASE}/parse-pdf`, {
                 method: 'POST',
                 body: formData,
@@ -1532,30 +1546,65 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
             }
 
             const result = await res.json();
-            setPdfPreviewData({
-                text: result.text,
-                pages: result.pages,
-                fileName: result.fileName
-            });
 
-            // Save parsed data to node config
-            if (configuringPdfNodeId) {
-                setNodes(prev => prev.map(n =>
-                    n.id === configuringPdfNodeId
-                        ? {
-                            ...n,
-                            label: file.name,
-                            config: {
-                                ...n.config,
-                                fileName: file.name,
-                                pdfText: result.text,
-                                pages: result.pages,
-                                info: result.info,
-                                metadata: result.metadata
+            if (result.useGCS) {
+                // PDF text stored in GCS - save reference only
+                setPdfPreviewData({
+                    text: result.pdfTextPreview,
+                    pages: result.pages,
+                    fileName: result.fileName
+                });
+
+                if (configuringPdfNodeId) {
+                    setNodes(prev => prev.map(n =>
+                        n.id === configuringPdfNodeId
+                            ? {
+                                ...n,
+                                label: file.name,
+                                config: {
+                                    ...n.config,
+                                    fileName: file.name,
+                                    gcsPath: result.gcsPath,
+                                    pdfTextPreview: result.pdfTextPreview,
+                                    pages: result.pages,
+                                    info: result.info,
+                                    metadata: result.metadata,
+                                    useGCS: true,
+                                    pdfText: undefined // Remove inline text to save space
+                                }
                             }
-                        }
-                        : n
-                ));
+                            : n
+                    ));
+                }
+
+                showToast(`PDF uploaded to cloud storage (${result.pages} pages)`, 'success');
+            } else {
+                // Small PDF or GCS unavailable - store inline
+                setPdfPreviewData({
+                    text: result.text,
+                    pages: result.pages,
+                    fileName: result.fileName
+                });
+
+                if (configuringPdfNodeId) {
+                    setNodes(prev => prev.map(n =>
+                        n.id === configuringPdfNodeId
+                            ? {
+                                ...n,
+                                label: file.name,
+                                config: {
+                                    ...n.config,
+                                    fileName: file.name,
+                                    pdfText: result.text,
+                                    pages: result.pages,
+                                    info: result.info,
+                                    metadata: result.metadata,
+                                    useGCS: false
+                                }
+                            }
+                            : n
+                    ));
+                }
             }
         } catch (error) {
             console.error('Error parsing PDF:', error);
