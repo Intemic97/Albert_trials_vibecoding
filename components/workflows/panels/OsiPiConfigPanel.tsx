@@ -26,6 +26,7 @@ export const OsiPiConfigPanel: React.FC<OsiPiConfigPanelProps> = ({ nodeId, node
 
   const handleSave = () => {
     onSave(nodeId, { osiPiHost, osiPiApiKey, osiPiGranularityValue, osiPiGranularityUnit, osiPiWebIds }, `OSI PI: ${osiPiHost || 'config'}`);
+    onClose();
   };
 
   return (

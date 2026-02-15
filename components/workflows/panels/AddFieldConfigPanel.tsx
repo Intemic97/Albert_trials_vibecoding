@@ -22,6 +22,7 @@ export const AddFieldConfigPanel: React.FC<AddFieldConfigPanelProps> = ({ nodeId
 
   const handleSave = () => {
     onSave(nodeId, { addFieldName, addFieldValue });
+    onClose();
   };
 
   return (

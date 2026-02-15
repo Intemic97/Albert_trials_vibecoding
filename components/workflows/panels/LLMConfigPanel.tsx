@@ -29,6 +29,7 @@ export const LLMConfigPanel: React.FC<LLMConfigPanelProps> = ({
 
   const handleSave = () => {
     onSave(nodeId, { llmPrompt, llmContextEntities, llmIncludeInput, llmProcessingMode });
+    onClose();
   };
 
   return (

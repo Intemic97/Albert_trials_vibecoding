@@ -22,6 +22,7 @@ export const ManualInputConfigPanel: React.FC<ManualInputConfigPanelProps> = ({ 
 
   const handleSave = () => {
     onSave(nodeId, { manualInputVarName, manualInputVarValue });
+    onClose();
   };
 
   return (

@@ -50,6 +50,7 @@ export const EmailConfigPanel: React.FC<EmailConfigPanelProps> = ({
 
   const handleSave = () => {
     onSave(nodeId, { emailTo: emailTo, emailSubject: emailSubject, emailBody: emailBody, emailSmtpHost: emailSmtpHost || undefined, emailSmtpPort: emailSmtpPort || undefined, emailSmtpUser: emailSmtpUser || undefined, emailSmtpPass: emailSmtpPass || undefined }, `Email to: ${emailTo.split('@')[0]}...`);
+    onClose();
   };
 
   // Note: Full JSX is extracted from Workflows.tsx and may reference variables above

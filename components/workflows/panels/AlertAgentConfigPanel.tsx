@@ -24,6 +24,7 @@ export const AlertAgentConfigPanel: React.FC<AlertAgentConfigPanelProps> = ({ no
 
   const handleSave = () => {
     onSave(nodeId, { alertConditions, alertSeverity, alertActions, alertRecipients });
+    onClose();
   };
 
   return (

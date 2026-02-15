@@ -40,6 +40,7 @@ export const RenameColumnsConfigPanel: React.FC<RenameColumnsConfigPanelProps> =
     const filtered = columnRenames.filter(r => r.oldName.trim() && r.newName.trim());
     if (filtered.length === 0) return;
     onSave(nodeId, { columnRenames: filtered });
+    onClose();
   };
 
   return (

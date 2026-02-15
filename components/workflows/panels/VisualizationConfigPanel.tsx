@@ -45,6 +45,7 @@ export const VisualizationConfigPanel: React.FC<VisualizationConfigPanelProps> =
 
   const handleSave = () => {
     onSave(nodeId, { visualizationPrompt, generatedWidget });
+    onClose();
   };
 
   return (

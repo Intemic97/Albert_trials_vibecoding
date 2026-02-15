@@ -22,6 +22,7 @@ export const EsiosConfigPanel: React.FC<EsiosConfigPanelProps> = ({ nodeId, node
 
   const handleSave = () => {
     onSave(nodeId, { esiosArchiveId, esiosDate });
+    onClose();
   };
 
   return (

@@ -23,35 +23,33 @@ export const HumanApprovalConfigPanel: React.FC<HumanApprovalConfigPanelProps> =
   nodeId, node, nodes, onSave, onClose, openFeedbackPopup
 }) => {
   const { user } = useAuth();
-  const token = user?.token;
-  const organizationId = user?.orgId;
   const [organizationUsers, setOrganizationUsers] = useState<any[]>([]);
-  const [selectedApproverUserId, setSelectedApproverUserId] = useState(node?.config?.approverUserId || '');
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
   useEffect(() => {
     const loadUsers = async () => {
       setIsLoadingUsers(true);
       try {
-        const response = await fetch(`${API_BASE}/organizations/${organizationId}/members`, {
-          headers: { Authorization: `Bearer ${token}` }
+        const response = await fetch(`${API_BASE}/organization/users`, {
+          credentials: 'include'
         });
         if (response.ok) {
           const data = await response.json();
-          setOrganizationUsers(data.members || []);
+          setOrganizationUsers(Array.isArray(data) ? data : []);
         }
       } catch (err) { console.error('Failed to load users:', err); }
       finally { setIsLoadingUsers(false); }
     };
     loadUsers();
-  }, [organizationId, token]);
+  }, []);
 
-  const handleSave = () => {
-    const approver = organizationUsers.find(u => u.userId === selectedApproverUserId);
+  const handleUserSelect = (userId: string, userName: string, profilePhoto?: string) => {
     onSave(nodeId, {
-      approverUserId: selectedApproverUserId,
-      approverName: approver ? (approver.name || approver.email) : 'Unknown',
+      approverUserId: userId,
+      approverName: userName,
+      approverPhoto: profilePhoto,
     });
+    onClose();
   };
 
   return (
@@ -76,41 +74,41 @@ export const HumanApprovalConfigPanel: React.FC<HumanApprovalConfigPanelProps> =
                     <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                         Assign to
                     </label>
-                    {organizationUsers.length === 0 ? (
+                    {isLoadingUsers || organizationUsers.length === 0 ? (
                     <div className="flex items-center justify-center py-8 text-[var(--text-tertiary)]">
                         <div className="w-5 h-5 border-2 border-[var(--border-medium)] border-t-teal-500 rounded-full animate-spin mr-2" />
                         Loading users...
                     </div>
                 ) : (
                     <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {organizationUsers.map((user) => {
+                        {organizationUsers.map((u) => {
                             const currentNode = nodes.find(n => n.id === nodeId);
-                            const isSelected = currentNode?.config?.assignedUserId === user.id;
+                            const isSelected = currentNode?.config?.approverUserId === u.id;
                             return (
                                 <button
-                                    key={user.id}
-                                    onClick={() => handleSave(user.id, user.name || user.email, user.profilePhoto)}
+                                    key={u.id}
+                                    onClick={() => handleUserSelect(u.id, u.name || u.email, u.profilePhoto)}
                                     className={`w-full p-3 rounded-lg border-2 text-left transition-all flex items-center gap-3 ${
                                         isSelected
                                             ? 'border-[var(--border-medium)] bg-[var(--bg-tertiary)]'
                                             : 'border-[var(--border-light)] hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)]/50'
                                     }`}
                                 >
-                                    <UserAvatar name={user.name || user.email} profilePhoto={user.profilePhoto} size="sm" />
+                                    <UserAvatar name={u.name || u.email} profilePhoto={u.profilePhoto} size="sm" />
                                     <div className="flex-1 min-w-0">
                                         <div className="font-medium text-[var(--text-primary)] truncate">
-                                            {user.name || 'Unnamed User'}
+                                            {u.name || 'Unnamed User'}
                                         </div>
                                         <div className="text-xs text-[var(--text-secondary)] truncate">
-                                            {user.email}
+                                            {u.email}
                                         </div>
                                     </div>
                                     <span className={`text-xs px-2 py-1 rounded-full ${
-                                        user.role === 'admin'
+                                        u.role === 'admin'
                                             ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
                                             : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
                                     }`}>
-                                        {user.role}
+                                        {u.role}
                                     </span>
                                 </button>
                             );

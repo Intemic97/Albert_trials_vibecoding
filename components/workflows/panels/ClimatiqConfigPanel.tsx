@@ -31,6 +31,7 @@ export const ClimatiqConfigPanel: React.FC<ClimatiqConfigPanelProps> = ({
       climatiqSelectedFactor: selectedFactor,
       climatiqEmissionFactor: selectedFactor?.id || null,
     });
+    onClose();
   };
 
   return (

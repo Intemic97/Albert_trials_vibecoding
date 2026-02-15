@@ -23,6 +23,7 @@ export const StatisticalConfigPanel: React.FC<StatisticalConfigPanelProps> = ({ 
 
   const handleSave = () => {
     onSave(nodeId, { statisticalMethod, statisticalParams, goldenBatchId });
+    onClose();
   };
 
   return (

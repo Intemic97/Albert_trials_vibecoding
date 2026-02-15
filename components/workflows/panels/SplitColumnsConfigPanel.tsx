@@ -49,6 +49,7 @@ export const SplitColumnsConfigPanel: React.FC<SplitColumnsConfigPanelProps> = (
 
   const handleSave = () => {
     onSave(nodeId, { columnsOutputA: splitColumnsOutputA, columnsOutputB: splitColumnsOutputB });
+    onClose();
   };
 
   return (

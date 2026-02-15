@@ -48,6 +48,7 @@ export const WhatsAppConfigPanel: React.FC<WhatsAppConfigPanelProps> = ({
 
   const handleSave = () => {
     onSave(nodeId, { whatsappTo: whatsappTo, whatsappBody: whatsappBody, whatsappTwilioAccountSid: whatsappTwilioAccountSid, whatsappTwilioAuthToken: whatsappTwilioAuthToken, whatsappTwilioFromNumber: whatsappTwilioFromNumber }, `WhatsApp to: ...${whatsappTo.slice(-4)}`);
+    onClose();
   };
 
   // Note: Full JSX is extracted from Workflows.tsx and may reference variables above

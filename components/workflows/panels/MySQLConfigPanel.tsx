@@ -26,6 +26,7 @@ export const MySQLConfigPanel: React.FC<MySQLConfigPanelProps> = ({ nodeId, node
 
   const handleSave = () => {
     onSave(nodeId, { mysqlHost, mysqlPort, mysqlDatabase, mysqlUsername, mysqlPassword, mysqlQuery }, `MySQL: ${mysqlDatabase || 'query'}`);
+    onClose();
   };
 
   return (

@@ -28,6 +28,7 @@ export const SAPConfigPanel: React.FC<SAPConfigPanelProps> = ({ nodeId, node, on
 
   const handleSave = () => {
     onSave(nodeId, { sapConnectionName, sapAuthType, sapClientId, sapClientSecret, sapTokenUrl, sapBaseApiUrl, sapServicePath, sapEntity }, `SAP: ${sapEntity || 'connection'}`);
+    onClose();
   };
 
   return (

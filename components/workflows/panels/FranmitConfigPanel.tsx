@@ -25,6 +25,7 @@ export const FranmitConfigPanel: React.FC<FranmitConfigPanelProps> = ({ nodeId, 
 
   const handleSave = () => {
     onSave(nodeId, { franmitApiSecretId, franmitReactorVolume, franmitReactionVolume, franmitCatalystScaleFactor });
+    onClose();
   };
 
   return (

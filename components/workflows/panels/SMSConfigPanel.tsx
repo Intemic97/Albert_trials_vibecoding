@@ -48,6 +48,7 @@ export const SMSConfigPanel: React.FC<SMSConfigPanelProps> = ({
 
   const handleSave = () => {
     onSave(nodeId, { smsTo: smsTo, smsBody: smsBody, twilioAccountSid: twilioAccountSid, twilioAuthToken: twilioAuthToken, twilioFromNumber: twilioFromNumber }, `SMS to: ...${smsTo.slice(-4)}`);
+    onClose();
   };
 
   // Note: Full JSX is extracted from Workflows.tsx and may reference variables above

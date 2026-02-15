@@ -5,20 +5,22 @@
 
 import React, { useState } from 'react';
 import { NodeConfigSidePanel } from '../../NodeConfigSidePanel';
-import { Bug, Check, Code, Sparkle, ChatText } from '@phosphor-icons/react';
+import { Bug, Check, Code, Sparkle, ChatText, X } from '@phosphor-icons/react';
 import { API_BASE } from '../../../config';
 import { AIPromptSection } from '../../AIPromptSection';
 
 interface PythonConfigPanelProps {
   nodeId: string;
   node: any;
+  nodes: any[];
+  connections: any[];
   onSave: (nodeId: string, config: Record<string, any>, label?: string) => void;
   onClose: () => void;
   openFeedbackPopup?: (type: string, name: string) => void;
 }
 
 export const PythonConfigPanel: React.FC<PythonConfigPanelProps> = ({
-  nodeId, node, onSave, onClose, openFeedbackPopup
+  nodeId, node, nodes, connections, onSave, onClose, openFeedbackPopup
 }) => {
   const [pythonCode, setPythonCode] = useState(node?.config?.pythonCode || 'def process(data):\n    # Modify data here\n    return data');
   const [pythonAiPrompt, setPythonAiPrompt] = useState('');
@@ -26,8 +28,82 @@ export const PythonConfigPanel: React.FC<PythonConfigPanelProps> = ({
   const [isDebuggingPython, setIsDebuggingPython] = useState(false);
   const [debugSuggestion, setDebugSuggestion] = useState<string | null>(null);
 
+  const generatePythonCode = async () => {
+    if (!pythonAiPrompt.trim()) return;
+
+    setIsGeneratingCode(true);
+    try {
+      // Get input data schema from parent node
+      let inputDataSchema: { columns: string[], sampleData?: any[] } | null = null;
+
+      const parentConnection = connections.find((c: any) => c.toNodeId === nodeId);
+      if (parentConnection) {
+        const parentNode = nodes.find((n: any) => n.id === parentConnection.fromNodeId);
+        if (parentNode) {
+          // Try to get data from different sources
+          let parentData = parentNode.outputData || parentNode.inputDataA || null;
+
+          // Handle splitColumns parent node
+          if (parentNode.type === 'splitColumns' && parentNode.outputData) {
+            parentData = parentConnection.outputType === 'B'
+              ? parentNode.outputData.outputB
+              : parentNode.outputData.outputA;
+          }
+
+          // Handle manualInput node
+          if (parentNode.type === 'manualInput' && parentNode.config) {
+            const varName = parentNode.config.inputVarName || 'value';
+            const varValue = parentNode.config.inputVarValue;
+            parentData = [{ [varName]: varValue }];
+          }
+
+          if (parentData && Array.isArray(parentData) && parentData.length > 0) {
+            const columns = Object.keys(parentData[0]);
+            inputDataSchema = {
+              columns,
+              sampleData: parentData.slice(0, 3) // Send first 3 records as sample
+            };
+            console.log('Python AI - Input data schema:', inputDataSchema);
+          }
+        }
+      }
+
+      console.log('Python AI - Sending to API:', { prompt: pythonAiPrompt, inputDataSchema });
+      const response = await fetch(`${API_BASE}/python/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: pythonAiPrompt,
+          inputDataSchema
+        }),
+        credentials: 'include'
+      });
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error('Failed to parse JSON:', text);
+        throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}...`);
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate code');
+      }
+
+      setPythonCode(data.code);
+    } catch (error: any) {
+      console.error('Error generating python code:', error);
+      alert(`Failed to generate code: ${error.message}`);
+    } finally {
+      setIsGeneratingCode(false);
+    }
+  };
+
   const handleSave = () => {
     onSave(nodeId, { pythonCode });
+    onClose();
   };
 
   return (
@@ -143,7 +219,7 @@ export const PythonConfigPanel: React.FC<PythonConfigPanelProps> = ({
             {/* Feedback Link */}
             <div className="pt-3 border-t border-[var(--border-light)]">
                 <button
-                    onClick={() => openFeedbackPopup('python', 'Python Code')}
+                    onClick={() => openFeedbackPopup?.('python', 'Python Code')}
                     className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1"
                 >
                     <ChatText size={12} />

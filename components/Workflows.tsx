@@ -8189,6 +8189,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                 nodes={nodes}
                                 onSave={handlePanelSave}
                                 onClose={() => setConfiguringExcelNodeId(null)}
+                                onRun={handleRunNode}
                                 openFeedbackPopup={openFeedbackPopup}
                                 handleExcelFileChange={handleExcelFileChange}
                                 excelFile={excelFile}
@@ -8245,6 +8246,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                             <PythonConfigPanel
                                 nodeId={configuringPythonNodeId!}
                                 node={nodes.find(n => n.id === configuringPythonNodeId)}
+                                nodes={nodes}
+                                connections={connections}
                                 onSave={handlePanelSave}
                                 onClose={() => setConfiguringPythonNodeId(null)}
                                 openFeedbackPopup={openFeedbackPopup}

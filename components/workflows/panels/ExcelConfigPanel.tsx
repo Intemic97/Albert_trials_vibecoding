@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { NodeConfigSidePanel } from '../../NodeConfigSidePanel';
-import { Table, CloudArrowUp, ChatText, Upload } from '@phosphor-icons/react';
+import { Table, CloudArrowUp, ChatText, Upload, Play } from '@phosphor-icons/react';
 
 interface ExcelConfigPanelProps {
   nodeId: string;
@@ -13,6 +13,7 @@ interface ExcelConfigPanelProps {
   nodes: any[];
   onSave: (nodeId: string, config: Record<string, any>, label?: string) => void;
   onClose: () => void;
+  onRun?: (nodeId: string) => void;
   openFeedbackPopup?: (type: string, name: string) => void;
   handleExcelFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   excelFile: File | null;
@@ -21,7 +22,7 @@ interface ExcelConfigPanelProps {
 }
 
 export const ExcelConfigPanel: React.FC<ExcelConfigPanelProps> = ({
-  nodeId, node, nodes, onSave, onClose, openFeedbackPopup,
+  nodeId, node, nodes, onSave, onClose, onRun, openFeedbackPopup,
   handleExcelFileChange, excelFile, excelPreviewData, isParsingExcel
 }) => {
   return (
@@ -114,6 +115,19 @@ export const ExcelConfigPanel: React.FC<ExcelConfigPanelProps> = ({
                                 Showing first 5 of {excelPreviewData.rowCount} rows
                             </div>
                         )}
+                    </div>
+                    {/* Run button */}
+                    <div className="flex justify-end mt-3">
+                        <button
+                            onClick={() => {
+                                onRun?.(nodeId);
+                                onClose();
+                            }}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-[#256A65] hover:bg-[#1d5450] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                        >
+                            <Play size={14} weight="fill" />
+                            Run
+                        </button>
                     </div>
                 </div>
             )}

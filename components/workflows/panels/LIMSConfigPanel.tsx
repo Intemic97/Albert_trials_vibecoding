@@ -24,6 +24,7 @@ export const LIMSConfigPanel: React.FC<LIMSConfigPanelProps> = ({ nodeId, node, 
 
   const handleSave = () => {
     onSave(nodeId, { limsServerUrl, limsApiKey, limsEndpoint, limsQuery });
+    onClose();
   };
 
   return (

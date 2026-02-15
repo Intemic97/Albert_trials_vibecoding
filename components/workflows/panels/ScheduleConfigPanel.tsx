@@ -26,6 +26,7 @@ export const ScheduleConfigPanel: React.FC<ScheduleConfigPanelProps> = ({
       scheduleUnit: scheduleIntervalUnit,
       scheduleEnabled,
     }, `Schedule: ${scheduleIntervalValue} ${scheduleIntervalUnit}`);
+    onClose();
   };
 
   return (

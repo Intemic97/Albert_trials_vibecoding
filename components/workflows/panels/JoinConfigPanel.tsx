@@ -26,6 +26,7 @@ export const JoinConfigPanel: React.FC<JoinConfigPanelProps> = ({
 
   const handleSave = () => {
     onSave(nodeId, { joinStrategy, joinType, joinKey });
+    onClose();
   };
 
   return (

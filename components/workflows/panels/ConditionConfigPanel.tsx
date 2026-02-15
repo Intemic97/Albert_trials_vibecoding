@@ -70,6 +70,7 @@ export const ConditionConfigPanel: React.FC<ConditionConfigPanelProps> = ({
       additionalConditions, logicalOperator: conditionLogicalOperator,
       customName: nodeCustomTitle.trim() || undefined
     }, finalLabel);
+    onClose();
   };
 
   const generateId = () => Math.random().toString(36).substring(2, 11);

@@ -22,6 +22,7 @@ export const HttpConfigPanel: React.FC<HttpConfigPanelProps> = ({ nodeId, node, 
   const handleSave = () => {
     if (!httpUrl.trim()) return;
     onSave(nodeId, { httpUrl });
+    onClose();
   };
 
   return (

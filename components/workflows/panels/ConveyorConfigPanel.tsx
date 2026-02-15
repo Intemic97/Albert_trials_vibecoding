@@ -28,6 +28,7 @@ export const ConveyorConfigPanel: React.FC<ConveyorConfigPanelProps> = ({ nodeId
 
   const handleSave = () => {
     onSave(nodeId, { conveyorSpeed, conveyorLength, conveyorWidth, conveyorInclination, conveyorLoadCapacity, conveyorBeltType, conveyorMotorPower, conveyorFrictionCoeff });
+    onClose();
   };
 
   return (

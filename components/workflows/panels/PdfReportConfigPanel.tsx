@@ -23,6 +23,7 @@ export const PdfReportConfigPanel: React.FC<PdfReportConfigPanelProps> = ({ node
 
   const handleSave = () => {
     onSave(nodeId, { pdfTemplate, pdfReportData, pdfOutputPath });
+    onClose();
   };
 
   return (

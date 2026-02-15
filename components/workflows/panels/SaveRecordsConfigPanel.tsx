@@ -33,6 +33,7 @@ export const SaveRecordsConfigPanel: React.FC<SaveRecordsConfigPanelProps> = ({
       entityId: saveEntityId,
       targetEntityName: entity?.name || '',
     }, entity ? `Save to: ${entity.name}` : 'Save Records');
+    onClose();
   };
 
   return (
