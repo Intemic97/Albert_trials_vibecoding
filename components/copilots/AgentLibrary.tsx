@@ -126,24 +126,22 @@ export const AgentLibrary: React.FC<AgentLibraryProps> = ({ onClose, onSelectAge
                 return (
                 <div
                   key={agent.id}
-                  className={`group p-5 bg-[var(--bg-tertiary)]/30 border rounded-xl transition-all ${
+                  className={`group p-5 bg-[var(--bg-tertiary)]/30 border rounded-xl transition-all overflow-hidden ${
                     selectedAgentId === agent.id
                       ? 'border-[var(--bg-selected)] shadow-md'
                       : 'border-[var(--border-light)] hover:border-[var(--border-medium)] hover:shadow-md'
                   }`}
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-start gap-3">
-                      <div className={`p-2 rounded-xl ${selectedAgentId === agent.id ? 'bg-[var(--bg-selected)] text-white' : 'bg-[var(--bg-hover)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'} transition-colors`}>
+                  <div className="flex items-start gap-3 mb-3 min-w-0">
+                      <div className={`p-2 rounded-xl flex-shrink-0 ${selectedAgentId === agent.id ? 'bg-[var(--bg-selected)] text-white' : 'bg-[var(--bg-hover)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'} transition-colors`}>
                         <AgentIcon size={24} weight="light" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 overflow-hidden">
                         <h4 className="font-medium text-sm mb-1 truncate">{agent.name}</h4>
                         <p className="text-xs text-[var(--text-secondary)] line-clamp-2 min-h-[2rem]">
                           {agent.description || 'Agente especializado'}
                         </p>
                       </div>
-                    </div>
                   </div>
 
                   {(agent.allowedEntities && agent.allowedEntities.length > 0) || (agent.folderIds && agent.folderIds.length > 0) ? (

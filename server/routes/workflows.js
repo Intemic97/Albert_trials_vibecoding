@@ -1,0 +1,1092 @@
+/**
+ * Workflow Routes
+ * 
+ * Handles: workflows CRUD, webhooks, public forms, execution,
+ * execution history, Prefect health, approvals.
+ */
+
+const express = require('express');
+const router = express.Router();
+const { authenticateToken } = require('../auth');
+const { generateId, logActivity } = require('../utils/helpers');
+const { openDb } = require('../db');
+const { WorkflowExecutor } = require('../workflowExecutor');
+const { prefectClient } = require('../prefectClient');
+const { getPollingService } = require('../executionPolling');
+const workflowScheduler = require('../services/workflowScheduler');
+
+module.exports = function({ db, broadcastToOrganization }) {
+
+router.get('/workflows', authenticateToken, async (req, res) => {
+    try {
+        const workflows = await db.all('SELECT id, name, createdAt, updatedAt, createdBy, createdByName, lastEditedBy, lastEditedByName, tags FROM workflows WHERE organizationId = ? ORDER BY updatedAt DESC', [req.user.orgId]);
+        // Parse tags JSON for each workflow
+        const parsedWorkflows = workflows.map(workflow => ({
+            ...workflow,
+            tags: workflow.tags ? JSON.parse(workflow.tags) : []
+        }));
+        res.json(parsedWorkflows);
+    } catch (error) {
+        console.error('Error fetching workflows:', error);
+        res.status(500).json({ error: 'Failed to fetch workflows' });
+    }
+});
+
+router.get('/workflows/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // First, try to get the workflow from user's organization
+        const workflow = await db.get('SELECT * FROM workflows WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+        // Parse JSON data and tags before sending
+        workflow.data = JSON.parse(workflow.data);
+        workflow.tags = workflow.tags ? JSON.parse(workflow.tags) : [];
+        res.json(workflow);
+    } catch (error) {
+        console.error('Error fetching workflow:', error);
+        res.status(500).json({ error: 'Failed to fetch workflow' });
+    }
+});
+
+router.post('/workflows', authenticateToken, async (req, res) => {
+    try {
+        const { name, data, tags, createdByName } = req.body;
+        const id = Math.random().toString(36).substr(2, 9);
+        const now = new Date().toISOString();
+
+        // Store data and tags as JSON strings
+        await db.run(
+            'INSERT INTO workflows (id, organizationId, name, data, tags, createdAt, updatedAt, createdBy, createdByName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, req.user.orgId, name, JSON.stringify(data), tags ? JSON.stringify(tags) : null, now, now, req.user.sub, createdByName || 'Unknown']
+        );
+
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: createdByName || req.user.email,
+            userEmail: req.user.email,
+            action: 'create',
+            resourceType: 'workflow',
+            resourceId: id,
+            resourceName: name,
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
+        // Sync schedule config if workflow has Schedule trigger
+        try {
+            await workflowScheduler.syncWorkflowSchedule(db, id, req.user.orgId, data);
+        } catch (schedErr) {
+            console.warn('[WorkflowScheduler] Sync failed:', schedErr.message);
+        }
+
+        res.json({ id, name, tags: tags || [], createdAt: now, updatedAt: now, createdBy: req.user.sub, createdByName: createdByName || 'Unknown' });
+    } catch (error) {
+        console.error('Error saving workflow:', error);
+        res.status(500).json({ error: 'Failed to save workflow' });
+    }
+});
+
+router.put('/workflows/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, data, tags, lastEditedByName } = req.body;
+        const now = new Date().toISOString();
+
+        await db.run(
+            'UPDATE workflows SET name = ?, data = ?, tags = ?, updatedAt = ?, lastEditedBy = ?, lastEditedByName = ? WHERE id = ? AND organizationId = ?',
+            [name, JSON.stringify(data), tags ? JSON.stringify(tags) : null, now, req.user.sub, lastEditedByName || 'Unknown', id, req.user.orgId]
+        );
+
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: lastEditedByName || req.user.email,
+            userEmail: req.user.email,
+            action: 'update',
+            resourceType: 'workflow',
+            resourceId: id,
+            resourceName: name,
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
+        // Sync schedule config for workflows with Schedule trigger
+        try {
+            await workflowScheduler.syncWorkflowSchedule(db, id, req.user.orgId, data);
+        } catch (schedErr) {
+            console.warn('[WorkflowScheduler] Sync failed:', schedErr.message);
+        }
+
+        res.json({ message: 'Workflow updated' });
+    } catch (error) {
+        console.error('Error updating workflow:', error);
+        res.status(500).json({ error: 'Failed to update workflow' });
+    }
+});
+
+router.delete('/workflows/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Get workflow name before deleting
+        const workflow = await db.get('SELECT name FROM workflows WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
+        
+        await db.run('DELETE FROM workflows WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
+
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'delete',
+            resourceType: 'workflow',
+            resourceId: id,
+            resourceName: workflow?.name || 'Unknown',
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
+        res.json({ message: 'Workflow deleted' });
+    } catch (error) {
+        console.error('Error deleting workflow:', error);
+        res.status(500).json({ error: 'Failed to delete workflow' });
+    }
+});
+
+// Request access to a workflow from another organization
+router.post('/workflows/:id/request-access', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Get workflow and organization information
+        const workflow = await db.get(
+            'SELECT w.name, w.organizationId, o.name as organizationName FROM workflows w LEFT JOIN organizations o ON w.organizationId = o.id WHERE w.id = ?',
+            [id]
+        );
+        
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+        
+        if (workflow.organizationId === req.user.orgId) {
+            return res.status(400).json({ error: 'You already have access to this workflow' });
+        }
+        
+        // Get user information
+        const user = await db.get('SELECT email, name FROM users WHERE id = ?', [req.user.sub]);
+        const userName = user?.name || user?.email?.split('@')[0] || 'Unknown User';
+        const userEmail = user?.email || 'Unknown';
+        
+        // Get user's organization name
+        const userOrg = await db.get('SELECT name FROM organizations WHERE id = ?', [req.user.orgId]);
+        const userOrgName = userOrg?.name || 'Unknown Organization';
+        
+        // TODO: In a real application, you would:
+        // 1. Create a notification for the organization admins
+        // 2. Send an email to the organization admins
+        // 3. Store the access request in a database table
+        
+        // For now, we'll just log it and return success
+        console.log(`Access request:
+            User: ${userName} (${userEmail}) from ${userOrgName}
+            Workflow: ${workflow.name}
+            Target Organization: ${workflow.organizationName}
+        `);
+        
+        res.json({ 
+            message: 'Access request sent successfully',
+            workflowName: workflow.name,
+            organizationName: workflow.organizationName
+        });
+        
+    } catch (error) {
+        console.error('Error requesting access:', error);
+        res.status(500).json({ error: 'Failed to request access' });
+    }
+});
+
+// ==================== WEBHOOK ENDPOINTS ====================
+
+// Receive webhook and trigger workflow execution
+router.post('/webhook/:workflowId', async (req, res) => {
+    try {
+        const { workflowId } = req.params;
+        const webhookData = req.body;
+
+        console.log(`[Webhook] Received for workflow ${workflowId}:`, JSON.stringify(webhookData));
+
+        // Verify workflow exists
+        const workflow = await db.get('SELECT * FROM workflows WHERE id = ?', [workflowId]);
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+
+        // Execute workflow with webhook data as input
+        const executor = new WorkflowExecutor(db, null, workflow.organizationId, null);
+        const result = await executor.executeWorkflow(workflowId, { _webhookData: webhookData }, workflow.organizationId);
+
+        // If workflow has a webhookResponse node, use its configured response
+        if (result.webhookResponse) {
+            const wr = result.webhookResponse;
+            // Set custom headers if any
+            if (wr.headers && typeof wr.headers === 'object') {
+                for (const [key, value] of Object.entries(wr.headers)) {
+                    res.setHeader(key, value);
+                }
+            }
+            return res.status(wr.statusCode || 200).json(wr.body);
+        }
+
+        // Default response (no webhookResponse node)
+        res.json({
+            success: true,
+            executionId: result.executionId,
+            status: result.status,
+            results: result.results,
+            message: 'Webhook processed successfully'
+        });
+    } catch (error) {
+        console.error('[Webhook] Error:', error);
+        res.status(500).json({ error: error.message || 'Webhook processing failed' });
+    }
+});
+
+// Webhook with custom token for security
+router.post('/webhook/:workflowId/:token', async (req, res) => {
+    try {
+        const { workflowId, token } = req.params;
+        const webhookData = req.body;
+
+        console.log(`[Webhook] Received for workflow ${workflowId} with token`);
+
+        // Verify workflow exists and token matches
+        const workflow = await db.get('SELECT * FROM workflows WHERE id = ?', [workflowId]);
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+
+        // Parse workflow data to check webhook token
+        const workflowData = JSON.parse(workflow.data);
+        const webhookNode = (workflowData.nodes || []).find(n => n.type === 'webhook');
+        
+        if (webhookNode?.config?.webhookToken && webhookNode.config.webhookToken !== token) {
+            return res.status(401).json({ error: 'Invalid webhook token' });
+        }
+
+        // Execute workflow with webhook data
+        const executor = new WorkflowExecutor(db, null, workflow.organizationId, null);
+        const result = await executor.executeWorkflow(workflowId, { _webhookData: webhookData }, workflow.organizationId);
+
+        // If workflow has a webhookResponse node, use its configured response
+        if (result.webhookResponse) {
+            const wr = result.webhookResponse;
+            if (wr.headers && typeof wr.headers === 'object') {
+                for (const [key, value] of Object.entries(wr.headers)) {
+                    res.setHeader(key, value);
+                }
+            }
+            return res.status(wr.statusCode || 200).json(wr.body);
+        }
+
+        // Default response (no webhookResponse node)
+        res.json({
+            success: true,
+            executionId: result.executionId,
+            status: result.status,
+            message: 'Webhook processed successfully'
+        });
+    } catch (error) {
+        console.error('[Webhook] Error:', error);
+        res.status(500).json({ error: error.message || 'Webhook processing failed' });
+    }
+});
+
+// Get webhook URL for a workflow
+router.get('/workflow/:id/webhook-url', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const baseUrl = process.env.API_URL || process.env.FRONTEND_URL?.replace(/:\d+/, ':3001') || 'http://localhost:3001';
+        
+        // Generate a simple token based on workflow id
+        const crypto = require('crypto');
+        const token = crypto.createHash('md5').update(id + 'webhook-secret').digest('hex').substring(0, 12);
+
+        res.json({
+            webhookUrl: `${baseUrl}/api/webhook/${id}`,
+            webhookUrlWithToken: `${baseUrl}/api/webhook/${id}/${token}`,
+            token
+        });
+    } catch (error) {
+        console.error('Error generating webhook URL:', error);
+        res.status(500).json({ error: 'Failed to generate webhook URL' });
+    }
+});
+
+// ==================== PUBLIC WORKFLOW FORM ENDPOINTS ====================
+
+// Debug endpoint to see workflow data
+router.get('/workflow/:id/debug', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const workflow = await db.get('SELECT * FROM workflows WHERE id = ?', [id]);
+        
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+
+        const data = JSON.parse(workflow.data || '{}');
+        res.json({
+            id: workflow.id,
+            name: workflow.name,
+            nodeCount: data.nodes?.length || 0,
+            connectionCount: data.connections?.length || 0,
+            nodes: data.nodes?.map(n => ({ id: n.id, type: n.type, label: n.label })) || [],
+            connections: data.connections || []
+        });
+    } catch (error) {
+        console.error('Debug error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get workflow info for public form (no auth required)
+router.get('/workflow/:id/public', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const workflow = await db.get('SELECT id, name, data FROM workflows WHERE id = ?', [id]);
+        
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+
+        // Parse workflow data to extract manual input nodes
+        let workflowData;
+        try {
+            workflowData = JSON.parse(workflow.data);
+        } catch (e) {
+            return res.status(500).json({ error: 'Invalid workflow data' });
+        }
+
+        // Find all manualInput nodes to create form fields
+        const inputs = (workflowData.nodes || [])
+            .filter(node => node.type === 'manualInput')
+            .map(node => ({
+                nodeId: node.id,
+                varName: node.config?.inputVarName || node.config?.variableName || 'input',
+                label: node.label || node.config?.inputVarName || node.config?.variableName || 'Input',
+                defaultValue: node.config?.inputVarValue || node.config?.variableValue || ''
+            }));
+
+        res.json({
+            id: workflow.id,
+            name: workflow.name,
+            inputs
+        });
+    } catch (error) {
+        console.error('Error fetching public workflow:', error);
+        res.status(500).json({ error: 'Failed to fetch workflow' });
+    }
+});
+
+// Run workflow from public form (no auth required) - FULL EXECUTION
+router.post('/workflow/:id/run-public', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { inputs } = req.body; // { nodeId: value, ... }
+
+        console.log(`[WorkflowExecutor] Public execution started for workflow ${id}`);
+
+        // Get workflow to retrieve organizationId
+        const workflow = await db.get('SELECT * FROM workflows WHERE id = ?', [id]);
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+
+        const executor = new WorkflowExecutor(db, null, workflow.organizationId, null);
+        const result = await executor.executeWorkflow(id, inputs || {}, workflow.organizationId);
+
+        res.json({
+            success: true,
+            executionId: result.executionId,
+            status: result.status,
+            result: result.results
+        });
+    } catch (error) {
+        console.error('Error running public workflow:', error);
+        res.status(500).json({ error: error.message || 'Failed to run workflow' });
+    }
+});
+
+// ==================== WORKFLOW EXECUTION ENDPOINTS ====================
+
+// Execute workflow (authenticated)
+router.post('/workflow/:id/execute', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { inputs, usePrefect } = req.body;
+
+        // Get workflow name for logging
+        const workflow = await db.get('SELECT name FROM workflows WHERE id = ?', [id]);
+
+        // Log workflow execution
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'execute',
+            resourceType: 'workflow',
+            resourceId: id,
+            resourceName: workflow?.name || 'Unknown',
+            details: { inputCount: Object.keys(inputs || {}).length },
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
+        // Check if we should use Prefect service (background execution)
+        const shouldUsePrefect = usePrefect !== false; // Default to true
+
+        if (shouldUsePrefect) {
+            console.log(`[WorkflowExecutor] Delegating workflow ${id} to Prefect service (background mode)`);
+            
+            try {
+                // Delegate to Prefect microservice for background execution
+                const result = await prefectClient.executeWorkflow(id, inputs || {}, req.user.orgId);
+
+                // Start polling for execution progress
+                const pollingService = getPollingService();
+                if (pollingService && result.executionId) {
+                    pollingService.startPolling(result.executionId, req.user.orgId, id);
+                    console.log(`[WorkflowExecutor] Started progress polling for execution ${result.executionId}`);
+                }
+
+                return res.json({
+                    success: true,
+                    executionId: result.executionId,
+                    status: result.status,
+                    message: result.message || 'Workflow execution started in background',
+                    usingPrefect: true,
+                    backgroundExecution: true
+                });
+
+            } catch (prefectError) {
+                console.warn('[WorkflowExecutor] Prefect service unavailable, falling back to local execution');
+                console.warn('[WorkflowExecutor] Error:', prefectError.message);
+                // Fall through to local execution
+            }
+        }
+
+        // Local execution (synchronous, blocks until complete)
+        console.log(`[WorkflowExecutor] Local execution for workflow ${id}`);
+
+        const executor = new WorkflowExecutor(db, null, req.user.orgId, req.user.sub);
+        const result = await executor.executeWorkflow(id, inputs || {}, req.user.orgId);
+
+        res.json({
+            success: true,
+            executionId: result.executionId,
+            status: result.status,
+            result: result.results,
+            usingPrefect: false,
+            backgroundExecution: false
+        });
+    } catch (error) {
+        console.error('Error executing workflow:', error);
+        res.status(500).json({ error: error.message || 'Failed to execute workflow' });
+    }
+});
+
+// Get execution status (authenticated)
+router.get('/executions/:executionId', authenticateToken, async (req, res) => {
+    try {
+        const { executionId } = req.params;
+        
+        // Try Prefect service first
+        try {
+            const status = await prefectClient.getExecutionStatus(executionId);
+            return res.json(status);
+        } catch (prefectError) {
+            // Fallback to local database
+            const db = await openDb();
+            const execution = await db.get(
+                'SELECT * FROM workflow_executions WHERE id = ?',
+                [executionId]
+            );
+            
+            if (!execution) {
+                return res.status(404).json({ error: 'Execution not found' });
+            }
+            
+            // Get logs
+            const logs = await db.all(
+                'SELECT * FROM execution_logs WHERE executionId = ? ORDER BY timestamp',
+                [executionId]
+            );
+            
+            return res.json({
+                executionId,
+                workflowId: execution.workflowId,
+                status: execution.status,
+                createdAt: execution.createdAt,
+                startedAt: execution.startedAt,
+                completedAt: execution.completedAt,
+                error: execution.error,
+                progress: {
+                    totalNodes: logs.length,
+                    completedNodes: logs.filter(l => l.status === 'completed').length,
+                    failedNodes: logs.filter(l => l.status === 'error').length
+                },
+                logs: logs.slice(-10)
+            });
+        }
+    } catch (error) {
+        console.error('Error getting execution status:', error);
+        res.status(500).json({ error: error.message || 'Failed to get execution status' });
+    }
+});
+
+// Get active polling executions (for debugging)
+router.get('/executions/polling/active', authenticateToken, async (req, res) => {
+    const pollingService = getPollingService();
+    if (pollingService) {
+        res.json({
+            activeExecutions: pollingService.getActiveExecutions()
+        });
+    } else {
+        res.json({ activeExecutions: [] });
+    }
+});
+
+// Cancel a running execution
+router.post('/executions/:executionId/cancel', authenticateToken, async (req, res) => {
+    try {
+        const { executionId } = req.params;
+        
+        console.log(`[Execution] Cancel request for: ${executionId}`);
+        
+        // Try Prefect service first
+        try {
+            const result = await prefectClient.cancelExecution(executionId);
+            
+            // Stop polling if active
+            const pollingService = getPollingService();
+            if (pollingService) {
+                pollingService.stopPolling(executionId);
+            }
+            
+            // Broadcast cancellation via WebSocket
+            const db = await openDb();
+            const execution = await db.get(
+                'SELECT workflowId, organizationId FROM workflow_executions WHERE id = ?',
+                [executionId]
+            );
+            
+            if (execution && execution.organizationId) {
+                broadcastToOrganization(execution.organizationId, {
+                    type: 'execution_cancelled',
+                    executionId,
+                    workflowId: execution.workflowId,
+                    message: 'Execution cancelled by user'
+                });
+            }
+            
+            return res.json(result);
+        } catch (prefectError) {
+            console.warn('[Execution] Prefect cancel failed, trying local:', prefectError.message);
+            
+            // Fallback: cancel in local database
+            const db = await openDb();
+            const execution = await db.get(
+                'SELECT * FROM workflow_executions WHERE id = ?',
+                [executionId]
+            );
+            
+            if (!execution) {
+                return res.status(404).json({ error: 'Execution not found' });
+            }
+            
+            if (!['pending', 'running'].includes(execution.status)) {
+                return res.json({
+                    success: false,
+                    executionId,
+                    message: `Cannot cancel execution with status '${execution.status}'`,
+                    previousStatus: execution.status
+                });
+            }
+            
+            await db.run(
+                "UPDATE workflow_executions SET status = 'cancelled', error = 'Execution cancelled by user' WHERE id = ?",
+                [executionId]
+            );
+            
+            // Broadcast cancellation
+            if (execution.organizationId) {
+                broadcastToOrganization(execution.organizationId, {
+                    type: 'execution_cancelled',
+                    executionId,
+                    workflowId: execution.workflowId,
+                    message: 'Execution cancelled by user'
+                });
+            }
+            
+            return res.json({
+                success: true,
+                executionId,
+                message: 'Execution cancelled successfully',
+                previousStatus: execution.status
+            });
+        }
+    } catch (error) {
+        console.error('Error cancelling execution:', error);
+        res.status(500).json({ error: error.message || 'Failed to cancel execution' });
+    }
+});
+
+// Execute a single node (authenticated)
+router.post('/workflow/:id/execute-node', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { nodeId, nodeType, node, inputData, recursive } = req.body;
+
+        if (!nodeId) {
+            return res.status(400).json({ error: 'nodeId is required' });
+        }
+
+        console.log(`[WorkflowExecutor] Single node execution: ${nodeId} (recursive: ${recursive})`);
+
+        // Try to use Prefect service if available
+        const prefectAvailable = await prefectClient.isAvailable();
+        
+        if (prefectAvailable && !recursive) {
+            // Use Prefect for single node execution (optimized)
+            try {
+                const result = await prefectClient.executeNode({
+                    workflowId: id,
+                    nodeId: nodeId,
+                    nodeType: nodeType,
+                    node: node,
+                    inputData: inputData || {}
+                });
+
+                console.log('[Prefect] Single node execution completed via Prefect');
+
+                return res.json({
+                    success: result.success,
+                    nodeId: result.nodeId,
+                    output: result.output,
+                    error: result.error,
+                    mode: 'prefect'
+                });
+            } catch (prefectError) {
+                console.warn('[Prefect] Failed to execute via Prefect, falling back to local:', prefectError.message);
+                // Fall through to local execution
+            }
+        }
+
+        // Fallback: Use local WorkflowExecutor
+        const workflow = await db.get('SELECT organizationId FROM workflows WHERE id = ?', [id]);
+        const executor = new WorkflowExecutor(db, null, workflow?.organizationId || req.user.orgId, req.user.sub);
+        const result = await executor.executeSingleNode(id, nodeId, inputData, recursive || false);
+
+        res.json({
+            success: true,
+            executionId: result.executionId,
+            nodeId: result.nodeId,
+            result: result.result,
+            mode: 'local'
+        });
+    } catch (error) {
+        console.error('Error executing node:', error);
+        res.status(500).json({ error: error.message || 'Failed to execute node' });
+    }
+});
+
+// Get execution status (works for both local and Prefect executions)
+router.get('/workflow/execution/:execId', authenticateToken, async (req, res) => {
+    try {
+        const { execId } = req.params;
+        const execution = await db.get('SELECT * FROM workflow_executions WHERE id = ?', [execId]);
+
+        if (!execution) {
+            return res.status(404).json({ error: 'Execution not found' });
+        }
+
+        // Parse JSON fields
+        execution.inputs = execution.inputs ? JSON.parse(execution.inputs) : null;
+        execution.nodeResults = execution.nodeResults ? JSON.parse(execution.nodeResults) : null;
+        execution.finalOutput = execution.finalOutput ? JSON.parse(execution.finalOutput) : null;
+
+        // If using Prefect, try to get additional progress info
+        if (execution.status === 'running' || execution.status === 'pending') {
+            try {
+                const prefectStatus = await prefectClient.getExecutionStatus(execId);
+                if (prefectStatus.progress) {
+                    execution.progress = prefectStatus.progress;
+                }
+            } catch (e) {
+                // Prefect service might not be available, that's ok
+                console.log('[API] Could not fetch Prefect status:', e.message);
+            }
+        }
+
+        res.json(execution);
+    } catch (error) {
+        console.error('Error fetching execution:', error);
+        res.status(500).json({ error: 'Failed to fetch execution' });
+    }
+});
+
+// Get execution logs (works for both local and Prefect executions)
+router.get('/workflow/execution/:execId/logs', authenticateToken, async (req, res) => {
+    try {
+        const { execId } = req.params;
+        const logs = await db.all(
+            'SELECT * FROM execution_logs WHERE executionId = ? ORDER BY timestamp ASC',
+            [execId]
+        );
+
+        // Parse JSON fields
+        logs.forEach(log => {
+            log.inputData = log.inputData ? JSON.parse(log.inputData) : null;
+            log.outputData = log.outputData ? JSON.parse(log.outputData) : null;
+        });
+
+        res.json(logs);
+    } catch (error) {
+        console.error('Error fetching execution logs:', error);
+        res.status(500).json({ error: 'Failed to fetch logs' });
+    }
+});
+
+// Check Prefect service health
+router.get('/prefect/health', authenticateToken, async (req, res) => {
+    try {
+        const isAvailable = await prefectClient.isAvailable();
+        
+        res.json({
+            available: isAvailable,
+            serviceUrl: process.env.PREFECT_SERVICE_URL || 'http://localhost:8000',
+            message: isAvailable 
+                ? 'Prefect service is running - background execution enabled' 
+                : 'Prefect service is not available - using local execution only'
+        });
+    } catch (error) {
+        res.json({
+            available: false,
+            error: error.message,
+            message: 'Prefect service is not available - using local execution only'
+        });
+    }
+});
+
+// Get execution history for a workflow (public - for webhook debugging)
+router.get('/workflow/:id/executions', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const limit = parseInt(req.query.limit) || 20;
+        
+        const executions = await db.all(`
+            SELECT id, status, triggerType, inputs, nodeResults, finalOutput, createdAt, startedAt, completedAt, error
+            FROM workflow_executions 
+            WHERE workflowId = ?
+            ORDER BY createdAt DESC
+            LIMIT ?
+        `, [id, limit]);
+
+        // Parse JSON fields
+        const parsed = executions.map(e => ({
+            ...e,
+            inputs: e.inputs ? JSON.parse(e.inputs) : null,
+            nodeResults: e.nodeResults ? JSON.parse(e.nodeResults) : null,
+            finalOutput: e.finalOutput ? JSON.parse(e.finalOutput) : null
+        }));
+
+        res.json(parsed);
+    } catch (error) {
+        console.error('Error fetching executions:', error);
+        res.status(500).json({ error: 'Failed to fetch executions' });
+    }
+});
+
+// Overview statistics endpoint
+router.get('/overview/stats', authenticateToken, async (req, res) => {
+    try {
+        const orgId = req.user.orgId;
+        
+        // Get workflow count
+        const workflowCount = await db.get(
+            'SELECT COUNT(*) as count FROM workflows WHERE organizationId = ?',
+            [orgId]
+        );
+        
+        // Get total executions count (events triggered)
+        const executionsCount = await db.get(
+            'SELECT COUNT(*) as count FROM workflow_executions WHERE workflowId IN (SELECT id FROM workflows WHERE organizationId = ?)',
+            [orgId]
+        );
+        
+        // Get executions from last 7 days for chart
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        const dailyExecutions = await db.all(`
+            SELECT 
+                DATE(createdAt) as date,
+                COUNT(*) as count
+            FROM workflow_executions 
+            WHERE workflowId IN (SELECT id FROM workflows WHERE organizationId = ?)
+                AND createdAt >= ?
+            GROUP BY DATE(createdAt)
+            ORDER BY date ASC
+        `, [orgId, sevenDaysAgo.toISOString()]);
+        
+        // Get recent workflows with execution counts
+        let recentWorkflowsRaw = [];
+        try {
+            recentWorkflowsRaw = await db.all(`
+                SELECT 
+                    w.id,
+                    w.name,
+                    w.updatedAt,
+                    COALESCE(COUNT(e.id), 0) as executionCount,
+                    MAX(e.createdAt) as lastExecutionAt,
+                    COALESCE(SUM(CASE WHEN e.status = 'running' THEN 1 ELSE 0 END), 0) as runningCount,
+                    COALESCE(SUM(CASE WHEN e.status = 'completed' THEN 1 ELSE 0 END), 0) as completedCount,
+                    COALESCE(SUM(CASE WHEN e.status = 'failed' THEN 1 ELSE 0 END), 0) as failedCount
+                FROM workflows w
+                LEFT JOIN workflow_executions e ON w.id = e.workflowId
+                WHERE w.organizationId = ?
+                GROUP BY w.id, w.name, w.updatedAt
+                ORDER BY COALESCE(MAX(e.createdAt), w.updatedAt) DESC
+                LIMIT 10
+            `, [orgId]);
+        } catch (error) {
+            console.error('[Overview Stats] Error fetching workflows:', error);
+            // If query fails, try simpler query without joins
+            try {
+                recentWorkflowsRaw = await db.all(`
+                    SELECT 
+                        id,
+                        name,
+                        updatedAt
+                    FROM workflows 
+                    WHERE organizationId = ?
+                    ORDER BY updatedAt DESC
+                    LIMIT 10
+                `, [orgId]);
+                // Add default values
+                recentWorkflowsRaw = recentWorkflowsRaw.map(w => ({
+                    ...w,
+                    executionCount: 0,
+                    lastExecutionAt: null,
+                    runningCount: 0,
+                    completedCount: 0,
+                    failedCount: 0
+                }));
+            } catch (e) {
+                console.error('[Overview Stats] Error with fallback query:', e);
+                recentWorkflowsRaw = [];
+            }
+        }
+        
+        console.log('[Overview Stats] Found workflows:', recentWorkflowsRaw.length);
+        
+        // Calculate percentage changes (comparing last 7 days vs previous 7 days)
+        const fourteenDaysAgo = new Date();
+        fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+        
+        const recentExecutions = await db.get(`
+            SELECT COUNT(*) as count FROM workflow_executions 
+            WHERE workflowId IN (SELECT id FROM workflows WHERE organizationId = ?)
+                AND createdAt >= ? AND createdAt < ?
+        `, [orgId, sevenDaysAgo.toISOString(), new Date().toISOString()]);
+        
+        const previousExecutions = await db.get(`
+            SELECT COUNT(*) as count FROM workflow_executions 
+            WHERE workflowId IN (SELECT id FROM workflows WHERE organizationId = ?)
+                AND createdAt >= ? AND createdAt < ?
+        `, [orgId, fourteenDaysAgo.toISOString(), sevenDaysAgo.toISOString()]);
+        
+        const eventsChange = previousExecutions.count > 0 
+            ? ((recentExecutions.count - previousExecutions.count) / previousExecutions.count * 100).toFixed(1)
+            : recentExecutions.count > 0 ? '100.0' : '0.0';
+        
+        res.json({
+            activeWorkflows: workflowCount?.count || 0,
+            eventsTriggered: recentExecutions?.count || 0,
+            eventsChange: parseFloat(eventsChange) || 0,
+            dailyExecutions: (dailyExecutions || []).map(row => ({
+                date: row.date,
+                count: row.count
+            })),
+            recentWorkflows: (recentWorkflowsRaw || []).map(w => ({
+                id: w.id,
+                name: w.name,
+                executionCount: w.executionCount || 0,
+                lastExecutionAt: w.lastExecutionAt || null,
+                status: w.runningCount > 0 ? 'running' : (w.failedCount > 0 ? 'error' : (w.completedCount > 0 ? 'paused' : 'paused'))
+            }))
+        });
+    } catch (error) {
+        console.error('Error fetching overview stats:', error);
+        // Return empty stats instead of error to prevent UI issues
+        res.json({
+            activeWorkflows: 0,
+            eventsTriggered: 0,
+            eventsChange: 0,
+            dailyExecutions: [],
+            recentWorkflows: []
+        });
+    }
+});
+
+// Cancel execution
+router.post('/workflow/execution/:execId/cancel', authenticateToken, async (req, res) => {
+    try {
+        const { execId } = req.params;
+        
+        await db.run(
+            'UPDATE workflow_executions SET status = ?, completedAt = ? WHERE id = ? AND status IN (?, ?)',
+            ['cancelled', new Date().toISOString(), execId, 'pending', 'running']
+        );
+
+        res.json({ success: true, message: 'Execution cancelled' });
+    } catch (error) {
+        console.error('Error cancelling execution:', error);
+        res.status(500).json({ error: 'Failed to cancel execution' });
+    }
+});
+
+// Resume paused execution (for human approval)
+router.post('/workflow/execution/:execId/resume', authenticateToken, async (req, res) => {
+    try {
+        const { execId } = req.params;
+        const { approved } = req.body;
+
+        const execution = await db.get('SELECT * FROM workflow_executions WHERE id = ?', [execId]);
+        
+        if (!execution) {
+            return res.status(404).json({ error: 'Execution not found' });
+        }
+
+        if (execution.status !== 'paused') {
+            return res.status(400).json({ error: 'Execution is not paused' });
+        }
+
+        if (!approved) {
+            // Rejected - mark as failed
+            await db.run(
+                'UPDATE workflow_executions SET status = ?, error = ?, completedAt = ? WHERE id = ?',
+                ['failed', 'Rejected by human approval', new Date().toISOString(), execId]
+            );
+            return res.json({ success: true, message: 'Execution rejected' });
+        }
+
+        // Approved - continue execution from current node
+        const workflow = await db.get('SELECT * FROM workflows WHERE id = ?', [execution.workflowId]);
+        const executor = new WorkflowExecutor(db, execId, workflow?.organizationId || null, req.user.sub);
+        
+        // Load workflow data
+        const workflowData = JSON.parse(workflow.data);
+        executor.nodes = workflowData.nodes || [];
+        executor.connections = workflowData.connections || [];
+        executor.workflow = workflow;
+        executor.nodeResults = execution.nodeResults ? JSON.parse(execution.nodeResults) : {};
+
+        // Update status to running
+        await db.run('UPDATE workflow_executions SET status = ? WHERE id = ?', ['running', execId]);
+
+        // Get next nodes after the approval node and continue
+        const nextNodes = executor.getNextNodes(execution.currentNodeId, { conditionResult: true });
+        
+        for (const nextNode of nextNodes) {
+            await executor.executeNode(nextNode.id, null, true);
+        }
+
+        // Mark as completed
+        await db.run(
+            'UPDATE workflow_executions SET status = ?, completedAt = ?, nodeResults = ? WHERE id = ?',
+            ['completed', new Date().toISOString(), JSON.stringify(executor.nodeResults), execId]
+        );
+
+        res.json({ success: true, message: 'Execution resumed and completed' });
+    } catch (error) {
+        console.error('Error resuming execution:', error);
+        res.status(500).json({ error: error.message || 'Failed to resume execution' });
+    }
+});
+
+// Pending Approvals Endpoints (Human in the Loop)
+router.get('/pending-approvals', authenticateToken, async (req, res) => {
+    try {
+        const approvals = await db.all(`
+            SELECT pa.*, w.name as workflowName 
+            FROM pending_approvals pa
+            LEFT JOIN workflows w ON pa.workflowId = w.id
+            WHERE pa.assignedUserId = ? AND pa.status = 'pending' AND pa.organizationId = ?
+            ORDER BY pa.createdAt DESC
+        `, [req.user.id, req.user.orgId]);
+        res.json(approvals || []);
+    } catch (error) {
+        console.error('Error fetching pending approvals:', error);
+        res.json([]); // Return empty array instead of error
+    }
+});
+
+router.post('/pending-approvals', authenticateToken, async (req, res) => {
+    try {
+        const { workflowId, nodeId, nodeLabel, assignedUserId, assignedUserName, inputDataPreview } = req.body;
+        const id = Math.random().toString(36).substr(2, 9);
+        const createdAt = new Date().toISOString();
+        
+        await db.run(`
+            INSERT INTO pending_approvals (id, workflowId, nodeId, nodeLabel, assignedUserId, assignedUserName, status, createdAt, inputDataPreview, organizationId)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+        `, [id, workflowId, nodeId, nodeLabel, assignedUserId, assignedUserName, createdAt, JSON.stringify(inputDataPreview), req.user.orgId]);
+        
+        res.json({ id, status: 'pending', createdAt });
+    } catch (error) {
+        console.error('Error creating pending approval:', error);
+        res.status(500).json({ error: 'Failed to create pending approval' });
+    }
+});
+
+router.post('/pending-approvals/:id/approve', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.run(`
+            UPDATE pending_approvals SET status = 'approved', updatedAt = ? 
+            WHERE id = ? AND assignedUserId = ? AND organizationId = ?
+        `, [new Date().toISOString(), id, req.user.id, req.user.orgId]);
+        res.json({ message: 'Approved' });
+    } catch (error) {
+        console.error('Error approving:', error);
+        res.status(500).json({ error: 'Failed to approve' });
+    }
+});
+
+router.post('/pending-approvals/:id/reject', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.run(`
+            UPDATE pending_approvals SET status = 'rejected', updatedAt = ? 
+            WHERE id = ? AND assignedUserId = ? AND organizationId = ?
+        `, [new Date().toISOString(), id, req.user.id, req.user.orgId]);
+        res.json({ message: 'Rejected' });
+    } catch (error) {
+        console.error('Error rejecting:', error);
+        res.status(500).json({ error: 'Failed to reject' });
+    }
+});
+
+// HTTP Proxy Endpoint
+
+    return router;
+};

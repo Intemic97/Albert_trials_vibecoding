@@ -2644,6 +2644,12 @@ export const Copilots: React.FC = () => {
                     onClose={() => setShowAgentLibrary(false)}
                     onSelectAgent={(agentId) => {
                         setSelectedAgentForChat(agentId);
+                        // Also update the current chat's agentId so it takes effect immediately
+                        if (activeChat) {
+                            setChats(prev => prev.map(c =>
+                                c.id === activeChat ? { ...c, agentId } : c
+                            ));
+                        }
                     }}
                     selectedAgentId={selectedAgentForChat}
                 />

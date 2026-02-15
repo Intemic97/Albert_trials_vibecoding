@@ -11,6 +11,10 @@ async function openDb() {
 async function initDb() {
   const db = await openDb();
 
+  // Enable WAL mode for better concurrent access (prevents SQLITE_BUSY)
+  await db.exec('PRAGMA journal_mode = WAL;');
+  await db.exec('PRAGMA busy_timeout = 5000;');
+
   // Enable foreign keys
   await db.exec('PRAGMA foreign_keys = ON;');
 
