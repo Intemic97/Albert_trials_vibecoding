@@ -242,7 +242,6 @@ def merge_inputs(parent_results: List[Dict], connections: List[Dict], node_id: s
 async def workflow_flow_optimized(
     workflow_id: str,
     execution_id: str,
-    workflow_data: Dict,
     inputs: Dict[str, Any]
 ) -> Dict:
     """
@@ -253,9 +252,24 @@ async def workflow_flow_optimized(
     - Better error handling and retry logic
     - Caching support
     - Native Prefect monitoring
+    
+    Note: workflow_data is loaded from DB inside the flow (not as parameter)
+    to avoid exceeding Prefect Cloud payload limits with large inline data.
     """
+    import json
     
     print(f"[Optimized Flow] Starting workflow execution: {execution_id}")
+    
+    # Load workflow data from DB instead of receiving as parameter
+    # This avoids Prefect Cloud payload limits with large inline data (PDFs, Excel)
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        cursor = await db.execute("SELECT data FROM workflows WHERE id = ?", (workflow_id,))
+        row = await cursor.fetchone()
+        if not row:
+            raise ValueError(f"Workflow {workflow_id} not found in database")
+        workflow_data = row[0]
+        if isinstance(workflow_data, str):
+            workflow_data = json.loads(workflow_data)
     
     nodes = workflow_data.get('nodes', [])
     connections = workflow_data.get('connections', [])
@@ -346,7 +360,7 @@ async def workflow_flow_optimized(
             # Wait for all tasks in this layer to complete
             # This is where Prefect executes tasks in PARALLEL
             for node_id, task_future in layer_tasks:
-                result = await task_future.result()
+                result = task_future.result()
                 node_results[node_id] = result
                 
                 print(f"[Optimized Flow] Node {node_id} completed: success={result.get('success')}, duration={result.get('duration')}s")

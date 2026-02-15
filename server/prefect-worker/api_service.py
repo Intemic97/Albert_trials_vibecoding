@@ -154,18 +154,14 @@ async def execute_workflow_background(
     try:
         print(f"🔄 Starting background execution for {execution_id} (mode: {mode})")
         
-        # Load workflow data
-        db = Database()
-        workflow = await db.get_workflow(workflow_id)
-        workflow_data = workflow.get('data', {})
-        
         # Execute workflow using optimized or legacy flow
+        # Note: the flow loads workflow_data from DB internally to avoid
+        # Prefect Cloud payload limits with large inline data (PDFs, Excel)
         if mode == "optimized":
             result = await workflow_flow_optimized(
                 workflow_id=workflow_id,
                 execution_id=execution_id,
-                workflow_data=workflow_data,
-                inputs=inputs
+                inputs=inputs or {}
             )
         else:
             # Legacy mode (sequential execution)

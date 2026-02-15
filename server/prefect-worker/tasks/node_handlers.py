@@ -822,7 +822,31 @@ async def handle_excel_input(node: Dict, input_data: Optional[Dict] = None, exec
     
     config_data = node.get("config", {})
     
-    # Check for parsed data (already processed in frontend)
+    # Check for GCS path first (preferred for large files)
+    if config_data.get("gcsPath"):
+        from gcs_service import gcs_service
+        
+        gcs_available = gcs_service.init()
+        if not gcs_available:
+            raise ValueError("Cloud storage not available for loading Excel data")
+        
+        result = gcs_service.download_workflow_data(config_data["gcsPath"])
+        
+        if not result["success"]:
+            raise ValueError(f"Failed to load Excel data from cloud: {result['error']}")
+        
+        data = result["data"]
+        row_count = result["row_count"]
+        
+        return {
+            "success": True,
+            "message": f"Loaded {row_count} rows from {config_data.get('fileName', 'cloud storage')} (GCS)",
+            "outputData": data,
+            "rowCount": row_count,
+            "source": "gcs"
+        }
+    
+    # Fallback: use inline parsedData (already processed in frontend)
     if config_data.get("parsedData") and isinstance(config_data["parsedData"], list):
         return {
             "success": True,
@@ -832,11 +856,6 @@ async def handle_excel_input(node: Dict, input_data: Optional[Dict] = None, exec
             "source": "inline"
         }
     
-    # Check for GCS path
-    if config_data.get("gcsPath"):
-        # TODO: Implement GCS download
-        raise ValueError("GCS data loading not yet implemented in Python service")
-    
     raise ValueError("No data configured for Excel/CSV node. Please upload a file.")
 
 @task(name="pdf_input", retries=0)
@@ -844,15 +863,43 @@ async def handle_pdf_input(node: Dict, input_data: Optional[Dict] = None, execut
     """Handle PDF input node"""
     config_data = node.get("config", {})
     
-    if config_data.get("parsedText"):
+    # Check for GCS path first (preferred for large PDFs)
+    if config_data.get("gcsPath") and config_data.get("useGCS"):
+        from gcs_service import gcs_service
+        
+        gcs_available = gcs_service.init()
+        if not gcs_available:
+            raise ValueError("Cloud storage not available for loading PDF data")
+        
+        result = gcs_service.download_workflow_data(config_data["gcsPath"])
+        
+        if not result["success"]:
+            raise ValueError(f"Failed to load PDF from cloud: {result['error']}")
+        
+        pdf_data = result["data"]
+        return {
+            "success": True,
+            "message": f"Loaded PDF: {pdf_data.get('fileName', config_data.get('fileName', 'file'))} ({pdf_data.get('pages', '?')} pages) from GCS",
+            "outputData": {
+                "text": pdf_data.get("text", ""),
+                "fileName": pdf_data.get("fileName", config_data.get("fileName")),
+                "pages": pdf_data.get("pages")
+            },
+            "source": "gcs"
+        }
+    
+    # Fallback: use inline text (pdfText or parsedText)
+    pdf_text = config_data.get("pdfText") or config_data.get("parsedText")
+    if pdf_text:
         return {
             "success": True,
             "message": f"Loaded PDF: {config_data.get('fileName', 'file')} ({config_data.get('pages', '?')} pages)",
             "outputData": {
-                "text": config_data["parsedText"],
+                "text": pdf_text,
                 "fileName": config_data.get("fileName"),
                 "pages": config_data.get("pages")
-            }
+            },
+            "source": "inline"
         }
     
     raise ValueError("No PDF data configured. Please upload a PDF file.")
