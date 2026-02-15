@@ -3862,8 +3862,9 @@ finally:
         let stdoutData = '';
         let stderrData = '';
 
-        // Send input data to stdin
-        pythonProcess.stdin.write(JSON.stringify(inputData || []));
+        // Send input data to stdin - normalize to array if single object (e.g. from webhook)
+        const normalizedInput = Array.isArray(inputData) ? inputData : (inputData ? [inputData] : []);
+        pythonProcess.stdin.write(JSON.stringify(normalizedInput));
         pythonProcess.stdin.end();
 
         pythonProcess.stdout.on('data', (data) => {

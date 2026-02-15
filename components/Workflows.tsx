@@ -3376,7 +3376,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     code: node.config.pythonCode,
-                                    inputData: inputData || []
+                                    inputData: Array.isArray(inputData) ? inputData : (inputData ? [inputData] : [])
                                 }),
                                 credentials: 'include'
                             });
