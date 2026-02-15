@@ -92,7 +92,7 @@ export const SMSConfigPanel: React.FC<SMSConfigPanelProps> = ({
                             hideButton={true}
                             onChange={(val) => setSmsTo(val)}
                             className="h-full [&_textarea]:!h-10 [&_textarea]:!min-h-0 [&_textarea]:!p-2 [&_textarea]:!text-sm"
-                            inputData={inputDataForSMS}
+                            inputData={inputData}
                         />
                     </div>
                 </div>
@@ -111,7 +111,7 @@ export const SMSConfigPanel: React.FC<SMSConfigPanelProps> = ({
                             hideButton={true}
                             onChange={(val) => setSmsBody(val)}
                             className="h-full"
-                            inputData={inputDataForSMS}
+                            inputData={inputData}
                         />
                     </div>
                     <p className="text-[10px] text-[var(--text-secondary)] mt-1">

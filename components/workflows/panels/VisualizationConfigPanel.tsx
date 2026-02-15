@@ -27,6 +27,22 @@ export const VisualizationConfigPanel: React.FC<VisualizationConfigPanelProps> =
   const [isGeneratingWidget, setIsGeneratingWidget] = useState(false);
   const [showWidgetExplanation, setShowWidgetExplanation] = useState(false);
 
+  // Get input data from parent node
+  const parentConnection = connections.find((c: any) => c.toNodeId === nodeId);
+  const parentNode = parentConnection ? nodes.find((n: any) => n.id === parentConnection.fromNodeId) : null;
+  let inputDataForViz: any[] = [];
+  if (parentNode) {
+    if (parentNode.type === 'splitColumns' && parentNode.outputData) {
+      inputDataForViz = parentConnection.outputType === 'B'
+        ? parentNode.outputData.outputB || []
+        : parentNode.outputData.outputA || [];
+    } else {
+      inputDataForViz = parentNode.outputData || parentNode.config?.parsedData || [];
+    }
+  }
+  const dataFields = Array.isArray(inputDataForViz) && inputDataForViz.length > 0 && typeof inputDataForViz[0] === 'object'
+    ? Object.keys(inputDataForViz[0]) : [];
+
   const handleSave = () => {
     onSave(nodeId, { visualizationPrompt, generatedWidget });
   };

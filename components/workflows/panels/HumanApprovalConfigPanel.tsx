@@ -33,7 +33,7 @@ export const HumanApprovalConfigPanel: React.FC<HumanApprovalConfigPanelProps> =
     const loadUsers = async () => {
       setIsLoadingUsers(true);
       try {
-        const response = await fetch(`${API_BASE}/api/organizations/${organizationId}/members`, {
+        const response = await fetch(`${API_BASE}/organizations/${organizationId}/members`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (response.ok) {

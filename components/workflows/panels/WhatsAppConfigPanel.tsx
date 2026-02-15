@@ -92,7 +92,7 @@ export const WhatsAppConfigPanel: React.FC<WhatsAppConfigPanelProps> = ({
                             hideButton={true}
                             onChange={(val) => setWhatsappTo(val)}
                             className="h-full [&_textarea]:!h-10 [&_textarea]:!min-h-0 [&_textarea]:!p-2 [&_textarea]:!text-sm"
-                            inputData={inputDataForWA}
+                            inputData={inputData}
                         />
                     </div>
                 </div>
@@ -111,7 +111,7 @@ export const WhatsAppConfigPanel: React.FC<WhatsAppConfigPanelProps> = ({
                             hideButton={true}
                             onChange={(val) => setWhatsappBody(val)}
                             className="h-full"
-                            inputData={inputDataForWA}
+                            inputData={inputData}
                         />
                     </div>
                     <p className="text-[10px] text-[var(--text-secondary)] mt-1">

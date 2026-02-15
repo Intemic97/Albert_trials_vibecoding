@@ -94,7 +94,7 @@ export const EmailConfigPanel: React.FC<EmailConfigPanelProps> = ({
                             hideButton={true}
                             onChange={(val) => setEmailTo(val)}
                             className="h-full [&_textarea]:!h-10 [&_textarea]:!min-h-0 [&_textarea]:!p-2 [&_textarea]:!text-sm"
-                            inputData={inputDataForEmail}
+                            inputData={inputData}
                         />
                     </div>
                 </div>
@@ -113,7 +113,7 @@ export const EmailConfigPanel: React.FC<EmailConfigPanelProps> = ({
                             hideButton={true}
                             onChange={(val) => setEmailSubject(val)}
                             className="h-full [&_textarea]:!h-10 [&_textarea]:!min-h-0 [&_textarea]:!p-2 [&_textarea]:!text-sm"
-                            inputData={inputDataForEmail}
+                            inputData={inputData}
                         />
                     </div>
                 </div>
@@ -132,7 +132,7 @@ export const EmailConfigPanel: React.FC<EmailConfigPanelProps> = ({
                             hideButton={true}
                             onChange={(val) => setEmailBody(val)}
                             className="h-full"
-                            inputData={inputDataForEmail}
+                            inputData={inputData}
                         />
                     </div>
                 </div>
