@@ -7212,11 +7212,24 @@ app.post('/api/webhook/:workflowId', async (req, res) => {
         const executor = new WorkflowExecutor(db, null, workflow.organizationId, null);
         const result = await executor.executeWorkflow(workflowId, { _webhookData: webhookData }, workflow.organizationId);
 
+        // If workflow has a webhookResponse node, use its configured response
+        if (result.webhookResponse) {
+            const wr = result.webhookResponse;
+            // Set custom headers if any
+            if (wr.headers && typeof wr.headers === 'object') {
+                for (const [key, value] of Object.entries(wr.headers)) {
+                    res.setHeader(key, value);
+                }
+            }
+            return res.status(wr.statusCode || 200).json(wr.body);
+        }
+
+        // Default response (no webhookResponse node)
         res.json({
             success: true,
             executionId: result.executionId,
             status: result.status,
-            results: result.results,  // Include workflow results
+            results: result.results,
             message: 'Webhook processed successfully'
         });
     } catch (error) {
@@ -7251,6 +7264,18 @@ app.post('/api/webhook/:workflowId/:token', async (req, res) => {
         const executor = new WorkflowExecutor(db, null, workflow.organizationId, null);
         const result = await executor.executeWorkflow(workflowId, { _webhookData: webhookData }, workflow.organizationId);
 
+        // If workflow has a webhookResponse node, use its configured response
+        if (result.webhookResponse) {
+            const wr = result.webhookResponse;
+            if (wr.headers && typeof wr.headers === 'object') {
+                for (const [key, value] of Object.entries(wr.headers)) {
+                    res.setHeader(key, value);
+                }
+            }
+            return res.status(wr.statusCode || 200).json(wr.body);
+        }
+
+        // Default response (no webhookResponse node)
         res.json({
             success: true,
             executionId: result.executionId,

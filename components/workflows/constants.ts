@@ -98,6 +98,7 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   { type: 'pdfReport', label: 'PDF Report Generator', icon: FilePdf, description: 'Generate structured PDF reports from data', category: 'Actions' },
   { type: 'action', label: 'Rename Columns', icon: TextAa, description: 'Rename columns in a dataset', category: 'Logic' },
   { type: 'output', label: 'Workflow Output', icon: CheckCircle, description: 'Set the final output', category: 'Actions' },
+  { type: 'webhookResponse', label: 'Webhook Response', icon: ArrowRight, description: 'Return data to the webhook caller', category: 'Actions' },
   
   // Other
   { type: 'comment', label: 'Comment', icon: ChatCircle, description: 'Add a comment or note', category: 'Other' },
@@ -161,6 +162,7 @@ export const NODE_ICONS: Record<NodeType, React.ElementType> = {
   mes: Factory,
   dataHistorian: Database,
   timeSeriesAggregator: TrendUp,
+  webhookResponse: ArrowRight,
 };
 
 /**

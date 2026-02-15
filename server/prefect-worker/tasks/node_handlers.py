@@ -236,6 +236,54 @@ async def handle_webhook(node: Dict, input_data: Optional[Dict] = None, executio
         "receivedAt": None  # Will be set by flow
     }
 
+@task(name="webhook_response", retries=0)
+async def handle_webhook_response(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
+    """Handle webhook response node - prepares response for webhook caller"""
+    config_data = node.get("config", {})
+    mode = config_data.get("webhookResponseMode", "passthrough")
+    status_code = config_data.get("webhookResponseStatusCode", 200)
+    custom_headers = config_data.get("webhookResponseHeaders", [])
+    
+    if mode == "passthrough":
+        response_body = input_data
+    elif mode == "selected":
+        fields = config_data.get("webhookResponseFields", [])
+        response_body = {}
+        if input_data and isinstance(input_data, dict):
+            for field in fields:
+                if field in input_data:
+                    response_body[field] = input_data[field]
+    elif mode == "template":
+        import json as json_mod
+        template = config_data.get("webhookResponseTemplate", "{}")
+        if input_data and isinstance(input_data, dict):
+            for key, value in input_data.items():
+                placeholder = "{{" + key + "}}"
+                replacement = json_mod.dumps(value) if isinstance(value, (dict, list)) else str(value)
+                template = template.replace(placeholder, replacement)
+        try:
+            response_body = json_mod.loads(template)
+        except Exception:
+            response_body = {"rawResponse": template}
+    else:
+        response_body = input_data
+    
+    headers_map = {}
+    for h in custom_headers:
+        if h.get("key") and h.get("value"):
+            headers_map[h["key"]] = h["value"]
+    
+    return {
+        "success": True,
+        "message": f"Webhook response prepared ({status_code})",
+        "outputData": response_body,
+        "isFinal": True,
+        "isWebhookResponse": True,
+        "webhookResponseStatusCode": status_code,
+        "webhookResponseHeaders": headers_map,
+        "webhookResponseBody": response_body
+    }
+
 @task(name="comment_node", retries=0)
 async def handle_comment(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
     """Handle comment node - no operation"""
@@ -1583,6 +1631,7 @@ NODE_HANDLERS = {
     "addField": handle_add_field,
     "join": handle_join,
     "webhook": handle_webhook,
+    "webhookResponse": handle_webhook_response,
     "comment": handle_comment,
     "python": handle_python,
     # Data source nodes

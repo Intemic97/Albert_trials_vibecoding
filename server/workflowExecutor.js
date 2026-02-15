@@ -99,6 +99,19 @@ class WorkflowExecutor {
                 }
             }
 
+            // Check if any node produced a webhookResponse
+            let webhookResponseData = null;
+            for (const [nodeId, result] of Object.entries(this.nodeResults)) {
+                if (result && result.isWebhookResponse) {
+                    webhookResponseData = {
+                        statusCode: result.webhookResponseStatusCode || 200,
+                        headers: result.webhookResponseHeaders || {},
+                        body: result.webhookResponseBody
+                    };
+                    break;
+                }
+            }
+
             // Mark as completed
             await this.updateExecutionStatus('completed', {
                 completedAt: new Date().toISOString(),
@@ -109,7 +122,8 @@ class WorkflowExecutor {
             return {
                 executionId: this.executionId,
                 status: 'completed',
-                results: this.nodeResults
+                results: this.nodeResults,
+                webhookResponse: webhookResponseData
             };
 
         } catch (error) {
@@ -275,6 +289,7 @@ class WorkflowExecutor {
             comment: () => this.handleComment(node, inputData),
             humanApproval: () => this.handleHumanApproval(node, inputData),
             webhook: () => this.handleWebhook(node, inputData),
+            webhookResponse: () => this.handleWebhookResponse(node, inputData),
             // OT/Industrial nodes
             opcua: () => this.handleOpcua(node, inputData),
             mqtt: () => this.handleMqtt(node, inputData),
@@ -1731,6 +1746,71 @@ class WorkflowExecutor {
             data: webhookData, // Also include as 'data' for compatibility
             webhookId: node.config?.webhookId || node.id,
             receivedAt: new Date().toISOString()
+        };
+    }
+
+    async handleWebhookResponse(node, inputData) {
+        const config = node.config || {};
+        const mode = config.webhookResponseMode || 'passthrough';
+        const statusCode = config.webhookResponseStatusCode || 200;
+        const customHeaders = config.webhookResponseHeaders || [];
+
+        let responseBody;
+
+        if (mode === 'passthrough') {
+            // Return all input data as-is
+            responseBody = inputData;
+        } else if (mode === 'selected') {
+            // Return only selected fields
+            const fields = config.webhookResponseFields || [];
+            responseBody = {};
+            if (inputData && typeof inputData === 'object') {
+                for (const field of fields) {
+                    if (field in inputData) {
+                        responseBody[field] = inputData[field];
+                    }
+                }
+            }
+        } else if (mode === 'template') {
+            // Apply template with placeholders
+            let template = config.webhookResponseTemplate || '{}';
+            if (inputData && typeof inputData === 'object') {
+                for (const [key, value] of Object.entries(inputData)) {
+                    const placeholder = `{{${key}}}`;
+                    // Replace with JSON value for objects/arrays, string for primitives
+                    const replacement = typeof value === 'object' ? JSON.stringify(value) : String(value);
+                    template = template.split(placeholder).join(replacement);
+                }
+            }
+            try {
+                responseBody = JSON.parse(template);
+            } catch (e) {
+                // If template is not valid JSON after substitution, return as string
+                responseBody = { rawResponse: template };
+            }
+        } else {
+            responseBody = inputData;
+        }
+
+        // Build headers map
+        const headersMap = {};
+        for (const h of customHeaders) {
+            if (h.key && h.value) {
+                headersMap[h.key] = h.value;
+            }
+        }
+
+        console.log('[WebhookResponse] Prepared response:', JSON.stringify(responseBody).substring(0, 200));
+
+        return {
+            success: true,
+            message: `Webhook response prepared (${statusCode})`,
+            outputData: responseBody,
+            isFinal: true,
+            isWebhookResponse: true,
+            webhookResponseStatusCode: statusCode,
+            webhookResponseHeaders: headersMap,
+            webhookResponseBody: responseBody
         };
     }
 

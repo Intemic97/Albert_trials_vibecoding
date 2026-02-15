@@ -586,6 +586,17 @@ export const NODE_DEFINITIONS: Record<NodeType, NodeDefinition> = {
       requiredConfig: ['conveyorSpeed', 'conveyorLength'],
     },
   },
+  webhookResponse: {
+    type: 'webhookResponse',
+    label: 'Webhook Response',
+    description: 'Return data to the webhook caller',
+    category: 'actions',
+    icon: ArrowRight,
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-50',
+    borderColor: 'border-orange-200',
+    configFields: ['webhookResponseStatusCode', 'webhookResponseMode', 'webhookResponseFields', 'webhookResponseTemplate'],
+  },
 } as any;
 
 /**

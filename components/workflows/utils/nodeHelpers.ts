@@ -157,7 +157,8 @@ export const isNodeConfigured = (node: WorkflowNode): boolean => {
         'opcua': () => true,
         'mqtt': () => true,
         'franmit': () => true,
-        'conveyor': (n) => !!(n.config?.conveyorSpeed && n.config?.conveyorLength)
+        'conveyor': (n) => !!(n.config?.conveyorSpeed && n.config?.conveyorLength),
+        'webhookResponse': () => true
     };
 
     const check = configChecks[node.type];

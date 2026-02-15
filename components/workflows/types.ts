@@ -46,7 +46,8 @@ export type NodeType =
   | 'pdfReport'
   | 'osiPi'
   | 'franmit'
-  | 'conveyor';
+  | 'conveyor'
+  | 'webhookResponse';
 
 export type NodeStatus = 'idle' | 'running' | 'completed' | 'error' | 'waiting';
 
@@ -225,6 +226,13 @@ export interface NodeConfig {
   conveyorBeltType?: string;
   conveyorMotorPower?: string;
   conveyorFrictionCoeff?: string;
+  // For Webhook Response nodes:
+  webhookResponseStatusCode?: number;
+  webhookResponseHeaders?: { key: string; value: string }[];
+  webhookResponseFields?: string[]; // field names to include from input data
+  webhookResponseMode?: 'passthrough' | 'selected' | 'template';
+  webhookResponseTemplate?: string; // JSON template with {{field}} placeholders
+
   // Alert configuration
   alerts?: {
     enabled: boolean;

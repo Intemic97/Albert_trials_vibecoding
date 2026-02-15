@@ -277,6 +277,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
     const [webhookUrl, setWebhookUrl] = useState<string>('');
     const [webhookToken, setWebhookToken] = useState<string>('');
 
+    // Webhook Response Node State
+    const [configuringWebhookResponseNodeId, setConfiguringWebhookResponseNodeId] = useState<string | null>(null);
+
     // MySQL Node State
     const [configuringMySQLNodeId, setConfiguringMySQLNodeId] = useState<string | null>(null);
     const [mysqlHost, setMysqlHost] = useState<string>('localhost');
@@ -1050,6 +1053,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         setConfiguringManualInputNodeId(null);
         setConfiguringHttpNodeId(null);
         setConfiguringWebhookNodeId(null);
+        setConfiguringWebhookResponseNodeId(null);
         setConfiguringMySQLNodeId(null);
         setConfiguringSAPNodeId(null);
         setConfiguringEmailNodeId(null);
@@ -2041,6 +2045,26 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         setWebhookUrl('');
         setWebhookToken('');
         setHttpUrl('');
+    };
+
+    // Webhook Response Node Functions
+    const openWebhookResponseConfig = (nodeId: string) => {
+        closeAllConfigs();
+        setConfiguringWebhookResponseNodeId(nodeId);
+    };
+
+    const closeWebhookResponseConfig = () => {
+        setConfiguringWebhookResponseNodeId(null);
+    };
+
+    const updateWebhookResponseConfig = (field: string, value: any) => {
+        if (!configuringWebhookResponseNodeId) return;
+        setNodes(prev => prev.map(n => {
+            if (n.id === configuringWebhookResponseNodeId) {
+                return { ...n, config: { ...n.config, [field]: value } };
+            }
+            return n;
+        }));
     };
 
     const openMySQLConfig = (nodeId: string) => {
@@ -5338,6 +5362,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                 return !!node.config?.httpUrl;
             case 'webhook':
                 return true; // Webhooks siempre están configurados
+            case 'webhookResponse':
+                return true; // Webhook Response siempre configurado
             case 'mysql':
                 return !!node.config?.mysqlQuery;
             case 'sapFetch':
@@ -5464,6 +5490,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
             case 'sendWhatsApp': return 'text-green-600';
             case 'dataVisualization': return 'text-indigo-600';
             case 'webhook': return 'text-cyan-600';
+            case 'webhookResponse': return 'text-orange-600';
             case 'agent': return 'text-purple-600';
             case 'opcua': return 'text-indigo-600';
             case 'mqtt': return 'text-cyan-600';
@@ -5830,7 +5857,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                             'Control Flow': { icon: AlertCircle, items: DRAGGABLE_ITEMS.filter(i => ['condition', 'humanApproval', 'alertAgent', 'dataVisualization'].includes(i.type)) },
                                             'Models': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['llm', 'statisticalAnalysis', 'franmit', 'conveyor'].includes(i.type)) },
                                             'Code': { icon: Code, items: DRAGGABLE_ITEMS.filter(i => ['python'].includes(i.type)) },
-                                            'Output & Logging': { icon: LogOut, items: DRAGGABLE_ITEMS.filter(i => ['output', 'saveRecords'].includes(i.type)) },
+                                            'Output & Logging': { icon: LogOut, items: DRAGGABLE_ITEMS.filter(i => ['output', 'webhookResponse', 'saveRecords'].includes(i.type)) },
                                             'Notifications': { icon: Mail, items: DRAGGABLE_ITEMS.filter(i => ['sendEmail', 'sendSMS', 'sendWhatsApp', 'pdfReport'].includes(i.type)) },
                                             'Utils': { icon: Wrench, items: DRAGGABLE_ITEMS.filter(i => ['comment'].includes(i.type)) },
                                         };
@@ -6436,6 +6463,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                 openHttpConfig(node.id);
                                             } else if (node.type === 'webhook') {
                                                 openWebhookConfig(node.id);
+                                            } else if (node.type === 'webhookResponse') {
+                                                openWebhookResponseConfig(node.id);
                                             } else if (node.type === 'mysql') {
                                                 openMySQLConfig(node.id);
                                             } else if (node.type === 'sapFetch') {
@@ -6641,6 +6670,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                                     openHttpConfig(node.id);
                                                                 } else if (node.type === 'webhook') {
                                                                     openWebhookConfig(node.id);
+                                                                } else if (node.type === 'webhookResponse') {
+                                                                    openWebhookResponseConfig(node.id);
                                                                 } else if (node.type === 'mysql') {
                                                                     openMySQLConfig(node.id);
                                                                 } else if (node.type === 'sapFetch') {
@@ -7588,6 +7619,207 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                 </div>
                             </NodeConfigSidePanel>
                         )}
+
+                        {/* Webhook Response Configuration Modal */}
+                        {configuringWebhookResponseNodeId && (() => {
+                            const wrNode = nodes.find(n => n.id === configuringWebhookResponseNodeId);
+                            const responseMode = wrNode?.config?.webhookResponseMode || 'passthrough';
+                            const statusCode = wrNode?.config?.webhookResponseStatusCode || 200;
+                            const selectedFields = wrNode?.config?.webhookResponseFields || [];
+                            const responseTemplate = wrNode?.config?.webhookResponseTemplate || '{\n  "result": "{{response}}",\n  "status": "ok"\n}';
+                            const responseHeaders = wrNode?.config?.webhookResponseHeaders || [];
+
+                            return (
+                            <NodeConfigSidePanel
+                                isOpen={!!configuringWebhookResponseNodeId}
+                                onClose={closeWebhookResponseConfig}
+                                title="Webhook Response"
+                                icon={ArrowRight}
+                                footer={
+                                    <button
+                                        onClick={closeWebhookResponseConfig}
+                                        className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                    >
+                                        Done
+                                    </button>
+                                }
+                            >
+                                <div className="space-y-5">
+                                    {/* Status Code */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                            HTTP Status Code
+                                        </label>
+                                        <select
+                                            value={statusCode}
+                                            onChange={(e) => updateWebhookResponseConfig('webhookResponseStatusCode', parseInt(e.target.value))}
+                                            className="w-full px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)]"
+                                        >
+                                            <option value={200}>200 - OK</option>
+                                            <option value={201}>201 - Created</option>
+                                            <option value={202}>202 - Accepted</option>
+                                            <option value={204}>204 - No Content</option>
+                                            <option value={400}>400 - Bad Request</option>
+                                            <option value={404}>404 - Not Found</option>
+                                            <option value={500}>500 - Server Error</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Response Mode */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                            Response Mode
+                                        </label>
+                                        <div className="space-y-2">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name="responseMode"
+                                                    value="passthrough"
+                                                    checked={responseMode === 'passthrough'}
+                                                    onChange={() => updateWebhookResponseConfig('webhookResponseMode', 'passthrough')}
+                                                    className="text-orange-600"
+                                                />
+                                                <div>
+                                                    <span className="text-xs font-medium text-[var(--text-primary)]">Pass-through</span>
+                                                    <p className="text-[10px] text-[var(--text-secondary)]">Return all input data as-is</p>
+                                                </div>
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name="responseMode"
+                                                    value="selected"
+                                                    checked={responseMode === 'selected'}
+                                                    onChange={() => updateWebhookResponseConfig('webhookResponseMode', 'selected')}
+                                                    className="text-orange-600"
+                                                />
+                                                <div>
+                                                    <span className="text-xs font-medium text-[var(--text-primary)]">Selected Fields</span>
+                                                    <p className="text-[10px] text-[var(--text-secondary)]">Choose which fields to include</p>
+                                                </div>
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name="responseMode"
+                                                    value="template"
+                                                    checked={responseMode === 'template'}
+                                                    onChange={() => updateWebhookResponseConfig('webhookResponseMode', 'template')}
+                                                    className="text-orange-600"
+                                                />
+                                                <div>
+                                                    <span className="text-xs font-medium text-[var(--text-primary)]">JSON Template</span>
+                                                    <p className="text-[10px] text-[var(--text-secondary)]">Define a custom JSON response with placeholders</p>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {/* Selected Fields (when mode = selected) */}
+                                    {responseMode === 'selected' && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                Fields to include (comma-separated)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={selectedFields.join(', ')}
+                                                onChange={(e) => {
+                                                    const fields = e.target.value.split(',').map(f => f.trim()).filter(Boolean);
+                                                    updateWebhookResponseConfig('webhookResponseFields', fields);
+                                                }}
+                                                placeholder="field1, field2, response"
+                                                className="w-full px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] font-mono"
+                                            />
+                                            <p className="text-[10px] text-[var(--text-secondary)] mt-1">
+                                                Only these fields from the input data will be returned
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Template (when mode = template) */}
+                                    {responseMode === 'template' && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                                JSON Response Template
+                                            </label>
+                                            <textarea
+                                                value={responseTemplate}
+                                                onChange={(e) => updateWebhookResponseConfig('webhookResponseTemplate', e.target.value)}
+                                                placeholder={'{\n  "result": "{{response}}",\n  "data": {{inputData}}\n}'}
+                                                rows={8}
+                                                className="w-full px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] font-mono resize-y"
+                                            />
+                                            <p className="text-[10px] text-[var(--text-secondary)] mt-1">
+                                                {'Use {{fieldName}} to insert values from input data'}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Custom Response Headers */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                                            Custom Response Headers
+                                        </label>
+                                        {responseHeaders.map((header: { key: string; value: string }, idx: number) => (
+                                            <div key={idx} className="flex gap-2 mb-2">
+                                                <input
+                                                    type="text"
+                                                    value={header.key}
+                                                    onChange={(e) => {
+                                                        const updated = [...responseHeaders];
+                                                        updated[idx] = { ...updated[idx], key: e.target.value };
+                                                        updateWebhookResponseConfig('webhookResponseHeaders', updated);
+                                                    }}
+                                                    placeholder="Header-Name"
+                                                    className="flex-1 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] font-mono"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={header.value}
+                                                    onChange={(e) => {
+                                                        const updated = [...responseHeaders];
+                                                        updated[idx] = { ...updated[idx], value: e.target.value };
+                                                        updateWebhookResponseConfig('webhookResponseHeaders', updated);
+                                                    }}
+                                                    placeholder="value"
+                                                    className="flex-1 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] font-mono"
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        const updated = responseHeaders.filter((_: any, i: number) => i !== idx);
+                                                        updateWebhookResponseConfig('webhookResponseHeaders', updated);
+                                                    }}
+                                                    className="px-2 py-1 text-red-500 hover:bg-red-50 rounded text-xs"
+                                                >
+                                                    x
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <button
+                                            onClick={() => {
+                                                updateWebhookResponseConfig('webhookResponseHeaders', [...responseHeaders, { key: '', value: '' }]);
+                                            }}
+                                            className="text-xs text-orange-600 hover:text-orange-700 font-medium"
+                                        >
+                                            + Add Header
+                                        </button>
+                                    </div>
+
+                                    {/* Info box */}
+                                    <div className="text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg p-3">
+                                        <p className="font-medium text-[var(--text-primary)] mb-1">How it works:</p>
+                                        <ol className="list-decimal list-inside space-y-1 text-[var(--text-primary)]">
+                                            <li>Place this node at the end of a webhook-triggered workflow</li>
+                                            <li>The data flowing into this node will be returned as the HTTP response</li>
+                                            <li>The external system that called the webhook receives the processed data</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </NodeConfigSidePanel>
+                            );
+                        })()}
 
                         {/* MySQL Configuration Modal */}
                         {configuringMySQLNodeId && (
