@@ -13,7 +13,9 @@ API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", 8000))
 
 # Database Configuration
-DATABASE_PATH = os.getenv("DATABASE_PATH", "../database.sqlite")
+# Default: ../../database.sqlite (root of project, same DB as Node.js backend)
+# In production, set DATABASE_PATH env var to absolute path
+DATABASE_PATH = os.getenv("DATABASE_PATH", "../../database.sqlite")
 
 # Prefect Configuration
 PREFECT_API_URL = os.getenv("PREFECT_API_URL", "http://127.0.0.1:4200/api")

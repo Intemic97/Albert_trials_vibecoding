@@ -784,7 +784,9 @@ async def handle_fetch_data(node: Dict, input_data: Optional[Dict] = None, execu
     if not entity_id:
         raise ValueError("No entity configured for fetchData node")
     
-    db_path = execution_context.get("db_path", "../database.sqlite") if execution_context else "../database.sqlite"
+    import config as cfg
+    default_db = cfg.DATABASE_PATH
+    db_path = execution_context.get("db_path", default_db) if execution_context else default_db
     
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
@@ -915,7 +917,9 @@ async def handle_save_records(node: Dict, input_data: Optional[Dict] = None, exe
     table_name = config_data.get("tableName") or config_data.get("entityName", "saved_records")
     mode = config_data.get("saveMode", "insert")
     
-    db_path = execution_context.get("db_path", "../database.sqlite") if execution_context else "../database.sqlite"
+    import config as cfg
+    default_db = cfg.DATABASE_PATH
+    db_path = execution_context.get("db_path", default_db) if execution_context else default_db
     
     records = input_data if isinstance(input_data, list) else [input_data] if input_data else []
     saved_ids = []
